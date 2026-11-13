@@ -1,0 +1,37 @@
+---
+// the top bar, as on the design system's site: the lockup, the sections of the area
+// being read (docs or spec), then search and the repository. below 72rem the
+// sections move into the menu (see Sidebar.astro).
+import Search from 'virtual:starlight/components/Search';
+import SiteTitle from 'virtual:starlight/components/SiteTitle';
+import { BASE, GITHUB } from '../../site.mjs';
+
+const area = Astro.url.pathname.slice(BASE.length).startsWith('/spec/') ? '/spec/' : '/docs/';
+// a section's address comes with or without the site's base, by how the page is served:
+// take it off to tell the area, and put it on for the link.
+const bare = (link: string) => (link.startsWith(BASE + '/') ? link.slice(BASE.length) : link);
+const topics = Astro.locals.starlightSidebarTopics.topics
+	.map((topic) => ({ ...topic, link: bare(topic.link) }))
+	.filter((topic) => topic.link.startsWith(area));
+---
+
+<div class="aw-header">
+	<SiteTitle />
+	<nav class="aw-sections" aria-label="sections">
+		<ul>
+			{
+				topics.map((topic) => (
+					<li>
+						<a class="aw-toplink" href={BASE + topic.link} aria-current={topic.isCurrent ? 'true' : undefined}>
+							{topic.label}
+						</a>
+					</li>
+				))
+			}
+		</ul>
+	</nav>
+	<div class="aw-aside print:hidden">
+		<Search />
+		<a class="aw-toplink aw-github" href={GITHUB}>github</a>
+	</div>
+</div>

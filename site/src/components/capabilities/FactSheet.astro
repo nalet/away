@@ -1,0 +1,89 @@
+---
+// one capability's fact sheet: where it stands for each kind of connection or for Away
+// itself, its note, the expectations that name it, and the rest of its area. the page
+// /spec/capabilities/<part>/<key>/ is this; the map shows the same element beside its
+// tiles, fetched from that page, so there is one fact sheet, not two.
+import { load, STATUS, WHO, EXPECTED, partLink, expectationsLink } from '../../lib/model.mjs';
+import { BASE } from '../../../site.mjs';
+
+interface Props {
+	cap: any;
+}
+const { cap } = Astro.props;
+const m = load();
+const area = m.areaByKey.get(cap.area);
+const part = m.partByKey.get(cap.part);
+const goal = m.goalByKey.get(area.goal);
+const listed = (xs: string[]) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs.at(-1));
+const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1) + '.';
+
+const where = m.where.map((w: any) => ({ ...w, status: cap.status[w.key] }));
+const stands = where.filter((w: any) => w.status !== '—');
+// a capability about a session: the protocols it does not apply to are worth a word
+const notMeant = stands.some((w: any) => w.session) ? where.filter((w: any) => w.session && w.status === '—') : [];
+const expected = cap.expected.map((k: string) => m.expectationByKey.get(k)).filter(Boolean);
+const siblings = m.capabilities.filter((c: any) => c.area === cap.area);
+---
+
+<div class="capsheet" data-factsheet data-key={cap.key}>
+	<p class="capsheet-trail not-content">
+		<a href={`${BASE}/spec/capabilities/map/?focus=${cap.key}`}>capability map</a>
+		<span aria-hidden="true">/</span>
+		<a href={partLink(m, cap.part)}>{part.label}</a>
+		<span aria-hidden="true">/</span>
+		<a href={partLink(m, cap.part, area.area)}>{area.area}</a>
+	</p>
+	<p class="capsheet-meta not-content">
+		<code>{cap.key}</code>
+		<span>{WHO[cap.who]}</span>
+		<span>
+			for the goal <a href={goal.url}>{goal.goal}</a>
+		</span>
+	</p>
+
+	<ul class="capsheet-faces not-content" aria-label="where it stands">
+		{
+			stands.map((w: any) => (
+				<li data-tone={STATUS[w.status].tone}>
+					<span class="capsheet-face">{w.session ? `a session over ${w.label}` : 'Away itself'}</span>
+					<span class="capsheet-status">{STATUS[w.status].name}</span>
+				</li>
+			))
+		}
+	</ul>
+	{notMeant.length > 0 && <p class="capsheet-quiet">Does not apply to a session over {listed(notMeant.map((w: any) => w.label))}.</p>}
+	{cap.note && <p class="capsheet-note">{sentence(cap.note)}</p>}
+
+	<h2 id="expected">Expected</h2>
+	{
+		expected.length > 0 ? (
+			<ul class="capsheet-expected">
+				{expected.map((e: any) => (
+					<li>
+						<a href={expectationsLink(m, e.goal)}>{e.expectation}</a>
+						<span class="capsheet-chip" data-tone={EXPECTED[e.state] ?? 'neutral'}>
+							{e.state}
+						</span>
+					</li>
+				))}
+			</ul>
+		) : (
+			<p>No expectation names it.</p>
+		)
+	}
+
+	<h2 id="area">{area.area}</h2>
+	<p class="capsheet-quiet">{area.intro}</p>
+	<ul class="capsheet-siblings">
+		{
+			siblings.map((c: any) => (
+				<li>
+					<a href={c.url} data-key={c.key} aria-current={c.key === cap.key ? 'page' : undefined}>
+						{c.capability}
+					</a>
+					<span>{STATUS[c.state].name}</span>
+				</li>
+			))
+		}
+	</ul>
+</div>

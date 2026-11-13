@@ -1,0 +1,20 @@
+key,part,goal,area,intro
+open,session,work,Opening a machine,"Getting a machine's desktop, one of its programs or its shell on the screen, and coming back to it."
+picture,session,work,The picture,"How the machine's screen reaches one's own: its size, its sharpness, how smoothly it moves, several screens."
+input,session,work,Keyboard and pointer,"Typing, shortcuts, the mouse and the trackpad, as they arrive on the machine."
+exchange,session,work,"Clipboard, files and printing",What passes between one's own device and the machine.
+sound,session,work,Sound and devices,"Hearing the machine, and what of one's own device the machine may use."
+shell,session,work,The shell,"What a shell needs that a picture does not: text, colours, its size, what scrolled by."
+touch,session,work,On a phone or a tablet,"Working without a keyboard and a mouse: touch, the keys a phone lacks, a small screen."
+signin,app,get-in,Signing in,"Signing in to Away once, and from there on each machine."
+frame,app,work,The frame,"What is around every page: the rail, the top bar, the search, and the bar of a session."
+find,app,machines,Finding a machine,"The machines a person may reach: the list, its groups, the search, what was used last."
+together,app,together,Working together,Two or more people in one session.
+own,app,work,One's own settings,What a person sets for themselves.
+register,admin,machines,The register of machines,"Which machines there are, how each is reached and how people are signed in on it."
+rules,admin,access,Who reaches what,"The rules: which people reach which machines, and what they may do there."
+live,admin,access,Sessions as they run,"Who is connected right now, and ending what should not be."
+records,admin,record,What happened,"The records of every connection and change, and the recordings of sessions."
+install,platform,run,Installing and configuring,"Away as an operator installs it: where it runs, the identity provider, addresses, certificates, what signing in on machines needs."
+operate,platform,run,Running it,"Keeping it running: updates, health, measures, backups, more than one instance."
+check,platform,trust,Checking it,What anyone can do to see that Away is what it says.

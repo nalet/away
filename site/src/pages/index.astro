@@ -1,0 +1,194 @@
+---
+// the product page. what it says of Away is what the model says: the goals, and where
+// the capabilities and the expectations stand, are read from it as the site is built.
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/jetbrains-mono/600.css';
+import '@fontsource/jetbrains-mono/700.css';
+import '@fontsource/jetbrains-mono/800.css';
+import '../styles/nalet.css';
+import '../styles/site.css';
+import { load, STATUS } from '../lib/model.mjs';
+import { BASE, GITHUB, ORIGIN } from '../../site.mjs';
+
+const m = load();
+const kinds = m.goalKinds.map((k: any) => ({ ...k, goals: m.goals.filter((g: any) => g.kind === k.key) }));
+const caps = ['built', 'partial', 'v1', 'later', 'no']
+	.map((s) => ({ name: STATUS[s].name, n: m.capabilities.filter((c: any) => c.state === s).length }))
+	.filter((x) => x.n);
+const expected = (m.expectStates as string[]).map((s) => ({ name: s, n: m.expectations.filter((e: any) => e.state === s).length })).filter((x) => x.n);
+const spec = `${BASE}/spec`;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Away</title>
+		<meta
+			name="description"
+			content="Away: remote access in a browser, signed in once. It is being specified in the open; nothing is built yet."
+		/>
+		<meta name="color-scheme" content="dark" />
+		<meta name="theme-color" content="#0B0F19" />
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content="Away" />
+		<meta property="og:description" content="Remote access in a browser, signed in once. Being specified in the open." />
+		<meta property="og:url" content={`${ORIGIN}${BASE}/`} />
+		<link rel="icon" href={`${BASE}/favicon.svg`} type="image/svg+xml" />
+	</head>
+	<body>
+		<a class="skip" href="#for">skip to what it is for</a>
+
+		<header class="site-head">
+			<div class="wrap head-inner">
+				<a class="brand" href={`${BASE}/`} aria-label="Away, home">
+					<svg class="lockup" viewBox="0 0 116 40" role="img" aria-label="Away">
+						<path d="M6 9 L17 20 L6 31" fill="none" stroke="#58A6FF" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"></path>
+						<text x="28" y="28" font-family="'JetBrains Mono', ui-monospace, monospace" font-weight="700" font-size="22" fill="#C9D1D9" letter-spacing="0.5">away</text>
+						<rect x="96" y="11" width="9" height="19" fill="#58A6FF">
+							<animate attributeName="opacity" values="1;1;0;0" keyTimes="0;.5;.5;1" dur="1.05s" repeatCount="indefinite"></animate>
+						</rect>
+					</svg>
+				</a>
+				<nav class="head-nav" aria-label="primary">
+					<a href="#for">what it is for</a>
+					<a href={`${spec}/`}>spec</a>
+					<a href={`${BASE}/docs/`}>docs</a>
+					<a href={GITHUB}>github</a>
+				</nav>
+			</div>
+		</header>
+
+		<main>
+			<section class="hero">
+				<div class="wrap hero-inner">
+					<p class="eyebrow">
+						<span class="chev">&gt;</span> remote access in a browser <span class="nc-badge nc-badge--blue">being specified</span>
+					</p>
+					<h1 class="hero-title">your machines.<br />one sign-in.</h1>
+					<p class="lede">
+						Away is being specified. A browser on one side; a Windows desktop or one of its programs, a Mac or a Linux
+						desktop, or a shell on the other; and no second password in between. Nothing is built yet: what it is for and
+						what it has to do are written down, and open to review.
+					</p>
+					<div class="cta-row">
+						<a class="nc-btn nc-btn--primary nc-btn--lg" href={`${spec}/goals/map/`}>the goal map</a>
+						<a class="nc-btn nc-btn--default nc-btn--lg" href={`${spec}/capabilities/map/`}>the capability map</a>
+					</div>
+				</div>
+			</section>
+
+			<section class="band">
+				<div class="wrap band-inner">
+					<h2 class="band-title"><span class="chev">&gt;</span> goals first, then code</h2>
+					<p class="band-body">
+						Away starts from what it is for. {m.goals.length} goals say what people want of it, what that takes, and what
+						being open adds. {m.expectations.length} expectations say what people look for in remote access they run
+						themselves. {m.capabilities.length} capabilities say what Away does about it, and when. What is built follows
+						from that model, once it is reviewed.
+					</p>
+				</div>
+			</section>
+
+			<section id="for" class="section">
+				<div class="wrap">
+					<h2 class="sec-title"><span class="chev">&gt;</span> what it is for</h2>
+					<p class="sec-lede">
+						Every capability is there because one of these goals needs it. The{' '}
+						<a href={`${spec}/goals/map/`}>goal map</a> shows how they hang together.
+					</p>
+					{
+						kinds.map((k: any) => (
+							<>
+								<h3 class="kind">{k.label}</h3>
+								<div class="grid">
+									{k.goals.map((g: any) => (
+										<article class="feat">
+											<h3>
+												<a href={g.url}>{g.goal}</a>
+											</h3>
+											<p>{g.why}</p>
+										</article>
+									))}
+								</div>
+							</>
+						))
+					}
+				</div>
+			</section>
+
+			<section id="stands" class="section">
+				<div class="wrap">
+					<h2 class="sec-title"><span class="chev">&gt;</span> where it stands</h2>
+					<p class="sec-lede">
+						Nothing is built, so the model says what is planned: for the first release, for later, or not at all. Each
+						number is counted from the model as this page is built.
+					</p>
+					<p class="stat-of">{m.capabilities.length} capabilities</p>
+					<div class="stats">
+						{
+							caps.map((x) => (
+								<div class="stat">
+									<span class="stat-n">{x.n}</span>
+									<span class="stat-is">{x.name}</span>
+								</div>
+							))
+						}
+					</div>
+					<p class="stat-of">{m.expectations.length} expectations</p>
+					<div class="stats">
+						{
+							expected.map((x) => (
+								<div class="stat">
+									<span class="stat-n">{x.n}</span>
+									<span class="stat-is">{x.name}</span>
+								</div>
+							))
+						}
+					</div>
+					<div class="doc-links">
+						<a class="nc-btn nc-btn--default" href={`${spec}/capabilities/map/`}>the capability map</a>
+						<a class="nc-btn nc-btn--default" href={`${spec}/capabilities/expectations/`}>expectations</a>
+						<a class="nc-btn nc-btn--default" href={`${spec}/capabilities/left-out/`}>what is left out</a>
+					</div>
+				</div>
+			</section>
+
+			<section class="band">
+				<div class="wrap band-inner">
+					<h2 class="band-title"><span class="chev">&gt;</span> written by hand, counted by a program</h2>
+					<p class="band-body">
+						The specification is a model: tables anyone can read and change, and pages whose numbers are computed from
+						them. To move a capability into the first release, or to leave it out, change one cell.
+					</p>
+					<div class="doc-links">
+						<a class="nc-btn nc-btn--default" href={`${spec}/`}>the specification</a>
+						<a class="nc-btn nc-btn--default" href={`${BASE}/docs/model/`}>changing the model</a>
+						<a class="nc-btn nc-btn--default" href={GITHUB}>the repository</a>
+					</div>
+				</div>
+			</section>
+		</main>
+
+		<footer class="site-foot">
+			<div class="wrap foot-inner">
+				<div class="foot-brand">
+					<span class="chev">&gt;</span><span class="foot-word">away</span>
+					<span class="foot-tag">· remote access in a browser</span>
+				</div>
+				<nav class="foot-nav" aria-label="footer">
+					<a href={GITHUB}>github</a>
+					<a href={`${spec}/`}>spec</a>
+					<a href={`${BASE}/docs/`}>docs</a>
+				</nav>
+				<p class="foot-fine">mpl-2.0 · being specified · nothing is built yet</p>
+			</div>
+		</footer>
+	</body>
+</html>

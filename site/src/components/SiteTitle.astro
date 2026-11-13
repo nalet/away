@@ -1,0 +1,19 @@
+---
+// the lockup goes home, to the product page at /. "docs" and "spec" go to the two
+// areas: the documentation and the specification; the one being read is marked.
+// inline, so the lockup's word is set in the page's own JetBrains Mono.
+import { BASE } from '../../site.mjs';
+
+const area = Astro.url.pathname.slice(BASE.length).startsWith('/spec/') ? 'spec' : 'docs';
+---
+
+<span class="aw-title">
+	<a class="aw-home" href={`${BASE}/`} aria-label="Away, home">
+		<svg class="aw-lockup" viewBox="0 0 90 40" aria-hidden="true">
+			<path d="M6 9 L17 20 L6 31"></path>
+			<text x="28" y="28">away</text>
+		</svg>
+	</a>
+	<a class="aw-docs" href={`${BASE}/docs/`} aria-current={area === 'docs' ? 'true' : undefined}>docs</a>
+	<a class="aw-docs aw-spec" href={`${BASE}/spec/`} aria-current={area === 'spec' ? 'true' : undefined}>spec</a>
+</span>

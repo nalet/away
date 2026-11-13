@@ -1,0 +1,9 @@
+key,goal,kind,needs,why
+work,Work on a machine that is somewhere else,use,machines ; access ; run,"A person opens a desktop, a single program or a shell of a machine that is somewhere else, in a browser, and works there as if sitting at it."
+get-in,Get in without another password,use,machines ; access ; run ; record,"A person signs in once, where the organisation already signs in, and is then signed in on the machine too, from any device."
+together,Look at a machine together,use,machines ; access ; run,"Two people look at the same session from wherever each is: one shows, helps or takes over."
+machines,Know the machines,enable,run,"To open a machine, Away has to know it: what it is, where it is, how it is reached and signed in to, whether it is on."
+access,Decide who reaches what,enable,run,"An organisation is many people and many machines: each person sees and reaches only what they may, and does there only what they may."
+record,Know what happened,enable,run,"Whoever answers for the machines can say afterwards who was on which one, when, as whom, and what was done there."
+run,Run it oneself,enable,trust,"Somebody runs it: installs it, makes it reachable, keeps it up to date, and learns when it fails."
+trust,Trust it,open,,"It opens the door to every machine it knows, so anyone can see what it does, check it, change it, and count on it staying open."

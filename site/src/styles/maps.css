@@ -1,0 +1,818 @@
+/* the maps and the fact sheets (src/pages/spec/), in the design system's tokens. a tone
+ * is one of its states: a tile, the legend's swatch and a fact sheet's cell read the same
+ * three values, so a colour means the same thing everywhere. */
+
+[data-tone='success'] {
+  --tone-bg: var(--state-success-bg);
+  --tone-line: var(--state-success-border);
+  --tone-mark: var(--state-success);
+}
+[data-tone='warning'] {
+  --tone-bg: var(--state-warning-bg);
+  --tone-line: var(--state-warning-border);
+  --tone-mark: var(--state-warning);
+}
+[data-tone='error'] {
+  --tone-bg: var(--state-error-bg);
+  --tone-line: var(--state-error-border);
+  --tone-mark: var(--state-error);
+}
+[data-tone='info'] {
+  --tone-bg: var(--state-information-bg);
+  --tone-line: var(--state-information-border);
+  --tone-mark: var(--state-information);
+}
+[data-tone='info-strong'] {
+  --tone-bg: color-mix(in srgb, var(--state-information-border) 55%, var(--bg));
+  --tone-line: var(--state-information);
+  --tone-mark: var(--fg);
+}
+[data-tone='neutral'] {
+  --tone-bg: var(--surface);
+  --tone-line: var(--border-2);
+  --tone-mark: var(--fg-dim);
+}
+[data-tone='none'] {
+  --tone-bg: transparent;
+  --tone-line: var(--border-2);
+  --tone-mark: var(--fg-dim);
+}
+/* left out on purpose: hollow, with a line of its own, so that it reads as a gap someone
+ * decided on and not as a fault */
+[data-tone='out'] {
+  --tone-bg: transparent;
+  --tone-line: var(--state-error-border);
+  --tone-mark: var(--state-error);
+}
+/* in the first release in part: the first release's colour, hollow */
+[data-tone='info-part'] {
+  --tone-bg: transparent;
+  --tone-line: var(--state-information-border);
+  --tone-mark: var(--state-information);
+}
+
+/* ---- the map's bar: what the tiles are coloured by, for which kind of connection, for whom ---- */
+
+.capmap-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s-3) var(--s-5);
+  margin-top: var(--s-5);
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+}
+
+.capmap-seg {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.capmap-seg legend,
+.capmap-face > span,
+.capmap-find > span {
+  display: block;
+  margin-bottom: 6px;
+  padding: 0;
+  font: 600 11px/1 var(--ff-mono);
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+}
+
+.capmap-opts {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.capmap-opts label {
+  position: relative;
+  margin: 0 -1px -1px 0;
+}
+
+.capmap-opts input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.capmap-opts span {
+  display: block;
+  padding: 6px 10px;
+  border: 1px solid var(--border-2);
+  background: var(--surface);
+  color: var(--fg-muted);
+  font: 500 12px/1.2 var(--ff-mono);
+}
+
+.capmap-opts input:hover + span {
+  color: var(--fg);
+}
+
+.capmap-opts input:checked + span {
+  position: relative;
+  z-index: 1;
+  border-color: var(--cloud-blue);
+  background: var(--surface-selected);
+  color: var(--fg);
+}
+
+.capmap-opts input:focus-visible + span {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  z-index: 2;
+}
+
+.capmap-face select,
+.capmap-find input {
+  padding: 6px 8px;
+  border: 1px solid var(--border-control);
+  background: var(--surface);
+  color: var(--fg);
+  font: 500 12px/1.2 var(--ff-mono);
+}
+
+.capmap-find {
+  flex: 1 1 14rem;
+}
+
+.capmap-find input {
+  width: 100%;
+}
+
+.capmap:not([data-lens='stands']) .capmap-face {
+  display: none;
+}
+
+/* ---- the legend, which is also a filter ------------------------------------------- */
+
+.capmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-4);
+  margin-top: var(--s-3) !important;
+}
+
+.capmap-shown {
+  margin: 0 !important;
+  font: 500 12px/1.4 var(--ff-mono);
+  color: var(--fg-muted);
+}
+
+.capmap-shown b {
+  color: var(--fg);
+}
+
+.capmap-legend ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 !important;
+  padding: 0;
+  list-style: none;
+}
+
+.capmap-legend ul[hidden] {
+  display: none;
+}
+
+.capmap-legend button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-2);
+  font: 500 12px/1.2 var(--ff-mono);
+  cursor: pointer;
+}
+
+.capmap-legend button:hover {
+  border-color: var(--border-control);
+}
+
+.capmap-legend button[aria-pressed='true'] {
+  border-color: var(--cloud-blue);
+  background: var(--surface-selected);
+  color: var(--fg);
+}
+
+.capmap-legend button b {
+  color: var(--fg);
+}
+
+.capmap-swatch {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--tone-line);
+  background: var(--tone-bg);
+  box-shadow: inset 3px 0 0 var(--tone-mark);
+}
+
+[data-tone='none'] > .capmap-swatch {
+  border-style: dashed;
+  box-shadow: none;
+}
+
+[data-tone='out'] > .capmap-swatch {
+  border-style: dashed;
+  box-shadow: none;
+}
+
+/* ---- lanes, clusters, tiles ------------------------------------------------------- */
+
+.capmap-lane {
+  margin-top: var(--s-6);
+}
+
+.capmap-lane-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-4);
+  margin-bottom: var(--s-4);
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--border-2);
+}
+
+.capmap-lane-head h2 {
+  margin: 0;
+  color: var(--fg);
+  font: 600 20px/1.2 var(--ff-mono);
+}
+
+.capmap-lane-head span {
+  color: var(--fg-dim);
+  font: 500 12px/1.4 var(--ff-mono);
+}
+
+.capmap-aslist {
+  margin-left: auto;
+  color: var(--cloud-blue);
+  font: 500 12px/1.4 var(--ff-mono);
+}
+
+.capmap-clusters {
+  columns: 21rem auto;
+  column-gap: var(--s-4);
+}
+
+.capmap-cluster {
+  break-inside: avoid;
+  margin: 0 0 var(--s-4);
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  transition: opacity 120ms;
+}
+
+.capmap-cluster[data-dim] {
+  opacity: 0.45;
+}
+
+.capmap-cluster header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--s-2);
+  margin-bottom: var(--s-2);
+}
+
+.capmap-cluster h3 {
+  margin: 0 auto 0 0;
+  font: 600 14px/1.3 var(--ff-mono);
+}
+
+.capmap-area {
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.capmap-area:hover {
+  color: var(--cloud-blue);
+}
+
+.capmap-depth {
+  padding: 2px 5px;
+  border: 1px solid var(--border-2);
+  color: var(--fg-dim);
+  font: 500 11px/1.2 var(--ff-mono);
+}
+
+.capmap-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.25rem, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capmap-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  height: 100%;
+  min-height: 4.5rem;
+  padding: 7px 8px 6px 11px;
+  border: 1px solid var(--tone-line);
+  background: var(--tone-bg);
+  box-shadow: inset 3px 0 0 var(--tone-mark);
+  color: var(--fg);
+  text-decoration: none;
+  transition: opacity 120ms;
+}
+
+.capmap-tile[data-tone='none'] {
+  border-style: dashed;
+  box-shadow: none;
+  color: var(--fg-muted);
+}
+
+.capmap-tile[data-tone='out'] {
+  border-style: dashed;
+  box-shadow: none;
+  color: var(--fg-muted);
+}
+
+.capmap-tile:hover {
+  border-color: var(--fg-muted);
+}
+
+.capmap-tile:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.capmap-tile[data-dim] {
+  opacity: 0.18;
+}
+
+.capmap-tile[data-flash] {
+  animation: capmap-flash 1.4s ease-out 2;
+}
+
+@keyframes capmap-flash {
+  from {
+    outline: 2px solid var(--cloud-blue);
+    outline-offset: 5px;
+  }
+  to {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+}
+
+.capmap-name {
+  font: 400 12.5px/1.35 var(--ff-ui);
+}
+
+.capmap-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.capmap-lab {
+  color: var(--tone-mark);
+  font: 500 10.5px/1.2 var(--ff-mono);
+}
+
+/* while a tile shows a capability as a whole, each kind of connection it stands for as a
+ * dot in its own colour (RDP · VNC · SSH) */
+.capmap-dots {
+  display: none;
+  gap: 3px;
+}
+
+.capmap[data-lens='stands'][data-way='all'] .capmap-dots {
+  display: flex;
+}
+
+.capmap-dots i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--tone-line);
+  background: var(--tone-mark);
+}
+
+.capmap-dots i[data-tone='none'] {
+  border-style: dashed;
+  background: transparent;
+}
+
+.capmap-dots i[data-tone='out'] {
+  border-style: dashed;
+  background: transparent;
+}
+
+/* ---- the fact sheet beside the map ------------------------------------------------ */
+
+.capmap-sheet {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(46rem, 100vw);
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0 !important;
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  border-left: 1px solid var(--border-2);
+  background: var(--bg);
+  color: var(--fg-2);
+}
+
+.capmap-sheet::backdrop {
+  background: rgb(11 15 25 / 0.62);
+}
+
+.capmap-sheet-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+}
+
+.capmap-sheet-bar button,
+.capmap-sheet-page {
+  padding: 6px 10px;
+  border: 1px solid var(--border-2);
+  background: var(--surface);
+  color: var(--fg);
+  font: 500 12px/1.2 var(--ff-mono);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.capmap-sheet-bar button:hover,
+.capmap-sheet-page:hover {
+  border-color: var(--cloud-blue);
+}
+
+.capmap-sheet-at {
+  color: var(--fg-dim);
+  font: 500 12px/1.2 var(--ff-mono);
+}
+
+.capmap-sheet-page {
+  margin-left: auto;
+  color: var(--cloud-blue);
+}
+
+.sl-markdown-content .capmap-sheet-title {
+  margin: var(--s-4) var(--s-4) 0;
+  color: var(--fg);
+  font: 700 22px/1.25 var(--ff-mono);
+}
+
+.capmap-sheet-body {
+  padding: 0 var(--s-4) var(--s-7);
+}
+
+.capmap-sheet-body[aria-busy='true']::before {
+  content: 'loading …';
+  display: block;
+  margin-top: var(--s-4);
+  color: var(--fg-dim);
+  font: 500 12px/1.4 var(--ff-mono);
+}
+
+/* ---- a fact sheet ----------------------------------------------------------------- */
+
+.capsheet-trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 var(--s-2);
+  color: var(--fg-dim);
+  font: 500 12px/1.4 var(--ff-mono);
+}
+
+.capsheet-trail a {
+  color: var(--fg-muted);
+  text-decoration: none;
+}
+
+.capsheet-trail a:hover {
+  color: var(--cloud-blue);
+}
+
+.capsheet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--s-3);
+  margin: 0;
+  color: var(--fg-muted);
+  font: 500 12px/1.5 var(--ff-mono);
+}
+
+.capsheet-meta code {
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.capsheet-faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: var(--s-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capsheet-faces li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 7.5rem;
+  padding: 6px 10px 6px 12px;
+  border: 1px solid var(--tone-line);
+  background: var(--tone-bg);
+  box-shadow: inset 3px 0 0 var(--tone-mark);
+}
+
+.capsheet-face {
+  color: var(--fg-muted);
+  font: 600 11px/1.3 var(--ff-mono);
+  letter-spacing: 0.02em;
+}
+
+.capsheet-status {
+  color: var(--fg);
+  font: 500 13px/1.3 var(--ff-ui);
+}
+
+.sl-markdown-content .capsheet-quiet {
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+
+.sl-markdown-content .capsheet-note {
+  padding-inline-start: var(--s-3);
+  border-inline-start: 2px solid var(--border-2);
+}
+.capsheet-chip {
+  padding: 3px 6px;
+  border: 1px solid var(--tone-line);
+  background: var(--tone-bg);
+  color: var(--tone-mark);
+  font: 600 11px/1 var(--ff-mono);
+}
+
+.sl-markdown-content .capsheet-expected,
+.sl-markdown-content .capsheet-siblings {
+  padding-inline-start: 0;
+  list-style: none;
+}
+
+.sl-markdown-content .capsheet-expected > li,
+.sl-markdown-content .capsheet-siblings > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px var(--s-3);
+  margin: 0;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.capsheet-siblings span {
+  color: var(--fg-dim);
+  font: 500 11px/1.3 var(--ff-mono);
+}
+
+.capsheet-siblings a[aria-current='page'] {
+  color: var(--fg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* ---- the arrows of the goal map: the goals one goal needs, and the goals that need it ---- */
+
+/* the lines run under the cards */
+.goalmap-wires {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.goalmap-wires path {
+  fill: none;
+  stroke-width: 1.6;
+}
+
+.goalmap-wires path.out {
+  stroke: var(--cloud-blue);
+}
+
+.goalmap-wires path.in {
+  stroke: var(--fg-muted);
+  stroke-dasharray: 5 4;
+}
+
+#goalmap-head-out path {
+  fill: var(--cloud-blue);
+}
+
+#goalmap-head-in path {
+  fill: var(--fg-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capmap-tile,
+  .capmap-cluster {
+    transition: none;
+  }
+  .capmap-tile[data-flash] {
+    animation: none;
+    outline: 2px solid var(--cloud-blue);
+  }
+}
+
+/* ---- the goal map: a band a kind of goal, a card a goal, a tile a group of capabilities ---- */
+
+.goalmap-bands {
+  position: relative;
+}
+
+.goalmap .capmap-lane {
+  margin-top: var(--s-5);
+}
+
+.goalmap-goals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--s-4);
+}
+
+/* a goal: the capability map's cluster, as a card that grows with its row; one with
+ * many groups takes a row of its own */
+.goalmap-goal {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 17rem;
+  margin: 0;
+  scroll-margin-top: 5rem;
+  transition:
+    opacity 120ms,
+    border-color 120ms;
+}
+
+.goalmap-goal[data-wide] {
+  flex-basis: 100%;
+}
+
+.goalmap-goal h3 {
+  font-size: 15px;
+}
+
+.goalmap-why {
+  max-width: 72ch;
+  margin: 0 0 var(--s-2);
+  color: var(--fg-muted);
+  font: 400 12.5px/1.45 var(--ff-ui);
+}
+
+.goalmap-needs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  margin: 0 0 var(--s-3);
+  font: 500 11px/1.3 var(--ff-mono);
+}
+
+.goalmap-needs span {
+  color: var(--fg-dim);
+}
+
+.goalmap-needs a {
+  padding: 2px 6px;
+  border: 1px solid var(--border-2);
+  color: var(--cloud-blue);
+  text-decoration: none;
+}
+
+.goalmap-needs a:hover {
+  border-color: var(--cloud-blue);
+}
+
+.goalmap-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--s-2) var(--s-4);
+  margin: 0 0 var(--s-3);
+}
+
+.goalmap-stats div {
+  min-width: 0;
+}
+
+.goalmap-stats dt {
+  margin: 0 0 3px;
+  color: var(--fg-dim);
+  font: 500 11px/1.3 var(--ff-mono);
+}
+
+.goalmap-stats dt a {
+  color: var(--cloud-blue);
+}
+
+.goalmap-stats dd {
+  margin: 0;
+  color: var(--fg-2);
+  font: 400 12px/1.4 var(--ff-ui);
+}
+
+/* how a count is made up: a stripe a state, as wide as its share */
+.goalmap-bar {
+  display: flex;
+  gap: 1px;
+  height: 5px;
+  margin: 0 0 4px;
+}
+
+.goalmap-bar i {
+  flex: var(--n, 1) 1 0;
+  min-width: 3px;
+  background: var(--tone-mark);
+}
+
+.goalmap-tiles {
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+}
+
+.goalmap-tile {
+  gap: 5px;
+  min-height: 4.6rem;
+}
+
+.goalmap-tile .capmap-name {
+  font-weight: 500;
+}
+
+.goalmap-tile .goalmap-bar {
+  margin: auto 0 0;
+}
+
+.goalmap-empty {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px dashed var(--border-2);
+  color: var(--fg-dim);
+  font: 400 12.5px/1.4 var(--ff-ui);
+}
+
+/* pointing at a goal: it and the goals at the other end of its arrows stay, the rest
+ * step back */
+.goalmap[data-pointing] .goalmap-goal:not([data-source]):not([data-end]) {
+  opacity: 0.5;
+}
+
+.goalmap-goal[data-source],
+.goalmap-goal[data-end='out'] {
+  border-color: var(--cloud-blue);
+}
+
+.goalmap-goal[data-end='in'] {
+  border-color: var(--fg-muted);
+}
+
+.goalmap-goal[data-dim] {
+  opacity: 0.45;
+}
+
+/* what every goal of a band needs, said once beside the band's name */
+.goalmap-shared {
+  margin: 0 0 0 auto;
+}
+
+/* in a stripe, what the first release holds in part is the first release's colour, paler */
+.goalmap-bar i[data-tone='info-part'] {
+  opacity: 0.5;
+}

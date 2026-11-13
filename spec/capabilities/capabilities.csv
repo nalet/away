@@ -1,0 +1,185 @@
+key,area,capability,who,rdp,vnc,ssh,away,note
+open-desktop,open,Open a machine's desktop,person,v1,v1,—,—,
+open-program,open,"Open one program of a Windows machine, without its desktop",person,v1,—,—,—,a program the machine publishes for remote use
+switch-programs,open,"Switch between the programs open on a machine, each in a window of its own",person,v1,—,—,—,one sign-in on the machine holds them all
+open-shell,open,Open a shell on a machine,person,—,—,v1,—,
+open-several,open,Keep several machines open at once and move between them,person,v1,v1,v1,—,
+open-in-own-tab,open,Open a session in a browser tab or window of its own,person,v1,v1,v1,—,
+see-connecting-steps,open,"See how far a connection has come, and which step failed and why",person,v1,v1,v1,—,"reaching the machine, checking who it is, signing in, the first picture"
+reconnect-by-itself,open,Come back to a session by itself after the connection dropped,system,v1,v1,v1,—,
+keep-while-away,open,"Leave a session running while the browser is closed, and pick it up again",person,v1,v1,later,—,a desktop goes on running on its machine; a shell has to be held by Away
+leave-or-sign-out,open,Choose between leaving a desktop running and signing out of the machine,person,v1,—,—,—,
+start-with-command,open,Open a machine straight into a given program or command,admin,later,—,later,—,
+follow-broker,open,Reach a farm of Windows machines through its broker and land on the right one,system,later,—,—,—,
+jump-through,open,Reach a shell that is only reachable through another machine,system,—,—,later,—,
+open-other-kinds,open,"Open other kinds of target: Telnet, a serial console, a database, a web page",person,—,—,—,no,Away is for desktops and shells
+fit-to-window,picture,"Fit the machine's screen to the window, and follow when its size changes",person,v1,v1,v1,—,a Windows machine and a shell take the window's size; other desktops are scaled to it
+fill-screen,picture,Fill the whole screen with a session,person,v1,v1,v1,—,
+sharp-on-dense-screen,picture,Show a sharp picture on a high-density screen,system,v1,later,v1,—,a desktop over VNC has the size its machine gives it
+exact-at-rest,picture,"Show a screen at rest exactly, pixel for pixel",system,v1,v1,—,—,
+adapt-to-line,picture,"Give up detail while the picture moves or the line is slow, and restore it after",system,v1,v1,—,—,
+choose-sharper-or-faster,picture,Choose between a sharper and a faster picture by hand,person,later,later,—,—,
+desktop-as-at-machine,picture,"Show the desktop as it looks at the machine: its background, smooth fonts, its effects",system,v1,—,—,—,
+pointer-without-delay,picture,"Draw the pointer on one's own device, so that it moves without delay",system,v1,v1,—,—,
+play-video-smoothly,picture,Play a video on the machine smoothly,system,later,no,—,—,the browser plays the machine's own video stream; VNC has none
+several-screens,picture,Spread a machine over several of one's own screens,person,later,no,—,—,VNC shows the machine's own screens as they are
+choose-machine-screen,picture,Choose which of a machine's screens to see,person,—,later,—,—,for a machine with several screens of its own
+type-in-own-layout,input,"Type with one's own keyboard layout, whatever the machine's is",person,v1,v1,v1,—,
+send-kept-keys,input,"Send the key combinations a browser or a device keeps for itself, from a menu",person,v1,v1,v1,—,"Ctrl+Alt+Del, Alt+Tab, the Windows key, Ctrl+W"
+give-all-keys,input,Give every key to the machine while a session fills the screen,person,v1,v1,v1,—,where the browser allows it
+map-modifier-keys,input,"Use a Mac keyboard on a Windows machine and the reverse, with the keys where the hands expect them",person,v1,v1,—,—,
+use-mouse-fully,input,"Use every mouse button and the wheel, in both directions",person,v1,v1,v1,—,"in a shell, for the programs that take the mouse"
+scroll-as-used-to,input,"Scroll with a trackpad as smoothly, as fast and in the direction one is used to",person,v1,v1,v1,—,whatever the machine's own system makes of a wheel
+type-clipboard,input,Type the clipboard's text into the machine key by key,person,later,v1,—,—,for a sign-in screen or a console that takes no clipboard
+compose-characters,input,Type in a language whose characters are composed of several keys,person,later,later,v1,—,
+hold-pointer,input,Hold the pointer inside the session for a program that needs it,person,later,later,—,—,
+copy-paste-text,exchange,Copy text on one side and paste it on the other,person,v1,v1,v1,—,
+copy-paste-rich,exchange,"Copy and paste a picture, or text with its formatting",person,later,no,—,—,VNC carries text alone
+copy-paste-files,exchange,Copy files on one side and paste them on the other,person,later,no,—,—,VNC carries text alone
+move-files,exchange,Move files between one's own device and the machine,person,later,no,later,—,a shell: in a panel beside it; a Windows machine: as a drive the machine sees; VNC moves no files
+drop-file,exchange,Drop a file onto a session to send it to the machine,person,later,no,later,—,VNC moves no files
+print-to-own-device,exchange,Print from the machine to a printer or a file of one's own,person,later,no,—,—,VNC carries no printing
+hear-sound,sound,Hear the machine's sound,person,later,no,—,—,VNC carries no sound
+use-microphone,sound,Speak to the machine through one's own microphone,person,later,no,—,—,VNC carries no sound
+use-camera,sound,Use one's own camera on the machine,person,no,no,—,—,a call is made on one's own device
+use-own-devices,sound,Use a USB device or a smart card of one's own on the machine,person,no,no,—,—,a browser hands neither to a page
+run-full-screen-programs,shell,"Run the programs that take the whole shell: editors, monitors, with colours and the mouse",system,—,—,v1,—,
+scroll-back,shell,"Scroll back through what the shell showed, and search it",person,—,—,v1,—,
+select-shell-text,shell,"Select the shell's text with the mouse or the keys, and copy it",person,—,—,v1,—,
+set-shell-look,shell,"Set the shell's text size, its font and its colours",person,—,—,v1,—,
+open-shell-link,shell,Open a web address the shell shows,person,—,—,later,—,
+split-shell,shell,"Open a further shell on the same machine, beside the first",person,—,—,later,—,
+forward-port,shell,Forward a port through the shell's connection,person,—,—,no,—,Away carries sessions and no other traffic
+use-on-phone,touch,"Find a machine and open it on a phone, with every page fitted to it",person,—,—,—,v1,
+work-by-touch,touch,"Work by touch: tap to click, hold for the other button, two fingers to scroll",person,v1,v1,v1,—,
+zoom-by-touch,touch,Zoom into the picture with two fingers and move around it,person,v1,v1,v1,—,
+use-extra-keys,touch,"Use the keys a phone's keyboard lacks: Ctrl, Alt, Esc, Tab, the arrows, the function keys",person,v1,v1,v1,—,
+touch-as-trackpad,touch,"Move the pointer as on a trackpad, for small targets",person,later,later,—,—,
+send-real-touch,touch,Send touches to the machine as touches,person,later,—,—,—,for a Windows machine's own touch gestures
+add-to-home-screen,touch,Add Away to a phone's home screen and open it like an app,person,—,—,—,later,
+sign-in,signin,Sign in through the organisation's identity provider,person,—,—,—,v1,over OpenID Connect
+sign-in-with-saml,signin,Sign in through an identity provider that speaks SAML only,person,—,—,—,no,OpenID Connect is the one way in
+stay-signed-in,signin,Stay signed in while the sign-in renews itself,system,—,—,—,v1,
+sign-out,signin,"Sign out, and end the sessions Away opened",person,—,—,—,v1,
+be-oneself-on-machine,signin,"Be signed in on the machine as oneself, with nothing asked",system,v1,no,v1,—,"a Windows machine in a domain, and a shell that trusts Away; an ordinary account is enough; VNC knows no identity"
+use-kept-secret,signin,Be signed in with a name and password or a key that Away keeps for the machine,system,v1,v1,v1,—,for a machine that knows no directory; the secret never reaches the browser
+type-credentials,signin,Type a name and a password when the machine asks for them,person,v1,v1,v1,—,
+remember-typed-credentials,signin,Have Away remember what one typed for a machine,person,later,later,later,—,
+choose-account,signin,Choose which of one's accounts to be on the machine as,person,later,—,later,—,
+reach-network-as-oneself,signin,Reach file shares and printers from the machine as oneself,system,v1,—,—,—,
+go-on-without-password,signin,Go on from the machine to a further one with nothing asked,person,no,—,no,—,the further machine is opened from Away: every connection starts there
+unlock-without-password,signin,Open a locked desktop again with nothing asked,person,v1,later,—,—,
+be-oneself-cloud-joined,signin,Be signed in as oneself on a Windows machine that is joined to a cloud directory only,system,later,—,—,—,
+check-machine-identity,signin,"Check that a machine is the one it claims to be, and refuse one that changed",system,v1,later,v1,—,
+move-between-views,frame,"Move between the machines, the open sessions and the settings",person,—,—,—,v1,"a rail of icons on a wide screen, a bar of icons on a phone"
+see-open-sessions,frame,"See the sessions that are open, and go to one",person,—,—,—,v1,
+find-from-anywhere,frame,Find a machine by its name from any page,person,—,—,—,v1,
+see-who-is-signed-in,frame,See which account is signed in,person,—,—,—,v1,
+use-session-bar,frame,"Reach a session's own controls without leaving it: keys, clipboard, files, size, ending it",person,—,—,—,v1,
+give-session-the-window,frame,Give the machine the whole window while a session is open,system,—,—,—,v1,
+use-without-mouse,frame,"Use every page around a session with the keyboard alone, and with a screen reader",person,—,—,—,v1,
+choose-language,frame,Use Away in one's own language,person,—,—,—,later,English first
+see-notices,frame,"Be told what happened meanwhile: a session ended, a request was answered",person,—,—,—,later,
+use-installed-app,frame,"Use an installed app instead of the browser, on a computer or a phone",person,—,—,—,no,the browser is the one way in
+see-machines,find,See the machines one may reach,person,—,—,—,v1,
+search-machines,find,"Find a machine by its name, its address or its group",person,—,—,—,v1,
+see-groups,find,See the machines in the groups an administrator made,person,—,—,—,v1,
+see-last-used,find,See the machines used last,person,—,—,—,v1,
+keep-favourites,find,Mark machines as favourites and see them first,person,—,—,—,v1,
+see-machine-details,find,"See what a machine is: its kind, its address, how one gets in",person,—,—,—,v1,
+see-programs,find,"See the programs a Windows machine offers, and open one",person,—,—,—,v1,
+open-by-address,find,Open a machine from a link or a bookmark,person,—,—,—,v1,
+see-machine-state,find,See whether a machine is on and can be reached,person,—,—,—,later,
+wake-machine,find,"Wake a machine that sleeps or is off, and connect once it is up",person,—,—,—,later,"needs a way into the machine's own network segment, or to its hypervisor"
+add-own-machine,find,Add a machine of one's own that nobody else sees,person,—,—,—,later,
+invite-to-session,together,Invite someone into a running session with a link,person,—,—,—,later,
+let-watch-only,together,Let someone watch without touching,person,—,—,—,later,
+hand-over-control,together,"Hand the keyboard and the mouse to someone else, and take them back",person,—,—,—,later,
+see-who-is-there,together,See who is in the session,person,—,—,—,later,
+join-to-help,together,"Join a person's session to help, once they agree",admin,—,—,—,later,
+invite-without-account,together,Invite someone who has no account,person,—,—,—,no,everyone in a session is known to the identity provider
+set-own-defaults,own,"Set how one's sessions open: their size, the picture, the keyboard layout",person,—,—,—,v1,
+set-per-machine,own,Keep one's settings for one machine apart from the rest,person,—,—,—,later,
+see-own-sessions,own,See one's own past sessions,person,—,—,—,later,
+forget-remembered,own,See and remove what Away remembers for oneself,person,—,—,—,later,
+report-problem,own,"Report a problem, with what Away knows of the session attached",person,—,—,—,later,
+keep-as-files,register,"Keep machines, groups and rules as files, applied as they change",operator,—,—,—,v1,so they can live in a repository and be reviewed like code
+add-machine-in-browser,register,"Add a machine in the browser: its address, its kind, how one gets in",admin,—,—,—,later,
+group-machines,register,Put machines in groups,admin,—,—,—,v1,
+set-sign-in-way,register,"Say for a machine how people are signed in: as themselves, with a kept secret, or by typing",admin,—,—,—,v1,
+keep-secret,register,"Keep a name and password or a key for a machine, never shown again",admin,—,—,—,v1,
+change-kept-secret,register,Change a kept password on the machine by itself from time to time,system,—,—,—,no,Away keeps the secrets it needs and manages no others
+offer-programs,register,Say which programs of a Windows machine people may open,admin,—,—,—,v1,
+read-programs-from-host,register,Read the programs a Windows machine publishes from the machine itself,system,—,—,—,later,
+set-connection-options,register,"Set how a machine is reached: its port, its screen, what may pass",admin,—,—,—,v1,
+test-machine,register,"Test a machine: is it reached, does signing in work, and if not, which step fails",admin,—,—,—,v1,
+take-from-directory,register,"Take machines over from the organisation's directory, and keep them in step",system,—,—,—,later,
+take-from-hypervisor,register,Take virtual machines over from a hypervisor,system,—,—,—,later,
+close-for-upkeep,register,"Close a machine for a while, and say why",admin,—,—,—,later,
+make-desktops,register,"Make, copy or hand out fresh desktops as people ask for them",system,—,—,—,no,Away reaches machines that exist
+install-helper-on-machine,register,Reach a machine through a helper installed on it,system,—,—,—,no,a machine is reached the way it already offers
+allow-by-group,rules,Allow a group of people to reach a machine or a group of machines,admin,—,—,—,v1,
+show-only-allowed,rules,Show a person only the machines a rule gives them,system,—,—,—,v1,
+take-people-from-provider,rules,"Take people and their groups from the identity provider, and keep none of its own",system,—,—,—,v1,
+name-roles,rules,"Say who administers Away, who reads its records, and who only connects",admin,—,—,—,v1,
+limit-clipboard,rules,"Allow or forbid the clipboard, in each direction",admin,—,—,—,v1,
+limit-files,rules,"Allow or forbid moving files, in each direction",admin,—,—,—,later,
+limit-other-channels,rules,"Allow or forbid printing, sound and the microphone",admin,—,—,—,later,
+allow-watch-only,rules,Allow looking at a machine without touching it,admin,—,—,—,later,
+end-when-idle,rules,End a session nobody has used for a set time,system,—,—,—,v1,
+limit-length,rules,"End a session after a longest time, with a warning before",system,—,—,—,later,
+limit-count,rules,Limit how many sessions a person or a machine has at once,system,—,—,—,later,
+limit-by-time,rules,Allow a machine at certain hours only,admin,—,—,—,later,
+limit-by-place,rules,Allow a machine from certain networks or kinds of device only,admin,—,—,—,later,
+ask-again-first,rules,Ask for a fresh sign-in or a second factor before a machine opens,admin,—,—,—,later,
+ask-for-access,rules,"Let a person ask for a machine, and someone allow it for a while",person,—,—,—,later,
+ask-for-reason,rules,"Ask why before a machine opens, and keep the answer",admin,—,—,—,later,
+set-account-by-rule,rules,"Say by rule which account a group is on a machine as: their own, or a shared one",admin,—,—,—,later,
+get-in-without-provider,rules,Let an administrator in while the identity provider is down,operator,—,—,—,later,
+see-live-sessions,live,See who is connected to what right now,admin,—,—,—,v1,
+end-session,live,"End a session, or all of a person's",admin,—,—,—,v1,
+end-on-lost-right,live,End a person's sessions as soon as their right or their account is gone,system,—,—,—,v1,
+watch-session,live,Watch a running session without taking part,admin,—,—,—,later,
+message-session,live,Send a message to the people in a session,admin,—,—,—,later,
+record-connections,records,"Keep a record of every connection: who, which machine, as whom, when, from where, how it ended",system,—,—,—,v1,
+record-sign-ins-made,records,Keep a record of every sign-in Away made on a machine for someone,system,—,—,—,v1,
+record-changes,records,"Keep a record of every change to machines, rules and settings",system,—,—,—,v1,
+read-records,records,Read the records and search them,admin,—,—,—,v1,
+send-records-on,records,Send every record on to the organisation's own log system as it is written,system,—,—,—,v1,as lines a log collector reads
+record-moved-content,records,Keep a record of every file moved and of what the clipboard carried,system,—,—,—,later,
+record-session,records,Record a session to play it back later,system,later,later,later,—,
+play-recording,records,"Play a recording back, at any speed and from any point",admin,later,later,later,—,
+search-recording,records,Find a moment in a recording by what was typed or shown,admin,no,no,later,—,"a shell is recorded as text, a desktop as pictures"
+tell-when-recorded,records,"Tell a person that their session is recorded, before it starts",system,—,—,—,later,
+keep-for-set-time,records,"Keep records and recordings for a set time, then remove them",system,—,—,—,later,
+show-tampering,records,Make a changed or missing record show,system,—,—,—,later,
+see-use-over-time,records,"See how Away is used over time: by whom, which machines, for how long",admin,—,—,—,later,
+install-with-chart,install,Install it on Kubernetes or OpenShift with one chart,operator,—,—,—,v1,
+run-without-special-rights,install,Run with no special rights on the cluster,system,—,—,—,v1,
+install-as-one-container,install,Run it as one container on one machine,operator,—,—,—,later,
+use-own-provider,install,"Use the identity provider that is there, over OpenID Connect",operator,—,—,—,v1,
+bring-provider-along,install,Bring an identity provider along for those who have none,operator,—,—,—,no,Away asks an identity provider and is none
+set-address,install,"Set the address it answers on, behind the reverse proxy that is there",operator,—,—,—,v1,
+use-own-certificates,install,"Use the cluster's certificates, or one's own",operator,—,—,—,v1,
+connect-domain-authority,install,"Connect a certificate authority the Windows domain trusts, for signing in on its machines",operator,—,—,—,v1,"the organisation's own, issuing on Away's request; or Away's own, made known to the domain once"
+make-shells-trust,install,"Have the shells trust Away's sign-in, with one line on each machine",operator,—,—,—,v1,
+sign-apart,install,"Run the part that signs people in on machines apart from the rest, with rights of its own",operator,—,—,—,v1,
+protect-secrets,install,"Keep what has to stay secret encrypted, with the key kept elsewhere",system,—,—,—,v1,
+check-setup,install,"Check the whole setup and say what is wrong: the provider, the authority, each kind of machine",operator,—,—,—,v1,
+reach-other-networks,install,"Reach machines in a network Away is not in, through a relay placed there",operator,—,—,—,later,
+carry-other-traffic,install,"Carry other traffic to the machines' network, as a private network would",operator,—,—,—,no,Away carries sessions and no other traffic
+update-in-one-step,operate,"Update to a new version in one step, with people told and their desktops back by themselves",operator,—,—,—,v1,
+go-back-a-version,operate,Go back to the version before,operator,—,—,—,later,
+see-health,operate,See whether Away and what it rests on are well,operator,—,—,—,v1,
+give-measures,operate,"Give the monitoring that is there its measures: sessions, sign-ins, failures, delay",system,—,—,—,v1,
+write-logs,operate,Write what happens as lines a log collector reads,system,—,—,—,v1,
+back-up,operate,Back up what Away holds and bring it back elsewhere,operator,—,—,—,later,
+run-several,operate,"Run more than one instance, so that load is shared and one may fail",operator,—,—,—,later,
+do-by-script,operate,Do by a script everything an administrator does in the browser,operator,—,—,—,later,
+collect-for-support,operate,"Collect what a helper needs to see into one file, with every secret left out",operator,—,—,—,later,
+verify-image,check,Check that an image is the one the project built,anyone,—,—,—,v1,
+see-image-contents,check,"See what an image holds: every part, its version, its licence",anyone,—,—,—,v1,
+build-from-source,check,Build it from its source with one command,anyone,—,—,—,v1,
+run-its-tests,check,"Run its tests on one's own machine, against a real server of each protocol",anyone,—,—,—,v1,
+call-nobody-else,check,"Run it with no call to anyone outside: no fonts, scripts, statistics or update checks",system,—,—,—,v1,
+report-in-private,check,"Report a security hole in private, and learn what happens next",anyone,—,—,—,v1,
