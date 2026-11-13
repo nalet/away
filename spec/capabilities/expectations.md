@@ -57,6 +57,7 @@ For the goal [Work on a machine that is somewhere else](../goals/README.md#work-
 | Several machines open at once | first release | [`open-several`](./session.md#opening-a-machine) first release, [`open-in-own-tab`](./session.md#opening-a-machine) first release, [`see-open-sessions`](./app.md#the-frame) first release | — |
 | A link or a bookmark that opens a machine | first release | [`open-by-address`](./app.md#finding-a-machine) first release | — |
 | A connection that fails says which step failed | first release | [`see-connecting-steps`](./session.md#opening-a-machine) first release, [`test-machine`](./admin.md#the-register-of-machines) first release | — |
+| A session that ends says why, and opens again from there | first release | [`see-why-ended`](./session.md#opening-a-machine) first release | — |
 | The interface in one's own language | later | [`choose-language`](./app.md#the-frame) later | — |
 | Usable with the keyboard alone and with a screen reader | first release | [`use-without-mouse`](./app.md#the-frame) first release | — |
 | An app to install instead of the browser | later | [`use-installed-app`](./app.md#the-frame) not planned, [`add-to-home-screen`](./session.md#on-a-phone-or-a-tablet) later | — |
@@ -70,6 +71,7 @@ For the goal [Get in without another password](../goals/README.md#get-in-without
 | Expected | State | Met by | Note |
 |---|---|---|---|
 | Sign in once, with the organisation's own sign-in | first release | [`sign-in`](./app.md#signing-in) first release, [`stay-signed-in`](./app.md#signing-in) first release | — |
+| A sign-in that runs out ends no work | first release | [`sign-in-again`](./app.md#signing-in) first release | — |
 | No second password on a Windows machine in a domain | first release | [`be-oneself-on-machine`](./app.md#signing-in) first release, [`connect-domain-authority`](./platform.md#installing-and-configuring) first release | — |
 | No second password and no key of one's own on a shell | first release | [`be-oneself-on-machine`](./app.md#signing-in) first release, [`make-shells-trust`](./platform.md#installing-and-configuring) first release | — |
 | From any device, also one the organisation does not manage | first release | [`sign-in`](./app.md#signing-in) first release, [`be-oneself-on-machine`](./app.md#signing-in) first release | — |
@@ -79,7 +81,7 @@ For the goal [Get in without another password](../goals/README.md#get-in-without
 | Signed in onwards too: on a file share, on a further machine | first release in part | [`reach-network-as-oneself`](./app.md#signing-in) first release, [`go-on-without-password`](./app.md#signing-in) not planned | — |
 | A locked desktop opens again without the password | first release | [`unlock-without-password`](./app.md#signing-in) first release | — |
 | A second factor where the organisation asks for one | first release in part | [`sign-in`](./app.md#signing-in) first release, [`ask-again-first`](./admin.md#who-reaches-what) later | The identity provider asks for it at sign-in |
-| The machine is the one it claims to be | first release | [`check-machine-identity`](./app.md#signing-in) first release | — |
+| The machine is the one it claims to be | first release | [`check-machine-identity`](./app.md#signing-in) first release, [`know-machine-identity`](./admin.md#the-register-of-machines) first release | — |
 | Signing in through SAML | not planned | [`sign-in-with-saml`](./app.md#signing-in) not planned | — |
 | Signing out ends what was opened | first release | [`sign-out`](./app.md#signing-in) first release | — |
 | Choosing between one's ordinary and one's administrator account | later | [`choose-account`](./app.md#signing-in) later | — |
@@ -104,11 +106,12 @@ For the goal [Know the machines](../goals/README.md#know-the-machines).
 |---|---|---|---|
 | A list of the machines one may reach, with a search | first release | [`see-machines`](./app.md#finding-a-machine) first release, [`search-machines`](./app.md#finding-a-machine) first release, [`find-from-anywhere`](./app.md#the-frame) first release | — |
 | Machines in groups | first release | [`see-groups`](./app.md#finding-a-machine) first release, [`group-machines`](./admin.md#the-register-of-machines) first release | — |
+| One machine with several ways in: its desktop, its programs, its shell | first release | [`choose-way-in`](./app.md#finding-a-machine) first release | — |
 | The machines used last, and favourites, first | first release | [`see-last-used`](./app.md#finding-a-machine) first release, [`keep-favourites`](./app.md#finding-a-machine) first release | — |
 | Machines come from the directory or the hypervisor by themselves | later | [`take-from-directory`](./admin.md#the-register-of-machines) later, [`take-from-hypervisor`](./admin.md#the-register-of-machines) later | — |
 | See whether a machine is on | later | [`see-machine-state`](./app.md#finding-a-machine) later | — |
 | Wake a sleeping machine before connecting | later | [`wake-machine`](./app.md#finding-a-machine) later | — |
-| Machines and rules kept as files, in a repository | first release | [`keep-as-files`](./admin.md#the-register-of-machines) first release | — |
+| Machines and rules kept as files, in a repository | first release | [`keep-as-files`](./admin.md#the-register-of-machines) first release, [`see-what-is-in-force`](./admin.md#the-register-of-machines) first release, [`see-refused-change`](./admin.md#the-register-of-machines) first release | — |
 | Add and change machines in the browser | later | [`add-machine-in-browser`](./admin.md#the-register-of-machines) later | — |
 | The programs a Windows machine publishes show up by themselves | later | [`read-programs-from-host`](./admin.md#the-register-of-machines) later | — |
 | A person adds a machine of their own | later | [`add-own-machine`](./app.md#finding-a-machine) later | — |
@@ -123,6 +126,8 @@ For the goal [Decide who reaches what](../goals/README.md#decide-who-reaches-wha
 |---|---|---|---|
 | Who reaches what follows the organisation's groups | first release | [`allow-by-group`](./admin.md#who-reaches-what) first release, [`take-people-from-provider`](./admin.md#who-reaches-what) first release | — |
 | A person sees only the machines they may reach | first release | [`show-only-allowed`](./admin.md#who-reaches-what) first release | — |
+| An administrator sees what a person reaches, and why | first release | [`see-who-reaches`](./admin.md#who-reaches-what) first release | — |
+| Two people do not end up on one desktop unnoticed | first release | [`see-in-use`](./session.md#opening-a-machine) first release | — |
 | Rules on what may pass: the clipboard, files, printing, sound | first release in part | [`limit-clipboard`](./admin.md#who-reaches-what) first release, [`limit-files`](./admin.md#who-reaches-what) later, [`limit-other-channels`](./admin.md#who-reaches-what) later | — |
 | A session ends when nobody uses it, and after a longest time | first release in part | [`end-when-idle`](./admin.md#who-reaches-what) first release, [`limit-length`](./admin.md#who-reaches-what) later | — |
 | An administrator sees who is connected and ends a session | first release | [`see-live-sessions`](./admin.md#sessions-as-they-run) first release, [`end-session`](./admin.md#sessions-as-they-run) first release | — |
@@ -157,10 +162,11 @@ For the goal [Run it oneself](../goals/README.md#run-it-oneself).
 |---|---|---|---|
 | Install it in one step | first release in part | [`install-with-chart`](./platform.md#installing-and-configuring) first release, [`install-as-one-container`](./platform.md#installing-and-configuring) later | — |
 | Runs on Kubernetes and OpenShift, without special rights | first release | [`install-with-chart`](./platform.md#installing-and-configuring) first release, [`run-without-special-rights`](./platform.md#installing-and-configuring) first release | — |
-| Works with the identity provider that is there | first release | [`use-own-provider`](./platform.md#installing-and-configuring) first release | — |
+| Works with the identity provider that is there | first release | [`use-own-provider`](./platform.md#installing-and-configuring) first release, [`name-account-claim`](./platform.md#installing-and-configuring) first release | — |
 | An identity provider comes along for those who have none | not planned | [`bring-provider-along`](./platform.md#installing-and-configuring) not planned | — |
 | Works behind the reverse proxy and with the certificates that are there | first release | [`set-address`](./platform.md#installing-and-configuring) first release, [`use-own-certificates`](./platform.md#installing-and-configuring) first release | — |
 | A check that says what is wrong with the setup | first release | [`check-setup`](./platform.md#installing-and-configuring) first release, [`test-machine`](./admin.md#the-register-of-machines) first release | — |
+| People learn whom to ask when something fails | first release | [`name-support-contact`](./platform.md#installing-and-configuring) first release | — |
 | An update in one step, and a way back | first release in part | [`update-in-one-step`](./platform.md#running-it) first release, [`go-back-a-version`](./platform.md#running-it) later | — |
 | Health and measures for the monitoring that is there | first release | [`see-health`](./platform.md#running-it) first release, [`give-measures`](./platform.md#running-it) first release, [`write-logs`](./platform.md#running-it) first release | — |
 | More than one instance, for load and for failure | later | [`run-several`](./platform.md#running-it) later | — |
@@ -176,7 +182,7 @@ For the goal [Trust it](../goals/README.md#trust-it).
 
 | Expected | State | Met by | Note |
 |---|---|---|---|
-| Check that what runs is what the project built | first release | [`verify-image`](./platform.md#checking-it) first release, [`see-image-contents`](./platform.md#checking-it) first release | — |
+| Check that what runs is what the project built | first release | [`verify-image`](./platform.md#checking-it) first release, [`see-image-contents`](./platform.md#checking-it) first release, [`see-version-and-licences`](./platform.md#checking-it) first release | — |
 | Build it oneself and run its tests | first release | [`build-from-source`](./platform.md#checking-it) first release, [`run-its-tests`](./platform.md#checking-it) first release | — |
 | It tells nobody what is done with it | first release | [`call-nobody-else`](./platform.md#checking-it) first release | — |
 | A security hole can be reported in private | first release | [`report-in-private`](./platform.md#checking-it) first release | — |

@@ -1,0 +1,402 @@
+<!doctype html>
+<!--
+  Chapter 12, administration: machines: the figures of spec/screens/admin-machines.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch12 [id …]
+  The look is screens.css, the frame is frame.js, the icons are icons.js. The
+  design system's components are the <ds-*> tags, which ds.js expands into the
+  package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 12 administration: machines</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  /* a tab's content: its parts one under the other */
+  .tab { display: flex; flex-direction: column; gap: 16px; }
+  .tab .text code { white-space: nowrap; }
+  .mk { margin-left: -8px; padding-left: 8px; }
+  .mkr { margin-right: -8px; padding-right: 8px; }
+  /* the way back to the list, set on the page's left edge */
+  .back { margin: -4px 0 -4px -12px; align-self: flex-start; }
+  /* a machine's page: its head, then its cards in two columns */
+  .mhead { display: flex; align-items: center; gap: 14px; }
+  .mhead > svg.i { width: 28px; height: 28px; color: var(--cloud-blue); stroke-width: 1.75; }
+  .mhead .main { display: flex; flex-direction: column; gap: 3px; }
+  .mhead .mname { font: 600 20px/1.2 var(--ff-mono); color: var(--fg); }
+  .mhead .sub { font: 400 13px/1.4 var(--ff-ui); color: var(--fg-muted); }
+  .mhead .end { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .cols > div { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .nc-card .text { font-size: 13px; color: var(--fg-muted); }
+  .nc-card .facts + .text { margin-top: 12px; }
+  .facts dd code { white-space: nowrap; }
+  /* the programs a machine offers, and the rules that give it: short lists in a card */
+  .plist { display: flex; flex-wrap: wrap; gap: 8px; }
+  .plist span { height: 28px; padding: 0 10px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border-2); background: var(--surface-2);
+                font: 500 13px/1 var(--ff-ui); color: var(--fg); }
+  .plist svg.i { width: 14px; height: 14px; color: var(--fg-muted); }
+  .rlist { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; font: 400 14px/1.4 var(--ff-ui); color: var(--fg-2); }
+  .rlist a { font: 500 13px/1.4 var(--ff-mono); color: var(--cloud-blue); text-decoration: underline; text-underline-offset: 3px; margin-right: 8px; }
+  /* an identity, as a machine shows it: one long number in two lines */
+  .id-print { margin-top: 12px; }
+  .nc-modal__body .label { display: block; margin: 0 0 6px; }
+  .nc-modal__body .nc-code--block + .label { margin-top: 16px; }
+  .nc-modal__body .text { margin-top: 16px; font-size: 13px; }
+  /* a test's steps, in a card */
+  .nc-card .steps li { min-height: 0; }
+</style>
+</head>
+<body>
+
+<!-- Figure 12.1 · the machines in force -->
+<figure class="shot" id="admin-machines-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab selected>machines</ds-tab><ds-tab>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <p class="text" data-co="1" data-co-side="right">In force since 13 November 2026, 09:02, when the files were last applied. To change a machine, change its file.</p>
+          <ds-filterbar count="6 machines" data-co="2">
+            <ds-search placeholder="filter machines…" value=""></ds-search>
+            <ds-facet type="select" label="kind" value="every kind"></ds-facet>
+            <ds-facet type="select" label="group" value="every group"></ds-facet>
+          </ds-filterbar>
+          <ds-table label="machines">
+            <ds-head>
+              <ds-th sort="ascending" width="214px">machine</ds-th><ds-th width="220px">what it is</ds-th><ds-th width="108px">groups</ds-th>
+              <ds-th width="158px">people get in</ds-th><ds-th width="236px">file</ds-th><ds-th>last test</ds-th>
+            </ds-head>
+            <ds-tr>
+              <ds-td data-co="3"><ds-idcell title="build-01" text="build-01.corp.example"></ds-idcell></ds-td><ds-td>shell</ds-td><ds-td>engineering</ds-td>
+              <ds-td>as themselves</ds-td><ds-td><ds-code>machines/engineering.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="success" detail="today, 07:02">worked</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="build-02" text="build-02.corp.example"></ds-idcell></ds-td><ds-td>shell</ds-td><ds-td>engineering</ds-td>
+              <ds-td>as themselves</ds-td><ds-td><ds-code>machines/engineering.yaml</ds-code></ds-td>
+              <ds-td data-co="7" data-co-side="right"><ds-statuscell state="error" detail="today, 07:30">failed</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="dev-linux-03" text="dev-linux-03.corp.example"></ds-idcell></ds-td><ds-td>Linux desktop</ds-td><ds-td>engineering</ds-td>
+              <ds-td>they type</ds-td><ds-td><ds-code>machines/engineering.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="success" detail="10 nov 2026, 16:20">worked</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="fin-app-02" text="fin-app-02.corp.example"></ds-idcell></ds-td><ds-td>Windows · desktop, 4 programs</ds-td><ds-td>finance</ds-td>
+              <ds-td>as themselves</ds-td><ds-td><ds-code>machines/finance.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="success" detail="today, 07:02">worked</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="hr-app-01" text="hr-app-01.corp.example"></ds-idcell></ds-td><ds-td>Windows desktop</ds-td><ds-td>finance</ds-td>
+              <ds-td>with a kept account</ds-td><ds-td><ds-code>machines/finance.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="success" detail="2 nov 2026, 11:45">worked</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="mac-design-01" text="mac-design-01.corp.example"></ds-idcell></ds-td><ds-td data-co="4" data-co-side="bottom">Mac desktop</ds-td><ds-td>design</ds-td>
+              <ds-td data-co="5" data-co-side="bottom">with a kept account</ds-td><ds-td data-co="6" data-co-side="bottom"><ds-code>machines/design.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="neutral">not tested</ds-statuscell></ds-td>
+            </ds-tr>
+          </ds-table>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 12.2 · a changed file that was refused -->
+<figure class="shot" id="admin-machines-refused-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab selected>machines</ds-tab><ds-tab>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-banner state="error" details="machines/finance.yaml, line 14&#10;    prot: rdp" details-open data-co="1" data-co-side="right"
+                     data-co-in=".nc-strip__details 2">A change to <ds-code>machines/finance.yaml</ds-code> was not applied today at 09:10. In line 14, “prot” is not something a machine has. What was in force before stays.</ds-banner>
+          <p class="text mk" data-co="3">In force since 13 November 2026, 09:02, when the files were last applied. To change a machine, change its file.</p>
+          <ds-filterbar count="6 machines">
+            <ds-search placeholder="filter machines…" value=""></ds-search>
+            <ds-facet type="select" label="kind" value="every kind"></ds-facet>
+            <ds-facet type="select" label="group" value="every group"></ds-facet>
+          </ds-filterbar>
+          <ds-table label="machines">
+            <ds-head>
+              <ds-th sort="ascending" width="214px">machine</ds-th><ds-th width="220px">what it is</ds-th><ds-th width="108px">groups</ds-th>
+              <ds-th width="158px">people get in</ds-th><ds-th width="236px">file</ds-th><ds-th>last test</ds-th>
+            </ds-head>
+            <ds-tr>
+              <ds-td><ds-idcell title="build-01" text="build-01.corp.example"></ds-idcell></ds-td><ds-td>shell</ds-td><ds-td>engineering</ds-td>
+              <ds-td>as themselves</ds-td><ds-td><ds-code>machines/engineering.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="success" detail="today, 07:02">worked</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="build-02" text="build-02.corp.example"></ds-idcell></ds-td><ds-td>shell</ds-td><ds-td>engineering</ds-td>
+              <ds-td>as themselves</ds-td><ds-td><ds-code>machines/engineering.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="error" detail="today, 07:30">failed</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="dev-linux-03" text="dev-linux-03.corp.example"></ds-idcell></ds-td><ds-td>Linux desktop</ds-td><ds-td>engineering</ds-td>
+              <ds-td>they type</ds-td><ds-td><ds-code>machines/engineering.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="success" detail="10 nov 2026, 16:20">worked</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="fin-app-02" text="fin-app-02.corp.example"></ds-idcell></ds-td><ds-td>Windows · desktop, 4 programs</ds-td><ds-td>finance</ds-td>
+              <ds-td>as themselves</ds-td><ds-td><ds-code>machines/finance.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="success" detail="today, 07:02">worked</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="hr-app-01" text="hr-app-01.corp.example"></ds-idcell></ds-td><ds-td>Windows desktop</ds-td><ds-td>finance</ds-td>
+              <ds-td>with a kept account</ds-td><ds-td><ds-code>machines/finance.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="success" detail="2 nov 2026, 11:45">worked</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="mac-design-01" text="mac-design-01.corp.example"></ds-idcell></ds-td><ds-td>Mac desktop</ds-td><ds-td>design</ds-td>
+              <ds-td>with a kept account</ds-td><ds-td><ds-code>machines/design.yaml</ds-code></ds-td>
+              <ds-td><ds-statuscell state="neutral">not tested</ds-statuscell></ds-td>
+            </ds-tr>
+          </ds-table>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 12.3 · one machine: people are signed in as themselves -->
+<figure class="shot" id="admin-machine-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab selected>machines</ds-tab><ds-tab>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-button class="back" variant="ghost" size="sm" icon="arrow-left">machines</ds-button>
+          <div class="mhead" data-co="1">
+            <i data-i="monitor"></i>
+            <div class="main"><span class="mname">fin-app-02</span><span class="sub">Windows · desktop, 4 programs</span></div>
+            <div class="end"><ds-statuscell state="success" detail="last test: today, 07:02">worked</ds-statuscell><ds-button icon="activity" data-co="2" data-co-side="right">test</ds-button></div>
+          </div>
+          <div class="cols">
+            <div>
+              <ds-card title="how it is reached" data-co="3">
+                <dl class="facts"><dt>Address</dt><dd><ds-code>fin-app-02.corp.example</ds-code></dd><dt>Port</dt><dd>3389</dd><dt>What it is</dt><dd>a Windows machine, in the domain CORP</dd></dl>
+              </ds-card>
+              <ds-card title="how people get in" data-co="4">
+                <dl class="facts"><dt>People are signed in</dt><dd>as themselves</dd></dl>
+                <p class="text">Away signs each person in with their own account in the domain. They type nothing.</p>
+              </ds-card>
+              <ds-card title="how it proves who it is" data-co="5">
+                <dl class="facts"><dt>It is known</dt><dd>by an authority Away trusts</dd><dt>Authority</dt><dd>Example Corp Issuing CA</dd></dl>
+              </ds-card>
+            </div>
+            <div>
+              <ds-card title="programs people may open" data-co="6" data-co-side="right">
+                <div class="plist"><span><i data-i="app-window"></i>Ledger</span><span><i data-i="app-window"></i>Payroll</span><span><i data-i="app-window"></i>Reports</span><span><i data-i="app-window"></i>Mail</span></div>
+              </ds-card>
+              <ds-card title="who reaches it" data-co="7" data-co-side="right">
+                <ul class="rlist"><li><a>finance-desktops</a>gives it to finance</li><li><a>audit-finance</a>gives it to away-audit</li></ul>
+              </ds-card>
+              <ds-card title="in the files" data-co="8" data-co-side="right">
+                <dl class="facts"><dt>Defined in</dt><dd><ds-code>machines/finance.yaml</ds-code>, line 3</dd><dt>Groups</dt><dd>finance</dd></dl>
+              </ds-card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 12.4 · one machine: a kept account, and an identity taken at its first test -->
+<figure class="shot" id="admin-machine-kept-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab selected>machines</ds-tab><ds-tab>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-button class="back" variant="ghost" size="sm" icon="arrow-left">machines</ds-button>
+          <div class="mhead">
+            <i data-i="monitor"></i>
+            <div class="main"><span class="mname">hr-app-01</span><span class="sub">Windows desktop</span></div>
+            <div class="end"><ds-statuscell state="success" detail="last test: 2 nov 2026, 11:45">worked</ds-statuscell><ds-button icon="activity">test</ds-button></div>
+          </div>
+          <div class="cols">
+            <div>
+              <ds-card title="how it is reached">
+                <dl class="facts"><dt>Address</dt><dd><ds-code>hr-app-01.corp.example</ds-code></dd><dt>Port</dt><dd>3389</dd><dt>What it is</dt><dd>a Windows machine</dd></dl>
+              </ds-card>
+              <ds-card title="how people get in">
+                <dl class="facts">
+                  <dt class="mk" data-co="1">People are signed in</dt><dd>with an account Away keeps</dd>
+                  <dt class="mk" data-co="2">Account</dt><dd><ds-code>hr-shared</ds-code></dd>
+                  <dt class="mk" data-co="3">Its secret</dt><dd>held by the cluster as <ds-code>away-hr-app-01</ds-code>, and never shown</dd>
+                </dl>
+                <p class="text">Everyone a rule lets in is hr-shared on this machine.</p>
+              </ds-card>
+            </div>
+            <div>
+              <ds-card title="how it proves who it is">
+                <dl class="facts"><dt>It is known</dt><dd data-co="4" data-co-side="right">by what it showed when it was first tested</dd><dt>First tested</dt><dd>2 November 2026, 11:45</dd></dl>
+                <ds-code block class="id-print" data-co="5" data-co-side="right">9F3A 17C2 0B5E 6D41 A8F0 22C9 7E13 54BD
+90A6 3C7F 1E88 D2B4 6A05 F7C1 38E9 4D60</ds-code>
+              </ds-card>
+              <ds-card title="who reaches it">
+                <ul class="rlist"><li><a>finance-desktops</a>gives it to finance</li></ul>
+              </ds-card>
+              <ds-card title="in the files">
+                <dl class="facts"><dt>Defined in</dt><dd><ds-code>machines/finance.yaml</ds-code>, line 21</dd><dt>Groups</dt><dd>finance</dd></dl>
+              </ds-card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 12.5 · a test, and the step that failed -->
+<figure class="shot" id="admin-machine-test-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab selected>machines</ds-tab><ds-tab>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-button class="back" variant="ghost" size="sm" icon="arrow-left">machines</ds-button>
+          <div class="mhead">
+            <i data-i="monitor"></i>
+            <div class="main"><span class="mname">fin-app-02</span><span class="sub">Windows · desktop, 4 programs</span></div>
+            <div class="end"><ds-statuscell state="error" detail="last test: today, 09:13">failed</ds-statuscell><ds-button icon="activity">test</ds-button></div>
+          </div>
+          <ds-card title="test">
+            <ds-aside><span class="nc-text nc-text--dim mkr" data-co="4" data-co-side="right">today, 09:13 · by Alex Urban</span></ds-aside>
+            <ul class="steps">
+              <li class="done" data-co="1"><span class="g"><i data-i="check"></i></span><span>Reaching fin-app-02<span class="why">It answered in 12 ms.</span></span></li>
+              <li class="done" data-co="2"><span class="g"><i data-i="check"></i></span><span>Checking that it is fin-app-02<span class="why">Its certificate comes from Example Corp Issuing CA.</span></span></li>
+              <li class="failed" data-co="3"><span class="g"><i data-i="x"></i></span><span>Signing in as CORP\alex.urban, as a test<span class="why">The domain doesn't accept certificates from Away's authority for signing in. Make the authority known to the domain; the installation guide says how.</span></span></li>
+            </ul>
+          </ds-card>
+          <div class="cols">
+            <div>
+              <ds-card title="how it is reached">
+                <dl class="facts"><dt>Address</dt><dd><ds-code>fin-app-02.corp.example</ds-code></dd><dt>Port</dt><dd>3389</dd><dt>What it is</dt><dd>a Windows machine, in the domain CORP</dd></dl>
+              </ds-card>
+              <ds-card title="how people get in">
+                <dl class="facts"><dt>People are signed in</dt><dd>as themselves</dd></dl>
+                <p class="text">Away signs each person in with their own account in the domain. They type nothing.</p>
+              </ds-card>
+            </div>
+            <div>
+              <ds-card title="programs people may open">
+                <div class="plist"><span><i data-i="app-window"></i>Ledger</span><span><i data-i="app-window"></i>Payroll</span><span><i data-i="app-window"></i>Reports</span><span><i data-i="app-window"></i>Mail</span></div>
+              </ds-card>
+              <ds-card title="who reaches it">
+                <ul class="rlist"><li><a>finance-desktops</a>gives it to finance</li><li><a>audit-finance</a>gives it to away-audit</li></ul>
+              </ds-card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 12.6 · a machine that shows another identity than the one Away knows -->
+<figure class="shot" id="admin-machine-changed-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab selected>machines</ds-tab><ds-tab>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-button class="back" variant="ghost" size="sm" icon="arrow-left">machines</ds-button>
+          <ds-banner state="warning" action="compare" data-co="1" data-co-in=".nc-btn 2 right">hr-app-01 shows another identity than on 2 November 2026. Away opens it for nobody until you accept the change.</ds-banner>
+          <div class="mhead">
+            <i data-i="monitor"></i>
+            <div class="main"><span class="mname">hr-app-01</span><span class="sub">Windows desktop</span></div>
+            <div class="end"><ds-statuscell state="error" detail="last test: today, 08:47">failed</ds-statuscell><ds-button icon="activity">test</ds-button></div>
+          </div>
+          <div class="cols">
+            <div>
+              <ds-card title="how it is reached">
+                <dl class="facts"><dt>Address</dt><dd><ds-code>hr-app-01.corp.example</ds-code></dd><dt>Port</dt><dd>3389</dd><dt>What it is</dt><dd>a Windows machine</dd></dl>
+              </ds-card>
+              <ds-card title="how people get in">
+                <dl class="facts">
+                  <dt>People are signed in</dt><dd>with an account Away keeps</dd>
+                  <dt>Account</dt><dd><ds-code>hr-shared</ds-code></dd>
+                  <dt>Its secret</dt><dd>held by the cluster as <ds-code>away-hr-app-01</ds-code>, and never shown</dd>
+                </dl>
+                <p class="text">Everyone a rule lets in is hr-shared on this machine.</p>
+              </ds-card>
+            </div>
+            <div>
+              <ds-card title="how it proves who it is">
+                <dl class="facts"><dt>It is known</dt><dd>by what it showed when it was first tested</dd><dt>First tested</dt><dd>2 November 2026, 11:45</dd></dl>
+                <ds-code block class="id-print">9F3A 17C2 0B5E 6D41 A8F0 22C9 7E13 54BD
+90A6 3C7F 1E88 D2B4 6A05 F7C1 38E9 4D60</ds-code>
+              </ds-card>
+              <ds-card title="who reaches it">
+                <ul class="rlist"><li><a>finance-desktops</a>gives it to finance</li></ul>
+              </ds-card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 12.7 · accepting a machine's new identity, on purpose -->
+<figure class="shot" id="admin-machine-identity-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab selected>machines</ds-tab><ds-tab>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-button class="back" variant="ghost" size="sm" icon="arrow-left">machines</ds-button>
+          <ds-banner state="warning" action="compare">hr-app-01 shows another identity than on 2 November 2026. Away opens it for nobody until you accept the change.</ds-banner>
+          <div class="mhead">
+            <i data-i="monitor"></i>
+            <div class="main"><span class="mname">hr-app-01</span><span class="sub">Windows desktop</span></div>
+            <div class="end"><ds-statuscell state="error" detail="last test: today, 08:47">failed</ds-statuscell><ds-button icon="activity">test</ds-button></div>
+          </div>
+          <div class="cols">
+            <div>
+              <ds-card title="how it is reached">
+                <dl class="facts"><dt>Address</dt><dd><ds-code>hr-app-01.corp.example</ds-code></dd><dt>Port</dt><dd>3389</dd><dt>What it is</dt><dd>a Windows machine</dd></dl>
+              </ds-card>
+            </div>
+            <div>
+              <ds-card title="how it proves who it is">
+                <dl class="facts"><dt>It is known</dt><dd>by what it showed when it was first tested</dd><dt>First tested</dt><dd>2 November 2026, 11:45</dd></dl>
+              </ds-card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ds-modal title="accept hr-app-01's new identity?" width="520">
+      <ds-body>
+        <span class="label">The identity Away knows, since 2 November 2026</span>
+        <ds-code block>9F3A 17C2 0B5E 6D41 A8F0 22C9 7E13 54BD
+90A6 3C7F 1E88 D2B4 6A05 F7C1 38E9 4D60</ds-code>
+        <span class="label">The identity hr-app-01 shows now, first seen today at 08:47</span>
+        <ds-code block>C41D 88A0 5F27 E3B9 0A6C 71F4 D85E 2B93
+47E1 9C06 B3DA 6F58 21C7 A0E4 5D39 8F12</ds-code>
+        <p class="text">A machine shows another identity after it was set up again or its certificate was renewed. If neither happened, another machine may be answering in its place: don't accept, and ask whoever looks after hr-app-01.</p>
+      </ds-body>
+      <ds-footer><ds-button variant="ghost">cancel</ds-button><ds-button variant="primary">accept</ds-button></ds-footer>
+    </ds-modal>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

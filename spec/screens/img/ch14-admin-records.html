@@ -1,0 +1,262 @@
+<!doctype html>
+<!--
+  Chapter 14, administration: sessions and records: the figures of
+  spec/screens/admin-records.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch14 [id …]
+  The look is screens.css, the frame is frame.js, the icons are icons.js. The
+  design system's components are the <ds-*> tags, which ds.js expands into the
+  package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 14 administration: sessions and records</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  /* a tab's content: its parts one under the other */
+  .tab { display: flex; flex-direction: column; gap: 16px; }
+  /* a mark on a line of text that starts at the page's edge stands a little off it */
+  .mk { margin-left: -8px; padding-left: 8px; }
+  /* the way back to the list, set on the page's left edge */
+  .back { margin: -4px 0 -4px -12px; align-self: flex-start; }
+  /* a cell of two lines: what happened, and to what */
+  .w2 { display: flex; flex-direction: column; gap: 2px; }
+  .w2 small { font: 400 12px/1.4 var(--ff-ui); color: var(--fg-muted); }
+  .nc-dt__cell { white-space: nowrap; }
+  .none { color: var(--fg-dim); }
+  /* a record's page: its head, then its cards in two columns */
+  .mhead { display: flex; align-items: center; gap: 14px; }
+  .mhead > svg.i { width: 28px; height: 28px; color: var(--cloud-blue); stroke-width: 1.75; }
+  .mhead .main { display: flex; flex-direction: column; gap: 3px; }
+  .mhead .mname { font: 600 20px/1.2 var(--ff-mono); color: var(--fg); }
+  .mhead .sub { font: 400 13px/1.4 var(--ff-ui); color: var(--fg-muted); }
+  .mhead .end { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .cols > div { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .facts dd small { display: block; margin-top: 2px; font: 400 13px/1.4 var(--ff-ui); color: var(--fg-muted); }
+  .facts dd a { color: var(--cloud-blue); text-decoration: underline; text-underline-offset: 3px; }
+  .nc-modal__body .text { margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<!-- Figure 14.1 · who is connected to what, right now -->
+<figure class="shot" id="admin-sessions-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab>machines</ds-tab><ds-tab>rules</ds-tab><ds-tab selected>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-filterbar count="7 sessions" data-co="1" data-co-side="right">
+            <ds-search placeholder="filter sessions…" value=""></ds-search>
+          </ds-filterbar>
+          <ds-table label="open sessions">
+            <ds-head>
+              <ds-th sort="ascending" width="178px">person</ds-th><ds-th width="140px">machine</ds-th><ds-th width="92px">what</ds-th><ds-th width="150px">as</ds-th>
+              <ds-th width="214px">since</ds-th><ds-th width="132px">from</ds-th><ds-th width="130px">last used</ds-th><ds-th align="right"></ds-th>
+            </ds-head>
+            <ds-tr>
+              <ds-td data-co="2"><ds-idcell title="Alex Urban" text="alex.urban"></ds-idcell></ds-td><ds-td>build-01</ds-td><ds-td>shell</ds-td><ds-td>alex.urban</ds-td>
+              <ds-td><ds-datecell abs="today, 07:40" rel="1 h 34 min"></ds-datecell></ds-td><ds-td>203.0.113.80</ds-td><ds-td>18 min ago</ds-td>
+              <ds-td><ds-iconbutton variant="ghost" size="sm" icon="power" label="end"></ds-iconbutton></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="Dana Kim" text="dana.kim"></ds-idcell></ds-td><ds-td>fin-app-02</ds-td><ds-td>desktop</ds-td><ds-td>CORP\dana.kim</ds-td>
+              <ds-td><ds-datecell abs="today, 08:02" rel="1 h 12 min"></ds-datecell></ds-td><ds-td>203.0.113.24</ds-td><ds-td>a moment ago</ds-td>
+              <ds-td data-co="3" data-co-side="right"><ds-iconbutton variant="ghost" size="sm" icon="power" label="end"></ds-iconbutton></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="Dana Kim" text="dana.kim"></ds-idcell></ds-td><ds-td>hr-app-01</ds-td><ds-td>desktop</ds-td><ds-td>hr-shared</ds-td>
+              <ds-td><ds-datecell abs="today, 08:40" rel="34 min"></ds-datecell></ds-td><ds-td>203.0.113.24</ds-td><ds-td>12 min ago</ds-td>
+              <ds-td><ds-iconbutton variant="ghost" size="sm" icon="power" label="end"></ds-iconbutton></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="Dana Kim" text="dana.kim"></ds-idcell></ds-td><ds-td>mac-design-01</ds-td><ds-td>desktop</ds-td><ds-td>design-shared</ds-td>
+              <ds-td><ds-datecell abs="today, 09:05" rel="9 min"></ds-datecell></ds-td><ds-td>203.0.113.24</ds-td><ds-td>2 min ago</ds-td>
+              <ds-td><ds-iconbutton variant="ghost" size="sm" icon="power" label="end"></ds-iconbutton></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="Jo Lindqvist" text="jo.lindqvist"></ds-idcell></ds-td><ds-td>build-01</ds-td><ds-td>shell</ds-td><ds-td>jo.lindqvist</ds-td>
+              <ds-td><ds-datecell abs="today, 07:12" rel="2 h 2 min"></ds-datecell></ds-td><ds-td>192.0.2.61</ds-td><ds-td>41 min ago</ds-td>
+              <ds-td><ds-iconbutton variant="ghost" size="sm" icon="power" label="end"></ds-iconbutton></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="Sam Ortiz" text="sam.ortiz"></ds-idcell></ds-td><ds-td>build-01</ds-td><ds-td>shell</ds-td><ds-td>sam.ortiz</ds-td>
+              <ds-td><ds-datecell abs="today, 06:48" rel="2 h 26 min"></ds-datecell></ds-td><ds-td>198.51.100.7</ds-td><ds-td>a moment ago</ds-td>
+              <ds-td><ds-iconbutton variant="ghost" size="sm" icon="power" label="end"></ds-iconbutton></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="Sam Ortiz" text="sam.ortiz"></ds-idcell></ds-td><ds-td>dev-linux-03</ds-td><ds-td>desktop</ds-td><ds-td>sortiz</ds-td>
+              <ds-td><ds-datecell abs="today, 07:31" rel="1 h 43 min"></ds-datecell></ds-td><ds-td>198.51.100.7</ds-td><ds-td>4 min ago</ds-td>
+              <ds-td><ds-iconbutton variant="ghost" size="sm" icon="power" label="end"></ds-iconbutton></ds-td>
+            </ds-tr>
+          </ds-table>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 14.2 · ending a session -->
+<figure class="shot" id="admin-sessions-end-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div data-page-of="admin-sessions-computer"></div>
+    <ds-modal title='end <span class="nc-keep-case">Dana Kim</span>&#39;s session on fin-app-02?' width="480">
+      <ds-body>
+        <p class="text">Dana Kim sees that an administrator ended it. The desktop keeps running on fin-app-02.</p>
+        <ds-checkbox>End all 3 of Dana Kim's sessions</ds-checkbox>
+      </ds-body>
+      <ds-footer><ds-button variant="ghost">cancel</ds-button><ds-button variant="danger">end session</ds-button></ds-footer>
+    </ds-modal>
+  </div>
+</figure>
+
+<!-- Figure 14.3 · the records -->
+<figure class="shot" id="admin-records-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab>machines</ds-tab><ds-tab>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab selected>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-filterbar count="128 records" data-co="1" data-co-side="right">
+            <ds-search placeholder="filter records…" value=""></ds-search>
+            <ds-facet type="select" label="kind" value="every kind"></ds-facet>
+            <ds-facet type="select" label="time" value="the last 24 hours" active></ds-facet>
+          </ds-filterbar>
+          <ds-table label="records">
+            <ds-head>
+              <ds-th sort="descending" width="176px">when</ds-th><ds-th width="240px">what</ds-th><ds-th width="114px">who</ds-th><ds-th width="122px">machine</ds-th>
+              <ds-th width="132px">as</ds-th><ds-th width="112px">from</ds-th><ds-th>how it ended</ds-th>
+            </ds-head>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 09:14:02"></ds-datecell></ds-td><ds-td><span class="w2">an administrator ended a session<small>Dana Kim's</small></span></ds-td><ds-td>Alex Urban</ds-td><ds-td>fin-app-02</ds-td>
+              <ds-td class="none">—</ds-td><ds-td>203.0.113.80</ds-td><ds-td class="none">—</ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 09:10:44"></ds-datecell></ds-td><ds-td><span class="w2">a change of the files<small>machines/finance.yaml</small></span></ds-td><ds-td class="none">—</ds-td><ds-td class="none">—</ds-td>
+              <ds-td class="none">—</ds-td><ds-td class="none">—</ds-td><ds-td data-co="2" data-co-side="right"><ds-statuscell state="error" detail="line 14">refused</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 09:05:31"></ds-datecell></ds-td><ds-td>a connection</ds-td><ds-td>Dana Kim</ds-td><ds-td>mac-design-01</ds-td>
+              <ds-td>design-shared</ds-td><ds-td>203.0.113.24</ds-td><ds-td><ds-status state="information">open</ds-status></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 09:05:30"></ds-datecell></ds-td><ds-td>a sign-in Away made</ds-td><ds-td>Dana Kim</ds-td><ds-td>mac-design-01</ds-td>
+              <ds-td>design-shared</ds-td><ds-td class="none">—</ds-td><ds-td><ds-status state="success">accepted</ds-status></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 09:02:10"></ds-datecell></ds-td><ds-td><span class="w2">a change of the files<small>3 files</small></span></ds-td><ds-td class="none">—</ds-td><ds-td class="none">—</ds-td>
+              <ds-td class="none">—</ds-td><ds-td class="none">—</ds-td><ds-td><ds-status state="success">applied</ds-status></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 08:47:19"></ds-datecell></ds-td><ds-td>a connection</ds-td><ds-td>Sam Ortiz</ds-td><ds-td>build-02</ds-td>
+              <ds-td>sam.ortiz</ds-td><ds-td>198.51.100.7</ds-td><ds-td><ds-status state="neutral">signed out</ds-status></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 08:47:18"></ds-datecell></ds-td><ds-td>a sign-in Away made</ds-td><ds-td>Sam Ortiz</ds-td><ds-td>build-02</ds-td>
+              <ds-td>sam.ortiz</ds-td><ds-td class="none">—</ds-td><ds-td><ds-status state="success">accepted</ds-status></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 08:40:12"></ds-datecell></ds-td><ds-td>a connection</ds-td><ds-td>Dana Kim</ds-td><ds-td>hr-app-01</ds-td>
+              <ds-td>hr-shared</ds-td><ds-td>203.0.113.24</ds-td><ds-td><ds-status state="information">open</ds-status></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 08:40:11"></ds-datecell></ds-td><ds-td>a sign-in Away made</ds-td><ds-td>Dana Kim</ds-td><ds-td>hr-app-01</ds-td>
+              <ds-td>hr-shared</ds-td><ds-td class="none">—</ds-td><ds-td><ds-status state="success">accepted</ds-status></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 08:12:27"></ds-datecell></ds-td><ds-td>a connection</ds-td><ds-td>Sam Ortiz</ds-td><ds-td>build-02</ds-td>
+              <ds-td class="none">—</ds-td><ds-td>198.51.100.7</ds-td><ds-td><ds-statuscell state="error" detail="at reaching the machine">failed</ds-statuscell></ds-td>
+            </ds-tr>
+            <ds-tr selected>
+              <ds-td><ds-datecell abs="13 nov 2026, 08:02:15"></ds-datecell></ds-td><ds-td>a connection</ds-td><ds-td>Dana Kim</ds-td><ds-td>fin-app-02</ds-td>
+              <ds-td>CORP\dana.kim</ds-td><ds-td>203.0.113.24</ds-td><ds-td data-co="3" data-co-side="right"><ds-status state="warning">ended by an administrator</ds-status></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 08:02:14"></ds-datecell></ds-td><ds-td>a sign-in Away made</ds-td><ds-td>Dana Kim</ds-td><ds-td>fin-app-02</ds-td>
+              <ds-td>CORP\dana.kim</ds-td><ds-td class="none">—</ds-td><ds-td><ds-status state="success">accepted</ds-status></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-datecell abs="13 nov 2026, 07:40:05"></ds-datecell></ds-td><ds-td>a connection</ds-td><ds-td>Alex Urban</ds-td><ds-td>build-01</ds-td>
+              <ds-td>alex.urban</ds-td><ds-td>203.0.113.80</ds-td><ds-td><ds-status state="information">open</ds-status></ds-td>
+            </ds-tr>
+          </ds-table>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 14.4 · one record -->
+<figure class="shot" id="admin-record-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab>machines</ds-tab><ds-tab>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab selected>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-button class="back" variant="ghost" size="sm" icon="arrow-left">records</ds-button>
+          <div class="mhead" data-co="1">
+            <i data-i="scroll-text"></i>
+            <div class="main"><span class="mname">a connection</span><span class="sub">13 November 2026, 08:02:15</span></div>
+            <div class="end"><ds-status state="warning">ended by an administrator</ds-status></div>
+          </div>
+          <div class="cols">
+            <div>
+              <ds-card title="the connection" data-co="2">
+                <dl class="facts">
+                  <dt>Who</dt><dd>Dana Kim <span class="soft">· dana.kim@example.com</span></dd>
+                  <dt>Machine</dt><dd>fin-app-02 <span class="soft">· fin-app-02.corp.example</span></dd>
+                  <dt>What</dt><dd>its desktop</dd>
+                  <dt>As</dt><dd>CORP\dana.kim</dd>
+                  <dt>From</dt><dd>203.0.113.24<small>Firefox 144 on Windows, as the browser named itself</small></dd>
+                </dl>
+              </ds-card>
+              <ds-card title="how it ended" data-co="3">
+                <dl class="facts">
+                  <dt>Opened</dt><dd>13 November 2026, 08:02:15</dd>
+                  <dt>Ended</dt><dd>13 November 2026, 09:14:02</dd>
+                  <dt>It lasted</dt><dd>1 h 11 min 47 s</dd>
+                  <dt>How it ended</dt><dd>ended by an administrator<small><a>Alex Urban ended it</a></small></dd>
+                </dl>
+              </ds-card>
+            </div>
+            <div>
+              <ds-card title="the sign-in away made" data-co="4" data-co-side="right">
+                <dl class="facts">
+                  <dt>As</dt><dd>CORP\dana.kim</dd>
+                  <dt>With</dt><dd>a certificate, valid for five minutes</dd>
+                  <dt>Its number</dt><dd><ds-code>4A7F 09C2 51D8 E36B</ds-code></dd>
+                  <dt>Made</dt><dd>13 November 2026, 08:02:14</dd>
+                  <dt>The machine</dt><dd>accepted it</dd>
+                </dl>
+              </ds-card>
+              <ds-card title="the record" data-co="5" data-co-side="right">
+                <dl class="facts">
+                  <dt>Number</dt><dd><ds-code>2026-11-13-000471</ds-code></dd>
+                  <dt>Written</dt><dd>08:02:15, when the connection opened<small>09:14:02, when it ended</small></dd>
+                  <dt>Put out</dt><dd>for the log system at 08:02:15<small>and at 09:14:03</small></dd>
+                </dl>
+              </ds-card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<script>
+  // a figure that shows a page again, under a dialog: the page is copied from the figure named, without its marks
+  for (const el of document.querySelectorAll('[data-page-of]')) {
+    el.innerHTML = document.querySelector(`#${el.dataset.pageOf} .pg`).outerHTML.replace(/ data-co(-side|-in)?="[^"]*"/g, '');
+  }
+</script>
+<script src="ds.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

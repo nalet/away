@@ -1,0 +1,282 @@
+@import url('ds/nalet-0.4.0.css');
+/* Away's screens: one look for every drawing in spec/screens/img/ch*.html.
+   The nalet design system 0.4.0 is imported above, unchanged: its tokens and its
+   components (nc-*), which the drawings write as short <ds-*> tags that ds.js
+   expands to the package's own markup. This file holds only what is Away's own:
+   the frame frame.js draws (the top bar, the rail, the phone's tabs), a machine's
+   tile, the steps of a connection, a session's bar, and the stand-ins for what a
+   machine shows. Marks in pink (.co numbers, .guide outlines) are notes on a
+   drawing, never part of a screen. The fonts are Inter and JetBrains Mono, taken
+   from the site's own packages (run `npm ci` in site/ first), so a drawing asks
+   nobody outside for anything. */
+@font-face { font-family: Inter; font-weight: 400; src: url('../../../site/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: Inter; font-weight: 500; src: url('../../../site/node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: Inter; font-weight: 600; src: url('../../../site/node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url('../../../site/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 500; src: url('../../../site/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 600; src: url('../../../site/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 700; src: url('../../../site/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2') format('woff2'); }
+:root { --mark: #FF7AC6; /* notes on a drawing */ }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px; background: #05070C; color: var(--fg); font: 14px/1.45 var(--ff-ui);
+       display: flex; flex-direction: column; align-items: flex-start; gap: 32px; }
+figure { margin: 0; }
+.shot { background: #05070C; padding: 28px; display: inline-flex; flex-direction: row; align-items: flex-start; gap: 28px; }
+
+/* ── notes on a drawing ─────────────────────────────────────────────── */
+.co { position: absolute; z-index: 301; width: 22px; height: 22px; background: var(--mark); color: #0B0F19;
+      font: 700 12px/22px var(--ff-mono); text-align: center; }
+.co-line { position: absolute; z-index: 300; height: 1.5px; background: var(--mark); }
+.co-line.left::after, .co-line.right::before { content: ""; position: absolute; top: -2.5px; width: 6px; height: 6px; background: var(--mark); }
+.co-line.left::after { right: -3px; } .co-line.right::before { left: -3px; }
+.co-line.top, .co-line.bottom { width: 1.5px; }
+.co-line.top::after, .co-line.bottom::before { content: ""; position: absolute; left: -2.5px; width: 6px; height: 6px; background: var(--mark); }
+.co-line.top::after { bottom: -3px; } .co-line.bottom::before { top: -3px; }
+.guide { position: absolute; z-index: 40; border: 1.5px dashed var(--mark); pointer-events: none; }
+
+/* ── icons ──────────────────────────────────────────────────────────── */
+svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg.i.fill { fill: currentColor; }
+svg.i.s12 { width: 12px; height: 12px; } svg.i.s14 { width: 14px; height: 14px; } svg.i.s16 { width: 16px; height: 16px; } svg.i.s18 { width: 18px; height: 18px; }
+svg.i.s24 { width: 24px; height: 24px; } svg.i.s32 { width: 32px; height: 32px; } svg.i.s48 { width: 48px; height: 48px; stroke-width: 1.5; }
+
+/* ── type ───────────────────────────────────────────────────────────── */
+.mono { font-family: var(--ff-mono); }
+.h1 { margin: 0; font: 600 24px/1.2 var(--ff-mono); }           /* a page's heading: lowercase */
+.h2 { margin: 0; font: 600 16px/1.2 var(--ff-mono); }           /* a section's name */
+.h3 { margin: 0; font: 500 13px/1.2 var(--ff-mono); color: var(--fg-muted); }
+.name { font: 600 14px/1.3 var(--ff-mono); color: var(--fg); }  /* a machine's or a person's name: keeps its case */
+.meta { margin: 0; font: 500 13px/1.3 var(--ff-mono); color: var(--fg-2); }
+.text { margin: 0; font: 400 14px/1.5 var(--ff-ui); color: var(--fg-2); }
+.small { font-size: 13px; } .muted { color: var(--fg-dim); } .fg { color: var(--fg); } .soft { color: var(--fg-muted); }
+.label { font: 400 13px/1.3 var(--ff-ui); color: var(--fg-muted); }   /* a fact's or a field's label */
+.row { display: flex; align-items: center; gap: 8px; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.grow { flex: 1; min-width: 0; }
+.end { margin-left: auto; }
+.sk { background: var(--surface-2); }       /* grey blocks in the shape of what is loading */
+.av { width: 32px; height: 32px; flex: none; background: var(--signal-amber); color: var(--bg); font: 600 13px/32px var(--ff-mono); text-align: center; }
+.av.c2 { background: #3FB950; } .av.c3 { background: #A371F7; } .av.c4 { background: #58A6FF; } .av.c5 { background: #F778BA; }
+.av.sm { width: 24px; height: 24px; font-size: 11px; line-height: 24px; }
+.icon-b { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; color: var(--fg-2); position: relative; flex: none; }
+.count { position: absolute; top: 6px; right: 6px; min-width: 16px; height: 16px; padding: 0 3px; background: var(--cloud-blue); color: var(--bg);
+         font: 600 10px/16px var(--ff-mono); text-align: center; }
+/* a fact with its label over it, and a list of them */
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 24px; margin: 0; align-items: baseline; }
+.facts dt { font: 400 13px/1.4 var(--ff-ui); color: var(--fg-muted); }
+.facts dd { margin: 0; font: 400 14px/1.4 var(--ff-ui); color: var(--fg); min-width: 0; }
+/* a line of a list: a setting, a rule, a way in */
+.li { display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.li:last-child { border-bottom: 0; }
+.li .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.li .ttl { font: 500 14px/1.3 var(--ff-ui); color: var(--fg); }
+.li .sub { font: 400 13px/1.35 var(--ff-ui); color: var(--fg-dim); }
+.li .tail { margin-left: auto; color: var(--fg-dim); display: inline-flex; align-items: center; gap: 8px; flex: none; }
+
+/* ── frames (frame.js draws their bars) ─────────────────────────────── */
+.computer { width: 1280px; height: 800px; position: relative; overflow: hidden; background: var(--bg); border: 1px solid var(--border); flex: none; }
+.phone { width: 360px; height: 780px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); flex: none; }
+.phone > .scroll { flex: 1; position: relative; overflow: hidden; }
+.logo { display: inline-flex; align-items: center; gap: 6px; font: 700 18px/1 var(--ff-mono); letter-spacing: .01em; color: var(--fg-2); white-space: nowrap; } /* as the design system's lockup sets a name */
+.logo svg { width: 16px; height: 16px; }
+
+/* on a computer: the top bar, with the mark over the rail, and the rail of icons down the left */
+.computer.railed { display: grid; grid-template-columns: 80px minmax(0, 1fr); grid-template-rows: 64px minmax(0, 1fr); }
+.computer.railed > .tb { grid-column: 1 / -1; grid-row: 1; height: 64px; display: flex; align-items: center; gap: 24px; padding: 0 24px 0 0;
+                         background: var(--bg-2); border-bottom: 1px solid var(--border); position: relative; z-index: 10; }
+.computer.railed > .tb .mark { width: 80px; align-self: stretch; flex: none; display: flex; align-items: center; justify-content: center; gap: 1px;
+                               border-right: 1px solid var(--border); font: 700 20px/1 var(--ff-mono); color: var(--fg-2); }
+.computer.railed > .tb .mark svg { width: 16px; height: 16px; }
+.computer.railed > .tb .end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.computer.railed > .tb .search-field { width: 576px; margin-right: 8px; }
+.computer.railed > .crail { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 0;
+                            background: var(--bg-2); border-right: 1px solid var(--border); position: relative; z-index: 9; }
+.computer.railed > .crail .it { width: 48px; height: 48px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--fg-muted); position: relative; }
+.computer.railed > .crail .it svg.i { width: 24px; height: 24px; }
+/* the current view: blue on a lighter square, and a bar on its edge, so not by colour alone */
+.computer.railed > .crail .it.on { color: var(--cloud-blue); background: var(--surface-2); box-shadow: inset 2px 0 0 var(--cloud-blue); }
+.computer.railed > .crail .gap { flex: 1; }
+.computer.railed > .cpage { grid-column: 2; grid-row: 2; min-width: 0; overflow: hidden; position: relative; }
+.computer .pg { padding: 32px 48px; }
+/* a page's head: its heading, and what belongs beside it */
+.pghead { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.pghead .end { display: flex; align-items: center; gap: 8px; }
+
+/* on a phone: the top bar and the tabs, icons alone */
+.phone > .tb, .phone.side > .side-col > .tb { height: 56px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 12px 0 16px; background: var(--bg-2);
+                                              border-bottom: 1px solid var(--border); position: relative; z-index: 10; }
+.phone .tb .logo { margin-right: auto; }
+.phone .tb .av { width: 28px; height: 28px; line-height: 28px; font-size: 12px; margin-left: 6px; }
+.phone .tb.back { gap: 10px; padding: 0 12px 0 6px; }
+.phone .tb.back .title { font: 600 16px/1 var(--ff-mono); margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phone > .tabs { height: 56px; flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--bg-2); border-top: 1px solid var(--border); position: relative; z-index: 10; }
+.phone .tabs > span { display: flex; align-items: center; justify-content: center; color: var(--fg-dim); position: relative; }
+.phone > .tabs .on { color: var(--cloud-blue); box-shadow: inset 0 2px 0 var(--cloud-blue); } /* not by colour alone */
+.phone .tabs svg.i { width: 24px; height: 24px; }
+.phone .tabs .count { top: 8px; right: calc(50% - 22px); }
+.phone.side .tabs .count { top: 4px; right: 16px; }
+.phone .pg { padding: 16px; }
+/* the phone held sideways: 780 × 360, the tabs as a rail on the left */
+.phone.side { width: 780px; height: 360px; flex-direction: row; }
+.phone.side > .side-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.phone.side > .side-col > .scroll { flex: 1; position: relative; overflow: hidden; }
+.phone.side > .side-col > .tb { height: 48px; }
+.phone.side > .siderail { width: 80px; height: auto; flex: none; display: flex; flex-direction: column; justify-content: center; gap: 8px; background: var(--bg-2);
+                          border-top: 0; border-right: 1px solid var(--border); position: relative; z-index: 10; }
+.phone.side > .siderail > span { height: 48px; }
+.phone.side > .siderail .on { color: var(--cloud-blue); box-shadow: inset 2px 0 0 var(--cloud-blue); }
+
+/* ── a machine's tile ───────────────────────────────────────────────── */
+/* built like the design system's tile (its surface, its border, its icon in blue), with what a
+   machine adds: its name in its own case, a star, and a menu */
+.mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 12px; }
+.m { position: relative; min-height: 88px; padding: 14px 44px 14px 16px; background: var(--surface); border: 1px solid var(--border);
+     display: flex; align-items: flex-start; gap: 12px; }
+.m > svg.i { width: 22px; height: 22px; color: var(--cloud-blue); stroke-width: 1.75; margin-top: 1px; }
+.m .main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.m .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m .sub { font: 400 13px/1.4 var(--ff-ui); color: var(--fg-muted); }
+.m .star { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--fg-dim); }
+.m .star.on { color: var(--signal-amber); } .m .star.on svg.i { fill: currentColor; }
+.m .star svg.i, .m .more svg.i { width: 16px; height: 16px; }
+.m .more { position: absolute; bottom: 6px; right: 6px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--fg-dim); }
+.m.hover { background: var(--surface-2); }
+.m.focus { border-color: var(--cloud-blue); outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.phone .mgrid { grid-template-columns: 1fr; gap: 8px; }
+.phone .m { min-height: 72px; }
+/* a group of machines: the design system's tile group's head over the grid */
+.grp { margin-top: 28px; }
+.grp > .gh { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font: 600 14px/1.2 var(--ff-mono); color: var(--fg); }
+.grp > .gh svg { width: 14px; height: 14px; color: var(--cloud-blue); }
+.grp > .gh .n { font-weight: 500; color: var(--fg-dim); }
+.phone .grp { margin-top: 20px; }
+
+/* ── a connection's steps ───────────────────────────────────────────── */
+.steps { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.steps li { display: flex; align-items: flex-start; gap: 12px; min-height: 36px; padding: 6px 0; font: 400 14px/1.45 var(--ff-ui); color: var(--fg-dim); }
+.steps li > .g { width: 20px; height: 20px; flex: none; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.steps li > .g svg.i { width: 16px; height: 16px; }
+.steps li.done { color: var(--fg-2); } .steps li.done > .g { color: var(--state-success); }
+.steps li.now { color: var(--fg); font-weight: 500; }
+.steps li.failed { color: var(--fg); font-weight: 500; } .steps li.failed > .g { color: var(--state-error); }
+.steps li.todo > .g::before { content: ""; width: 6px; height: 6px; background: var(--border-control); }
+.steps li .why { display: block; margin-top: 2px; font: 400 13px/1.45 var(--ff-ui); color: var(--fg-muted); }
+/* a card in the middle of an empty window: connecting, a question, an ending */
+.stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+.stage > .box { width: 440px; max-width: calc(100% - 32px); background: var(--surface); border: 1px solid var(--border-2); padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.stage > .box .who { display: flex; align-items: center; gap: 12px; }
+.stage > .box .who > svg.i { width: 28px; height: 28px; color: var(--cloud-blue); stroke-width: 1.75; }
+.stage > .box .ft { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.phone .stage > .box { border-left: 0; border-right: 0; max-width: 100%; width: 100%; padding: 20px 16px; }
+
+/* ── a session: the machine's picture has the whole window ──────────── */
+.session { position: absolute; inset: 0; background: #05070C; overflow: hidden; }
+.remote { position: absolute; inset: 0; overflow: hidden; }
+.dim { position: absolute; inset: 0; background: rgba(5,7,12,.72); z-index: 20; }
+/* the handle that opens the session's bar, and the bar itself, over the picture */
+.shandle { position: absolute; top: 0; left: 50%; margin-left: -44px; z-index: 30; width: 88px; height: 18px; display: flex; align-items: center; justify-content: center;
+           background: var(--bg-2); border: 1px solid var(--border-2); border-top: 0; color: var(--fg-muted); }
+.shandle svg.i { width: 14px; height: 14px; }
+.sbar { position: absolute; left: 0; right: 0; top: 0; height: 48px; z-index: 30; display: flex; align-items: stretch; background: var(--bg-2);
+        border-bottom: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
+.sbar .mark { width: 56px; flex: none; display: flex; align-items: center; justify-content: center; gap: 1px; border-right: 1px solid var(--border);
+              font: 700 18px/1 var(--ff-mono); color: var(--fg-2); }
+.sbar .mark svg { width: 14px; height: 14px; }
+.sbar .stabs { display: flex; align-items: stretch; min-width: 0; }
+.sbar .stab { display: flex; align-items: center; gap: 8px; padding: 0 14px; border-right: 1px solid var(--border); color: var(--fg-muted); font: 500 13px/1 var(--ff-mono); white-space: nowrap; }
+.sbar .stab svg.i { width: 16px; height: 16px; }
+.sbar .stab.on { color: var(--fg); background: var(--surface-2); box-shadow: inset 0 -2px 0 var(--cloud-blue); }
+.sbar .stab.add { padding: 0 12px; color: var(--fg-dim); }
+.sbar .sp { flex: 1; }
+.sbar .as { display: flex; align-items: center; padding: 0 14px; font: 400 12px/1.2 var(--ff-ui); color: var(--fg-dim); white-space: nowrap; }
+.sbar .sgrp { display: flex; align-items: center; gap: 2px; padding: 0 6px; border-left: 1px solid var(--border); }
+.sbar .nc-iconbtn.on { color: var(--cloud-blue); background: var(--surface-2); }
+/* a panel under one of the bar's buttons: the clipboard, the shell's look */
+.spanel { position: absolute; z-index: 31; top: 52px; width: 320px; background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073;
+          padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.spanel .h2 { font-size: 13px; }
+/* the keys a phone's keyboard lacks, in a row over it */
+.xkeys { display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: var(--bg-2); border-top: 1px solid var(--border); overflow: hidden; }
+.xkeys span { min-width: 40px; height: 48px; padding: 0 8px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-2);
+              background: var(--surface); color: var(--fg-2); font: 500 12px/1 var(--ff-mono); }
+.xkeys span.on { border-color: var(--cloud-blue); color: var(--cloud-blue); }
+.xkeys span svg.i { width: 16px; height: 16px; }
+/* a phone's own keyboard, as a block */
+.oskb { height: 216px; flex: none; background: #1a1f2a; border-top: 1px solid var(--border); display: grid; grid-template-rows: repeat(4, 1fr); gap: 6px; padding: 8px 4px; }
+.oskb div { display: flex; justify-content: center; gap: 4px; }
+.oskb i { flex: 1; max-width: 32px; background: #2c3342; }
+.oskb i.w { max-width: 48px; } .oskb i.sp { max-width: 180px; }
+
+/* a session's picture, small: drawn at full size and scaled down */
+.thumb { position: relative; overflow: hidden; width: 320px; height: 200px; flex: none; background: #05070C; border: 1px solid var(--border); }
+.thumb > .remote { right: auto; bottom: auto; width: 1280px; height: 800px; transform: scale(.25); transform-origin: 0 0; }
+.thumb > .remote.term { font-size: 26px; padding: 28px 32px; }
+
+/* ── stand-ins for what a machine shows ─────────────────────────────── */
+/* a desktop: a backdrop, a bar, windows. No real system's look, and nothing of Away's. */
+/* flat tones with hard edges: a picture of them stays small */
+.desk { background: linear-gradient(155deg, #3d6082 0 34%, #2f4c69 34% 71%, #223a53 71% 100%); font: 400 12px/1.3 var(--ff-ui); color: #1b2430; }
+.desk .tbar { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: rgba(14,20,30,.84); display: flex; align-items: center; gap: 6px; padding: 0 10px; }
+.desk .tbar i { width: 26px; height: 26px; background: rgba(255,255,255,.16); }
+.desk .tbar i.on { background: rgba(255,255,255,.34); box-shadow: inset 0 -2px 0 #9cc7ff; }
+.desk .tbar .clock { margin-left: auto; color: #dfe7f1; font: 500 11px/1.25 var(--ff-ui); text-align: right; }
+.desk .ico { position: absolute; width: 72px; text-align: center; color: #eef3f9; font: 400 11px/1.25 var(--ff-ui); }
+.desk .ico::before { content: ""; display: block; width: 36px; height: 36px; margin: 0 auto 6px; background: rgba(255,255,255,.28); }
+/* a desktop with its bar at the top and a dock at the foot */
+.desk.topbar { background: linear-gradient(200deg, #6a5c8c 0 30%, #4c4674 30% 68%, #33325a 68% 100%); }
+.desk.topbar .tbar { top: 0; bottom: auto; height: 24px; gap: 14px; padding: 0 12px; color: #e8ecf3; font: 500 11px/1 var(--ff-ui); }
+.desk.topbar .tbar i { width: 12px; height: 12px; }
+.desk .dock { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); display: flex; gap: 8px; padding: 6px 10px; background: rgba(14,20,30,.6); }
+.desk .dock i { width: 34px; height: 34px; background: rgba(255,255,255,.24); }
+.desk .dock i.on { box-shadow: 0 5px 0 -3px #dfe7f1; }
+/* a window on a desktop, or a program's window on its own */
+.w { position: absolute; background: #fff; border: 1px solid #55657a; box-shadow: 0 10px 30px rgba(0,0,0,.35); display: flex; flex-direction: column; overflow: hidden;
+     font: 400 12px/1.3 var(--ff-ui); color: #1b2430; }
+.w > .wt { height: 28px; flex: none; background: #E7EBF0; border-bottom: 1px solid #C9D1DA; display: flex; align-items: center; padding: 0 10px; font: 500 12px/1 var(--ff-ui); color: #2a3441; white-space: nowrap; }
+.w > .wt::after { content: ""; margin-left: auto; width: 46px; height: 10px; flex: none;
+                  background: linear-gradient(90deg, #8f9cab 0 10px, transparent 10px 18px, #8f9cab 18px 28px, transparent 28px 36px, #8f9cab 36px 46px); }
+.w.front > .wt { background: #DCE6F2; }
+.w > .wm { height: 30px; flex: none; background: #F4F6F9; border-bottom: 1px solid #D9DFE6; display: flex; align-items: center; gap: 16px; padding: 0 12px; color: #4a5666; font-size: 12px; white-space: nowrap; }
+.w > .wb { flex: 1; position: relative; background: #fff; overflow: hidden; }
+.w .sheet { position: absolute; inset: 0; background:
+            linear-gradient(#EEF1F5, #EEF1F5) 0 0 / 100% 22px no-repeat, linear-gradient(#EEF1F5, #EEF1F5) 0 0 / 40px 100% no-repeat,
+            repeating-linear-gradient(180deg, transparent 0 21px, #DDE3EA 21px 22px), repeating-linear-gradient(90deg, transparent 0 87px, #DDE3EA 87px 88px) 40px 0; }
+.w .sheet b { position: absolute; height: 22px; padding: 0 6px; font: 400 12px/22px var(--ff-ui); color: #1b2430; white-space: nowrap; }
+.w .sheet b.h { font-weight: 600; } .w .sheet b.n { text-align: right; width: 88px; }
+.w .sheet b.sel { box-shadow: inset 0 0 0 2px #2f6fd0; width: 88px; }
+.w .doc { position: absolute; inset: 0; padding: 18px 22px; display: flex; flex-direction: column; gap: 9px; }
+.w .doc p { margin: 0; height: 8px; background: #C9D2DD; } .w .doc p.t { height: 12px; background: #8695a8; width: 46%; margin-bottom: 6px; } .w .doc p.gap { background: none; }
+.w .wside { position: absolute; left: 0; top: 0; bottom: 0; width: 168px; background: #F4F6F9; border-right: 1px solid #D9DFE6; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.w .wside p { margin: 0; height: 8px; background: #C3CCD8; } .w .wside p.on { background: #2f6fd0; }
+/* a machine's own sign-in screen, where it asks for a name and a password */
+.desk .lockbox { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 280px; display: flex; flex-direction: column; align-items: center; gap: 12px; color: #eef3f9; font: 400 13px/1.3 var(--ff-ui); }
+.desk .lockbox .face { width: 84px; height: 84px; background: rgba(255,255,255,.26); }
+.desk .lockbox .fld { width: 100%; height: 30px; background: rgba(255,255,255,.9); }
+/* a shell: text in the face a shell has, with the colours a shell's programs use */
+.term { background: #0B0F19; padding: 14px 16px; font: 500 13px/1.5 var(--ff-mono); color: #C9D1D9; white-space: pre; }
+.term .g { color: #3FB950; } .term .b { color: #58A6FF; } .term .y { color: #F2B233; } .term .r { color: #F85149; } .term .c { color: #39C5CF; }
+.term .p { color: #BC8CFF; } .term .d { color: #7B8597; } .term .w1 { color: #fff; font-weight: 700; }
+.term .inv { background: #C9D1D9; color: #0B0F19; } .term .hl { background: #F2B233; color: #0B0F19; } .term .selx { background: #264F78; }
+.term .cur { display: inline-block; width: 8px; height: 17px; background: #C9D1D9; vertical-align: text-bottom; }
+.term .barl { background: #1f6f3a; color: #0B0F19; }
+.phone .term { font-size: 11px; padding: 10px 10px; }
+
+/* ── the design system's overlays, inside a drawing ─────────────────── */
+/* its menus, dialogs and toasts open over the browser window; in a drawing they
+   open over the screen's frame, so they are placed against it */
+:is(.computer, .phone) :is(.nc-actionmenu, .nc-modal, .nc-toaster) { position: absolute; }
+:is(.computer, .phone) .nc-modal { z-index: 60; }
+/* an empty state's details: the drawings' addition until the design system's empty state has them; the banner's own toggle and block */
+.kit-details { --nc-strip-border: var(--border-2); display: flex; flex-direction: column; align-items: center; gap: var(--s-2); margin-top: var(--s-3); max-width: 100%; }
+.kit-details .nc-strip__toggle { display: inline-flex; }
+.kit-details .nc-strip__details { text-align: left; align-self: stretch; }
+/* a field or a dropdown drawn with the focus in it: the design system's own focus look (its :focus-within) */
+.nc-input.is-focused, .nc-select.is-focused { border-color: var(--cloud-blue); box-shadow: inset 0 0 0 1px var(--cloud-blue); }
+/* the avatar's menu: one sheet under the avatar. The design system's user menu is planned, so the sheet and its
+   head (the name, then the address, quieter) are drawn on its tokens; the items are its action menu's */
+.usermenu { position: absolute; z-index: 150; width: 248px; display: flex; flex-direction: column; box-shadow: 0 8px 24px #00000073; }
+.usermenu .who { display: flex; flex-direction: column; gap: 2px; padding: 12px 12px 11px; background: var(--surface); border: 1px solid var(--border-2); border-bottom: 0; }
+.usermenu .nc-actionmenu { position: relative; box-shadow: none; }
+.usermenu .nc-actionmenu + .nc-actionmenu { margin-top: -1px; }
+/* a page's place, shown as a quiet block, where a drawing is about what is around it */
+.ph { background: var(--surface); border: 1px dashed var(--border-2); display: flex; align-items: center; justify-content: center; font: 500 13px/1 var(--ff-mono); color: var(--fg-dim); }

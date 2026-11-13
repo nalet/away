@@ -1,0 +1,120 @@
+<!doctype html>
+<!--
+  Chapter 10, on a phone: the figures of spec/screens/phone.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch10 [id …]
+  The look is screens.css; frame.js draws the session's bar as a phone has it
+  (this chapter specifies it); remote.js draws what the machine shows, here at
+  the sizes a phone gives it. The design system's components are the <ds-*>
+  tags, which ds.js expands into the package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 10 on a phone</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  /* the machine's screen is drawn at its own size, 1280 × 800, and shown as a phone shows it */
+  .remote.zoom, .remote.whole { right: auto; bottom: auto; width: 1280px; height: 800px; transform-origin: 0 0; }
+  /* zoomed in on a part of it: the picture fills the phone */
+  .remote.zoom { transform: translate(-320px, 0) scale(.975); }
+  /* held sideways, a screen that keeps its shape fits whole, with the rest left empty */
+  .remote.whole { transform: translate(102px, 0) scale(.45); }
+  /* a menu under one of the bar's parts */
+  .session > .nc-actionmenu { top: 52px; }
+  /* the session one is in, in the list of the open sessions: blue, with a bar on its edge */
+  .smenu .nc-actionmenu__item:first-child { color: var(--cloud-blue); box-shadow: inset 2px 0 0 var(--cloud-blue); }
+  .smenu .nc-actionmenu__item:first-child .nc-actionmenu__icon { color: inherit; }
+  /* the keyboard is up: the session keeps what is left over it */
+  .kcol { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .kcol > .session { position: relative; inset: auto; flex: 1; min-height: 0; }
+  .kcol .term { padding-top: 60px; }
+  /* the keys a phone lacks: as high as everything a phone presses */
+  .phone .xkeys { padding: 6px; position: relative; }
+  .phone .xkeys .spot.edge { right: 0; top: -1px; height: 6px; min-width: 0; width: 8px; padding: 0; border: 0; background: none; }
+  .phone .xkeys span { height: 48px; min-width: 32px; padding: 0 7px; }
+  /* a point of the picture, for a note to mark */
+  .spot { position: absolute; width: 8px; height: 16px; }
+</style>
+</head>
+<body>
+
+<!-- Figure 10.1 · a desktop on a phone, zoomed in, with the session's bar -->
+<figure class="shot" id="phone-desktop">
+  <div class="phone" data-bar="none" data-co-parts="away:1:top,stab:2:top,kb:3:top,more:4:top">
+    <div class="session" data-sbar="open" data-tabs="desktop:fin-app-02,shell:build-01">
+      <div class="remote desk zoom" data-desk="work"></div>
+      <span class="spot" style="right: 8px; top: 420px" data-co="5" data-co-side="right"></span>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 10.2 · held sideways: a screen that keeps its shape fits whole -->
+<figure class="shot" id="phone-desktop-side">
+  <div class="phone side" data-bar="none" data-co-parts="handle:1:top">
+    <div class="session" data-sbar="closed">
+      <div class="remote desk whole" data-desk="top" data-co="2"></div>
+      <span class="spot" style="right: 40px; top: 172px" data-co="3" data-co-side="right"></span>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 10.3 · the keys a phone lacks, over the phone's own keyboard -->
+<figure class="shot" id="phone-keys">
+  <div class="phone" data-bar="none">
+    <div class="kcol">
+      <div class="session" data-sbar="open" data-tabs="shell:build-01,desktop:fin-app-02" data-on="kb">
+        <div class="remote term" data-term="phone"></div>
+        <span class="spot" style="right: 8px; top: 128px" data-co="1" data-co-side="right"></span>
+      </div>
+      <div class="xkeys">
+        <span class="spot edge" data-co="2" data-co-side="right"></span><span>esc</span><span>tab</span><span class="on" data-co="3" data-co-side="bottom">ctrl</span><span>alt</span><span><i data-i="arrow-left"></i></span><span><i data-i="arrow-up"></i></span><span><i data-i="arrow-down"></i></span><span><i data-i="arrow-right"></i></span><span>fn</span>
+      </div>
+      <div class="oskb" data-co="4">
+        <div><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div><i class="w"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="w"></i></div>
+        <div><i class="w"></i><i class="w"></i><i class="sp"></i><i class="w"></i></div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 10.4 · more: what the bar has no room for -->
+<figure class="shot" id="phone-more">
+  <div class="phone" data-bar="none">
+    <div class="session" data-sbar="open" data-tabs="desktop:fin-app-02,shell:build-01" data-on="more">
+      <div class="remote desk zoom" data-desk="work"></div>
+      <ds-menu style="right: 6px; min-width: 216px" data-co-in=".nc-actionmenu__item:nth-child(1) 1 right, .nc-actionmenu__item:nth-child(2) 2 right, .nc-actionmenu__item:nth-child(3) 3 right, .nc-actionmenu__item:nth-child(5) 4 right, .nc-actionmenu__item:nth-child(6) 5 right">
+        <ds-item icon="keyboard">keys</ds-item>
+        <ds-item icon="clipboard">clipboard</ds-item>
+        <ds-item icon="circle-dot">fit the window</ds-item>
+        <ds-item icon="circle">actual size</ds-item>
+        <ds-item icon="fullscreen">fill the screen</ds-item>
+        <ds-item icon="power">end</ds-item>
+      </ds-menu>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 10.5 · the open sessions, under the session's name -->
+<figure class="shot" id="phone-sessions">
+  <div class="phone" data-bar="none">
+    <div class="session" data-sbar="open" data-tabs="desktop:fin-app-02,shell:build-01">
+      <div class="remote desk zoom" data-desk="work"></div>
+      <ds-menu class="smenu" style="left: 56px; min-width: 232px" data-co-in=".nc-actionmenu__item:nth-child(1) 1 right, .nc-actionmenu__item:nth-child(2) 2 right, .nc-actionmenu__item:nth-child(4) 3 right">
+        <ds-item icon="monitor">fin-app-02</ds-item>
+        <ds-item icon="square-terminal">build-01</ds-item>
+        <ds-item icon="monitor">mac-design-01</ds-item>
+        <ds-item icon="plus">open another machine</ds-item>
+      </ds-menu>
+    </div>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script src="remote.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

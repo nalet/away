@@ -1,0 +1,47 @@
+/* the drawings of the screens, small: on the page of all screens, on a capability's
+   fact sheet and on the product page. each leads to its place in its chapter. */
+.figs {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 1.5rem 1.25rem;
+	margin: 1rem 0 2.5rem;
+}
+.fig {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	max-width: 100%;
+	color: var(--fg-muted);
+	text-decoration: none;
+}
+.fig img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border: 1px solid var(--border);
+	background: #05070c;
+}
+.fig:hover img,
+.fig:focus-visible img {
+	border-color: var(--cloud-blue);
+}
+.fig:focus-visible {
+	outline: 2px solid var(--focus-ring);
+	outline-offset: 2px;
+}
+.fig-cap {
+	font: 400 13px/1.4 var(--ff-ui);
+}
+.fig-cap b {
+	margin-right: 0.25rem;
+	font: 600 12px/1.4 var(--ff-mono);
+	color: var(--fg);
+}
+.fig:hover .fig-cap {
+	color: var(--fg);
+}
+/* a figure's anchor in its chapter stops under the top bar */
+img[id^='fig-'] {
+	scroll-margin-top: 5.5rem;
+}

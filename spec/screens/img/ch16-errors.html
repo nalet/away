@@ -1,0 +1,131 @@
+<!doctype html>
+<!--
+  Chapter 16, when something goes wrong: the figures of spec/screens/errors.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch16 [id …]
+  The look is screens.css, the frame is frame.js, the icons are icons.js;
+  remote.js draws what a machine shows. The design system's components are the
+  <ds-*> tags, which ds.js expands into the package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 16 when something goes wrong</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  /* a page that has nothing but what went wrong: in the middle of its place */
+  .mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  /* whom to turn to: the last line, where the operator named someone */
+  .ask { margin: 0; font: 400 13px/1.5 var(--ff-ui); color: var(--fg-dim); text-align: center; }
+  .ask b { font-weight: 500; color: var(--fg-2); }
+  .mid .ask { margin-top: -8px; }
+  .phone .mid .ask { margin-top: 0; padding: 0 16px; }
+  /* an empty state's details, with the rule a banner's details have */
+  .kit-details { --nc-strip-border: var(--border-2); }
+  /* a number's line ends before the words it marks */
+  .nc-illu > [data-co], .mid > .ask[data-co] { padding-left: 14px; padding-right: 14px; }
+  .over > [data-co], .steps li[data-co], .stage > .box .det[data-co] { margin-left: -14px; padding-left: 14px; }
+  /* the card over a dimmed picture, as chapter 6 has it */
+  .over { position: absolute; z-index: 25; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 440px; background: var(--surface); border: 1px solid var(--border-2);
+          padding: 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 8px 24px #00000073; }
+  /* the connecting box of chapter 5, with the details of a failed step */
+  .stage > .box .det { display: flex; justify-content: flex-start; margin-top: -8px; }
+  .stage > .box .ft { align-items: center; }
+  .stage > .box .ask { text-align: left; border-top: 1px solid var(--border); padding-top: 14px; }
+</style>
+</head>
+<body>
+
+<!-- Figure 16.1 · a page that couldn't load -->
+<figure class="shot" id="errors-page-computer">
+  <div class="computer" data-view="home">
+    <div class="mid">
+      <ds-empty illustration="error" title="couldn't load this page" description="Away didn't answer." details="request timed out after 10 s" details-open
+                data-co-in=".nc-illu__title 1, .nc-illu__description 2, .nc-illu__actions 3, .kit-details 4">
+        <ds-button variant="primary" icon="refresh-cw">try again</ds-button>
+      </ds-empty>
+      <p class="ask" data-co="5">Questions go to <b>it-help@example.com</b>.</p>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 16.2 · a link to a machine that doesn't exist, or that no rule gives this person -->
+<figure class="shot" id="errors-not-here-computer">
+  <div class="computer" data-view="none">
+    <div class="mid">
+      <ds-empty illustration="unknown" title="this machine isn't here for you" description="It doesn't exist, or no rule gives it to you."
+                data-co-in=".nc-illu__title 1, .nc-illu__description 2, .nc-illu__actions 3">
+        <ds-button variant="primary" icon="house">machines</ds-button>
+      </ds-empty>
+      <p class="ask" data-co="4" style="margin-top: 0">Questions go to <b>it-help@example.com</b>.</p>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 16.3 · a browser that can't show a session -->
+<figure class="shot" id="errors-browser-computer">
+  <div class="computer" data-bar="none">
+    <div class="stage">
+      <ds-empty illustration="error" size="lg" title="this browser can't show a session" details="what the browser lacks, by its technical name"
+                description="It lacks something a session needs. A current version of Chrome, Edge, Firefox or Safari has it."
+                data-co-in=".nc-illu__title 1, .nc-illu__description 2, .nc-illu__actions 3, .kit-details 4">
+        <ds-button icon="house">machines</ds-button>
+      </ds-empty>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 16.4 · Away is being updated while a session is open -->
+<figure class="shot" id="errors-updating-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="closed">
+      <div class="remote desk" data-desk="work"></div>
+      <div class="dim"></div>
+      <div class="over">
+        <div class="row" data-co="1"><ds-spinner size="16"></ds-spinner><span class="h2">away is being updated</span></div>
+        <p class="text" data-co="2">Your desktop comes back by itself.</p>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 16.5 · a machine is not opened, because Away can't write its record of the connection -->
+<figure class="shot" id="errors-no-record-computer">
+  <div class="computer" data-bar="none">
+    <div class="stage">
+      <div class="box">
+        <div class="who"><i data-i="monitor"></i><div class="col" style="gap: 2px"><span class="name">fin-app-02</span><span class="label">Windows desktop</span></div></div>
+        <ul class="steps">
+          <li class="failed" data-co="1"><span class="g"><i data-i="x"></i></span><span>Keeping a record of this connection<span class="why">Away can't keep its records right now, so it opens no machine.</span></span></li>
+          <li class="todo" data-co="2"><span class="g"></span>Reaching fin-app-02</li>
+          <li class="todo"><span class="g"></span>Checking that it is fin-app-02</li>
+          <li class="todo"><span class="g"></span>Signing you in as alex.urban</li>
+          <li class="todo"><span class="g"></span>Waiting for its first picture</li>
+        </ul>
+        <div class="det" data-co="3"><button type="button" class="nc-strip__toggle" aria-expanded="false"><svg viewBox="0 0 12 12" width="10" height="10" fill="none" aria-hidden="true" class="nc-strip__caret"><path d="M4 2.5 L7.5 6 L4 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"></path></svg>details</button></div>
+        <div class="ft" data-co="4" data-co-side="right"><ds-button>machines</ds-button><ds-button variant="primary" icon="refresh-cw">try again</ds-button></div>
+        <p class="ask" data-co="5" data-co-side="right">Questions go to <b>it-help@example.com</b>.</p>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 16.6 · a page that couldn't load, on a phone -->
+<figure class="shot" id="errors-phone">
+  <div class="phone" data-view="home">
+    <div class="mid">
+      <ds-empty illustration="error" size="sm" title="couldn't load this page" description="Away didn't answer." details="request timed out after 10 s"
+                data-co-in=".nc-illu__title 1, .nc-illu__actions 2, .kit-details 3 right">
+        <ds-button variant="primary" icon="refresh-cw">try again</ds-button>
+      </ds-empty>
+      <p class="ask" data-co="4" data-co-side="right">Questions go to <b>it-help@example.com</b>.</p>
+    </div>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script src="remote.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!doctype html>
+<!--
+  Chapter 13, administration: rules: the figures of spec/screens/admin-rules.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch13 [id …]
+  The look is screens.css, the frame is frame.js, the icons are icons.js. The
+  design system's components are the <ds-*> tags, which ds.js expands into the
+  package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 13 administration: rules</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  /* a tab's content: its parts one under the other */
+  .tab { display: flex; flex-direction: column; gap: 16px; }
+  /* a mark on a line of text that starts at the page's edge stands a little off it */
+  .mk { margin-left: -8px; padding-left: 8px; }
+  /* the way back to the list, set on the page's left edge */
+  .back { margin: -4px 0 -4px -12px; align-self: flex-start; }
+  .nc-card .text { font-size: 13px; color: var(--fg-muted); }
+  .nc-card .facts + .text { margin-top: 12px; }
+  /* a group's or a machine's name, as it is written in the files */
+  .id { font: 400 13px/1.4 var(--ff-mono); color: var(--fg); }
+  /* what a person reaches: the field, then who it is */
+  .ask { display: flex; align-items: center; gap: 16px; }
+  .ask .nc-input { width: 360px; flex: none; }
+  .person { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); }
+  .person .main { display: flex; flex-direction: column; gap: 3px; margin-right: 32px; }
+  .person .sub { font: 400 13px/1.4 var(--ff-ui); color: var(--fg-muted); }
+  .person .facts { grid-template-columns: max-content max-content; gap: 6px 16px; }
+  .person .facts dd { font-size: 13px; }
+  /* where the answer would be, with nothing in it */
+  .none { border: 1px solid var(--border); background: var(--surface); }
+</style>
+</head>
+<body>
+
+<!-- Figure 13.1 · the rules in force, and the roles -->
+<figure class="shot" id="admin-rules-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab>machines</ds-tab><ds-tab selected>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <div class="row">
+            <p class="text grow">In force since 13 November 2026, 09:02, when the files were last applied. To change a rule, change its file.</p>
+            <ds-button icon="user-check" data-co="1" data-co-side="right">what a person reaches</ds-button>
+          </div>
+          <ds-table label="rules" data-co-in="thead 2">
+            <ds-head>
+              <ds-th sort="ascending" width="212px">rule</ds-th><ds-th width="150px">who</ds-th><ds-th width="216px">reaches</ds-th>
+              <ds-th width="186px">clipboard</ds-th><ds-th width="158px">ends unused after</ds-th><ds-th>file</ds-th>
+            </ds-head>
+            <ds-tr>
+              <ds-td><span class="id">admins-engineering</span></ds-td><ds-td>away-admins</ds-td><ds-td><ds-idcell title="engineering" text="a group of 3 machines"></ds-idcell></ds-td>
+              <ds-td>from the machine only</ds-td><ds-td>never</ds-td><ds-td><ds-code>rules/access.yaml</ds-code></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><span class="id">audit-finance</span></ds-td><ds-td>away-audit</ds-td><ds-td><ds-idcell title="fin-app-02" text="a machine"></ds-idcell></ds-td>
+              <ds-td>off</ds-td><ds-td>30 min</ds-td><ds-td><ds-code>rules/access.yaml</ds-code></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><span class="id">design-mac</span></ds-td><ds-td>design</ds-td><ds-td><ds-idcell title="mac-design-01" text="a machine"></ds-idcell></ds-td>
+              <ds-td>to the machine only</ds-td><ds-td>30 min</ds-td><ds-td><ds-code>rules/access.yaml</ds-code></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><span class="id">engineering-machines</span></ds-td><ds-td>engineering</ds-td><ds-td><ds-idcell title="engineering" text="a group of 3 machines"></ds-idcell></ds-td>
+              <ds-td>both ways</ds-td><ds-td>2 h</ds-td><ds-td><ds-code>rules/access.yaml</ds-code></ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><span class="id">finance-desktops</span></ds-td><ds-td>finance</ds-td><ds-td><ds-idcell title="finance" text="a group of 2 machines"></ds-idcell></ds-td>
+              <ds-td>both ways</ds-td><ds-td>30 min</ds-td><ds-td><ds-code>rules/access.yaml</ds-code></ds-td>
+            </ds-tr>
+          </ds-table>
+          <ds-card title="roles" data-co="3">
+            <ds-aside><ds-code>rules/access.yaml</ds-code></ds-aside>
+            <dl class="facts"><dt>Administrators</dt><dd><span class="id">away-admins</span></dd><dt>Readers of the records</dt><dd><span class="id">away-audit</span></dd></dl>
+            <p class="text">Everyone else who signs in reaches what a rule gives them, and sees nothing of the administration.</p>
+          </ds-card>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 13.2 · what a person reaches, and by which rule -->
+<figure class="shot" id="admin-rules-person-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab>machines</ds-tab><ds-tab selected>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-button class="back" variant="ghost" size="sm" icon="arrow-left">rules</ds-button>
+          <span class="h2">what a person reaches</span>
+          <div class="ask" data-co="1"><ds-input icon="search" value="dana.kim" placeholder="a name or an account…" focused></ds-input></div>
+          <div class="person" data-co="2">
+            <span class="av c3">dk</span>
+            <div class="main"><span class="name">Dana Kim</span><span class="sub">dana.kim@example.com</span></div>
+            <dl class="facts"><dt>Groups at the last sign-in</dt><dd><span class="id">finance</span>, <span class="id">design</span></dd><dt>Last signed in</dt><dd>today, 08:01</dd></dl>
+          </div>
+          <ds-table label="what Dana Kim reaches" data-co-in="thead 3">
+            <ds-head>
+              <ds-th sort="ascending" width="230px">machine</ds-th><ds-th width="250px">what it is</ds-th><ds-th width="220px">by which rule</ds-th>
+              <ds-th width="210px">clipboard</ds-th><ds-th>ends unused after</ds-th>
+            </ds-head>
+            <ds-tr>
+              <ds-td><ds-idcell title="fin-app-02" text="fin-app-02.corp.example"></ds-idcell></ds-td><ds-td>Windows · desktop, 4 programs</ds-td><ds-td><span class="id">finance-desktops</span></ds-td>
+              <ds-td>both ways</ds-td><ds-td>30 min</ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="hr-app-01" text="hr-app-01.corp.example"></ds-idcell></ds-td><ds-td>Windows desktop</ds-td><ds-td><span class="id">finance-desktops</span></ds-td>
+              <ds-td>both ways</ds-td><ds-td>30 min</ds-td>
+            </ds-tr>
+            <ds-tr>
+              <ds-td><ds-idcell title="mac-design-01" text="mac-design-01.corp.example"></ds-idcell></ds-td><ds-td>Mac desktop</ds-td><ds-td><span class="id">design-mac</span></ds-td>
+              <ds-td>to the machine only</ds-td><ds-td>30 min</ds-td>
+            </ds-tr>
+          </ds-table>
+          <p class="text small soft mk" data-co="4">As of Dana Kim's last sign-in: a person's groups come from the identity provider each time they sign in.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 13.3 · someone no rule gives a machine -->
+<figure class="shot" id="admin-rules-nobody-computer">
+  <div class="computer" data-view="administration" data-role="admin">
+    <div class="pg">
+      <div class="pghead"><span class="h1">administration</span></div>
+      <ds-tabs><ds-tab>machines</ds-tab><ds-tab selected>rules</ds-tab><ds-tab>sessions</ds-tab><ds-tab>records</ds-tab><ds-tab>status</ds-tab></ds-tabs>
+      <div style="margin-top: 24px">
+        <div class="tab">
+          <ds-button class="back" variant="ghost" size="sm" icon="arrow-left">rules</ds-button>
+          <span class="h2">what a person reaches</span>
+          <div class="ask"><ds-input icon="search" value="priya.nair" placeholder="a name or an account…" focused></ds-input></div>
+          <div class="person" data-co="1">
+            <span class="av c5">pn</span>
+            <div class="main"><span class="name">Priya Nair</span><span class="sub">priya.nair@example.com</span></div>
+            <dl class="facts"><dt>Groups at the last sign-in</dt><dd><span class="id">marketing</span></dd><dt>Last signed in</dt><dd>11 November 2026, 14:20</dd></dl>
+          </div>
+          <div class="none" data-co="2">
+            <ds-empty illustration="empty" size="md" title="no machines" description="No rule names a group Priya Nair is in."></ds-empty>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

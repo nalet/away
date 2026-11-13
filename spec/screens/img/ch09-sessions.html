@@ -1,0 +1,205 @@
+<!doctype html>
+<!--
+  Chapter 9, sessions: the figures of spec/screens/sessions.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch09 [id …]
+  The look is screens.css, the frame is frame.js; remote.js draws what a session
+  showed last, small. The design system's components are the <ds-*> tags, which
+  ds.js expands into the package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 9 sessions</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  /* a session's card: Away's own, on the design system's surface and border, as a machine's tile is */
+  .sgrid { display: flex; flex-wrap: wrap; gap: 24px; }
+  .scard { position: relative; width: 344px; background: var(--surface); border: 1px solid var(--border); display: flex; flex-direction: column; }
+  .scard > .thumb { width: 342px; height: 214px; border: 0; border-bottom: 1px solid var(--border); }
+  .scard > .thumb > .remote { transform: scale(.2672); }
+  .scard .body { padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .scard .ttl { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+  .scard .ttl svg.i { width: 18px; height: 18px; color: var(--cloud-blue); stroke-width: 1.75; }
+  .scard .ttl .nc-badge { margin-left: auto; }
+  .scard .sub { font: 400 13px/18px var(--ff-ui); color: var(--fg-muted); }
+  .scard .ago { font: 400 13px/18px var(--ff-ui); color: var(--fg-dim); }
+  .scard .ft { display: flex; align-items: center; gap: 8px; padding: 2px 16px 14px; }
+  .scard .ft .end { margin-left: auto; display: inline-flex; }
+  .scard > .nc-actionmenu { top: calc(100% - 10px); right: 16px; min-width: 248px; }
+  /* nothing open: the empty state in the middle of the page */
+  .mid { position: absolute; inset: 96px 48px 48px; display: flex; align-items: center; justify-content: center; }
+  /* on a phone: one card per row, the picture small beside the facts, and what is pressed 48 px high */
+  .phone .h1 { font-size: 20px; margin-bottom: 16px; }
+  .plist { display: flex; flex-direction: column; gap: 12px; }
+  .pcard { position: relative; background: var(--surface); border: 1px solid var(--border); display: flex; flex-direction: column; }
+  .pcard .top { display: flex; gap: 12px; padding: 12px; }
+  .pcard .thumb { width: 112px; height: 70px; }
+  .pcard .thumb > .remote { transform: scale(.0875); }
+  .pcard .body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .pcard .ttl { display: flex; align-items: center; gap: 6px; }
+  .pcard .ttl svg.i { width: 16px; height: 16px; color: var(--cloud-blue); stroke-width: 1.75; }
+  .pcard .sub { font: 400 13px/17px var(--ff-ui); color: var(--fg-muted); }
+  .pcard .ago { font: 400 13px/17px var(--ff-ui); color: var(--fg-dim); }
+  .pcard .ft { display: flex; align-items: center; gap: 8px; padding: 0 12px 12px; }
+  .pcard .ft .nc-btn { flex: 1; height: 48px; }
+  .pcard .ft .nc-iconbtn { width: 48px; height: 48px; flex: none; }
+</style>
+</head>
+<body>
+
+<!-- Figure 9.1 · the sessions that are open, on a computer -->
+<figure class="shot" id="sessions-computer">
+  <div class="computer" data-view="sessions" data-count="3" data-co-parts="sessions:1">
+    <div class="pg">
+      <div class="pghead"><span class="h1">sessions</span></div>
+      <div class="sgrid">
+        <div class="scard">
+          <div class="thumb"><div class="remote desk" data-desk="work"></div></div>
+          <div class="body">
+            <div class="ttl"><i data-i="monitor"></i><span class="name">fin-app-02</span></div>
+            <span class="sub">Windows desktop</span>
+            <span class="sub">as alex.urban</span>
+            <span class="ago">open for 2 h 14 min</span>
+          </div>
+          <div class="ft"><ds-button>go to</ds-button><span class="end"><ds-menubutton label="more for fin-app-02" size="md"></ds-menubutton></span></div>
+        </div>
+        <div class="scard">
+          <div class="thumb"><div class="remote term" data-term="shell"></div></div>
+          <div class="body">
+            <div class="ttl"><i data-i="square-terminal"></i><span class="name">build-01</span><ds-badge data-co="8" data-co-side="bottom">in another tab</ds-badge></div>
+            <span class="sub">shell</span>
+            <span class="sub">as alex</span>
+            <span class="ago">open for 48 min</span>
+          </div>
+          <div class="ft"><ds-button>go to</ds-button><span class="end"><ds-menubutton label="more for build-01" size="md"></ds-menubutton></span></div>
+        </div>
+        <div class="scard">
+          <div class="thumb" data-co="2" data-co-side="right"><div class="remote desk" data-desk="top"></div></div>
+          <div class="body">
+            <div class="ttl" data-co="3" data-co-side="right"><i data-i="monitor"></i><span class="name">mac-design-01</span></div>
+            <span class="sub">Mac desktop</span>
+            <span class="sub" data-co="4" data-co-side="right">as studio</span>
+            <span class="ago" data-co="5" data-co-side="right">open for 6 min</span>
+          </div>
+          <div class="ft"><ds-button data-co="6" data-co-side="bottom">go to</ds-button><span class="end" data-co="7" data-co-side="right"><ds-menubutton label="more for mac-design-01" size="md"></ds-menubutton></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 9.2 · a session's menu, for a Windows desktop -->
+<figure class="shot" id="sessions-menu-computer">
+  <div class="computer" data-view="sessions" data-count="3">
+    <div class="pg">
+      <div class="pghead"><span class="h1">sessions</span></div>
+      <div class="sgrid">
+        <div class="scard">
+          <div class="thumb"><div class="remote desk" data-desk="work"></div></div>
+          <div class="body">
+            <div class="ttl"><i data-i="monitor"></i><span class="name">fin-app-02</span></div>
+            <span class="sub">Windows desktop</span>
+            <span class="sub">as alex.urban</span>
+            <span class="ago">open for 2 h 14 min</span>
+          </div>
+          <div class="ft"><ds-button>go to</ds-button><span class="end"><ds-menubutton label="more for fin-app-02" size="md" open></ds-menubutton></span></div>
+          <ds-menu data-co-in=".nc-actionmenu__item:nth-child(1) 1, .nc-actionmenu__item:nth-child(2) 2, .nc-actionmenu__item:nth-child(3) 3">
+            <ds-item icon="square-arrow-out-up-right">open in a tab of its own</ds-item>
+            <ds-item icon="door-open">leave it running</ds-item>
+            <ds-item icon="log-out">sign out of the machine</ds-item>
+          </ds-menu>
+        </div>
+        <div class="scard">
+          <div class="thumb"><div class="remote term" data-term="shell"></div></div>
+          <div class="body">
+            <div class="ttl"><i data-i="square-terminal"></i><span class="name">build-01</span><ds-badge>in another tab</ds-badge></div>
+            <span class="sub">shell</span>
+            <span class="sub">as alex</span>
+            <span class="ago">open for 48 min</span>
+          </div>
+          <div class="ft"><ds-button>go to</ds-button><span class="end"><ds-menubutton label="more for build-01" size="md"></ds-menubutton></span></div>
+        </div>
+        <div class="scard">
+          <div class="thumb"><div class="remote desk" data-desk="top"></div></div>
+          <div class="body">
+            <div class="ttl"><i data-i="monitor"></i><span class="name">mac-design-01</span></div>
+            <span class="sub">Mac desktop</span>
+            <span class="sub">as studio</span>
+            <span class="ago">open for 6 min</span>
+          </div>
+          <div class="ft"><ds-button>go to</ds-button><span class="end"><ds-menubutton label="more for mac-design-01" size="md"></ds-menubutton></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 9.3 · the same list on a phone -->
+<figure class="shot" id="sessions-phone">
+  <div class="phone" data-view="sessions" data-count="3" data-co-parts="current:1:bottom">
+    <div class="pg">
+      <div class="h1">sessions</div>
+      <div class="plist">
+        <div class="pcard" data-co="2">
+          <div class="top">
+            <div class="thumb"><div class="remote desk" data-desk="work"></div></div>
+            <div class="body">
+              <div class="ttl"><i data-i="monitor"></i><span class="name">fin-app-02</span></div>
+              <span class="sub">Windows desktop</span>
+              <span class="sub">as alex.urban</span>
+              <span class="ago">open for 2 h 14 min</span>
+            </div>
+          </div>
+          <div class="ft"><ds-button size="lg" data-co="3">go to</ds-button><ds-menubutton label="more for fin-app-02" size="lg" data-co="4" data-co-side="right"></ds-menubutton></div>
+        </div>
+        <div class="pcard">
+          <div class="top">
+            <div class="thumb"><div class="remote term" data-term="shell"></div></div>
+            <div class="body">
+              <div class="ttl"><i data-i="square-terminal"></i><span class="name">build-01</span></div>
+              <span class="sub">shell</span>
+              <span class="sub">as alex</span>
+              <span class="ago">open for 48 min</span>
+              <span><ds-badge>in another tab</ds-badge></span>
+            </div>
+          </div>
+          <div class="ft"><ds-button size="lg">go to</ds-button><ds-menubutton label="more for build-01" size="lg"></ds-menubutton></div>
+        </div>
+        <div class="pcard">
+          <div class="top">
+            <div class="thumb"><div class="remote desk" data-desk="top"></div></div>
+            <div class="body">
+              <div class="ttl"><i data-i="monitor"></i><span class="name">mac-design-01</span></div>
+              <span class="sub">Mac desktop</span>
+              <span class="sub">as studio</span>
+              <span class="ago">open for 6 min</span>
+            </div>
+          </div>
+          <div class="ft"><ds-button size="lg">go to</ds-button><ds-menubutton label="more for mac-design-01" size="lg"></ds-menubutton></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 9.4 · no session is open -->
+<figure class="shot" id="sessions-empty-computer">
+  <div class="computer" data-view="sessions">
+    <div class="pg">
+      <div class="pghead"><span class="h1">sessions</span></div>
+    </div>
+    <div class="mid">
+      <ds-empty illustration="empty" size="md" title="no sessions open" description="Open a machine from home." data-co-in=".nc-illu__title 1, .nc-illu__actions 2">
+        <ds-button variant="primary" icon="house">home</ds-button>
+      </ds-empty>
+    </div>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script src="remote.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

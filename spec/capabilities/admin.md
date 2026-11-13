@@ -12,6 +12,8 @@ Which machines there are, how each is reached and how people are signed in on it
 | Capability | Who | Away | Key |
 |---|---|---|---|
 | Keep machines, groups and rules as files, applied as they change | operator | v1 | `keep-as-files` |
+| See the machines, groups and rules that are in force, and the file each comes from | admin | v1 | `see-what-is-in-force` |
+| See that a changed file was refused, and why, while what was in force stays | operator | v1 | `see-refused-change` |
 | Add a machine in the browser: its address, its kind, how one gets in | admin | later | `add-machine-in-browser` |
 | Put machines in groups | admin | v1 | `group-machines` |
 | Say for a machine how people are signed in: as themselves, with a kept secret, or by typing | admin | v1 | `set-sign-in-way` |
@@ -21,6 +23,7 @@ Which machines there are, how each is reached and how people are signed in on it
 | Read the programs a Windows machine publishes from the machine itself | system | later | `read-programs-from-host` |
 | Set how a machine is reached: its port, its screen, what may pass | admin | v1 | `set-connection-options` |
 | Test a machine: is it reached, does signing in work, and if not, which step fails | admin | v1 | `test-machine` |
+| Say how a machine proves who it is, and accept a changed identity on purpose | admin | v1 | `know-machine-identity` |
 | Take machines over from the organisation's directory, and keep them in step | system | later | `take-from-directory` |
 | Take virtual machines over from a hypervisor | system | later | `take-from-hypervisor` |
 | Close a machine for a while, and say why | admin | later | `close-for-upkeep` |
@@ -28,7 +31,9 @@ Which machines there are, how each is reached and how people are signed in on it
 | Reach a machine through a helper installed on it | system | no | `install-helper-on-machine` |
 
 - *Keep machines, groups and rules as files, applied as they change*: so they can live in a repository and be reviewed like code.
+- *Keep a name and password or a key for a machine, never shown again*: in the first release the machine's file names a secret that the cluster holds; typing one in the browser comes with adding machines there.
 - *Change a kept password on the machine by itself from time to time*: Away keeps the secrets it needs and manages no others.
+- *Say how a machine proves who it is, and accept a changed identity on purpose*: by an authority Away trusts, or by what the machine showed when it was first tested.
 - *Make, copy or hand out fresh desktops as people ask for them*: Away reaches machines that exist.
 - *Reach a machine through a helper installed on it*: a machine is reached the way it already offers.
 
@@ -40,13 +45,14 @@ The rules: which people reach which machines, and what they may do there. For th
 |---|---|---|---|
 | Allow a group of people to reach a machine or a group of machines | admin | v1 | `allow-by-group` |
 | Show a person only the machines a rule gives them | system | v1 | `show-only-allowed` |
+| See what a person reaches, and by which rule | admin | v1 | `see-who-reaches` |
 | Take people and their groups from the identity provider, and keep none of its own | system | v1 | `take-people-from-provider` |
 | Say who administers Away, who reads its records, and who only connects | admin | v1 | `name-roles` |
 | Allow or forbid the clipboard, in each direction | admin | v1 | `limit-clipboard` |
 | Allow or forbid moving files, in each direction | admin | later | `limit-files` |
 | Allow or forbid printing, sound and the microphone | admin | later | `limit-other-channels` |
 | Allow looking at a machine without touching it | admin | later | `allow-watch-only` |
-| End a session nobody has used for a set time | system | v1 | `end-when-idle` |
+| End a session nobody has used for a set time, with a warning before | system | v1 | `end-when-idle` |
 | End a session after a longest time, with a warning before | system | later | `limit-length` |
 | Limit how many sessions a person or a machine has at once | system | later | `limit-count` |
 | Allow a machine at certain hours only | admin | later | `limit-by-time` |

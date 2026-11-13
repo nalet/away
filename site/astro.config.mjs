@@ -78,8 +78,12 @@ export default defineConfig({
       plugins: [
         // every page is in a section's side navigation (src/nav.mjs); the 404 page is in
         // none, the goal map (src/pages/spec/goals/) is in the goals', the capability map
-        // (src/pages/spec/capabilities/) in the capabilities'.
-        starlightSidebarTopics(topics, { exclude: ['/404'], topics: { goals: ['/spec/goals/**'], capabilities: ['/spec/capabilities/**'] } }),
+        // (src/pages/spec/capabilities/) in the capabilities', the page of all screens
+        // (src/pages/spec/screens/) in the screens'.
+        starlightSidebarTopics(topics, {
+          exclude: ['/404'],
+          topics: { goals: ['/spec/goals/**'], capabilities: ['/spec/capabilities/**'], screens: ['/spec/screens/**'] },
+        }),
         // the product page is outside the docs.
         starlightLinksValidator({ exclude: [`${BASE}/`] }),
       ],

@@ -1,0 +1,206 @@
+<!doctype html>
+<!--
+  Chapter 8, a shell: the figures of spec/screens/shell.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch08 [id …]
+  The look is screens.css; frame.js draws the session's bar (chapter 6 specifies
+  it, this chapter the two buttons a shell adds); remote.js draws what the shell
+  shows, and two figures write their own lines. The design system's components
+  are the <ds-*> tags, which ds.js expands into the package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 8 a shell</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  /* a menu under one of the bar's buttons */
+  .session > .nc-actionmenu { top: 52px; }
+  /* the find field, over the top right of the shell */
+  .findbar { position: absolute; z-index: 31; top: 56px; right: 16px; display: flex; align-items: center; gap: 4px; padding: 6px; background: var(--surface);
+             border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
+  .findbar .nc-input { width: 220px; }
+  .findbar .cnt { padding: 0 10px 0 8px; font: 500 12px/1 var(--ff-mono); color: var(--fg-muted); white-space: nowrap; }
+  /* a match that is not the current one: the same mark, quieter */
+  .term .hm { background: rgba(242, 178, 51, .26); }
+  /* how far back the shell is scrolled, at its foot, and where that is in all that went by */
+  .backline { position: absolute; z-index: 28; left: 0; right: 0; bottom: 0; height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 16px;
+              background: var(--bg-2); border-top: 1px solid var(--border-2); font: 500 12px/1 var(--ff-mono); color: var(--fg-muted); }
+  .scrollv { position: absolute; z-index: 28; right: 0; top: 48px; bottom: 36px; width: 8px; }
+  .scrollv i { position: absolute; left: 2px; right: 2px; top: 71%; height: 7%; background: var(--border-control); }
+  /* a point of the shell, for a note to mark */
+  .spot { position: absolute; width: 8px; height: 16px; }
+</style>
+</head>
+<body>
+
+<!-- Figure 8.1 · a shell: its text has the whole window -->
+<figure class="shot" id="shell-computer">
+  <div class="computer" data-bar="none" data-co-parts="handle:1:top">
+    <div class="session" data-sbar="closed">
+      <div class="remote term" data-term="shell" data-co="2"></div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 8.2 · the bar of a shell: text and find in the place of picture -->
+<figure class="shot" id="shell-bar-computer">
+  <div class="computer" data-bar="none" data-co-parts="look:1:top,find:2:top">
+    <div class="session" data-sbar="open" data-tabs="shell:build-01,desktop:fin-app-02" data-as="as alex">
+      <div class="remote term" data-term="shell"></div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 8.3 · the text's look -->
+<figure class="shot" id="shell-look-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="open" data-tabs="shell:build-01,desktop:fin-app-02" data-as="as alex" data-on="look">
+      <div class="remote term" data-term="shell"></div>
+      <div class="spanel" style="right: 172px">
+        <span class="h2">text</span>
+        <ds-field label="Text size" data-co="1" data-co-side="right"><ds-select value="13 px"></ds-select></ds-field>
+        <ds-field label="Font" data-co="2" data-co-side="right"><ds-select value="JetBrains Mono"></ds-select></ds-field>
+        <ds-field label="Colours" data-co="3" data-co-side="right"><ds-select value="dark"></ds-select></ds-field>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 8.4 · scrolled back, and finding a word in what went by -->
+<figure class="shot" id="shell-find-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="open" data-tabs="shell:build-01,desktop:fin-app-02" data-as="as alex" data-on="find">
+<div class="remote term">2026-11-13T08:41:07Z <span class="c">info</span>  batch 4391 started
+2026-11-13T08:42:31Z <span class="c">info</span>  batch 4391 done: 198 invoices, 0 failed
+2026-11-13T08:42:32Z <span class="c">info</span>  batch 4392 started
+2026-11-13T08:43:50Z <span class="c">info</span>  batch 4392 done: 204 invoices, 0 failed
+2026-11-13T08:43:51Z <span class="c">info</span>  batch 4393 started
+<span data-co="3"></span>2026-11-13T08:44:12Z <span class="y hm">warn</span>  queue lag 31 s, above 30 s
+2026-11-13T08:45:09Z <span class="c">info</span>  batch 4393 done: 187 invoices, 0 failed
+2026-11-13T08:45:10Z <span class="c">info</span>  batch 4394 started
+2026-11-13T08:46:33Z <span class="c">info</span>  batch 4394 done: 201 invoices, 0 failed
+2026-11-13T08:46:34Z <span class="c">info</span>  batch 4395 started
+2026-11-13T08:47:02Z <span class="c">info</span>  ledger: connection 7 recycled after 600 s
+2026-11-13T08:47:58Z <span class="c">info</span>  batch 4395 done: 213 invoices, 0 failed
+2026-11-13T08:47:59Z <span class="c">info</span>  batch 4396 started
+<span data-co="2"></span>2026-11-13T08:48:40Z <span class="hl">warn</span>  retry 1 of 3 for invoice 2026-4291: ledger busy
+2026-11-13T08:48:42Z <span class="c">info</span>  invoice 2026-4291 written
+2026-11-13T08:49:21Z <span class="c">info</span>  batch 4396 done: 196 invoices, 0 failed
+2026-11-13T08:49:22Z <span class="c">info</span>  batch 4397 started
+2026-11-13T08:50:44Z <span class="c">info</span>  batch 4397 done: 209 invoices, 0 failed
+2026-11-13T08:50:45Z <span class="c">info</span>  batch 4398 started
+2026-11-13T08:51:30Z <span class="c">info</span>  mail: 4 statements queued
+2026-11-13T08:52:11Z <span class="c">info</span>  batch 4398 done: 187 invoices, 0 failed
+2026-11-13T08:52:12Z <span class="c">info</span>  batch 4399 started
+2026-11-13T08:52:40Z <span class="y hm">warn</span>  queue lag 34 s, above 30 s
+2026-11-13T08:53:37Z <span class="c">info</span>  batch 4399 done: 201 invoices, 0 failed
+2026-11-13T08:53:38Z <span class="c">info</span>  batch 4400 started
+2026-11-13T08:55:02Z <span class="c">info</span>  batch 4400 done: 190 invoices, 0 failed
+2026-11-13T08:55:03Z <span class="c">info</span>  batch 4401 started
+2026-11-13T08:56:19Z <span class="c">info</span>  batch 4401 done: 207 invoices, 0 failed
+2026-11-13T08:56:20Z <span class="c">info</span>  batch 4402 started
+2026-11-13T08:56:48Z <span class="y hm">warn</span>  queue lag 33 s, above 30 s
+2026-11-13T08:57:41Z <span class="c">info</span>  batch 4402 done: 199 invoices, 0 failed
+2026-11-13T08:57:42Z <span class="c">info</span>  batch 4403 started
+2026-11-13T08:59:00Z <span class="c">info</span>  batch 4403 done: 211 invoices, 0 failed
+2026-11-13T08:59:01Z <span class="c">info</span>  batch 4404 started
+2026-11-13T09:00:15Z <span class="c">info</span>  batch 4404 done: 205 invoices, 0 failed
+2026-11-13T09:00:16Z <span class="c">info</span>  batch 4405 started</div>
+      <div class="findbar" data-co="1" data-co-side="right">
+        <ds-input icon="search" value="warn" focused></ds-input>
+        <span class="cnt">2 of 5</span>
+        <ds-iconbutton variant="ghost" size="sm" icon="chevron-up" label="the match before"></ds-iconbutton>
+        <ds-iconbutton variant="ghost" size="sm" icon="chevron-down" label="the next match"></ds-iconbutton>
+        <ds-iconbutton variant="ghost" size="sm" icon="x" label="close"></ds-iconbutton>
+      </div>
+      <div class="scrollv"><i></i></div>
+      <div class="backline" data-co="4"><span>412 lines back</span><span class="end"><ds-button variant="ghost" size="sm" icon="arrow-down">to the newest</ds-button></span></div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 8.5 · text selected with the mouse, and the clipboard's menu -->
+<figure class="shot" id="shell-select-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="open" data-tabs="shell:build-01,desktop:fin-app-02" data-as="as alex" data-on="clipboard">
+<div class="remote term"><span class="g">alex@build-01</span>:<span class="b">~/src/billing</span>$ git status --short
+ <span class="y">M</span> api/invoice.rs
+ <span class="y">M</span> api/tests/invoice.rs
+<span class="g">alex@build-01</span>:<span class="b">~/src/billing</span>$ cargo test invoice
+   <span class="g">Compiling</span> billing v0.14.2 (/home/alex/src/billing)
+    <span class="g">Finished</span> test [unoptimized + debuginfo] target(s) in 8.41s
+     <span class="g">Running</span> unittests src/lib.rs
+
+running 6 tests
+test invoice::tests::adds_lines ... <span class="g">ok</span>
+test invoice::tests::rounds_half_up ... <span class="g">ok</span>
+test invoice::tests::rejects_negative_total ... <span class="g">ok</span>
+test invoice::tests::keeps_currency ... <span class="g">ok</span>
+test invoice::tests::numbers_in_sequence ... <span class="g">ok</span>
+test invoice::tests::dates_in_utc ... <span class="g">ok</span>
+
+test result: <span class="g">ok</span>. 6 passed; 0 failed; 0 ignored; 0 measured; finished in 0.03s
+
+<span class="g">alex@build-01</span>:<span class="b">~/src/billing</span>$ tail -n 3 /var/log/billing/worker.log
+<span data-co="1"></span>2026-11-13T09:13:41Z <span class="c">info</span>  <span class="selx">batch 4411 done: 212 invoices, 0 failed
+2026-11-13T09:13:58Z warn  queue lag 41 s, above 30 s</span>
+2026-11-13T09:14:02Z <span class="c">info</span>  batch 4412 started
+<span class="g">alex@build-01</span>:<span class="b">~/src/billing</span>$ <span class="cur"></span></div>
+      <ds-menu style="right: 208px; min-width: 216px" data-co-in=".nc-actionmenu__item:nth-child(1) 2 right, .nc-actionmenu__item:nth-child(2) 3 right">
+        <ds-item icon="copy">copy the selection</ds-item>
+        <ds-item icon="clipboard-paste">paste</ds-item>
+      </ds-menu>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 8.6 · pasting several lines asks first -->
+<figure class="shot" id="shell-paste-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="closed">
+      <div class="remote term" data-term="shell"></div>
+      <ds-modal title="paste 4 lines?" width="520" data-co-in=".nc-modal__title 1, .nc-code 2, .nc-modal__footer 3">
+        <ds-body>
+          <p class="text" style="margin-bottom: 12px">The shell runs each line as soon as it arrives.</p>
+          <ds-code block>cd ~/src/billing
+git pull --rebase
+cargo build --release
+sudo systemctl restart billing</ds-code>
+        </ds-body>
+        <ds-footer><ds-button variant="ghost">cancel</ds-button><ds-button variant="primary">paste</ds-button></ds-footer>
+      </ds-modal>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 8.7 · a program that takes the whole shell -->
+<figure class="shot" id="shell-monitor-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="closed">
+      <div class="remote term" data-term="monitor"></div>
+      <span class="spot" style="left: 16px; top: 34px" data-co="1"></span>
+      <span class="spot" style="left: 16px; top: 171px" data-co="2"></span>
+      <span class="spot" style="left: 16px; top: 406px" data-co="3"></span>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 8.8 · the shell ended -->
+<figure class="shot" id="shell-ended-computer">
+  <div class="computer" data-bar="none">
+    <div class="stage">
+      <ds-empty illustration="empty" size="lg" title="the shell on build-01 ended" data-co-in=".nc-illu__title 1, .nc-illu__description 2, .nc-illu__actions 3"
+                description="You left it with exit, or the machine closed it.">
+        <ds-button variant="primary" icon="square-terminal">open again</ds-button><ds-button>machines</ds-button>
+      </ds-empty>
+    </div>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script src="remote.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

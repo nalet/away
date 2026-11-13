@@ -14,6 +14,7 @@ Signing in to Away once, and from there on each machine. For the goal [Get in wi
 | Sign in through the organisation's identity provider | person | — | — | — | v1 | `sign-in` |
 | Sign in through an identity provider that speaks SAML only | person | — | — | — | no | `sign-in-with-saml` |
 | Stay signed in while the sign-in renews itself | system | — | — | — | v1 | `stay-signed-in` |
+| Sign in again when the sign-in has run out, with the open sessions kept | person | — | — | — | v1 | `sign-in-again` |
 | Sign out, and end the sessions Away opened | person | — | — | — | v1 | `sign-out` |
 | Be signed in on the machine as oneself, with nothing asked | system | v1 | no | v1 | — | `be-oneself-on-machine` |
 | Be signed in with a name and password or a key that Away keeps for the machine | system | v1 | v1 | v1 | — | `use-kept-secret` |
@@ -66,6 +67,7 @@ The machines a person may reach: the list, its groups, the search, what was used
 | Mark machines as favourites and see them first | person | v1 | `keep-favourites` |
 | See what a machine is: its kind, its address, how one gets in | person | v1 | `see-machine-details` |
 | See the programs a Windows machine offers, and open one | person | v1 | `see-programs` |
+| Choose how to open a machine that offers more than one way: its desktop, its programs, its shell | person | v1 | `choose-way-in` |
 | Open a machine from a link or a bookmark | person | v1 | `open-by-address` |
 | See whether a machine is on and can be reached | person | later | `see-machine-state` |
 | Wake a machine that sleeps or is off, and connect once it is up | person | later | `wake-machine` |

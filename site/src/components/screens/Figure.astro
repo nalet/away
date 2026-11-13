@@ -1,0 +1,27 @@
+---
+// one drawing of the screens, small, leading to its place in its chapter. the pictures
+// are the chapters' own (spec/screens/img/, copied in by scripts/sync.mjs), drawn at
+// twice their size; `width` is how wide this one is shown.
+import { Image } from 'astro:assets';
+import '../../styles/screens.css';
+
+interface Props {
+	screen: any;
+	width: number;
+}
+const { screen, width } = Astro.props;
+const pictures = import.meta.glob<{ default: ImageMetadata }>('/src/content/docs/spec/screens/img/*.png', { eager: true });
+const picture = pictures[`/src/content/docs/spec/screens/img/${screen.key}.png`]?.default;
+---
+
+{
+	picture && (
+		<a class="fig" href={screen.url} style={`width:${width}px`}>
+			<Image src={picture} width={width} densities={[1, 2]} alt="" loading="lazy" />
+			<span class="fig-cap">
+				<b>{screen.no}</b>
+				{screen.figure}
+			</span>
+		</a>
+	)
+}

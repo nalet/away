@@ -1,8 +1,10 @@
 ---
 // one capability's fact sheet: where it stands for each kind of connection or for Away
-// itself, its note, the expectations that name it, and the rest of its area. the page
+// itself, its note, the expectations that name it, the figures of the screens that draw
+// it, and the rest of its area. the page
 // /spec/capabilities/<part>/<key>/ is this; the map shows the same element beside its
 // tiles, fetched from that page, so there is one fact sheet, not two.
+import Figure from '../screens/Figure.astro';
 import { load, STATUS, WHO, EXPECTED, partLink, expectationsLink } from '../../lib/model.mjs';
 import { BASE } from '../../../site.mjs';
 
@@ -23,6 +25,11 @@ const stands = where.filter((w: any) => w.status !== '—');
 const notMeant = stands.some((w: any) => w.session) ? where.filter((w: any) => w.session && w.status === '—') : [];
 const expected = cap.expected.map((k: string) => m.expectationByKey.get(k)).filter(Boolean);
 const siblings = m.capabilities.filter((c: any) => c.area === cap.area);
+// the figures of the screens that draw it; one that a person or an administrator would
+// see in the first release, and that no figure draws, says so
+const figures: any[] = cap.figures ?? [];
+const toSee = ['person', 'admin'].includes(cap.who) && ['built', 'partial', 'v1'].includes(cap.state);
+const WIDTH: Record<string, number> = { computer: 300, phone: 104, 'phone-side': 230 };
 ---
 
 <div class="capsheet" data-factsheet data-key={cap.key}>
@@ -69,6 +76,19 @@ const siblings = m.capabilities.filter((c: any) => c.area === cap.area);
 			</ul>
 		) : (
 			<p>No expectation names it.</p>
+		)
+	}
+
+	{(figures.length > 0 || toSee) && <h2 id="drawn">Drawn</h2>}
+	{
+		figures.length > 0 ? (
+			<div class="figs not-content">
+				{figures.map((f: any) => (
+					<Figure screen={f} width={WIDTH[f.size] ?? 300} />
+				))}
+			</div>
+		) : (
+			toSee && <p>No figure of the screens shows it.</p>
 		)
 	}
 

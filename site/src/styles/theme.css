@@ -538,3 +538,31 @@ footer .meta a,
 .sl-menu-button:has(~ :popover-open) {
   border-color: var(--cloud-blue) !important;
 }
+
+/* a drawing of the screens: its anchor stops under the top bar, and a click shows it at
+   its full size over the page (src/components/MarkdownContent.astro) */
+.sl-markdown-content img[id^='fig-'] {
+	cursor: zoom-in;
+	scroll-margin-top: 5.5rem;
+}
+.sl-markdown-content img[id^='fig-']:focus-visible {
+	outline: 2px solid var(--focus-ring);
+	outline-offset: 2px;
+}
+dialog.fig-zoom {
+	max-width: 96vw;
+	max-height: 94vh;
+	padding: 0;
+	border: 1px solid var(--border-2);
+	background: #05070c;
+	overflow: auto;
+	cursor: zoom-out;
+}
+dialog.fig-zoom::backdrop {
+	background: rgba(5, 7, 12, 0.85);
+}
+dialog.fig-zoom img {
+	display: block;
+	max-width: none;
+	height: auto;
+}

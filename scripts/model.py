@@ -14,6 +14,10 @@ What Away does is three files in spec/capabilities/:
   expectations.csv  one row a thing people expect of remote access they run themselves,
                     with the capabilities that meet it
 Every area and every expectation is for one goal, so each capability leads up to a goal.
+What Away looks like is the chapters of spec/screens/ and one file there:
+  screens.csv       one row a figure: its chapter, what it shows, its size, and the
+                    capabilities it draws. A figure's picture is img/<key>.png, drawn by
+                    scripts/render-mockups.mjs from the chapter's img/ch*.html.
 
 Where a capability stands is one of:
   built     there
@@ -33,6 +37,9 @@ It checks, and names every problem it finds:
   - every area, expectation and quality is for a goal that exists, every capability is in
     an area that exists, every expectation names capabilities that exist;
   - every goal has an area, an expectation or a quality; every area has a capability;
+  - every figure has its picture and is in its chapter, in the file's order and under its
+    number; every picture and every drawing in the chapters' sources is a figure; every
+    capability a figure draws exists;
   - the pages' generated blocks are what the model says (--check), else they are written.
     A block is the text between "<!-- generated: name -->" and "<!-- end: name -->";
     everything outside the blocks is written by hand.
@@ -53,6 +60,7 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 SPEC = os.path.join(ROOT, 'spec')
 GOALS = os.path.join(SPEC, 'goals')
 CAP = os.path.join(SPEC, 'capabilities')
+SCREENS = os.path.join(SPEC, 'screens')
 
 GOAL_KINDS = [('use', 'what people want'), ('enable', 'what that takes'), ('open', 'what being open adds')]
 CHARACTERISTICS = ['functional suitability', 'performance efficiency', 'compatibility', 'interaction capability',
@@ -76,6 +84,10 @@ QUALITY_COLS = ['key', 'goal', 'characteristic', 'quality', 'measure', 'target',
 AREA_COLS = ['key', 'part', 'goal', 'area', 'intro']
 CAP_COLS = ['key', 'area', 'capability', 'who'] + [k for k, _ in WHERE] + ['note']
 EXPECT_COLS = ['key', 'goal', 'expectation', 'capabilities', 'note']
+SCREEN_COLS = ['key', 'chapter', 'figure', 'size', 'capabilities', 'note']
+SIZES = ['computer', 'phone', 'phone-side']
+# whose capabilities have something to see: a figure can draw them
+SEEN_BY = ['person', 'admin']
 
 problems = []
 
@@ -108,13 +120,13 @@ def slug(text):
     return kept.replace(' ', '-')
 
 
-def keys_of(rows, name):
+def keys_of(rows, name, most=32):
     """the rows by key; a key that is malformed or there twice is a problem"""
     out = {}
     for r in rows:
         w = f'{name} {r.get("key")}'
-        if not KEY.match(r['key']) or len(r['key']) > 32:
-            problem(w, 'key is not kebab-case of at most 32 characters')
+        if not KEY.match(r['key']) or len(r['key']) > most:
+            problem(w, f'key is not kebab-case of at most {most} characters')
         if r['key'] in out:
             problem(w, 'key twice')
         out[r['key']] = r
@@ -224,6 +236,82 @@ def check_model(goal_keys, areas, caps, expectations, qualities):
     return area_keys, cap_keys
 
 
+def chapters():
+    """the chapters of spec/screens/, by file name without .md: each starts "# 6 A desktop" """
+    out = {}
+    if not os.path.isdir(SCREENS):
+        return out
+    for name in sorted(os.listdir(SCREENS)):
+        if not name.endswith('.md'):
+            continue
+        text = open(os.path.join(SCREENS, name), encoding='utf-8').read()
+        m = re.match(r'# (\d+) (.+)\n', text)
+        if not m:
+            problem(f'spec/screens/{name}', 'does not start with "# <number> <title>"')
+            continue
+        out[name[:-3]] = {'key': name[:-3], 'no': int(m.group(1)), 'title': m.group(2).strip(), 'file': name, 'text': text}
+    numbers = Counter(c['no'] for c in out.values())
+    for c in out.values():
+        if numbers[c['no']] > 1:
+            problem(f'spec/screens/{c["file"]}', f'chapter number {c["no"]} is taken twice')
+    return out
+
+
+def check_screens(screens, chaps, cap_keys):
+    """every figure, with its number: 6.3 is the third figure of chapter 6"""
+    keys_of(screens, 'screens.csv', 40)
+    img = os.path.join(SCREENS, 'img')
+    pictures = {n[:-4] for n in os.listdir(img) if n.endswith('.png')} if os.path.isdir(img) else set()
+    drawn = set()
+    if os.path.isdir(img):
+        for name in sorted(os.listdir(img)):
+            if name.endswith('.html'):
+                source = re.sub(r'<!--.*?-->', '', open(os.path.join(img, name), encoding='utf-8').read(), flags=re.S)
+                drawn |= set(re.findall(r'<figure class="shot" id="([^"]+)"', source))
+    seen = Counter()
+    last = {}
+    for f in screens:
+        w = f'screens.csv {f["key"]}'
+        sentence(w, 'figure', f['figure'], 100)
+        if f['size'] not in SIZES:
+            problem(w, f'size "{f["size"]}" is none of {SIZES}')
+        for k in split(f['capabilities']):
+            if k not in cap_keys:
+                problem(w, f'draws the capability "{k}", which does not exist')
+        c = chaps.get(f['chapter'])
+        if not c:
+            problem(w, f'chapter "{f["chapter"]}" has no file spec/screens/{f["chapter"]}.md')
+            continue
+        seen[f['chapter']] += 1
+        f['no'] = f'{c["no"]}.{seen[f["chapter"]]}'
+        if f['key'] not in pictures:
+            problem(w, f'has no picture spec/screens/img/{f["key"]}.png')
+        if f['key'] not in drawn:
+            problem(w, 'is drawn in no img/ch*.html')
+        at = c['text'].find(f'](img/{f["key"]}.png)')
+        if at < 0:
+            problem(w, f'is not in spec/screens/{c["file"]}')
+            continue
+        if at < last.get(f['chapter'], -1):
+            problem(w, f'comes earlier in spec/screens/{c["file"]} than the figure before it in screens.csv')
+        last[f['chapter']] = at
+        m = re.match(r'\]\(img/[^)]+\)\s*\n\s*\n\*\*Figure (\d+\.\d+)\*\*', c['text'][at:])
+        if not m:
+            problem(w, f'has no caption "**Figure {f["no"]}** …" under it in spec/screens/{c["file"]}')
+        elif m.group(1) != f['no']:
+            problem(w, f'is figure {f["no"]} by its place, and its caption in spec/screens/{c["file"]} says {m.group(1)}')
+    listed = {f['key'] for f in screens}
+    for k in sorted(pictures - listed):
+        problem(f'spec/screens/img/{k}.png', 'is no figure of screens.csv')
+    for k in sorted(drawn - listed):
+        problem(f'the drawing "{k}"', 'is no figure of screens.csv')
+    for c in chaps.values():
+        for k in re.findall(r'\]\(img/([^)]+)\.png\)', c['text']):
+            if k not in listed:
+                problem(f'spec/screens/{c["file"]}', f'shows img/{k}.png, which is no figure of screens.csv')
+    return [f for f in screens if 'no' in f]
+
+
 # ------------------------------------------------------------------- the states
 def cap_state(c):
     """a capability in one word, over every protocol it stands for, or over Away itself:
@@ -273,8 +361,14 @@ def count(n, one, many=None):
 
 
 class Model:
-    def __init__(self, goals, qualities, areas, caps, expectations, cap_keys):
+    def __init__(self, goals, qualities, areas, caps, expectations, cap_keys, screens=(), chaps=None):
         self.goals, self.qualities, self.areas, self.caps, self.expectations = goals, qualities, areas, caps, expectations
+        self.screens, self.chapters = list(screens), sorted((chaps or {}).values(), key=lambda c: c['no'])
+        # the figures that draw a capability, by its key
+        self.drawn = {}
+        for f in self.screens:
+            for k in split(f['capabilities']):
+                self.drawn.setdefault(k, []).append(f)
         self.goal = {g['key']: g for g in goals}
         self.area = {a['key']: a for a in areas}
         self.cap = cap_keys
@@ -437,6 +531,47 @@ class Model:
                          ['Expected', 'For the goal', 'Note']) + '\n')
         return '\n'.join(out)
 
+    # ---- spec/screens/
+    def to_see(self):
+        """the capabilities of the first release that have something to see"""
+        return [c for c in self.caps if c['who'] in SEEN_BY and self.state[c['key']] in ('built', 'partial', 'v1')]
+
+    def cap_link(self, k, base='../capabilities/'):
+        a = self.area[self.cap[k]['area']]
+        return f'[{self.cap[k]["capability"]}]({base}{self.page[a["key"]]}#{slug(a["area"])})'
+
+    def figures_block(self):
+        rows = []
+        for c in self.chapters:
+            its = [f for f in self.screens if f['chapter'] == c['key']]
+            if its:
+                caps = {k for f in its for k in split(f['capabilities']) if k in self.cap}
+                rows.append([c['no'], f'[{c["title"]}](./{c["file"]})', len(its), len(caps)])
+        seen = self.to_see()
+        shown = sum(1 for c in seen if c['key'] in self.drawn)
+        every = {k for f in self.screens for k in split(f['capabilities']) if k in self.cap}
+        rows.append(['', 'all', len(self.screens), len(every)])
+        return (table(rows, ['No.', 'Chapter', 'Figures', 'Capabilities they draw']) +
+                f'\n\nThe first release holds {len(seen)} capabilities for a person or an administrator. '
+                f'A figure shows {shown} of them.\n')
+
+    def not_drawn_block(self):
+        rows = []
+        for a in self.areas:
+            its = [c for c in self.to_see() if c['area'] == a['key']]
+            gone = [c for c in its if c['key'] not in self.drawn]
+            if gone:
+                rows.append([self.area_link(a, '../capabilities/'), f'{len(its) - len(gone)} of {len(its)}',
+                             '; '.join(f'{c["capability"]} `{c["key"]}`' for c in gone)])
+        if not rows:
+            return 'Every one of them is in a figure.\n'
+        return table(rows, ['Area', 'In a figure', 'In no figure']) + '\n'
+
+    def draws_block(self, chapter):
+        rows = [[f'{f["no"]} {f["figure"]}', ', '.join(self.cap_link(k) for k in split(f['capabilities']) if k in self.cap) or '—']
+                for f in self.screens if f['chapter'] == chapter]
+        return table(rows, ['Figure', 'Draws']) + '\n'
+
     # ---- spec/README.md
     def state_block(self):
         n = Counter(self.state.values())
@@ -448,6 +583,12 @@ class Model:
             ['Expectations', len(self.expectations), said(e, EXPECT_STATES)],
             ['Capabilities', len(self.caps), f'in {count(len(self.areas), "area")}: ' + said(n, STATES, STATE_WORD)],
         ]
+        if self.screens:
+            seen = self.to_see()
+            rows.append(['Figures', len(self.screens),
+                         f'in {count(len({f["chapter"] for f in self.screens}), "chapter")}; they show '
+                         f'{sum(1 for c in seen if c["key"] in self.drawn)} of the {len(seen)} capabilities the first '
+                         f'release holds for a person or an administrator'])
         return table(rows, ['', 'Rows', 'Of them']) + '\n'
 
     # ---- the model, for the site
@@ -461,7 +602,12 @@ class Model:
                 'key': c['key'], 'area': c['area'], 'capability': c['capability'], 'who': c['who'], 'note': c['note'],
                 'status': {k: c[k] for k, _ in WHERE}, 'state': self.state[c['key']],
                 'expected': [e['key'] for e in self.expectations if c['key'] in split(e['capabilities'])],
+                'drawn': [f['key'] for f in self.drawn.get(c['key'], [])],
             } for c in self.caps],
+            'chapters': [{'key': c['key'], 'no': c['no'], 'title': c['title'], 'page': f'spec/screens/{c["file"]}'}
+                         for c in self.chapters],
+            'screens': [{'key': f['key'], 'chapter': f['chapter'], 'no': f['no'], 'figure': f['figure'], 'size': f['size'],
+                         'capabilities': [k for k in split(f['capabilities']) if k in self.cap]} for f in self.screens],
             'goalKinds': [{'key': k, 'label': label} for k, label in GOAL_KINDS],
             'goals': [{'key': g['key'], 'goal': g['goal'], 'kind': g['kind'], 'needs': split(g['needs']), 'why': g['why'],
                        'areas': [a['key'] for a in self.areas if a['goal'] == g['key']]} for g in self.goals],
@@ -501,14 +647,16 @@ def main():
     expectations = read('expectations.csv', EXPECT_COLS)
     goal_keys = check_goals(goals, qualities)
     area_keys, cap_keys = check_model(goal_keys, areas, caps, expectations, qualities)
+    chaps = chapters()
+    screens = check_screens(read('screens.csv', SCREEN_COLS, SCREENS), chaps, cap_keys)
     # what the check has named as unknown is left out of the pages
     m = Model(goals, [q for q in qualities if q['goal'] in goal_keys],
               [a for a in areas if a['goal'] in goal_keys and a['part'] in [p for p, _, _ in PARTS]],
               [c for c in caps if c['area'] in area_keys and all(c[k] in STATUS for k, _ in WHERE)],
-              [e for e in expectations if e['goal'] in goal_keys], cap_keys)
+              [e for e in expectations if e['goal'] in goal_keys], cap_keys, screens, chaps)
     m.caps = [c for c in m.caps if c['area'] in m.area]
     summary = (f'{len(goals)} goals, {len(qualities)} qualities; {len(caps)} capabilities in {len(areas)} areas, '
-               f'{len(expectations)} expectations')
+               f'{len(expectations)} expectations; {len(screens)} figures in {len({f["chapter"] for f in screens})} chapters')
     if '--json' in sys.argv:
         at = sys.argv.index('--json') + 1
         if at >= len(sys.argv):
@@ -523,6 +671,10 @@ def main():
     fill(os.path.join(CAP, 'left-out.md'), {'left-out': m.left_out_block()}, write)
     for p, _, page in PARTS:
         fill(os.path.join(CAP, page), {'areas': m.area_blocks(p)}, write)
+    fill(os.path.join(SCREENS, 'README.md'), {'figures': m.figures_block(), 'not-drawn': m.not_drawn_block()}, write)
+    for c in m.chapters:
+        if any(f['chapter'] == c['key'] for f in m.screens):
+            fill(os.path.join(SCREENS, c['file']), {'draws': m.draws_block(c['key'])}, write)
     for p in problems:
         print(p)
     print(f'{len(problems)} problems; {summary}')

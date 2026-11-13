@@ -1,0 +1,174 @@
+<!doctype html>
+<!--
+  Chapter 11, settings: the figures of spec/screens/settings.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch11 [id …]
+  The look is screens.css, the frame is frame.js, the icons are icons.js. The
+  design system's components are the <ds-*> tags, which ds.js expands into the
+  package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 11 settings</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  /* a group of settings: the design system's card, its rows edge to edge */
+  .set .nc-card__body { padding: 0; }
+  .set .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; align-items: start; }
+  .set .colx { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .set .li { min-height: 60px; }
+  .set .li .tail .nc-select { width: 232px; }
+  .set .li .tail .nc-badge + .nc-badge { margin-left: -2px; }
+  .set .li .tail svg.i { width: 18px; height: 18px; }
+  /* on a phone: one column, the choices narrower */
+  .phone .set { display: flex; flex-direction: column; gap: 12px; }
+  .phone .set .li { min-height: 56px; padding: 8px 12px; gap: 10px; }
+  .phone .set .li.st { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px 12px; }
+  .phone .set .li.st .tail { margin-left: 0; display: flex; justify-content: flex-start; }
+  .phone .set .li.st .tail .nc-select { width: 100%; }
+  .phone .set .nc-card__header { padding: 10px 12px; }
+  /* a page moved to its end: its foot at the foot of the screen, its start out of sight under the bar */
+  .phone .scroll > .pg.atend { position: absolute; left: 0; right: 0; bottom: 0; }
+  /* the about page: facts on the left, the parts on the right */
+  .ab .cols { display: grid; grid-template-columns: 440px minmax(0, 1fr); gap: 24px; align-items: start; }
+  .ab .facts { gap: 12px 24px; }
+  .ab .lnk { color: var(--cloud-blue); text-decoration: underline; text-underline-offset: 3px; }
+  .ab .nc-card__body { display: flex; flex-direction: column; gap: 16px; }
+  .ab .bar { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
+  .ab .bar .nc-input { width: 280px; }
+  .ab .rule { height: 1px; background: var(--border); }
+  .ab .nc-card [data-co] { margin-left: -16px; padding-left: 16px; }
+</style>
+</head>
+<body>
+
+<!-- Figure 11.1 · settings, on a computer -->
+<figure class="shot" id="settings-computer">
+  <div class="computer" data-view="settings">
+    <div class="pg set">
+      <div class="pghead"><span class="h1">settings</span></div>
+      <div class="cols">
+        <div class="colx">
+          <ds-card title="desktops">
+            <div class="li"><div class="main"><span class="ttl">A machine opens</span><span class="sub">Where a session goes when you choose a machine.</span></div><div class="tail"><ds-select value="in this tab"></ds-select></div></div>
+            <div class="li"><div class="main"><span class="ttl">Picture</span><span class="sub">The size a desktop's screen has when it opens.</span></div><div class="tail"><ds-select value="fit the window"></ds-select></div></div>
+          </ds-card>
+          <ds-card title="keyboard" data-co="1">
+            <div class="li" data-co="2"><div class="main"><span class="ttl">Layout</span><span class="sub">This device: German (Switzerland).</span></div><div class="tail"><ds-select value="as this device has it"></ds-select></div></div>
+            <div class="li" data-co="3"><div class="main"><span class="ttl">Cmd works as Ctrl on a Windows machine</span><span class="sub">And Ctrl as Cmd on a Mac, so that shortcuts are where your hands expect them.</span></div><div class="tail"><ds-switch checked></ds-switch></div></div>
+          </ds-card>
+          <ds-card title="scrolling">
+            <div class="li"><div class="main"><span class="ttl">Direction</span><span class="sub">Which way a page on the machine moves under two fingers or the wheel.</span></div><div class="tail"><ds-select value="as on this device"></ds-select></div></div>
+          </ds-card>
+        </div>
+        <div class="colx">
+          <ds-card title="shell">
+            <div class="li"><div class="main"><span class="ttl">Text size</span></div><div class="tail"><ds-select value="13 px" data-co="4" data-co-side="right"></ds-select></div></div>
+            <div class="li"><div class="main"><span class="ttl">Font</span></div><div class="tail"><ds-select value="JetBrains Mono"></ds-select></div></div>
+            <div class="li"><div class="main"><span class="ttl">Colours</span></div><div class="tail"><ds-select value="dark"></ds-select></div></div>
+          </ds-card>
+          <ds-card title="account">
+            <div class="li" data-co="5" data-co-side="right"><span class="av">au</span><div class="main"><span class="ttl">Alex Urban</span><span class="sub">alex.urban@example.com</span></div></div>
+            <div class="li"><div class="main"><span class="ttl">Groups</span><span class="sub">Like your name and your address, they come from the service you sign in with, and are changed there.</span></div><div class="tail"><ds-badge>finance</ds-badge><ds-badge>engineering</ds-badge></div></div>
+            <div class="li"><div class="main"><span class="ttl">Sign out of Away</span><span class="sub">This ends your open sessions too.</span></div><div class="tail"><ds-button data-co="6" data-co-side="right">sign out</ds-button></div></div>
+          </ds-card>
+          <ds-card title="about">
+            <div class="li" data-co="7" data-co-side="right"><div class="main"><span class="ttl">About Away</span><span class="sub">Version 0.1.0, its source and its licences.</span></div><div class="tail"><i data-i="chevron-right"></i></div></div>
+          </ds-card>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 11.2 · about Away -->
+<figure class="shot" id="settings-about-computer">
+  <div class="computer" data-view="settings">
+    <div class="pg ab">
+      <div class="pghead"><ds-iconbutton variant="ghost" icon="arrow-left" label="settings" data-co="1" data-co-side="top"></ds-iconbutton><span class="h1">about away</span></div>
+      <div class="cols">
+        <ds-card title="this away">
+          <dl class="facts">
+            <dt data-co="2">Version</dt><dd>0.1.0</dd>
+            <dt data-co="3">Built from</dt><dd><ds-code>4f2c91a</ds-code> of <span class="lnk">github.com/nalet/away</span></dd>
+            <dt data-co="4">Licence</dt><dd>Mozilla Public License 2.0 · <span class="lnk">its text</span></dd>
+          </dl>
+          <div class="rule"></div>
+          <p class="text small" data-co="5">This Away asks nobody outside for anything: no fonts, no scripts, no statistics and no checks for updates.</p>
+          <div class="rule"></div>
+          <p class="text small" data-co="6">Found a security hole? <span class="lnk">How to report it in private</span>.</p>
+        </ds-card>
+        <div>
+          <div class="bar"><span class="h2">what it is built from</span><span class="meta muted end">214 parts</span><ds-input icon="search" placeholder="find a part…"></ds-input></div>
+          <ds-table label="what away is built from" dense data-co="7" data-co-side="right">
+            <ds-head><ds-th sort="ascending">part</ds-th><ds-th width="120px">version</ds-th><ds-th width="220px">licence</ds-th></ds-head>
+            <ds-tr><ds-td>an asynchronous runtime</ds-td><ds-td>1.44.2</ds-td><ds-td>MIT</ds-td></ds-tr>
+            <ds-tr><ds-td>a database driver</ds-td><ds-td>0.8.6</ds-td><ds-td>Apache-2.0 or MIT</ds-td></ds-tr>
+            <ds-tr><ds-td>Inter, the face of the text</ds-td><ds-td>4.1</ds-td><ds-td>OFL-1.1</ds-td></ds-tr>
+            <ds-tr><ds-td>JetBrains Mono, the face of the code</ds-td><ds-td>2.304</ds-td><ds-td>OFL-1.1</ds-td></ds-tr>
+            <ds-tr><ds-td>a library for certificates</ds-td><ds-td>0.17.1</ds-td><ds-td>Apache-2.0 or MIT</ds-td></ds-tr>
+            <ds-tr><ds-td>a library for encrypted connections</ds-td><ds-td>0.23.19</ds-td><ds-td>Apache-2.0 or ISC or MIT</ds-td></ds-tr>
+            <ds-tr><ds-td>the nalet design system</ds-td><ds-td>0.4.0</ds-td><ds-td>MIT</ds-td></ds-tr>
+            <ds-tr><ds-td>a terminal for the browser</ds-td><ds-td>5.5.0</ds-td><ds-td>MIT</ds-td></ds-tr>
+            <ds-tr><ds-td>a web server</ds-td><ds-td>0.8.4</ds-td><ds-td>MIT</ds-td></ds-tr>
+          </ds-table>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 11.3 · settings on a phone: the top of the page, and the page moved to its end -->
+<figure class="shot" id="settings-phone">
+  <div class="phone" data-bar="back" data-title="settings" data-tabs="none" data-co-parts="back:1:top">
+    <div class="pg set" id="phone-page">
+      <ds-card title="desktops">
+        <div class="li st"><div class="main"><span class="ttl">A machine opens</span><span class="sub">Where a session goes when you choose a machine.</span></div><div class="tail"><ds-select value="in this tab"></ds-select></div></div>
+        <div class="li st"><div class="main"><span class="ttl">Picture</span><span class="sub">The size a desktop's screen has when it opens.</span></div><div class="tail"><ds-select value="fit the window"></ds-select></div></div>
+      </ds-card>
+      <ds-card title="keyboard">
+        <div class="li st" data-co="2"><div class="main"><span class="ttl">Layout</span><span class="sub">This device: English (United Kingdom).</span></div><div class="tail"><ds-select value="as this device has it"></ds-select></div></div>
+        <div class="li"><div class="main"><span class="ttl">Cmd works as Ctrl on a Windows machine</span><span class="sub">And Ctrl as Cmd on a Mac, so that shortcuts are where your hands expect them.</span></div><div class="tail"><ds-switch checked></ds-switch></div></div>
+      </ds-card>
+      <ds-card title="scrolling">
+        <div class="li st"><div class="main"><span class="ttl">Direction</span><span class="sub">Which way a page on the machine moves under two fingers or the wheel.</span></div><div class="tail"><ds-select value="as on this device"></ds-select></div></div>
+      </ds-card>
+      <ds-card title="shell">
+        <div class="li st"><div class="main"><span class="ttl">Text size</span></div><div class="tail"><ds-select value="13 px"></ds-select></div></div>
+        <div class="li st"><div class="main"><span class="ttl">Font</span></div><div class="tail"><ds-select value="JetBrains Mono"></ds-select></div></div>
+        <div class="li st"><div class="main"><span class="ttl">Colours</span></div><div class="tail"><ds-select value="dark"></ds-select></div></div>
+      </ds-card>
+      <ds-card title="account">
+        <div class="li"><span class="av">au</span><div class="main"><span class="ttl">Alex Urban</span><span class="sub">alex.urban@example.com</span></div></div>
+        <div class="li st"><div class="main"><span class="ttl">Groups</span><span class="sub">Like your name and your address, they come from the service you sign in with, and are changed there.</span></div><div class="tail"><ds-badge>finance</ds-badge><ds-badge>engineering</ds-badge></div></div>
+        <div class="li"><div class="main"><span class="ttl">Sign out of Away</span><span class="sub">This ends your open sessions too.</span></div><div class="tail"><ds-button>sign out</ds-button></div></div>
+      </ds-card>
+      <ds-card title="about">
+        <div class="li"><div class="main"><span class="ttl">About Away</span><span class="sub">Version 0.1.0, its source and its licences.</span></div><div class="tail"><i data-i="chevron-right"></i></div></div>
+      </ds-card>
+    </div>
+  </div>
+  <div class="phone" data-bar="back" data-title="settings" data-tabs="none">
+    <div class="pg set atend" id="phone-page-end"></div>
+  </div>
+</figure>
+
+<script>
+  // the second phone shows the same page moved to its end: the same cards, with its own numbers
+  (function () {
+    const end = document.getElementById('phone-page-end');
+    end.innerHTML = document.getElementById('phone-page').innerHTML;
+    for (const el of end.querySelectorAll('[data-co]')) el.removeAttribute('data-co');
+    const mark = (el, n) => { el.setAttribute('data-co', n); el.setAttribute('data-co-side', 'right'); };
+    mark(end.querySelector('ds-button'), 3);
+    mark(end.querySelector('ds-card[title="about"] .li'), 4);
+  })();
+</script>
+
+<script src="ds.js"></script>
+<script src="remote.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!doctype html>
+<!--
+  Chapter 4, machines: the figures of spec/screens/machines.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch04 [id …]
+  The look is screens.css, the frame is frame.js, the icons are icons.js. The
+  design system's components are the <ds-*> tags, which ds.js expands into the
+  package's own markup. Home is drawn once, in the template below, and each
+  figure that shows it takes a copy.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 4 machines</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  .pg > .grp:first-child { margin-top: 0; }
+  .nw { white-space: nowrap; }
+  /* a tile's menu: the ways in, then the rest, as two of the design system's action menus under one shadow */
+  .tmenu { position: absolute; z-index: 150; top: 84px; right: 6px; width: 232px; display: flex; flex-direction: column; box-shadow: 0 8px 24px #00000073; }
+  .tmenu .nc-actionmenu { position: relative; box-shadow: none; }
+  .tmenu .nc-actionmenu + .nc-actionmenu { margin-top: -1px; }
+  /* what the search found: a panel under the field, over the page */
+  .found { position: absolute; z-index: 150; top: 52px; right: 72px; width: 576px; display: flex; flex-direction: column; background: var(--surface);
+           border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
+  .found .hit { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 14px; border-bottom: 1px solid var(--border); }
+  .found .hit.on { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--cloud-blue); }
+  .found .hit > svg.i { width: 20px; height: 20px; color: var(--cloud-blue); stroke-width: 1.75; }
+  .found .hit .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .found .hit .sub { font: 400 13px/1.35 var(--ff-ui); color: var(--fg-muted); }
+  .found .hit .gname { font: 500 12px/1 var(--ff-mono); color: var(--fg-dim); }
+  /* what matched: blue and underlined, so not by colour alone */
+  .found mark { background: none; color: var(--cloud-blue); text-decoration: underline; text-underline-offset: 3px; }
+  .found .foot { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: var(--bg-2); font: 400 12px/1.4 var(--ff-ui); color: var(--fg-dim); }
+  .found .foot .keys { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+  .found .foot svg.i { width: 12px; height: 12px; }
+  .found .none { display: flex; flex-direction: column; gap: 4px; padding: 16px 14px; }
+  /* a machine's own page */
+  .mhead { gap: 12px; }
+  .mhead > svg.i { width: 28px; height: 28px; color: var(--cloud-blue); stroke-width: 1.75; }
+  .mhead .star { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; color: var(--signal-amber); }
+  .mhead .star svg.i { width: 18px; height: 18px; fill: currentColor; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 48px; align-items: start; }
+  .cols .grp:first-child { margin-top: 0; }
+  .cols .mgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .m.prog { min-height: 56px; padding: 12px 16px; align-items: center; }
+  .m.prog > svg.i { margin-top: 0; }
+  /* an empty state in the middle of the page */
+  .fill { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  /* on a phone a tile has one button, its menu, at least 48 px high; a favourite shows a small star beside its name */
+  .phone .m { padding-right: 56px; }
+  .phone .m .more { top: 50%; bottom: auto; right: 4px; margin-top: -24px; width: 48px; height: 48px; }
+  .phone .m .more svg.i { width: 20px; height: 20px; }
+  .phone .m .name { display: flex; align-items: center; gap: 6px; }
+  .phone .m .name svg.i { width: 12px; height: 12px; color: var(--signal-amber); fill: currentColor; }
+</style>
+</head>
+<body>
+
+<!-- home, as every figure of it shows it: last used, favourites, then the groups -->
+<template id="home">
+  <section class="grp last">
+    <div class="gh"><ds-chevron size="14"></ds-chevron>last used</div>
+    <div class="mgrid">
+      <div class="m"><i data-i="square-terminal"></i><div class="main"><span class="name">build-01</span><span class="sub">shell</span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+      <div class="m"><i data-i="app-window"></i><div class="main"><span class="name">Ledger</span><span class="sub">program on fin-app-02</span></div><span class="more"><i data-i="ellipsis"></i></span></div>
+      <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">mac-design-01</span><span class="sub">Mac desktop</span></div><span class="star"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+      <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">fin-app-02</span><span class="sub">Windows desktop, <span class="nw">4 programs</span></span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+    </div>
+  </section>
+  <section class="grp fav">
+    <div class="gh"><ds-chevron size="14"></ds-chevron>favourites <span class="n">3</span></div>
+    <div class="mgrid">
+      <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">fin-app-02</span><span class="sub">Windows desktop, <span class="nw">4 programs</span></span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+      <div class="m"><i data-i="square-terminal"></i><div class="main"><span class="name">build-01</span><span class="sub">shell</span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+      <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">dev-linux-03</span><span class="sub">Linux desktop</span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+    </div>
+  </section>
+  <section class="grp g-finance">
+    <div class="gh"><ds-chevron size="14"></ds-chevron>finance <span class="n">2</span></div>
+    <div class="mgrid">
+      <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">fin-app-02</span><span class="sub">Windows desktop, <span class="nw">4 programs</span></span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+      <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">hr-app-01</span><span class="sub">Windows desktop</span></div><span class="star"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+    </div>
+  </section>
+  <section class="grp g-engineering">
+    <div class="gh"><ds-chevron size="14"></ds-chevron>engineering <span class="n">3</span></div>
+    <div class="mgrid">
+      <div class="m"><i data-i="square-terminal"></i><div class="main"><span class="name">build-01</span><span class="sub">shell</span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+      <div class="m"><i data-i="square-terminal"></i><div class="main"><span class="name">build-02</span><span class="sub">shell</span></div><span class="star"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+      <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">dev-linux-03</span><span class="sub">Linux desktop</span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+    </div>
+  </section>
+  <section class="grp g-design">
+    <div class="gh"><ds-chevron size="14"></ds-chevron>design <span class="n">1</span></div>
+    <div class="mgrid">
+      <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">mac-design-01</span><span class="sub">Mac desktop</span></div><span class="star"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+    </div>
+  </section>
+</template>
+<script>
+  // a copy of home, in place of the script that asks for it
+  const home = () => document.currentScript.replaceWith(document.getElementById('home').content.cloneNode(true));
+</script>
+
+<!-- Figure 4.1 · home, on a computer -->
+<figure class="shot" id="machines-computer">
+  <div class="computer" data-view="home">
+    <div class="pg" data-co-in=".last .gh 1 top, .last .m:nth-child(2) 2 top, .last .m:nth-child(4) .star 3 right, .last .m:nth-child(4) .more 4 right, .fav .gh 5, .g-finance .gh 6">
+      <script>home()</script>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 4.2 · a machine's menu -->
+<figure class="shot" id="machines-menu-computer">
+  <div class="computer" data-view="home">
+    <div class="pg">
+      <script>home()</script>
+      <script>
+        // the menu of the last tile in the first row, open under its button
+        (() => {
+          const tile = document.currentScript.parentElement.querySelector('.last .m:nth-child(4)');
+          tile.classList.add('hover');
+          tile.insertAdjacentHTML('beforeend', `<div class="tmenu">
+            <ds-menu data-co="1" data-co-side="right"><ds-item icon="monitor">open the desktop</ds-item><ds-item icon="app-window">programs</ds-item></ds-menu>
+            <ds-menu data-co="2" data-co-side="right"><ds-item icon="square-arrow-out-up-right">open in a new tab</ds-item><ds-item icon="link">copy the link</ds-item><ds-item icon="info">details</ds-item></ds-menu>
+          </div>`);
+          document.currentScript.remove();
+        })();
+      </script>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 4.3 · the search, with what it found -->
+<figure class="shot" id="machines-search-computer">
+  <div class="computer" data-view="home" data-query="fin" data-co-parts="search:1:top">
+    <div class="pg"><script>home()</script></div>
+    <div class="found" data-over>
+      <div class="hit on" data-co="2" data-co-side="right"><i data-i="monitor"></i><div class="main"><span class="name"><mark>fin</mark>-app-02</span><span class="sub">Windows desktop, <span class="nw">4 programs</span></span></div><span class="gname"><mark>fin</mark>ance</span></div>
+      <div class="hit"><i data-i="monitor"></i><div class="main"><span class="name">hr-app-01</span><span class="sub">Windows desktop</span></div><span class="gname"><mark>fin</mark>ance</span></div>
+      <div class="foot"><ds-kbd>enter</ds-kbd>opens fin-app-02<span class="keys"><ds-kbd><i data-i="arrow-up"></i></ds-kbd><ds-kbd><i data-i="arrow-down"></i></ds-kbd>choose another</span></div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 4.4 · the search found nothing -->
+<figure class="shot" id="machines-no-match-computer">
+  <div class="computer" data-view="home" data-query="xyz">
+    <div class="pg"><script>home()</script></div>
+    <div class="found" data-over>
+      <div class="none" data-co="1" data-co-side="right"><span class="text fg">No machine matches “xyz”.</span><span class="text small muted">The search looks at the names, the addresses and the groups of the machines you can reach.</span></div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 4.5 · a machine's own page -->
+<figure class="shot" id="machines-machine-computer">
+  <div class="computer" data-view="home">
+    <div class="pg">
+      <div class="pghead mhead">
+        <ds-iconbutton variant="ghost" icon="arrow-left" label="machines"></ds-iconbutton>
+        <i data-i="monitor"></i>
+        <span class="h1" data-co="1" data-co-side="top">fin-app-02</span>
+        <span class="star"><i data-i="star"></i></span>
+        <div class="end" data-co="2" data-co-side="right"><ds-button icon="link">copy the link</ds-button></div>
+      </div>
+      <div class="cols">
+        <div>
+          <section class="grp">
+            <div class="gh"><ds-chevron size="14"></ds-chevron>desktop</div>
+            <div class="row" data-co="3"><ds-button variant="primary" size="lg" icon="monitor">open the desktop</ds-button></div>
+          </section>
+          <section class="grp">
+            <div class="gh" data-co="4"><ds-chevron size="14"></ds-chevron>programs <span class="n">4</span></div>
+            <div class="mgrid">
+              <div class="m prog"><i data-i="app-window"></i><div class="main"><span class="name">Ledger</span></div></div>
+              <div class="m prog"><i data-i="app-window"></i><div class="main"><span class="name">Payroll</span></div></div>
+              <div class="m prog"><i data-i="app-window"></i><div class="main"><span class="name">Reports</span></div></div>
+              <div class="m prog"><i data-i="app-window"></i><div class="main"><span class="name">Mail</span></div></div>
+            </div>
+          </section>
+        </div>
+        <ds-card title="about this machine" data-co="5" data-co-side="right">
+          <dl class="facts">
+            <dt>What it is</dt><dd>Windows machine</dd>
+            <dt>Address</dt><dd><ds-code>fin-app-02.corp.example</ds-code></dd>
+            <dt>Groups</dt><dd>finance</dd>
+            <dt>You get in</dt><dd>as yourself, with nothing to type</dd>
+          </dl>
+        </ds-card>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 4.6 · home, on a phone -->
+<figure class="shot" id="machines-phone">
+  <div class="phone" data-view="home">
+    <div class="pg">
+      <section class="grp">
+        <div class="gh"><ds-chevron size="14"></ds-chevron>last used</div>
+        <div class="mgrid">
+          <div class="m" data-co="1"><i data-i="square-terminal"></i><div class="main"><span class="name">build-01<i data-i="star" data-co="2" data-co-side="top"></i></span><span class="sub">shell</span></div><span class="more" data-co="3" data-co-side="right"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="app-window"></i><div class="main"><span class="name">Ledger</span><span class="sub">program on fin-app-02</span></div><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">mac-design-01</span><span class="sub">Mac desktop</span></div><span class="more"><i data-i="ellipsis"></i></span></div>
+        </div>
+      </section>
+      <section class="grp">
+        <div class="gh"><ds-chevron size="14"></ds-chevron>favourites <span class="n">3</span></div>
+        <div class="mgrid">
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">fin-app-02<i data-i="star"></i></span><span class="sub">Windows desktop, <span class="nw">4 programs</span></span></div><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="square-terminal"></i><div class="main"><span class="name">build-01<i data-i="star"></i></span><span class="sub">shell</span></div><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">dev-linux-03<i data-i="star"></i></span><span class="sub">Linux desktop</span></div><span class="more"><i data-i="ellipsis"></i></span></div>
+        </div>
+      </section>
+      <section class="grp">
+        <div class="gh" data-co="4"><ds-chevron size="14"></ds-chevron>finance <span class="n">2</span></div>
+        <div class="mgrid">
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">fin-app-02<i data-i="star"></i></span><span class="sub">Windows desktop, <span class="nw">4 programs</span></span></div><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">hr-app-01</span><span class="sub">Windows desktop</span></div><span class="more"><i data-i="ellipsis"></i></span></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 4.7 · home could not load -->
+<figure class="shot" id="machines-couldnt-load-computer">
+  <div class="computer" data-view="home">
+    <div class="fill">
+      <ds-empty illustration="error" size="lg" title="couldn't load the machines" description="Away ran into a problem."
+                details="503 Service Unavailable" details-open data-co-in=".nc-illu__title 1, .nc-illu__description 2, .nc-illu__actions 3, .kit-details 4">
+        <ds-button variant="primary">try again</ds-button>
+      </ds-empty>
+    </div>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

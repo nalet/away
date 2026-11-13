@@ -12,6 +12,7 @@ import '@fontsource/jetbrains-mono/700.css';
 import '@fontsource/jetbrains-mono/800.css';
 import '../styles/nalet.css';
 import '../styles/site.css';
+import Figure from '../components/screens/Figure.astro';
 import { load, STATUS } from '../lib/model.mjs';
 import { BASE, GITHUB, ORIGIN } from '../../site.mjs';
 
@@ -22,6 +23,9 @@ const caps = ['built', 'partial', 'v1', 'later', 'no']
 	.filter((x) => x.n);
 const expected = (m.expectStates as string[]).map((s) => ({ name: s, n: m.expectations.filter((e: any) => e.state === s).length })).filter((x) => x.n);
 const spec = `${BASE}/spec`;
+// three of the drawings: home, a desktop with its bar, a shell
+const shown = ['machines-computer', 'desktop-bar-computer', 'shell-computer'].map((k) => m.screenByKey.get(k)).filter(Boolean);
+const chapters = new Set(m.screens.map((f: any) => f.chapter)).size;
 ---
 
 <!doctype html>
@@ -57,7 +61,8 @@ const spec = `${BASE}/spec`;
 					</svg>
 				</a>
 				<nav class="head-nav" aria-label="primary">
-					<a href="#for">what it is for</a>
+					<a href="#for">goals</a>
+					<a href={`${spec}/screens/all/`}>screens</a>
 					<a href={`${spec}/`}>spec</a>
 					<a href={`${BASE}/docs/`}>docs</a>
 					<a href={GITHUB}>github</a>
@@ -75,11 +80,12 @@ const spec = `${BASE}/spec`;
 					<p class="lede">
 						Away is being specified. A browser on one side; a Windows desktop or one of its programs, a Mac or a Linux
 						desktop, or a shell on the other; and no second password in between. Nothing is built yet: what it is for and
-						what it has to do are written down, and open to review.
+						what it has to do are written down, its screens are drawn, and all of it is open to review.
 					</p>
 					<div class="cta-row">
 						<a class="nc-btn nc-btn--primary nc-btn--lg" href={`${spec}/goals/map/`}>the goal map</a>
 						<a class="nc-btn nc-btn--default nc-btn--lg" href={`${spec}/capabilities/map/`}>the capability map</a>
+						<a class="nc-btn nc-btn--default nc-btn--lg" href={`${spec}/screens/all/`}>all screens</a>
 					</div>
 				</div>
 			</section>
@@ -95,6 +101,31 @@ const spec = `${BASE}/spec`;
 					</p>
 				</div>
 			</section>
+
+			{
+				shown.length > 0 && (
+					<section id="looks" class="section">
+						<div class="wrap">
+							<h2 class="sec-title">
+								<span class="chev">&gt;</span> what it looks like
+							</h2>
+							<p class="sec-lede">
+								Drawings of the first release, from the specification: {m.screens.length} figures in {chapters} chapters.
+								Nothing is built yet, so none of them is a screenshot. The pink numbers are notes that a chapter explains.
+							</p>
+							<div class="figs">
+								{shown.map((f: any) => (
+									<Figure screen={f} width={328} />
+								))}
+							</div>
+							<div class="doc-links">
+								<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/screens/all/`}>all screens</a>
+								<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/screens/`}>how to read them</a>
+							</div>
+						</div>
+					</section>
+				)
+			}
 
 			<section id="for" class="section">
 				<div class="wrap">
@@ -153,9 +184,9 @@ const spec = `${BASE}/spec`;
 						}
 					</div>
 					<div class="doc-links">
-						<a class="nc-btn nc-btn--default" href={`${spec}/capabilities/map/`}>the capability map</a>
-						<a class="nc-btn nc-btn--default" href={`${spec}/capabilities/expectations/`}>expectations</a>
-						<a class="nc-btn nc-btn--default" href={`${spec}/capabilities/left-out/`}>what is left out</a>
+						<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/capabilities/map/`}>the capability map</a>
+						<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/capabilities/expectations/`}>expectations</a>
+						<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/capabilities/left-out/`}>what is left out</a>
 					</div>
 				</div>
 			</section>
@@ -168,9 +199,9 @@ const spec = `${BASE}/spec`;
 						them. To move a capability into the first release, or to leave it out, change one cell.
 					</p>
 					<div class="doc-links">
-						<a class="nc-btn nc-btn--default" href={`${spec}/`}>the specification</a>
-						<a class="nc-btn nc-btn--default" href={`${BASE}/docs/model/`}>changing the model</a>
-						<a class="nc-btn nc-btn--default" href={GITHUB}>the repository</a>
+						<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/`}>the specification</a>
+						<a class="nc-btn nc-btn--default nc-btn--md" href={`${BASE}/docs/model/`}>changing the model</a>
+						<a class="nc-btn nc-btn--default nc-btn--md" href={GITHUB}>the repository</a>
 					</div>
 				</div>
 			</section>

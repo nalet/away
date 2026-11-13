@@ -1,0 +1,149 @@
+<!doctype html>
+<!--
+  Chapter 3, getting in: the figures of spec/screens/start.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch03 [id …]
+  The look is screens.css, the frame is frame.js, the icons are icons.js;
+  remote.js draws what a machine shows. The design system's components are the
+  <ds-*> tags, which ds.js expands into the package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 3 getting in</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  .pg > .grp:first-child { margin-top: 0; }
+  .nw { white-space: nowrap; }
+  /* the page of someone who is not signed in: the name, one sentence, one button */
+  .gate { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; background: var(--bg); text-align: center; }
+  .gate .logo { font-size: 32px; gap: 10px; }
+  .gate .logo svg { width: 26px; height: 26px; }
+  .gate .text { max-width: 300px; }
+  /* an empty state with a line under it, in the middle of the window or of the page */
+  .fill { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg); }
+  .fill > .text { margin-top: -12px; }
+  /* the card over a dimmed picture, as chapter 6 has it */
+  .over { position: absolute; z-index: 25; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 440px; background: var(--surface); border: 1px solid var(--border-2);
+          padding: 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 8px 24px #00000073; }
+  .over .ft { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  .nc-modal__body p { margin: 0 0 12px; }
+  .nc-modal__body p:last-child { margin-bottom: 0; }
+</style>
+</head>
+<body>
+
+<!-- Figure 3.1 · not signed in, on a computer -->
+<figure class="shot" id="start-signed-out-computer">
+  <div class="computer" data-bar="none">
+    <div class="gate">
+      <span class="logo" data-co="1"><ds-chevron size="26"></ds-chevron>away</span>
+      <p class="text" data-co="2">You sign in with your organisation's account.</p>
+      <div data-co="3"><ds-button variant="primary" size="lg">sign in</ds-button></div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 3.2 · not signed in, on a phone -->
+<figure class="shot" id="start-signed-out-phone">
+  <div class="phone" data-bar="none">
+    <div class="gate">
+      <span class="logo"><ds-chevron size="26"></ds-chevron>away</span>
+      <p class="text">You sign in with your organisation's account.</p>
+      <ds-button variant="primary" size="lg">sign in</ds-button>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 3.3 · signing in failed: the sign-in service did not answer -->
+<figure class="shot" id="start-failed-computer">
+  <div class="computer" data-bar="none">
+    <div class="fill">
+      <ds-empty illustration="error" size="lg" title="couldn't sign you in" description="The sign-in service didn't answer."
+                details="sso.corp.example · no answer after 10 s" details-open data-co-in=".nc-illu__title 1, .nc-illu__description 2, .nc-illu__actions 3, .kit-details 4">
+        <ds-button variant="primary">try again</ds-button>
+      </ds-empty>
+      <p class="text small soft" data-co="5">Questions go to it-help@example.com.</p>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 3.4 · signed in, and no rule gives a machine -->
+<figure class="shot" id="start-nothing-computer">
+  <div class="computer" data-view="home">
+    <div class="fill">
+      <ds-empty illustration="empty" size="lg" title="no machines for you yet" description="No rule gives your account a machine yet. An administrator can add you to one."
+                data-co-in=".nc-illu__title 1, .nc-illu__description 2"></ds-empty>
+      <p class="text small soft" data-co="3">Questions go to it-help@example.com.</p>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 3.5 · the sign-in ran out while a session is open -->
+<figure class="shot" id="start-again-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="closed">
+      <div class="remote desk" data-desk="work"></div>
+      <div class="dim"></div>
+      <div class="over">
+        <span class="h2" data-co="1">sign in again</span>
+        <p class="text" data-co="2">Your sign-in has run out. Your sessions stay open for 10 minutes while you sign in again.</p>
+        <div class="ft" data-co="3"><ds-button variant="primary">sign in</ds-button></div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 3.6 · signing out while sessions are open -->
+<figure class="shot" id="start-sign-out-computer">
+  <div class="computer" data-view="home" data-count="2">
+    <div class="pg">
+      <section class="grp">
+        <div class="gh"><ds-chevron size="14"></ds-chevron>last used</div>
+        <div class="mgrid">
+          <div class="m"><i data-i="square-terminal"></i><div class="main"><span class="name">build-01</span><span class="sub">shell</span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="app-window"></i><div class="main"><span class="name">Ledger</span><span class="sub">program on fin-app-02</span></div><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">mac-design-01</span><span class="sub">Mac desktop</span></div><span class="star"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">fin-app-02</span><span class="sub">Windows desktop, <span class="nw">4 programs</span></span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+        </div>
+      </section>
+      <section class="grp">
+        <div class="gh"><ds-chevron size="14"></ds-chevron>favourites <span class="n">3</span></div>
+        <div class="mgrid">
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">fin-app-02</span><span class="sub">Windows desktop, <span class="nw">4 programs</span></span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="square-terminal"></i><div class="main"><span class="name">build-01</span><span class="sub">shell</span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">dev-linux-03</span><span class="sub">Linux desktop</span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+        </div>
+      </section>
+      <section class="grp">
+        <div class="gh"><ds-chevron size="14"></ds-chevron>finance <span class="n">2</span></div>
+        <div class="mgrid">
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">fin-app-02</span><span class="sub">Windows desktop, <span class="nw">4 programs</span></span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">hr-app-01</span><span class="sub">Windows desktop</span></div><span class="star"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+        </div>
+      </section>
+      <section class="grp">
+        <div class="gh"><ds-chevron size="14"></ds-chevron>engineering <span class="n">3</span></div>
+        <div class="mgrid">
+          <div class="m"><i data-i="square-terminal"></i><div class="main"><span class="name">build-01</span><span class="sub">shell</span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="square-terminal"></i><div class="main"><span class="name">build-02</span><span class="sub">shell</span></div><span class="star"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+          <div class="m"><i data-i="monitor"></i><div class="main"><span class="name">dev-linux-03</span><span class="sub">Linux desktop</span></div><span class="star on"><i data-i="star"></i></span><span class="more"><i data-i="ellipsis"></i></span></div>
+        </div>
+      </section>
+    </div>
+    <ds-modal title="sign out?" width="480" data-co-in=".nc-modal__body 1, .nc-modal__footer 2 right">
+      <ds-body>
+        <p>Signing out ends the 2 sessions that Away opened for you.</p>
+        <p>Desktops you left running stay as they are on their machines.</p>
+      </ds-body>
+      <ds-footer><ds-button variant="ghost">cancel</ds-button><ds-button variant="danger">sign out</ds-button></ds-footer>
+    </ds-modal>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script src="remote.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

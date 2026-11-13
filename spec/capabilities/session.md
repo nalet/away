@@ -22,6 +22,8 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 | Come back to a session by itself after the connection dropped | system | v1 | v1 | v1 | — | `reconnect-by-itself` |
 | Leave a session running while the browser is closed, and pick it up again | person | v1 | v1 | later | — | `keep-while-away` |
 | Choose between leaving a desktop running and signing out of the machine | person | v1 | — | — | — | `leave-or-sign-out` |
+| See why a session ended, and open it again from there | person | v1 | v1 | v1 | — | `see-why-ended` |
+| See that a desktop is in use by someone else, where opening it would take it from them or show their screen | person | v1 | v1 | — | — | `see-in-use` |
 | Open a machine straight into a given program or command | admin | later | — | later | — | `start-with-command` |
 | Reach a farm of Windows machines through its broker and land on the right one | system | later | — | — | — | `follow-broker` |
 | Reach a shell that is only reachable through another machine | system | — | — | later | — | `jump-through` |
@@ -30,7 +32,10 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 - *Open one program of a Windows machine, without its desktop*: a program the machine publishes for remote use.
 - *Switch between the programs open on a machine, each in a window of its own*: one sign-in on the machine holds them all.
 - *See how far a connection has come, and which step failed and why*: reaching the machine, checking who it is, signing in, the first picture.
+- *Come back to a session by itself after the connection dropped*: a desktop goes on at its machine meanwhile; a shell is held by Away for a few minutes, while its page stays open.
 - *Leave a session running while the browser is closed, and pick it up again*: a desktop goes on running on its machine; a shell has to be held by Away.
+- *See why a session ended, and open it again from there*: nobody used it, an administrator ended it, the right to it is gone, the machine closed it, it was opened elsewhere.
+- *See that a desktop is in use by someone else, where opening it would take it from them or show their screen*: a desktop with one screen for everyone, or one account that several people are signed in with.
 - *Open other kinds of target: Telnet, a serial console, a database, a web page*: Away is for desktops and shells.
 
 ## The picture
@@ -52,6 +57,7 @@ How the machine's screen reaches one's own: its size, its sharpness, how smoothl
 | Choose which of a machine's screens to see | person | — | later | — | `choose-machine-screen` |
 
 - *Fit the machine's screen to the window, and follow when its size changes*: a Windows machine and a shell take the window's size; other desktops are scaled to it.
+- *Fill the whole screen with a session*: where the browser can; a phone's browser may not.
 - *Show a sharp picture on a high-density screen*: a desktop over VNC has the size its machine gives it.
 - *Play a video on the machine smoothly*: the browser plays the machine's own video stream; VNC has none.
 - *Spread a machine over several of one's own screens*: VNC shows the machine's own screens as they are.

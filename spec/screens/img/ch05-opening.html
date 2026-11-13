@@ -1,0 +1,164 @@
+<!doctype html>
+<!--
+  Chapter 5, opening a machine: the figures of spec/screens/opening.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch05 [id …]
+  The look is screens.css (the steps of a connection and the card they stand in
+  are its .steps and .stage), the icons are icons.js. The design system's
+  components are the <ds-*> tags, which ds.js expands into the package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 5 opening a machine</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  .stage > .box .who .col { gap: 2px; }
+  /* a step's text, with what belongs under it: why it failed, or what the machine asks for */
+  .steps li > .grow { display: flex; flex-direction: column; }
+  /* the step that waits for the person: the chevron in blue, in place of the loader */
+  .steps li.ask > .g { color: var(--cloud-blue); }
+  .steps li .form { display: flex; flex-direction: column; gap: 12px; margin: 12px 0 4px; font-weight: 400; }
+  /* the technical reason, behind the banner's own toggle: the design system has details on a banner only */
+  .dtl { --nc-strip-border: var(--border-2); display: flex; flex-direction: column; align-items: flex-start; margin: -4px 0 0 24px; }
+  .dtl .nc-strip__toggle { display: inline-flex; margin-left: -8px; }
+  .dtl .nc-strip__details { margin-top: 4px; align-self: stretch; }
+  .stage > .box > .text { margin-left: 32px; }
+</style>
+</head>
+<body>
+
+<!-- Figure 5.1 · the steps of a connection, the third one running -->
+<figure class="shot" id="opening-computer">
+  <div class="computer" data-bar="none">
+    <div class="stage"><div class="box">
+      <div class="who" data-co="1"><i data-i="monitor"></i><div class="col"><span class="name">fin-app-02</span><span class="label">Windows desktop</span></div></div>
+      <ul class="steps">
+        <li class="done" data-co="2"><span class="g"><i data-i="check"></i></span>Reaching fin-app-02</li>
+        <li class="done"><span class="g"><i data-i="check"></i></span>Checking that it is fin-app-02</li>
+        <li class="now" data-co="3"><span class="g"><ds-spinner size="16"></ds-spinner></span>Signing you in as alex.urban</li>
+        <li class="todo" data-co="4"><span class="g"></span>Waiting for its first picture</li>
+      </ul>
+      <div class="ft" data-co="5"><ds-button variant="ghost">cancel</ds-button></div>
+    </div></div>
+  </div>
+</figure>
+
+<!-- Figure 5.2 · a machine that asks for a name and a password -->
+<figure class="shot" id="opening-credentials-computer">
+  <div class="computer" data-bar="none">
+    <div class="stage"><div class="box">
+      <div class="who"><i data-i="monitor"></i><div class="col"><span class="name">dev-linux-03</span><span class="label">Linux desktop</span></div></div>
+      <ul class="steps">
+        <li class="done"><span class="g"><i data-i="check"></i></span>Reaching dev-linux-03</li>
+        <li class="now ask"><span class="g"><i data-i="chevron-right"></i></span><div class="grow">Signing in on dev-linux-03
+          <span class="why" data-co="1">dev-linux-03 asks for a name and a password. Away passes them on and doesn't keep them.</span>
+          <div class="form" data-co="2">
+            <ds-field label="Name"><ds-input value="alex"></ds-input></ds-field>
+            <ds-field label="Password"><ds-input value="••••••••••" focused></ds-input></ds-field>
+          </div></div></li>
+        <li class="todo"><span class="g"></span>Waiting for its first picture</li>
+      </ul>
+      <div class="ft" data-co="3"><ds-button variant="ghost">cancel</ds-button><ds-button variant="primary">sign in</ds-button></div>
+    </div></div>
+  </div>
+</figure>
+
+<!-- Figure 5.3 · the machine could not be reached -->
+<figure class="shot" id="opening-failed-computer">
+  <div class="computer" data-bar="none">
+    <div class="stage"><div class="box">
+      <div class="who"><i data-i="monitor"></i><div class="col"><span class="name">fin-app-02</span><span class="label">Windows desktop</span></div></div>
+      <ul class="steps">
+        <li class="failed" data-co="1"><span class="g"><i data-i="x"></i></span><div class="grow"><span>Reaching fin-app-02</span>
+          <span class="why" data-co="2">It didn't answer within 10 seconds. It may be switched off, or its address may have changed.</span></div></li>
+        <li class="todo"><span class="g"></span>Checking that it is fin-app-02</li>
+        <li class="todo"><span class="g"></span>Signing you in as alex.urban</li>
+        <li class="todo"><span class="g"></span>Waiting for its first picture</li>
+      </ul>
+      <div class="dtl" data-details="fin-app-02.corp.example:3389 · no answer, 10 s" data-co="3"></div>
+      <p class="text small soft" data-co="4">Questions go to it-help@example.com.</p>
+      <div class="ft" data-co="5"><ds-button>machines</ds-button><ds-button variant="primary">try again</ds-button></div>
+    </div></div>
+  </div>
+</figure>
+
+<!-- Figure 5.4 · the machine is not the one Away knows -->
+<figure class="shot" id="opening-identity-computer">
+  <div class="computer" data-bar="none">
+    <div class="stage"><div class="box">
+      <div class="who"><i data-i="monitor"></i><div class="col"><span class="name">fin-app-02</span><span class="label">Windows desktop</span></div></div>
+      <ul class="steps">
+        <li class="done"><span class="g"><i data-i="check"></i></span>Reaching fin-app-02</li>
+        <li class="failed"><span class="g"><i data-i="x"></i></span><div class="grow"><span>Checking that it is fin-app-02</span>
+          <span class="why" data-co="1">It showed another identity than the one Away knows. Away doesn't connect to it until an administrator has accepted the change.</span></div></li>
+        <li class="todo"><span class="g"></span>Signing you in as alex.urban</li>
+        <li class="todo"><span class="g"></span>Waiting for its first picture</li>
+      </ul>
+      <div class="dtl" data-co="2" data-details="known since 2 nov 2026 · SHA256:7b1f09ce…c94e
+shown now · SHA256:e02a6f17…51d7"></div>
+      <p class="text small soft">Questions go to it-help@example.com.</p>
+      <div class="ft" data-co="3"><ds-button>machines</ds-button></div>
+    </div></div>
+  </div>
+</figure>
+
+<!-- Figure 5.5 · the machine did not accept the sign-in Away made -->
+<figure class="shot" id="opening-refused-computer">
+  <div class="computer" data-bar="none">
+    <div class="stage"><div class="box">
+      <div class="who"><i data-i="monitor"></i><div class="col"><span class="name">fin-app-02</span><span class="label">Windows desktop</span></div></div>
+      <ul class="steps">
+        <li class="done"><span class="g"><i data-i="check"></i></span>Reaching fin-app-02</li>
+        <li class="done"><span class="g"><i data-i="check"></i></span>Checking that it is fin-app-02</li>
+        <li class="failed"><span class="g"><i data-i="x"></i></span><div class="grow"><span>Signing you in as alex.urban</span>
+          <span class="why" data-co="1">fin-app-02 didn't accept the sign-in Away made for you. Your account may not be allowed to sign in there.</span></div></li>
+        <li class="todo"><span class="g"></span>Waiting for its first picture</li>
+      </ul>
+      <div class="dtl" data-co="2" data-details="fin-app-02.corp.example:3389
+sign-in refused: not granted to this account"></div>
+      <p class="text small soft">Questions go to it-help@example.com.</p>
+      <div class="ft" data-co="3"><ds-button>machines</ds-button><ds-button variant="primary">try again</ds-button></div>
+    </div></div>
+  </div>
+</figure>
+
+<!-- Figure 5.6 · a desktop someone else is on -->
+<figure class="shot" id="opening-in-use-computer">
+  <div class="computer" data-bar="none">
+    <div class="stage"><div class="box">
+      <div class="who"><i data-i="monitor"></i><div class="col"><span class="name">mac-design-01</span><span class="label">Mac desktop</span></div></div>
+      <ds-banner state="warning" data-co="1">Dana Kim has this desktop open. It shows one screen to everyone, so one person is on it at a time.</ds-banner>
+      <div class="ft" data-co="2"><ds-button>machines</ds-button><ds-button variant="primary">try again</ds-button></div>
+    </div></div>
+  </div>
+</figure>
+
+<!-- Figure 5.7 · the steps on a phone, for a machine with an account that Away keeps -->
+<figure class="shot" id="opening-phone">
+  <div class="phone" data-bar="none">
+    <div class="stage"><div class="box">
+      <div class="who"><i data-i="monitor"></i><div class="col"><span class="name">hr-app-01</span><span class="label">Windows desktop</span></div></div>
+      <ul class="steps">
+        <li class="done"><span class="g"><i data-i="check"></i></span>Reaching hr-app-01</li>
+        <li class="done"><span class="g"><i data-i="check"></i></span>Checking that it is hr-app-01</li>
+        <li class="now" data-co="1"><span class="g"><ds-spinner size="16"></ds-spinner></span>Signing you in with the account Away keeps for this machine</li>
+        <li class="todo"><span class="g"></span>Waiting for its first picture</li>
+      </ul>
+      <div class="ft"><ds-button variant="ghost">cancel</ds-button></div>
+    </div></div>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script>
+  // the technical reason of a failure, open: the banner's own toggle and block, which the design system has on a banner only
+  for (const el of document.querySelectorAll('.dtl[data-details]')) {
+    el.innerHTML = `<button type="button" class="nc-strip__toggle" aria-expanded="true">${DS.svg.stripCaret}details</button><div class="nc-strip__details"></div>`;
+    el.querySelector('.nc-strip__details').textContent = el.dataset.details;
+  }
+</script>
+<script src="frame.js"></script>
+</body>
+</html>

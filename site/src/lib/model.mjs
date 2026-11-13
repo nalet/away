@@ -1,4 +1,4 @@
-// the model of this repository (spec/goals, spec/capabilities), for the maps
+// the model of this repository (spec/goals, spec/capabilities, spec/screens), for the maps
 // (src/pages/spec/) and the product page. scripts/sync.mjs has scripts/model.py write
 // it, with every state worked out, to src/generated/model.json.
 import { existsSync, readFileSync } from 'node:fs';
@@ -24,6 +24,14 @@ function index(m) {
     c.part = m.areaByKey.get(c.area).part;
     c.url = `${BASE}/spec/capabilities/${c.part}/${c.key}/`;
   }
+  // the screens: a figure leads to its place in its chapter
+  m.chapters ??= [];
+  m.screens ??= [];
+  m.chapterByKey = new Map(m.chapters.map((c) => [c.key, c]));
+  m.screenByKey = new Map(m.screens.map((f) => [f.key, f]));
+  for (const c of m.chapters) c.url = route(c.page);
+  for (const f of m.screens) f.url = `${m.chapterByKey.get(f.chapter).url}#fig-${f.key}`;
+  for (const c of m.capabilities) c.figures = (c.drawn ?? []).map((k) => m.screenByKey.get(k)).filter(Boolean);
   for (const g of m.goals) {
     g.url = `${BASE}/spec/goals/#${slug(g.goal)}`;
     g.neededBy = m.goals.filter((o) => o.needs.includes(g.key)).map((o) => o.key);

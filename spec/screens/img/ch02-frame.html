@@ -1,0 +1,69 @@
+<!doctype html>
+<!--
+  Chapter 2, the frame: the figures of spec/screens/frame.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch02 [id …]
+  The look is screens.css, the frame is frame.js (this chapter specifies what
+  frame.js draws), the icons are icons.js. The design system's components are
+  the <ds-*> tags, which ds.js expands into the package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 2 the frame</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  /* a page's place, shown as a quiet block: this chapter is about what is around it */
+  .computer .ph { position: absolute; inset: 32px 48px; }
+  .phone .ph { position: absolute; inset: 16px; }
+  .phone.side .ph { inset: 16px 24px; }
+  .usermenu { top: 60px; right: 24px; }
+</style>
+</head>
+<body>
+
+<!-- Figure 2.1 · the frame on a computer -->
+<figure class="shot" id="frame-computer">
+  <div class="computer" data-view="home" data-co-parts="logo:1:top,rail:2,current:3,settings:4,search:5:top,avatar:6:top">
+    <div class="ph">the page</div>
+  </div>
+</figure>
+
+<!-- Figure 2.2 · the rail of an administrator, with two sessions open -->
+<figure class="shot" id="frame-admin-computer">
+  <div class="computer" data-view="administration" data-role="admin" data-count="2" data-co-parts="sessions:1,admin:2">
+    <div class="ph">the page</div>
+  </div>
+</figure>
+
+<!-- Figure 2.3 · the avatar's menu -->
+<figure class="shot" id="frame-menu-computer">
+  <div class="computer" data-view="home">
+    <div class="ph">the page</div>
+    <div class="usermenu">
+      <div class="who" data-co="1" data-co-side="right"><span class="nc-text nc-text--ui">Alex Urban</span><span class="nc-text nc-text--dim">alex.urban@example.com</span></div>
+      <ds-menu data-co="2" data-co-side="right"><ds-item icon="settings">settings</ds-item></ds-menu>
+      <ds-menu data-co="3" data-co-side="right"><ds-item icon="log-out">sign out</ds-item></ds-menu>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 2.4 · the frame on a phone held upright -->
+<figure class="shot" id="frame-phone">
+  <div class="phone" data-view="home" data-count="1" data-co-parts="logo:1:top,search:2:top,avatar:3:top,tabs:4,current:5:bottom">
+    <div class="ph">the page</div>
+  </div>
+</figure>
+
+<!-- Figure 2.5 · the frame on a phone held sideways: the tabs as a rail at the left, the bar slimmer -->
+<figure class="shot" id="frame-sideways-phone">
+  <div class="phone side" data-view="home" data-count="1" data-co-parts="rail:1,current:2">
+    <div class="ph" data-co="3" data-co-side="right">the page</div>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

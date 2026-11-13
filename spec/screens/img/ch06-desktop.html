@@ -1,0 +1,158 @@
+<!doctype html>
+<!--
+  Chapter 6, a desktop: the figures of spec/screens/desktop.md.
+  Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
+    node scripts/render-mockups.mjs ch06 [id …]
+  The look is screens.css; frame.js draws the session's bar (chapter 6 specifies
+  it); remote.js draws what the machine shows. The design system's components are
+  the <ds-*> tags, which ds.js expands into the package's own markup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>away · 6 a desktop</title>
+<link rel="stylesheet" href="screens.css">
+<script src="icons.js"></script>
+<style>
+  /* a menu under one of the bar's buttons */
+  .session > .nc-actionmenu { top: 52px; }
+  /* the card over a dimmed picture: the connection dropped */
+  .over { position: absolute; z-index: 25; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 440px; background: var(--surface); border: 1px solid var(--border-2);
+          padding: 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 8px 24px #00000073; }
+  .over .ft { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  /* a warning over the picture, under the place of the bar */
+  .warn { position: absolute; z-index: 25; left: 50%; top: 28px; transform: translateX(-50%); width: 620px; box-shadow: 0 8px 24px #00000073; }
+</style>
+</head>
+<body>
+
+<!-- Figure 6.1 · a Windows desktop: the machine has the whole window -->
+<figure class="shot" id="desktop-computer">
+  <div class="computer" data-bar="none" data-co-parts="handle:1:top">
+    <div class="session" data-sbar="closed">
+      <div class="remote desk" data-desk="work" data-co="2"></div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 6.2 · the session's bar, open -->
+<figure class="shot" id="desktop-bar-computer">
+  <div class="computer" data-bar="none" data-co-parts="away:1:top,stabs:2:top,add:3:top,as:4:top,keys:5:top,clipboard:6:top,picture:7:top,fill:8:top,endsession:9:top,closebar:10:top">
+    <div class="session" data-sbar="open" data-tabs="desktop:fin-app-02,shell:build-01" data-as="as alex.urban">
+      <div class="remote desk" data-desk="work"></div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 6.3 · the keys a browser keeps for itself, in a menu -->
+<figure class="shot" id="desktop-keys-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="open" data-tabs="desktop:fin-app-02,shell:build-01" data-as="as alex.urban" data-on="keys">
+      <div class="remote desk" data-desk="work"></div>
+      <ds-menu style="right: 208px; min-width: 232px" data-co="1" data-co-side="right">
+        <ds-item>ctrl + alt + del</ds-item>
+        <ds-item>alt + tab</ds-item>
+        <ds-item>alt + f4</ds-item>
+        <ds-item>windows key</ds-item>
+        <ds-item>ctrl + w</ds-item>
+      </ds-menu>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 6.4 · the clipboard, in a browser that doesn't hand it over by itself -->
+<figure class="shot" id="desktop-clipboard-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="open" data-tabs="desktop:fin-app-02,shell:build-01" data-as="as alex.urban" data-on="clipboard">
+      <div class="remote desk" data-desk="work"></div>
+      <div class="spanel" style="right: 172px">
+        <span class="h2">clipboard</span>
+        <p class="text small" data-co="1" data-co-side="right">This browser doesn't pass its clipboard on by itself. Paste here what fin-app-02 should have in its clipboard.</p>
+        <ds-field label="To the machine" data-co="2" data-co-side="right"><ds-textarea rows="3">Invoice 2026-4412, due 30 November</ds-textarea></ds-field>
+        <div class="row"><ds-button variant="primary" size="sm">send</ds-button></div>
+        <ds-divider></ds-divider>
+        <ds-field label="From the machine" data-co="3" data-co-side="right"><ds-textarea rows="2">26 130</ds-textarea></ds-field>
+        <div class="row"><ds-button size="sm" icon="copy">copy</ds-button></div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 6.5 · the picture's size -->
+<figure class="shot" id="desktop-picture-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="open" data-tabs="desktop:fin-app-02,shell:build-01" data-as="as alex.urban" data-on="picture">
+      <div class="remote desk" data-desk="work"></div>
+      <ds-menu style="right: 136px; min-width: 232px" data-co="1" data-co-side="right">
+        <ds-item icon="circle-dot">fit the window</ds-item>
+        <ds-item icon="circle">actual size</ds-item>
+      </ds-menu>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 6.6 · another desktop: its screen keeps its own shape and is scaled to the window -->
+<figure class="shot" id="desktop-scaled-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="closed">
+      <div class="remote desk" data-desk="top" style="top: 40px; bottom: 40px" data-co="1"></div>
+      <span class="guide" style="left: 0; right: 0; top: 0; height: 40px" data-co="2" data-co-side="right"></span>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 6.7 · ending a Windows desktop: leave it running, or sign out of the machine -->
+<figure class="shot" id="desktop-end-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="open" data-tabs="desktop:fin-app-02,shell:build-01" data-as="as alex.urban" data-on="end">
+      <div class="remote desk" data-desk="work"></div>
+      <ds-menu style="right: 53px; min-width: 264px">
+        <ds-item icon="door-open" data-co="1" data-co-side="right">leave it running</ds-item>
+        <ds-item icon="log-out" data-co="2" data-co-side="right">sign out of the machine</ds-item>
+      </ds-menu>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 6.8 · the connection dropped: Away tries again by itself -->
+<figure class="shot" id="desktop-reconnecting-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="closed">
+      <div class="remote desk" data-desk="work"></div>
+      <div class="dim"></div>
+      <div class="over">
+        <div class="row" data-co="1"><ds-spinner size="16"></ds-spinner><span class="h2">connection lost</span></div>
+        <p class="text" data-co="2">Trying again, for the third time. Your desktop is still running on fin-app-02.</p>
+        <div class="ft" data-co="3"><ds-button variant="ghost">leave</ds-button><ds-button>try now</ds-button></div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 6.9 · a warning before a session ends because nobody uses it -->
+<figure class="shot" id="desktop-idle-computer">
+  <div class="computer" data-bar="none">
+    <div class="session" data-sbar="closed">
+      <div class="remote desk" data-desk="work"></div>
+      <ds-banner class="warn" state="warning" action="keep it open" data-co="1" data-co-side="right">This session ends in 60 seconds, because nobody has used it for 29 minutes.</ds-banner>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 6.10 · the session ended, and why -->
+<figure class="shot" id="desktop-ended-computer">
+  <div class="computer" data-bar="none">
+    <div class="stage">
+      <ds-empty illustration="empty" size="lg" title="this session ended" data-co-in=".nc-illu__title 1, .nc-illu__description 2, .nc-illu__actions 3"
+                description="Nobody used it for 30 minutes. Your desktop is still running on fin-app-02, and opens as you left it.">
+        <ds-button variant="primary" icon="monitor">open again</ds-button><ds-button>machines</ds-button>
+      </ds-empty>
+    </div>
+  </div>
+</figure>
+
+<script src="ds.js"></script>
+<script src="remote.js"></script>
+<script src="frame.js"></script>
+</body>
+</html>

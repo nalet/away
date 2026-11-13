@@ -1,12 +1,54 @@
 ---
 // the page's text. a ```mermaid block is drawn here, in the browser, in the design
 // system's colours (see src/lib/remark-mermaid.mjs); a page without one loads nothing.
+//
+// every picture in the pages is a drawing rendered at twice its size
+// (scripts/render-mockups.mjs), so it is shown at half its pixel size: a phone as wide
+// as a phone, and nothing wider than the column. each gets an anchor after its file's
+// name, #fig-desktop-bar-computer, so that the page of all screens and a capability's
+// fact sheet can lead to it. a click on a drawing shows it at its full size.
 import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+
+const html = (await Astro.slots.render('default')).replace(/<img\b[^>]*>/g, (tag) => {
+	const key = tag.match(/\bsrc="[^"]*\/([a-z0-9-]+)\.[^"/]*"/)?.[1];
+	return tag
+		.replace(/\b(width|height)="(\d+)"/g, (_, name, px) => `${name}="${Math.round(Number(px) / 2)}"`)
+		.replace(/^<img/, key ? `<img id="fig-${key}"` : '<img');
+});
 ---
 
-<Default><slot /></Default>
+<Default><Fragment set:html={html} /></Default>
 
 <script>
+	// a drawing opens at its full size over the page; a click or Esc closes it again
+	const drawings = document.querySelectorAll<HTMLImageElement>('.sl-markdown-content img[id^="fig-"]');
+	if (drawings.length) {
+		const dialog = document.createElement('dialog');
+		dialog.className = 'fig-zoom';
+		dialog.innerHTML = '<img alt="">';
+		document.body.append(dialog);
+		const large = dialog.querySelector('img')!;
+		dialog.addEventListener('click', () => dialog.close());
+		for (const img of drawings) {
+			const open = () => {
+				large.src = img.currentSrc || img.src;
+				large.alt = img.alt;
+				large.width = Math.round(img.naturalWidth / 2);
+				dialog.showModal();
+			};
+			img.tabIndex = 0;
+			img.setAttribute('role', 'button');
+			img.title = 'show at full size';
+			img.addEventListener('click', open);
+			img.addEventListener('keydown', (e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					open();
+				}
+			});
+		}
+	}
+
 	const blocks = document.querySelectorAll<HTMLElement>('pre.mermaid');
 	if (blocks.length) {
 		import('mermaid').then(async ({ default: mermaid }) => {

@@ -1,0 +1,65 @@
+---
+// /spec/screens/all/: every drawing of the screens on one page, chapter by chapter, each
+// leading to its place in its chapter. the figures are the rows of
+// spec/screens/screens.csv (see src/lib/model.mjs).
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import Figure from '../../../components/screens/Figure.astro';
+import { load } from '../../../lib/model.mjs';
+import { BASE } from '../../../../site.mjs';
+
+const m = load();
+const chapters: any[] = (m?.chapters ?? [])
+	.map((c: any) => ({ ...c, figures: m.screens.filter((f: any) => f.chapter === c.key) }))
+	.filter((c: any) => c.figures.length);
+// how wide a drawing is shown, by the size of the screen it draws
+const WIDTH: Record<string, number> = { computer: 432, phone: 150, 'phone-side': 330 };
+const headings = chapters.map((c) => ({ depth: 2, slug: `chapter-${c.no}`, text: `${c.no} ${c.title}` }));
+const count = (n: number, one: string) => `${n} ${n === 1 ? one : one + 's'}`;
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'All screens',
+		description: 'Every screen of Away, as a drawing: the first release, chapter by chapter.',
+		editUrl: false,
+	}}
+	headings={headings}
+>
+	{
+		!chapters.length ? (
+			<p>The drawings are not in this build of the site.</p>
+		) : (
+			<>
+				<p>
+					Every screen of the first release, as a drawing. Nothing of Away is built yet: each one is a proposal, under review
+					like the rest of the specification. A drawing leads to its place in its chapter, where its parts are numbered and
+					its rules are written. How to read them: <a href={`${BASE}/spec/screens/`}>the introduction</a>.
+				</p>
+				<p>
+					{count(m.screens.length, 'figure')} in {count(chapters.length, 'chapter')}.
+				</p>
+				{chapters.map((c) => (
+					<>
+						<h2 id={`chapter-${c.no}`}>
+							<a href={c.url}>
+								{c.no} {c.title}
+							</a>
+						</h2>
+						<div class="figs not-content">
+							{c.figures.map((f: any) => (
+								<Figure screen={f} width={WIDTH[f.size] ?? 432} />
+							))}
+						</div>
+					</>
+				))}
+			</>
+		)
+	}
+</StarlightPage>
+
+<style is:global>
+	/* the drawings take the width there is: no column of text here */
+	:root {
+		--sl-content-width: 100rem;
+	}
+</style>

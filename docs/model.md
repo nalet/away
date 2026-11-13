@@ -1,8 +1,9 @@
 # Changing the model
 
-The specification is a model: five tables, kept as CSV files, and pages whose
+The specification is a model: six tables, kept as CSV files, and pages whose
 tables and numbers a program writes from them. To change what the specification
-says, change a row; never a generated table.
+says, change a row; never a generated table. The screens are drawings, and
+[changing a drawing](#changing-a-drawing) is below.
 
 | File | One row is |
 |---|---|
@@ -11,6 +12,7 @@ says, change a row; never a generated table.
 | [spec/capabilities/areas.csv](../spec/capabilities/areas.csv) | an area of capabilities: its part, the goal it is for |
 | [spec/capabilities/capabilities.csv](../spec/capabilities/capabilities.csv) | a capability: who it is for, and where it stands for RDP, VNC, SSH or Away itself |
 | [spec/capabilities/expectations.csv](../spec/capabilities/expectations.csv) | something people expect of remote access, with the capabilities that meet it |
+| [spec/screens/screens.csv](../spec/screens/screens.csv) | a figure of the screens: its chapter, what it shows, the capabilities it draws |
 
 What the columns and their values mean is in
 [how to read the goals](../spec/goals/README.md#how-to-read-it),
@@ -47,11 +49,42 @@ files say.
 | strike a goal | remove its row from `goals.csv`, then the areas, expectations and qualities that are for it: the check names each |
 | add a capability | add a row with a new key, in an area that exists; name it in an expectation if one is met by it |
 
+## Changing a drawing
+
+Every screen is drawn in an HTML file beside its chapter, one file a chapter:
+`spec/screens/img/ch06-desktop.html` holds the figures of
+[chapter 6](../spec/screens/desktop.md). A figure's picture is made from it,
+never edited itself.
+[The drawings' sources](../spec/screens/README.md#17-the-drawings-sources) says
+what the files are.
+
+1. Edit the figure in its chapter's HTML file. Opened in a browser, the file
+   shows every figure of the chapter.
+2. Make the pictures again. The first line is needed once: the drawings take
+   their fonts from the site's packages.
+
+   ```sh
+   (cd site && npm ci)
+   npx -p playwright@1.63.0 node scripts/render-mockups.mjs ch06
+   ```
+
+3. Where what the figure shows has changed, change its text in the chapter and
+   its row in `spec/screens/screens.csv`, then run `python3 scripts/model.py`.
+
+| To | Do |
+|---|---|
+| add a figure | draw it as a new `<figure class="shot" id="…">`, make its picture, show it in the chapter with its caption, and add its row to `screens.csv` at its place in the chapter's order |
+| say that a figure draws a capability | add the capability's key to the figure's row in `screens.csv` |
+| remove a figure | remove it from the HTML file, the chapter and `screens.csv`, and delete its picture |
+
+The check names a figure without a picture, a picture that is no figure, and a
+caption whose number is not the figure's place in its chapter.
+
 ## The site
 
 The site at <https://nalet.github.io/away/> is built from this repository on
-every change to its main branch: the pages under `docs/` and `spec/`, and the
-two maps, which are drawn from the same CSV files. To build it on one's own
+every change to its main branch: the pages under `docs/` and `spec/`, the two
+maps and the page of all screens, which are made from the same CSV files. To build it on one's own
 machine:
 
 ```sh
