@@ -15,6 +15,7 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 | Open a machine's desktop | person | v1 | v1 | — | — | `open-desktop` |
 | Open one program of a Windows machine, without its desktop | person | v1 | — | — | — | `open-program` |
 | Switch between the programs open on a machine, each in a window of its own | person | v1 | — | — | — | `switch-programs` |
+| See a machine's open windows in a list beside them, and bring one to the front, also one made small | person | v1 | — | — | — | `list-open-windows` |
 | Open a shell on a machine | person | — | — | v1 | — | `open-shell` |
 | Keep several machines open at once and move between them | person | v1 | v1 | v1 | — | `open-several` |
 | Open a session in a browser tab or window of its own | person | v1 | v1 | v1 | — | `open-in-own-tab` |
@@ -25,17 +26,22 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 | See why a session ended, and open it again from there | person | v1 | v1 | v1 | — | `see-why-ended` |
 | See that a desktop is in use by someone else, where opening it would take it from them or show their screen | person | v1 | v1 | — | — | `see-in-use` |
 | Open a machine straight into a given program or command | admin | later | — | later | — | `start-with-command` |
+| See the programs of several machines side by side, in one list of windows | person | later | — | — | — | `programs-of-several-machines` |
+| Use the small icons a program puts beside the machine's clock | person | later | — | — | — | `use-tray-icons` |
 | Reach a farm of Windows machines through its broker and land on the right one | system | later | — | — | — | `follow-broker` |
 | Reach a shell that is only reachable through another machine | system | — | — | later | — | `jump-through` |
 | Open other kinds of target: Telnet, a serial console, a database, a web page | person | — | — | — | no | `open-other-kinds` |
 
 - *Open one program of a Windows machine, without its desktop*: a program the machine publishes for remote use.
 - *Switch between the programs open on a machine, each in a window of its own*: one sign-in on the machine holds them all.
+- *See a machine's open windows in a list beside them, and bring one to the front, also one made small*: programs bring no task bar of the machine's, so the list is how a window that was made small is reached.
 - *See how far a connection has come, and which step failed and why*: reaching the machine, checking who it is, signing in, the first picture.
 - *Come back to a session by itself after the connection dropped*: a desktop goes on at its machine meanwhile; a shell is held by Away for a few minutes, while its page stays open.
 - *Leave a session running while the browser is closed, and pick it up again*: a desktop goes on running on its machine; a shell has to be held by Away.
 - *See why a session ended, and open it again from there*: nobody used it, an administrator ended it, the right to it is gone, the machine closed it, it was opened elsewhere.
 - *See that a desktop is in use by someone else, where opening it would take it from them or show their screen*: a desktop with one screen for everyone, or one account that several people are signed in with.
+- *See the programs of several machines side by side, in one list of windows*: in the first release each machine's programs are a session of their own.
+- *Use the small icons a program puts beside the machine's clock*: for a program that hides its window there.
 - *Open other kinds of target: Telnet, a serial console, a database, a web page*: Away is for desktops and shells.
 
 ## The picture

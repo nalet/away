@@ -2,6 +2,7 @@ key,area,capability,who,rdp,vnc,ssh,away,note
 open-desktop,open,Open a machine's desktop,person,v1,v1,—,—,
 open-program,open,"Open one program of a Windows machine, without its desktop",person,v1,—,—,—,a program the machine publishes for remote use
 switch-programs,open,"Switch between the programs open on a machine, each in a window of its own",person,v1,—,—,—,one sign-in on the machine holds them all
+list-open-windows,open,"See a machine's open windows in a list beside them, and bring one to the front, also one made small",person,v1,—,—,—,"programs bring no task bar of the machine's, so the list is how a window that was made small is reached"
 open-shell,open,Open a shell on a machine,person,—,—,v1,—,
 open-several,open,Keep several machines open at once and move between them,person,v1,v1,v1,—,
 open-in-own-tab,open,Open a session in a browser tab or window of its own,person,v1,v1,v1,—,
@@ -12,6 +13,8 @@ leave-or-sign-out,open,Choose between leaving a desktop running and signing out 
 see-why-ended,open,"See why a session ended, and open it again from there",person,v1,v1,v1,—,"nobody used it, an administrator ended it, the right to it is gone, the machine closed it, it was opened elsewhere"
 see-in-use,open,"See that a desktop is in use by someone else, where opening it would take it from them or show their screen",person,v1,v1,—,—,"a desktop with one screen for everyone, or one account that several people are signed in with"
 start-with-command,open,Open a machine straight into a given program or command,admin,later,—,later,—,
+programs-of-several-machines,open,"See the programs of several machines side by side, in one list of windows",person,later,—,—,—,in the first release each machine's programs are a session of their own
+use-tray-icons,open,Use the small icons a program puts beside the machine's clock,person,later,—,—,—,for a program that hides its window there
 follow-broker,open,Reach a farm of Windows machines through its broker and land on the right one,system,later,—,—,—,
 jump-through,open,Reach a shell that is only reachable through another machine,system,—,—,later,—,
 open-other-kinds,open,"Open other kinds of target: Telnet, a serial console, a database, a web page",person,—,—,—,no,Away is for desktops and shells
@@ -79,7 +82,7 @@ see-open-sessions,frame,"See the sessions that are open, and go to one",person,�
 find-from-anywhere,frame,Find a machine by its name from any page,person,—,—,—,v1,
 see-who-is-signed-in,frame,See which account is signed in,person,—,—,—,v1,
 use-session-bar,frame,"Reach a session's own controls without leaving it: keys, clipboard, files, size, ending it",person,—,—,—,v1,
-give-session-the-window,frame,Give the machine the whole window while a session is open,system,—,—,—,v1,
+give-session-the-window,frame,Give the machine the whole window while a session is open,system,—,—,—,v1,a session with programs keeps the list of their windows beside them
 use-without-mouse,frame,"Use every page around a session with the keyboard alone, and with a screen reader",person,—,—,—,v1,
 choose-language,frame,Use Away in one's own language,person,—,—,—,later,English first
 see-notices,frame,"Be told what happened meanwhile: a session ended, a request was answered",person,—,—,—,later,

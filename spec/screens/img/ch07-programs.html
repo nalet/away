@@ -4,8 +4,9 @@
   Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
     node scripts/render-mockups.mjs ch07 [id …]
   The look is screens.css; frame.js draws the session's bar (chapter 6 specifies
-  it); remote.js draws the programs' windows. The design system's components are
-  the <ds-*> tags, which ds.js expands into the package's own markup.
+  it) and the head and foot of the list of windows; remote.js draws the programs'
+  windows. The design system's components are the <ds-*> tags, which ds.js expands
+  into the package's own markup.
 -->
 <html lang="en">
 <head>
@@ -14,69 +15,116 @@
 <link rel="stylesheet" href="screens.css">
 <script src="icons.js"></script>
 <style>
-  /* programs have no picture to size, so their bar is without that button */
-  .sbar .sb-picture { display: none; }
-  /* the strip of this machine's open windows, right under the bar: how one switches.
-     Away's own, drawn as the bar draws its sessions */
-  .sbar { box-shadow: none; }
-  .wstrip { position: absolute; left: 0; right: 0; top: 48px; height: 36px; z-index: 29; display: flex; align-items: stretch; background: var(--surface);
-            border-bottom: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
-  .wstrip .wchip { display: flex; align-items: center; gap: 8px; padding: 0 14px; border-right: 1px solid var(--border); color: var(--fg-muted);
-                   font: 500 12px/1 var(--ff-mono); white-space: nowrap; }
-  .wstrip .wchip svg.i { width: 14px; height: 14px; }
-  .wstrip .wchip:first-child { padding-left: 26px; }
-  .wstrip .wchip.on { color: var(--fg); background: var(--surface-2); box-shadow: inset 0 -2px 0 var(--cloud-blue); }
-  .wstrip .wchip.add { color: var(--fg-2); }
-  .wstrip .wchip.add.on { color: var(--cloud-blue); box-shadow: none; }
   /* a point on the ground, for a note to mark */
   .spot { position: absolute; width: 8px; height: 8px; }
 </style>
 </head>
 <body>
 
-<!-- Figure 7.1 · two programs of one machine, each in a window of its own, on Away's ground -->
+<!-- Figure 7.1 · two programs of one machine, each in a window of its own, on Away's ground, beside the list of their windows -->
 <figure class="shot" id="programs-computer">
   <div class="computer" data-bar="none">
     <div class="session" data-sbar="closed">
-      <div class="w" data-w="doc" data-title="Reports – Q3 2026" style="left: 96px; top: 132px; width: 600px; height: 400px"></div>
-      <div class="w front" data-w="sheet" data-title="Ledger – November" style="left: 300px; top: 200px; width: 860px; height: 540px" data-co="1" data-co-side="right"></div>
-      <span class="spot" style="left: 44px; top: 640px" data-co="2"></span>
+      <div class="wlist" data-machine="fin-app-02">
+        <span class="wl-row on" data-p="L">Ledger – November</span>
+        <span class="wl-row" data-p="R:b">Reports – Q3 2026</span>
+      </div>
+      <div class="warea">
+        <div class="w" data-w="doc" data-p="R:b" data-title="Reports – Q3 2026" style="left: 48px; top: 120px; width: 560px; height: 400px"></div>
+        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 190px; top: 196px; width: 810px; height: 540px" data-co="1" data-co-side="right"></div>
+        <span class="spot" style="left: 96px; top: 640px" data-co="2" data-co-side="bottom"></span>
+      </div>
+      <span class="guide" style="left: 0; top: 0; width: 224px; bottom: 0" data-co="3"></span>
     </div>
   </div>
 </figure>
 
-<!-- Figure 7.2 · the bar, and under it the strip of this machine's open windows -->
-<figure class="shot" id="programs-bar-computer">
-  <div class="computer" data-bar="none" data-co-parts="stab:1:top">
-    <div class="session" data-sbar="open" data-tabs="programs:fin-app-02,shell:build-01" data-as="as alex.urban">
-      <div class="w" data-w="doc" data-title="Reports – Q3 2026" style="left: 96px; top: 132px; width: 600px; height: 400px"></div>
-      <div class="w front" data-w="sheet" data-title="Ledger – November" style="left: 300px; top: 200px; width: 860px; height: 540px"></div>
-      <div class="wstrip" data-co="2" data-co-side="right">
-        <span class="wchip on" data-co="3"><i data-i="app-window"></i>Ledger – November</span>
-        <span class="wchip"><i data-i="app-window"></i>Reports – Q3 2026</span>
-        <span class="wchip add" data-co="4" data-co-side="top"><i data-i="plus"></i>program</span>
+<!-- Figure 7.2 · the list: the machine, the window in front, another window of the same program, one that was made small -->
+<figure class="shot" id="programs-list-computer">
+  <div class="computer" data-bar="none" data-co-parts="whead:1,wadd:5,wsize:6">
+    <div class="session" data-sbar="closed">
+      <div class="wlist" data-machine="fin-app-02">
+        <span class="wl-row on" data-p="L" data-co="2">Ledger – November</span>
+        <span class="wl-row" data-p="L" data-co="3">Ledger – Budget 2027</span>
+        <span class="wl-row small" data-p="R:b" data-co="4">Reports – Q3 2026</span>
+      </div>
+      <div class="warea">
+        <div class="w" data-w="sheet" data-p="L" data-title="Ledger – Budget 2027" style="left: 48px; top: 96px; width: 700px; height: 460px"></div>
+        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 190px; top: 196px; width: 810px; height: 540px"></div>
       </div>
     </div>
   </div>
 </figure>
 
-<!-- Figure 7.3 · the programs the machine offers -->
+<!-- Figure 7.3 · the list made narrow: one icon for each program, and the windows of a program that has two -->
+<figure class="shot" id="programs-narrow-computer">
+  <div class="computer" data-bar="none" data-co-parts="wsize:4">
+    <div class="session" data-sbar="closed">
+      <div class="wlist narrow" data-machine="fin-app-02">
+        <span class="wl-row on" data-p="L" data-n="2" title="Ledger – November, and 1 more window" data-co="1" data-co-in=".count 2 top"></span>
+        <span class="wl-row" data-p="R:b" title="Reports – Q3 2026"></span>
+      </div>
+      <div class="warea">
+        <div class="w" data-w="sheet" data-p="L" data-title="Ledger – Budget 2027" style="left: 250px; top: 96px; width: 700px; height: 460px"></div>
+        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 392px; top: 196px; width: 800px; height: 540px"></div>
+      </div>
+      <ds-menu style="left: 60px; top: 52px; min-width: 232px" data-co="3" data-co-side="top">
+        <ds-item icon="circle-dot"><span class="nc-keep-case">Ledger – November</span></ds-item>
+        <ds-item icon="circle"><span class="nc-keep-case">Ledger – Budget 2027</span></ds-item>
+      </ds-menu>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 7.4 · the programs the machine offers, from the list's last row -->
 <figure class="shot" id="programs-open-computer">
   <div class="computer" data-bar="none">
-    <div class="session" data-sbar="open" data-tabs="programs:fin-app-02,shell:build-01" data-as="as alex.urban">
-      <div class="w" data-w="doc" data-title="Reports – Q3 2026" style="left: 96px; top: 132px; width: 600px; height: 400px"></div>
-      <div class="w front" data-w="sheet" data-title="Ledger – November" style="left: 300px; top: 200px; width: 860px; height: 540px"></div>
-      <div class="wstrip">
-        <span class="wchip on"><i data-i="app-window"></i>Ledger – November</span>
-        <span class="wchip"><i data-i="app-window"></i>Reports – Q3 2026</span>
-        <span class="wchip add on"><i data-i="plus"></i>program</span>
+    <div class="session" data-sbar="closed">
+      <div class="wlist" data-machine="fin-app-02" data-on="add">
+        <span class="wl-row on" data-p="L">Ledger – November</span>
+        <span class="wl-row" data-p="R:b">Reports – Q3 2026</span>
       </div>
-      <ds-menu style="left: 347px; top: 88px; min-width: 200px" data-co="1" data-co-side="right">
+      <div class="warea">
+        <div class="w" data-w="doc" data-p="R:b" data-title="Reports – Q3 2026" style="left: 240px; top: 120px; width: 560px; height: 400px"></div>
+        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 330px; top: 196px; width: 700px; height: 540px"></div>
+      </div>
+      <ds-menu style="left: 228px; top: 132px; min-width: 200px" data-co="1" data-co-side="top">
         <ds-item icon="app-window"><span class="nc-keep-case">Ledger</span></ds-item>
         <ds-item icon="app-window"><span class="nc-keep-case">Mail</span></ds-item>
         <ds-item icon="app-window"><span class="nc-keep-case">Payroll</span></ds-item>
         <ds-item icon="app-window"><span class="nc-keep-case">Reports</span></ds-item>
       </ds-menu>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 7.5 · the session's bar, open over the list and the windows -->
+<figure class="shot" id="programs-bar-computer">
+  <div class="computer" data-bar="none" data-co-parts="stab:1:top">
+    <div class="session" data-sbar="open" data-tabs="programs:fin-app-02,shell:build-01" data-as="as alex.urban">
+      <div class="wlist" data-machine="fin-app-02">
+        <span class="wl-row on" data-p="L" data-co="2">Ledger – November</span>
+        <span class="wl-row" data-p="R:b">Reports – Q3 2026</span>
+      </div>
+      <div class="warea">
+        <div class="w" data-w="doc" data-p="R:b" data-title="Reports – Q3 2026" style="left: 48px; top: 120px; width: 560px; height: 400px"></div>
+        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 190px; top: 196px; width: 810px; height: 540px"></div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 7.6 · on a phone: one window at a time, and the programs as icons along the foot -->
+<figure class="shot" id="programs-phone">
+  <div class="phone" data-bar="none" data-co-parts="wadd:3:right">
+    <div class="session" data-sbar="closed">
+      <div class="wlist" data-machine="fin-app-02">
+        <span class="wl-row on" data-p="L" data-n="2" title="Ledger – November, and 1 more window" data-co="2"></span>
+        <span class="wl-row" data-p="R:b" title="Reports – Q3 2026"></span>
+      </div>
+      <div class="warea">
+        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 0; top: 0; width: 360px; height: 100%; border: 0; box-shadow: none" data-co="1" data-co-side="right"></div>
+      </div>
     </div>
   </div>
 </figure>

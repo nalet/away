@@ -62,7 +62,7 @@ A chapter specifies one screen, or a few that belong together:
 | 4 | [Machines](./machines.md) | home: the machines one may reach, the search, a machine's page |
 | 5 | [Opening a machine](./opening.md) | the steps of a connection, typing a name and a password, a connection that fails |
 | 6 | [A desktop](./desktop.md) | a session: its bar, keys, the clipboard, the picture's size, its end |
-| 7 | [Programs](./programs.md) | a program of a Windows machine without its desktop, and switching between programs |
+| 7 | [Programs](./programs.md) | programs of a Windows machine without its desktop, and the list of their windows that moves between them |
 | 8 | [A shell](./shell.md) | a shell: its text, its look, scrolling back and searching |
 | 9 | [Sessions](./sessions.md) | the open sessions, and moving between them |
 | 10 | [On a phone](./phone.md) | a desktop and a shell by touch, the keys a phone lacks |
@@ -88,7 +88,7 @@ release holds for a person or an administrator and no figure shows.
 | 4 | [Machines](./machines.md) | 7 | 12 |
 | 5 | [Opening a machine](./opening.md) | 7 | 8 |
 | 6 | [A desktop](./desktop.md) | 10 | 14 |
-| 7 | [Programs](./programs.md) | 3 | 6 |
+| 7 | [Programs](./programs.md) | 6 | 7 |
 | 8 | [A shell](./shell.md) | 8 | 10 |
 | 9 | [Sessions](./sessions.md) | 4 | 6 |
 | 10 | [On a phone](./phone.md) | 5 | 10 |
@@ -98,9 +98,9 @@ release holds for a person or an administrator and no figure shows.
 | 14 | [Administration: sessions and records](./admin-records.md) | 4 | 7 |
 | 15 | [Administration: status](./admin-status.md) | 2 | 8 |
 | 16 | [When something goes wrong](./errors.md) | 6 | 8 |
-|  | all | 80 | 83 |
+|  | all | 83 | 84 |
 
-The first release holds 65 capabilities for a person or an administrator. A figure shows 59 of them.
+The first release holds 66 capabilities for a person or an administrator. A figure shows 60 of them.
 <!-- end: figures -->
 
 A capability with nothing to see is in no figure: typing in one's own keyboard
@@ -143,8 +143,9 @@ package looks like its figure.
 
 The rest is Away's own, drawn on the design system's colours, faces and sizes:
 the frame of [chapter 2](./frame.md), a machine's tile (4), the steps of a
-connection (5), the session's bar and its panels (6), the keys a phone lacks
-(10), and the stand-ins for what a machine shows.
+connection (5), the session's bar and its panels (6), the list of windows of a
+session with programs (7), the keys a phone lacks (10), and the stand-ins for
+what a machine shows.
 
 Where the design system has nothing yet, the drawings show how Away draws it
 until it does: the top bar and its user menu, the rail of icons and the phone's
@@ -168,8 +169,9 @@ chapter 6 and so on. They share one stylesheet,
 a design system component as a short tag, such as
 `<ds-button variant="primary">open again</ds-button>`, and
 [img/ds.js](./img/ds.js) turns it into the markup the package's component
-renders. [img/frame.js](./img/frame.js) draws the frame of chapter 2 and the
-session's bar of chapter 6 around every screen and places the pink marks, and
+renders. [img/frame.js](./img/frame.js) draws the frame of chapter 2, the session's
+bar of chapter 6 and the list of windows of chapter 7 around every screen and
+places the pink marks, and
 [img/remote.js](./img/remote.js) draws the stand-ins for what a machine shows.
 
 ```sh

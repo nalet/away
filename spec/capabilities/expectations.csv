@@ -1,7 +1,7 @@
 key,goal,expectation,capabilities,note
 windows-desktop,work,A Windows desktop in the browser,open-desktop ; fit-to-window ; desktop-as-at-machine,
 one-program,work,"One program of a Windows machine, without its desktop",open-program ; see-programs ; offer-programs,
-programs-side-by-side,work,"Several programs side by side, with a way to switch between them",switch-programs,
+programs-side-by-side,work,"Several programs side by side, with a way to switch between them",switch-programs ; list-open-windows,
 other-desktop,work,A Mac or a Linux desktop in the browser,open-desktop ; fit-to-window ; pointer-without-delay,
 a-shell,work,A shell in the browser,open-shell ; run-full-screen-programs ; scroll-back ; select-shell-text,
 copy-and-paste,work,Copy and paste between the machine and one's own device,copy-paste-text ; copy-paste-rich ; copy-paste-files,

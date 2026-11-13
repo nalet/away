@@ -9,7 +9,8 @@ A session opens on a phone as it does on a computer, from
 [home](./machines.md) through the steps of [chapter 5](./opening.md). Away's
 own pages on a phone are drawn in their chapters: the frame in
 [chapter 2](./frame.md), home in [chapter 4](./machines.md), the sessions in
-[chapter 9](./sessions.md) and the settings in [chapter 11](./settings.md).
+[chapter 9](./sessions.md) and the settings in [chapter 11](./settings.md). A
+machine's programs on a phone are in [chapter 7](./programs.md).
 
 It draws what the first release holds of
 [On a phone or a tablet](../capabilities/session.md#on-a-phone-or-a-tablet),

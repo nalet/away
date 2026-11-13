@@ -29,6 +29,17 @@
 //       menu open (keys, clipboard, picture, look, find, fill, end; on a phone kb, more).
 //       The machine's picture is a <div class="remote …"> of remote.js.
 //
+//   <div class="wlist" data-machine="fin-app-02">…rows…</div><div class="warea">…windows…</div>
+//       in a session with programs: the list of the machine's open windows down the side, and
+//       the room its windows have beside it, against which they are placed. A drawing writes
+//       the rows; the head, the row that opens a program and the foot are drawn here:
+//         <span class="wl-row on" data-p="L">Ledger – November</span>        the window in front
+//         <span class="wl-row small" data-p="R:b">Reports – Q3 2026</span>   one that was made small
+//       data-p is the program's icon, as for a window of remote.js. class="wlist narrow" has one
+//       row for each program, its icon alone: <span class="wl-row on" data-p="L" data-n="2"
+//       title="Ledger"></span>, data-n being how many windows it has. On a phone the list lies
+//       along the foot, narrow. data-on="add" shows the row that opens a program pressed.
+//
 // A dialog (<ds-modal>), the avatar's menu (class usermenu) and anything marked
 // data-over lie over the whole frame, the bar and the rail too, and are placed
 // against it.
@@ -37,7 +48,8 @@
 // frame.js draws itself: logo, rail, search, avatar, tabs, back, settings, sessions,
 // admin, current (the current view); and of a session's bar: handle, away (the mark),
 // stabs (the open sessions), stab (the current one), add, as, keys, clipboard, picture,
-// look, find, fill, endsession, closebar, kb, more (name:number:side).
+// look, find, fill, endsession, closebar, kb, more; and of the list of windows: whead (the
+// machine), wadd (open a program), wsize (narrow or wide) (name:number:side).
 //
 // data-co-in=".nc-illu__title 3, .nc-btn 4 right" numbers parts inside an element by a
 // selector (the parts a <ds-*> tag draws itself).
@@ -126,6 +138,24 @@
       <div class="sgrp">${sbtn('end', 'end', 'power', on)}</div><div class="sgrp">${sbtn('close', 'close the bar', 'chevron-up', on)}</div></div>`));
   }
 
+  // the list of windows of a session with programs: the rows are the drawing's; the head with the machine's
+  // name, the row that opens a program and the button that makes the list narrow or wide are drawn here
+  for (const l of document.querySelectorAll('.wlist')) {
+    const phone = !!l.closest('.phone'), slim = phone || l.classList.contains('narrow'), machine = l.dataset.machine || '';
+    for (const r of l.querySelectorAll('.wl-row')) {
+      const [letter, tone] = (r.dataset.p || '').split(':'), title = r.textContent.trim();
+      if (slim) r.setAttribute('aria-label', r.title || title);
+      r.innerHTML = `<span class="pico ${tone || ''}">${letter}</span>${slim ? '' : `<span class="t">${title}</span>`}`
+        + (r.dataset.n > 1 ? `<span class="count">${r.dataset.n}</span>` : '') + (!slim && r.classList.contains('small') ? icon('minus') : '');
+    }
+    l.append(make(`<span class="wl-row wl-add${l.dataset.on === 'add' ? ' on' : ''}" aria-label="open a program">${icon('plus')}${slim ? '' : '<span class="t">program</span>'}</span>`));
+    if (phone) continue;
+    l.prepend(make(`<span class="wl-head" title="${machine}">${icon('app-window')}${slim ? '' : `<span class="t">${machine}</span>`}</span>`));
+    const size = slim ? ['show the names', 'chevrons-right'] : ['make the list narrow', 'chevrons-left'];
+    l.append(make('<span class="wl-gap"></span>'));
+    l.append(make(`<span class="wl-foot"><button type="button" aria-label="${size[0]}" title="${size[0]}" class="nc-iconbtn nc-iconbtn--ghost nc-iconbtn--md wl-size">${icon(size[1], 's18')}</button></span>`));
+  }
+
   for (const el of document.querySelectorAll('i[data-i]')) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
@@ -142,7 +172,8 @@
                   current: '.crail .it.on, .tabs .on',
                   handle: '.shandle', away: '.sbar .mark', stabs: '.sbar .stabs', stab: '.sbar .stab.on', add: '.sbar .stab.add', as: '.sbar .as',
                   keys: '.sb-keys', clipboard: '.sb-clipboard', picture: '.sb-picture', look: '.sb-look', find: '.sb-find', fill: '.sb-fill',
-                  endsession: '.sb-end', closebar: '.sb-close', kb: '.sb-kb', more: '.sb-more' };
+                  endsession: '.sb-end', closebar: '.sb-close', kb: '.sb-kb', more: '.sb-more',
+                  whead: '.wl-head', wadd: '.wl-add', wsize: '.wl-size' };
   for (const f of document.querySelectorAll('[data-co-parts]')) {
     for (const entry of f.dataset.coParts.split(',')) {
       const [name, n, side] = entry.trim().split(':');

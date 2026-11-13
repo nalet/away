@@ -51,6 +51,7 @@ What is around every page: the rail, the top bar, the search, and the bar of a s
 | Use an installed app instead of the browser, on a computer or a phone | person | no | `use-installed-app` |
 
 - *Move between the machines, the open sessions and the settings*: a rail of icons on a wide screen, a bar of icons on a phone.
+- *Give the machine the whole window while a session is open*: a session with programs keeps the list of their windows beside them.
 - *Use Away in one's own language*: English first.
 - *Use an installed app instead of the browser, on a computer or a phone*: the browser is the one way in.
 

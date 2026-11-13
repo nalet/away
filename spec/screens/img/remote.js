@@ -8,7 +8,8 @@
 //       (the machine's own sign-in screen), "empty" (the desktop alone).
 //   <div class="w front" data-w="sheet" style="left:…;top:…;width:…;height:…"></div>
 //       one window: "sheet" (a table of figures), "doc" (a text), "mail" (a list
-//       beside a text). data-title sets its title.
+//       beside a text). data-title sets its title; data-p="L" or "R:b" puts its
+//       program's icon before the title: a letter on a tone (b, o, v; green without).
 //   <div class="remote term" data-term="shell"></div>
 //       a shell: "shell" (commands and their output), "monitor" (a program that
 //       takes the whole shell), "editor" (a text editor), "phone" (a few short lines).
@@ -46,7 +47,8 @@
   const fill = (el) => {
     const w = WINDOWS[el.dataset.w];
     if (!w) { console.error(`remote.js: no window "${el.dataset.w}"`); return; }
-    el.innerHTML = `<div class="wt">${el.dataset.title || w.title}</div><div class="wm">${w.menu.map((m) => `<span>${m}</span>`).join('')}</div><div class="wb">${w.body}</div>`;
+    const [letter, tone] = (el.dataset.p || '').split(':');
+    el.innerHTML = `<div class="wt">${letter ? `<span class="pico ${tone || ''}">${letter}</span>` : ''}${el.dataset.title || w.title}</div><div class="wm">${w.menu.map((m) => `<span>${m}</span>`).join('')}</div><div class="wb">${w.body}</div>`;
   };
   const win = (kind, cls, style) => `<div class="w ${cls}" data-w="${kind}" style="${style}"></div>`;
   const ICOS = ['Reports', 'Shared', 'Bin'].map((n, i) => `<span class="ico" style="left:12px;top:${16 + i * 84}px">${n}</span>`).join('');

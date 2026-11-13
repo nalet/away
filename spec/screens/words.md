@@ -17,6 +17,8 @@ last section.
 | connection | The line a session runs over. A connection can drop and come back while the session goes on. |
 | the session's bar | The bar across the top of a session, with what Away offers there. |
 | the handle | The small tab at the top edge of a session that opens the bar. |
+| window | A program's window, as its machine draws it. The browser's own is always “the browser window”. |
+| the list of windows | The list down the side of a session with programs: the machine's open windows, and the way to a further program. |
 | group | Machines that an administrator put together, such as finance. Also the groups of people that the identity provider gives; a page says which it means: “a group of machines”, “a group of people”. |
 | rule | Says which group of people reaches which machines, and what may pass. |
 | role | What someone may do in the administration: an administrator, a reader of the records. |

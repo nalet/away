@@ -32,8 +32,8 @@ every product shares. The specification doesn't repeat them.
 | Goals | 8 | 3 what people want, 4 what that takes, 1 what being open adds |
 | Qualities | 34 | 0 with a target, 34 with a proposal |
 | Expectations | 98 | 50 first release, 12 first release in part, 28 later, 8 not planned |
-| Capabilities | 195 | in 19 areas: 111 first release, 71 later, 13 not planned |
-| Figures | 80 | in 15 chapters; they show 59 of the 65 capabilities the first release holds for a person or an administrator |
+| Capabilities | 198 | in 19 areas: 112 first release, 73 later, 13 not planned |
+| Figures | 83 | in 15 chapters; they show 60 of the 66 capabilities the first release holds for a person or an administrator |
 <!-- end: state -->
 
 A capability counts once, by the soonest it is planned for any kind of
