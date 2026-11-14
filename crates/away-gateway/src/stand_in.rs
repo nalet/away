@@ -1,7 +1,8 @@
 //! A machine that stands in for a real one, for tests: it takes connections as a
 //! Windows machine of a domain does, secures them with a certificate of its own, signs
 //! one account in before the desktop, and then shows a desktop that draws a mark for
-//! every click and for every key.
+//! every click and for every key. It publishes one program, `||ledger`: a client that
+//! asks for it is shown the program's window in the place of the desktop.
 
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -48,6 +49,9 @@ pub fn desktop() -> Picture {
     }
     picture
 }
+
+/// The program a stand-in publishes, as a client asks for it.
+pub const PROGRAM: &str = "||ledger";
 
 /// What a stand-in keeps of its connections, for a test to look at.
 #[derive(Default)]
@@ -204,8 +208,8 @@ async fn serve(
 
     // then the desktop, for as long as the client stays
     let mut desktop = match sends_on {
-        Some(to) => Desktop::new(shows).that_sends_on(to),
-        None => Desktop::new(shows),
+        Some(to) => Desktop::new(shows).that_publishes(&[PROGRAM]).that_sends_on(to),
+        None => Desktop::new(shows).that_publishes(&[PROGRAM]),
     };
     let mut frames = Frames::new();
     let nth = {

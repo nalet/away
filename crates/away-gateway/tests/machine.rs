@@ -38,7 +38,8 @@ async fn a_desktop_opens_shows_the_machines_picture_and_takes_keys_and_the_point
     // what the machine shows of itself is what it is known by
     assert_eq!(secured.identity().fingerprint_text(), machine.fingerprint());
     assert!(!secured.signs_in_itself());
-    let Ok(Opened::Desktop(mut desktop)) = secured.sign_in(Account::named(KNOWN, Secret::new(PASSWORD)), 1280, 800, 0x0807, None).await
+    let Ok(Opened::Desktop(mut desktop)) =
+        secured.sign_in(Account::named(KNOWN, Secret::new(PASSWORD)), 1280, 800, 0x0807, None, None).await
     else {
         panic!("the account is signed in, and the machine shows its desktop")
     };
@@ -114,21 +115,21 @@ async fn a_farms_broker_says_where_the_connection_belongs_and_the_machine_it_nam
     let (at, on) = broker.address();
     let wanted = b"tsv://MS Terminal Services Plugin.1.Desktops";
     let secured = reach(&at, on, Some(wanted)).await.expect("the broker is reached").secure().await.expect("the connection is secured");
-    let Ok(Opened::SentOn(to)) = secured.sign_in(account(), 1280, 800, 0x0409, None).await else {
+    let Ok(Opened::SentOn(to)) = secured.sign_in(account(), 1280, 800, 0x0409, None, None).await else {
         panic!("the broker sends the connection on")
     };
     assert_eq!(to, sends_on);
     assert_eq!(broker.said_first(), [Some(wanted.to_vec())]);
     // a wrong password ends at the broker, as it does at a machine
     let secured = reach(&at, on, Some(wanted)).await.unwrap().secure().await.unwrap();
-    let Err(refused) = secured.sign_in(Account::named(KNOWN, Secret::new("another password")), 1280, 800, 0x0409, None).await else {
+    let Err(refused) = secured.sign_in(Account::named(KNOWN, Secret::new("another password")), 1280, 800, 0x0409, None, None).await else {
         panic!("a wrong password")
     };
     assert_eq!((refused.step, refused.why), (Step::SigningIn, Why::SignInRefused), "{}", refused.details);
 
     // the machine it names is told what the broker gave for it, and which session is asked for
     let secured = reach(&host, port, to.token.as_deref()).await.expect("the machine is reached").secure().await.expect("it is secured");
-    let Ok(Opened::Desktop(mut desktop)) = secured.sign_in(account(), 1280, 800, 0x0409, Some(to.session)).await else {
+    let Ok(Opened::Desktop(mut desktop)) = secured.sign_in(account(), 1280, 800, 0x0409, Some(to.session), None).await else {
         panic!("the machine shows its desktop")
     };
     let shows = stand_in::desktop();
@@ -149,7 +150,7 @@ async fn a_machine_that_does_not_take_the_password_or_is_not_there_says_at_which
     let machine = Machine::start(KNOWN, PASSWORD, stand_in::desktop()).await;
     let (host, port) = machine.address();
     let secured = reach(&host, port, None).await.unwrap().secure().await.unwrap();
-    let Err(refused) = secured.sign_in(Account::named(KNOWN, Secret::new("another password")), 1280, 800, 0x0409, None).await else {
+    let Err(refused) = secured.sign_in(Account::named(KNOWN, Secret::new("another password")), 1280, 800, 0x0409, None, None).await else {
         panic!("a wrong password")
     };
     assert_eq!((refused.step, refused.why), (Step::SigningIn, Why::SignInRefused), "{}", refused.details);

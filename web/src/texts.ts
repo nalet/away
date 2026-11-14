@@ -68,7 +68,7 @@ export const texts = {
     notHere: 'no machine of that name for you',
     notHereWhy: "It doesn't exist, or no rule gives it to you.",
     home: 'go home',
-    notYet: "This version of Away opens Windows desktops. It doesn't open programs, shells or other desktops yet.",
+    notYet: "This version of Away opens Windows desktops and the programs of Windows machines. It doesn't open shells or other desktops yet.",
     desktop: 'desktop',
     programs: 'programs',
     shell: 'shell',
@@ -131,13 +131,14 @@ export const texts = {
         'signing-in sign-in-refused': { says: `${machine} didn't accept that name and password.`, again: true },
         'signing-in sent-elsewhere': { says: "Its farm sent Away on to a machine that isn't among those named for it, so Away doesn't connect there.", again: false },
         'first-picture no-picture': { says: 'It took the sign-in and showed nothing within 30 seconds.', again: true },
+        'first-picture program-not-started': { says: "It took the sign-in and didn't start the program.", again: true },
       };
       return known[`${step} ${why}`] ?? { says: 'Something went wrong on the way to it.', again: true };
     },
     // the server didn't begin the session: what the page says, and whether trying again can help
     refused: (status: number, machine: string): { title: string; why: string; again: boolean } => {
       if (status === 404) return { title: 'no machine of that name for you', why: "It doesn't exist, or no rule gives it to you.", again: false };
-      if (status === 501) return { title: `${machine} can't be opened yet`, why: 'This version of Away opens Windows desktops, and nothing else yet.', again: false };
+      if (status === 501) return { title: `${machine} can't be opened yet`, why: 'This version of Away opens Windows desktops and programs, and nothing else yet.', again: false };
       if (status === 503) return { title: "away can't open machines right now", why: "No machine is opened without a record, and Away can't write its records right now.", again: true };
       return { title: `couldn't open ${machine}`, why: 'Away did not begin the session.', again: true };
     },
@@ -148,6 +149,10 @@ export const texts = {
       return { title: `couldn't open ${machine}`, why: 'Away did not begin the session.', again: true };
     },
     screenOf: (machine: string) => `the desktop of ${machine}`,
+    windowsOf: (program: string) => `the windows of ${program}`,
+    windows: 'windows',
+    toFront: (title: string) => `bring to the front: ${title}`,
+    closeWindow: (title: string) => `close: ${title}`,
     openBar: "open the session's bar",
     bar: "the session's bar",
     fill: 'fill the screen',

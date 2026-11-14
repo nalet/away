@@ -139,6 +139,12 @@ export function opensDesktop(machine: Machine): boolean {
   return machine.desktop !== null && over === 'rdp';
 }
 
+// Whether this version of Away opens a machine's programs: those of a Windows machine,
+// each in windows of its own.
+export function opensPrograms(machine: Machine): boolean {
+  return machine.kind === 'windows';
+}
+
 // Where a machine's own page is.
 export function pageOf(name: string): string {
   return `/machines/${encodeURIComponent(name)}`;

@@ -70,6 +70,46 @@ pub enum ToBrowser<'a> {
     },
     /// The session ended: why, as one word.
     Ended(&'a str),
+    /// The windows of the programs that are open, from the front one back, and which of
+    /// them is the one the person works in.
+    Windows {
+        /// The windows.
+        windows: &'a [Window],
+        /// The window in front, where one is.
+        in_front: Option<u32>,
+    },
+}
+
+/// A window of a program, as the browser is told of it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Window {
+    /// What names it for as long as it is open.
+    pub id: u32,
+    /// Its title.
+    pub title: String,
+    /// How it shows: `as-it-is`, `maximized`, `minimized` or `hidden`.
+    pub shown: &'static str,
+    /// Whether it is a window of its own, which a list of windows names: not a menu, a
+    /// tip or a dialogue that belongs to another window.
+    pub listed: bool,
+    /// The parts of it that can be seen, each by its left, its top, its right and its
+    /// bottom edge on the desktop; the right and the bottom edge are outside it.
+    pub seen: Vec<[i32; 4]>,
+}
+
+/// What a person does with a window as a whole.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Does {
+    /// Brings it to the front.
+    Front,
+    /// Makes it small.
+    Minimize,
+    /// Makes it as large as it gets.
+    Maximize,
+    /// Brings it back to the size it had.
+    Restore,
+    /// Closes it.
+    Close,
 }
 
 /// The kind of bytes that are a rectangle of the picture.
@@ -103,6 +143,22 @@ impl ToBrowser<'_> {
                 object(Json::object([("failed", Json::object([("step", step.into()), ("why", why.into()), ("details", details.into())]))]))
             }
             ToBrowser::Ended(why) => object(Json::object([("ended", why.into())])),
+            ToBrowser::Windows { windows, in_front } => {
+                let window = |window: &Window| {
+                    let part = |part: &[i32; 4]| Json::List(part.iter().map(|edge| Json::Number(f64::from(*edge))).collect());
+                    Json::object([
+                        ("id", u64::from(window.id).into()),
+                        ("title", window.title.as_str().into()),
+                        ("shown", window.shown.into()),
+                        ("listed", window.listed.into()),
+                        ("seen", Json::List(window.seen.iter().map(part).collect())),
+                    ])
+                };
+                object(Json::object([
+                    ("windows", Json::List(windows.iter().map(window).collect())),
+                    ("in_front", in_front.map_or(Json::Null, |window| u64::from(window).into())),
+                ]))
+            }
         }
     }
 }
@@ -211,6 +267,13 @@ pub enum FromBrowser {
     Did(Vec<Did>),
     /// The person leaves.
     Leaves,
+    /// What the person does with a window of a program as a whole.
+    Window {
+        /// The window.
+        id: u32,
+        /// What they do with it.
+        does: Does,
+    },
 }
 
 impl FromBrowser {
@@ -236,6 +299,17 @@ impl FromBrowser {
                 }
                 if said.get("leaves").and_then(Json::flag) == Some(true) {
                     return Ok(FromBrowser::Leaves);
+                }
+                if let Some(id) = said.get("window").and_then(Json::count).and_then(|id| u32::try_from(id).ok()) {
+                    let does = match said.text_of("does") {
+                        Some("front") => Does::Front,
+                        Some("minimize") => Does::Minimize,
+                        Some("maximize") => Does::Maximize,
+                        Some("restore") => Does::Restore,
+                        Some("close") => Does::Close,
+                        _ => return Err(NotThis("a window is brought to the front, made small, made large, brought back or closed")),
+                    };
+                    return Ok(FromBrowser::Window { id, does });
                 }
                 Err(NotThis("a message of the browser says nothing a session knows"))
             }
@@ -338,6 +412,17 @@ mod tests {
             ToBrowser::Drawn(7).write(),
             ToBrowser::Failed { step: "reaching", why: "no-answer", details: "no answer within 10 seconds" }.write(),
             ToBrowser::Ended("left").write(),
+            ToBrowser::Windows {
+                windows: &[Window {
+                    id: 65537,
+                    title: "Ledger".to_string(),
+                    shown: "as-it-is",
+                    listed: true,
+                    seen: vec![[20, 10, 180, 110]],
+                }],
+                in_front: Some(65537),
+            }
+            .write(),
         ];
         assert_eq!(written.len(), to_browser.len());
         for (written, example) in written.iter().zip(to_browser) {
@@ -363,7 +448,8 @@ mod tests {
                 FromBrowser::read(&carried).unwrap_or_else(|NotThis(why)| panic!("{}: {why}", example.write()))
             })
             .collect();
-        assert_eq!(read.len(), 6);
+        assert_eq!(read.len(), 7);
+        assert!(matches!(read[6], FromBrowser::Window { id: 65537, does: Does::Close }));
         assert!(
             matches!(&read[0], FromBrowser::Begins { ticket, width: 1280, height: 800, layout: Some(0x0807) } if ticket.expose() == "7f3a")
         );
@@ -403,6 +489,9 @@ mod tests {
             r#"{"name":"alex"}"#,
             r#"{"seen":-1}"#,
             r#"{"leaves":false}"#,
+            r#"{"window":65537}"#,
+            r#"{"window":65537,"does":"shake"}"#,
+            r#"{"window":-1,"does":"close"}"#,
         ] {
             assert!(FromBrowser::read(&Carried::Text(text.to_string())).is_err(), "{text}");
         }

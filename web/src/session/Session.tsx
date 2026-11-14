@@ -1,8 +1,10 @@
-// A session: a machine's desktop in the browser. While it opens, the steps of the
-// connection show, and the machine's question for a name and a password. Once it is
-// open the machine has the whole window, and Away shows nothing of its own but a handle.
+// A session: a machine's desktop in the browser, or one of its programs. While it
+// opens, the steps of the connection show, and the machine's question for a name and a
+// password. Once it is open the machine has the whole window, and Away shows nothing of
+// its own but a handle. A program's windows show on Away's ground, where the machine
+// has them on its desktop.
 import { Button, Chevron, EmptyState, Field, IconButton, Input, Spinner } from '@nalet/design-system';
-import { Check, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
+import { AppWindow, Check, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
@@ -11,8 +13,8 @@ import type { Machine } from '../machines';
 import { addressOf } from '../place';
 import { texts } from '../texts';
 import { layoutOf, placeOf } from './keys';
-import { begins, credentials, did, leaves, readRectangle, readSaid, seen } from './wire';
-import type { Did, Step } from './wire';
+import { begins, credentials, did, leaves, readRectangle, readSaid, seen, windowDoes } from './wire';
+import type { Did, Step, WindowOf } from './wire';
 
 const STEPS: Step[] = ['reaching', 'checking', 'signing-in', 'first-picture'];
 
@@ -24,9 +26,12 @@ type State =
   | { is: 'open' }
   | { is: 'ended'; why: string };
 
-// One session with a machine's desktop: from asking the server for it to its end.
-function useSession(machine: string) {
+// One session with a machine's desktop, or with one of its programs: from asking the
+// server for it to its end.
+function useSession(machine: string, program: string | null) {
   const [state, setState] = useState<State>({ is: 'opening', step: null, asks: null });
+  // the windows of the programs, from the front one back
+  const [windows, setWindows] = useState<WindowOf[]>([]);
   const [attempt, setAttempt] = useState(0);
   // the picture is drawn on a canvas of the session's own, which a page shows once it is open
   const [canvas] = useState(() => document.createElement('canvas'));
@@ -38,9 +43,10 @@ function useSession(machine: string) {
     // what arrives is drawn in the order it arrived, and confirmed once it is drawn
     let drawing: Promise<void> = Promise.resolve();
     setState({ is: 'opening', step: null, asks: null });
+    setWindows([]);
     const begin = async () => {
       const [asked, layout] = await Promise.all([
-        fetch(`/api/sessions?${new URLSearchParams({ machine })}`, { method: 'POST', headers: { 'x-away': '1' } }),
+        fetch(`/api/sessions?${new URLSearchParams(program === null ? { machine } : { machine, program })}`, { method: 'POST', headers: { 'x-away': '1' } }),
         layoutOf(),
       ]);
       if (over) return;
@@ -86,6 +92,7 @@ function useSession(machine: string) {
           });
         } else if ('failed' in said) setState({ is: 'failed', ...said.failed });
         else if ('ended' in said) setState({ is: 'ended', why: said.ended });
+        else if ('windows' in said) setWindows(said.windows);
       };
       opened.onclose = () => {
         if (over) return;
@@ -102,36 +109,36 @@ function useSession(machine: string) {
       connection?.close();
       socket.current = null;
     };
-  }, [machine, attempt, canvas]);
+  }, [machine, program, attempt, canvas]);
 
   const say = useCallback((message: string | Uint8Array<ArrayBuffer>) => {
     if (socket.current?.readyState === WebSocket.OPEN) socket.current.send(message);
   }, []);
-  return { state, canvas, say, again: () => setAttempt((before) => before + 1) };
+  return { state, windows, canvas, say, again: () => setAttempt((before) => before + 1) };
 }
 
-// The page of a session with a machine's desktop.
-export function Session({ name, go, contact }: { name: string; go: (to: string) => void; contact: string | null }) {
+// The page of a session with a machine's desktop, or with one of its programs.
+export function Session({ name, program, go, contact }: { name: string; program: string | null; go: (to: string) => void; contact: string | null }) {
   const [machines] = useMachines();
-  const { state, canvas, say, again } = useSession(name);
+  const { state, windows, canvas, say, again } = useSession(name, program);
   const machine = typeof machines === 'string' ? null : (machines.find((one) => one.name === name) ?? null);
   const toMachines = () => go(machine ? pageOf(name) : addressOf.machines);
 
   useEffect(() => {
-    document.title = `${name} · ${texts.name}`;
-  }, [name]);
-  // a person who left is back where the machine is
+    document.title = `${program ?? name} · ${texts.name}`;
+  }, [name, program]);
+  // a person who left, or closed the program, is back where the machine is
   useEffect(() => {
-    if (state.is === 'ended' && state.why === 'left') go(pageOf(name));
+    if (state.is === 'ended' && (state.why === 'left' || state.why === 'closed')) go(pageOf(name));
   }, [state, go, name]);
 
-  if (state.is === 'open') return <Desktop name={name} canvas={canvas} say={say} />;
+  if (state.is === 'open') return <Desktop name={name} program={program} windows={windows} canvas={canvas} say={say} />;
   const t = texts.session;
   if (state.is === 'refused' || state.is === 'ended') {
     const says = state.is === 'refused' ? t.refused(state.status, name) : t.ended(state.why, name);
     return (
       <div className="stage">
-        <h1 className="unseen asis">{name}</h1>
+        <h1 className="unseen asis">{program ?? name}</h1>
         <EmptyState
           illustration={state.is === 'refused' && state.status === 404 ? 'unknown' : 'error'}
           size="lg"
@@ -155,13 +162,14 @@ export function Session({ name, go, contact }: { name: string; go: (to: string) 
       </div>
     );
   }
-  return <Opening name={name} machine={machine} state={state} say={say} again={again} toMachines={toMachines} contact={contact} />;
+  return <Opening name={name} program={program} machine={machine} state={state} say={say} again={again} toMachines={toMachines} contact={contact} />;
 }
 
 // The steps of a connection: which are done, which runs, which failed and why, and what
 // the machine asks for.
 function Opening({
   name,
+  program,
   machine,
   state,
   say,
@@ -170,6 +178,7 @@ function Opening({
   contact,
 }: {
   name: string;
+  program: string | null;
   machine: Machine | null;
   state: Extract<State, { is: 'opening' | 'failed' }>;
   say: (message: string) => void;
@@ -197,10 +206,12 @@ function Opening({
     <form className="stage" onSubmit={signIn}>
       <div className="box">
         <div className="who">
-          <Monitor size={28} aria-hidden="true" />
+          {program === null ? <Monitor size={28} aria-hidden="true" /> : <AppWindow size={28} aria-hidden="true" />}
           <div className="col">
-            <h1 className="name asis">{name}</h1>
-            <span className="label">{machine ? texts.machine.desktopOf[machine.kind] : texts.machine.desktop}</span>
+            <h1 className="name asis">{program ?? name}</h1>
+            <span className="label">
+              {program !== null ? texts.programOn(name) : machine ? texts.machine.desktopOf[machine.kind] : texts.machine.desktop}
+            </span>
           </div>
         </div>
         <ol className="steps" aria-label={t.stepsOf(name)}>
@@ -292,8 +303,21 @@ function Opening({
 }
 
 // A desktop that is open: the machine's screen has the window, and every key, every
-// click and the wheel go to the machine.
-function Desktop({ name, canvas, say }: { name: string; canvas: HTMLCanvasElement; say: (message: string | Uint8Array<ArrayBuffer>) => void }) {
+// click and the wheel go to the machine. Of a program, the windows show where the
+// machine has them on its desktop, and what is around them is Away's ground.
+function Desktop({
+  name,
+  program,
+  windows,
+  canvas,
+  say,
+}: {
+  name: string;
+  program: string | null;
+  windows: WindowOf[];
+  canvas: HTMLCanvasElement;
+  say: (message: string | Uint8Array<ArrayBuffer>) => void;
+}) {
   const t = texts.session;
   const [bar, setBar] = useState(false);
   const [filled, setFilled] = useState(Boolean(document.fullscreenElement));
@@ -311,7 +335,9 @@ function Desktop({ name, canvas, say }: { name: string; canvas: HTMLCanvasElemen
     canvas.tabIndex = 0;
     canvas.className = 'screen';
     canvas.setAttribute('role', 'application');
-    canvas.setAttribute('aria-label', t.screenOf(name));
+    canvas.setAttribute('aria-label', program === null ? t.screenOf(name) : t.windowsOf(program));
+    // of a program only the windows show: the parts of them that can be seen
+    canvas.style.clipPath = program === null ? '' : 'url(#seen-parts)';
     holds.replaceChildren(canvas);
     canvas.focus();
 
@@ -418,7 +444,7 @@ function Desktop({ name, canvas, say }: { name: string; canvas: HTMLCanvasElemen
       canvas.removeEventListener('keyup', onKeyUp);
       canvas.removeEventListener('blur', onBlur);
     };
-  }, [canvas, name, say, t]);
+  }, [canvas, name, program, say, t]);
 
   const fill = () => {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
@@ -428,9 +454,27 @@ function Desktop({ name, canvas, say }: { name: string; canvas: HTMLCanvasElemen
     setBar(false);
     canvas.focus();
   };
+  // the parts of the windows that can be seen, as shares of the desktop's width and height
+  const parts = windows.flatMap((window) => window.seen.map((part) => ({ of: window.id, part })));
+  const listed = windows.filter((window) => window.listed);
   return (
-    <div className="sess">
-      <h1 className="unseen asis">{name}</h1>
+    <div className={program === null ? 'sess' : 'sess prog'}>
+      <h1 className="unseen asis">{program ?? name}</h1>
+      {program !== null && (
+        <svg className="unseen" width="0" height="0" aria-hidden="true">
+          <clipPath id="seen-parts" clipPathUnits="objectBoundingBox">
+            {parts.map(({ of, part: [left, top, right, bottom] }, nth) => (
+              <rect
+                key={`${of} ${nth}`}
+                x={left / Math.max(1, canvas.width)}
+                y={top / Math.max(1, canvas.height)}
+                width={(right - left) / Math.max(1, canvas.width)}
+                height={(bottom - top) / Math.max(1, canvas.height)}
+              />
+            ))}
+          </clipPath>
+        </svg>
+      )}
       {bar ? (
         <div
           className="sbar"
@@ -441,9 +485,23 @@ function Desktop({ name, canvas, say }: { name: string; canvas: HTMLCanvasElemen
           }}
         >
           <span className="on">
-            <Monitor size={16} aria-hidden="true" />
-            {name}
+            {program === null ? <Monitor size={16} aria-hidden="true" /> : <AppWindow size={16} aria-hidden="true" />}
+            {program ?? name}
           </span>
+          {program !== null && (
+            <ul className="wins" aria-label={t.windows}>
+              {listed.map((window) => (
+                <li key={window.id}>
+                  <button type="button" className="win" title={t.toFront(window.title)} onClick={() => say(windowDoes(window.id, 'front'))}>
+                    {window.title}
+                  </button>
+                  <IconButton variant="ghost" size="sm" label={t.closeWindow(window.title)} title={t.closeWindow(window.title)} onClick={() => say(windowDoes(window.id, 'close'))}>
+                    <X size={14} aria-hidden="true" />
+                  </IconButton>
+                </li>
+              ))}
+            </ul>
+          )}
           <span className="grow" />
           <IconButton variant="ghost" label={filled ? t.unfill : t.fill} title={filled ? t.unfill : t.fill} onClick={fill} autoFocus>
             {filled ? <Minimize size={16} aria-hidden="true" /> : <Maximize size={16} aria-hidden="true" />}

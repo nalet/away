@@ -67,7 +67,7 @@ The machines a person may reach: the list, its groups, the search, what was used
 | See the machines used last | person | v1 | `see-last-used` |
 | Mark machines and programs as favourites, and see them on home | person | built | `keep-favourites` |
 | See what a machine is: its kind, its address, how one gets in | person | built | `see-machine-details` |
-| See the programs a Windows machine offers, and open one | person | v1 | `see-programs` |
+| See the programs a Windows machine offers, and open one | person | built | `see-programs` |
 | See every program one may open on a page of their own, each as an entry, and find it by its name | person | built | `see-all-programs` |
 | Choose how to open a machine that offers more than one way: its desktop, its programs, its shell | person | v1 | `choose-way-in` |
 | Open a machine from a link or a bookmark | person | built | `open-by-address` |

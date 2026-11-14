@@ -56,6 +56,8 @@ export function App() {
   };
   // a session has the whole window: no bar and no rail of Away's around it
   const session = sessionAt(path);
-  if (session !== null && !who.ran_out) return <Session key={session} name={session} go={go} contact={who.contact} />;
+  if (session !== null && !who.ran_out) {
+    return <Session key={path} name={session.machine} program={session.program} go={go} contact={who.contact} />;
+  }
   return <Frame who={who} path={path} go={go} signOut={leave} signInAgain={() => window.location.assign(signInAt(here))} />;
 }

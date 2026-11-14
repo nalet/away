@@ -13,9 +13,9 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 | Capability | Who | RDP | VNC | SSH | Away | Key |
 |---|---|---|---|---|---|---|
 | Open a machine's desktop | person | partial | v1 | — | — | `open-desktop` |
-| Open one program of a Windows machine, without its desktop | person | v1 | — | — | — | `open-program` |
+| Open one program of a Windows machine, without its desktop | person | built | — | — | — | `open-program` |
 | Switch between the programs open on a machine, each in a window of its own | person | v1 | — | — | — | `switch-programs` |
-| See a machine's open windows in a list beside them, and bring one to the front, also one made small | person | v1 | — | — | — | `list-open-windows` |
+| See a machine's open windows in a list beside them, and bring one to the front, also one made small | person | partial | — | — | — | `list-open-windows` |
 | Open a shell on a machine | person | — | — | v1 | — | `open-shell` |
 | Keep several machines open at once and move between them | person | v1 | v1 | v1 | — | `open-several` |
 | Open a session in a browser tab or window of its own | person | v1 | v1 | v1 | — | `open-in-own-tab` |

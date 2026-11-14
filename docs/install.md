@@ -6,9 +6,9 @@ act in one namespace. It asks for no rights over the cluster.
 > **What this version is.** Away's three parts run and say whether they are
 > well. Someone who opens Away is signed in through the organisation's sign-in
 > service, sees the machines and the programs a rule gives them, stars what
-> they use, and opens Windows desktops, that of one machine and that of a
-> farm of machines, with a name and a password they type. It doesn't open
-> programs, shells or other desktops yet.
+> they use, and opens Windows desktops and the programs of Windows machines,
+> those of one machine and those of a farm of machines, with a name and a
+> password they type. It doesn't open shells or other desktops yet.
 > [The work packages](../spec/plan/README.md) say what comes next.
 
 ## What it needs

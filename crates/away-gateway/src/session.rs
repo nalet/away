@@ -18,6 +18,7 @@ use away_part::lines::Lines;
 use away_rdp::input::{Button, Input};
 use away_rdp::ntlm::Account;
 use away_rdp::picture::Picture;
+use away_rdp::rail::Program;
 use away_secret::Secret;
 use away_wire::{Carried, Did, FromBrowser, ToBrowser};
 use futures_util::{SinkExt, StreamExt};
@@ -38,6 +39,9 @@ const ASKS_AT_MOST: usize = 5;
 const ON_THEIR_WAY: u32 = 2;
 /// The side of the squares the picture is divided into, to say what changed.
 const TILE: usize = 64;
+/// How long a program may be without a window of its own before its session is at its
+/// end: a window that opens in the place of one that closed comes within this.
+const CLOSED_FOR: Duration = Duration::from_secs(3);
 
 /// The server, as the gateway asks it.
 pub struct Server {
@@ -60,6 +64,8 @@ pub struct Taken {
     /// The machines that serve the collection, by their addresses, as the files name
     /// them: each may name its port after a colon.
     pub served_by: Vec<String>,
+    /// The program the session is for, where it is for one and not for the desktop.
+    pub program: Option<Program>,
 }
 
 impl Server {
@@ -92,8 +98,13 @@ impl Server {
             .map(|served| served.iter().filter_map(Json::text).map(str::to_string).collect())
             .unwrap_or_default();
         match (status, text(Some(&said), "session"), text(machine, "name"), text(machine, "address"), port) {
-            (200, Some(session), Some(machine), Some(address), Some(port)) => {
-                Ok(Some(Taken { session, machine, address, port, collection, served_by }))
+            (200, Some(session), Some(name), Some(address), Some(port)) => {
+                // what the machine is asked to start, where the session is for a program
+                let program = machine
+                    .and_then(|machine| machine.get("program"))
+                    .and_then(|program| program.text_of("run"))
+                    .map(|run| Program { run: run.to_string(), arguments: String::new() });
+                Ok(Some(Taken { session, machine: name, address, port, collection, served_by, program }))
             }
             _ => Err(format!("the server answered the ticket with the status {status}, and with nothing a session can begin with")),
         }
@@ -123,6 +134,8 @@ enum Ended {
     BrowserGone,
     /// The machine ended the connection, or it broke.
     Machine(String),
+    /// The person closed the last window of the program.
+    Closed,
 }
 
 /// Runs one session on a browser's connection, from its first message to its end.
@@ -179,6 +192,7 @@ where
                 Ended::Left => ("left", String::new()),
                 Ended::BrowserGone => ("browser-gone", String::new()),
                 Ended::Machine(details) => ("machine", details),
+                Ended::Closed => ("closed", String::new()),
             }
         }
         // the person gave up before the desktop was open
@@ -271,7 +285,8 @@ where
                 let details = "it showed another identity than a moment before".to_string();
                 return Err(Failure { step: Step::Checking, why: Why::AnotherIdentity, details });
             }
-            let sent_on = match secured.sign_in(Account::named(&name, password.clone()), width, height, layout, None).await {
+            let program = taken.program.clone();
+            let sent_on = match secured.sign_in(Account::named(&name, password.clone()), width, height, layout, None, program).await {
                 Ok(Opened::Desktop(desktop)) => break 'asked (*desktop, None),
                 Ok(Opened::SentOn(to)) => to,
                 Err(Failure { why: Why::SignInRefused, .. }) => {
@@ -285,7 +300,8 @@ where
             let (host, port) = served_by(&sent_on, taken).await?;
             let secured = machine::reach(&host, port, sent_on.token.as_deref()).await?.secure().await?;
             known(server, taken, &host, port, &secured.identity().fingerprint_text()).await?;
-            match secured.sign_in(Account::named(&name, password), width, height, layout, Some(sent_on.session)).await {
+            let program = taken.program.clone();
+            match secured.sign_in(Account::named(&name, password), width, height, layout, Some(sent_on.session), program).await {
                 Ok(Opened::Desktop(desktop)) => break 'asked (*desktop, Some(format!("{host}:{port}"))),
                 Ok(Opened::SentOn(_)) => {
                     let details = format!("{host} sends the connection on again, which a machine of a farm doesn't");
@@ -385,7 +401,27 @@ where
     let mut changed = Changed::default();
     changed.add(Area { left: 0, top: 0, width: wide, height: high });
     let (mut sent, mut seen) = (0u32, 0u32);
+    // a program whose last window was closed is at its end, once no new one came in its place
+    let mut had_windows = false;
+    let mut closed_since: Option<tokio::time::Instant> = None;
     loop {
+        // where the windows of the programs are goes out before what is drawn in them
+        if let Some((windows, in_front)) = desktop.windows() {
+            if tell(browser, ToBrowser::Windows { windows: &windows, in_front }).await.is_err() {
+                return Ended::BrowserGone;
+            }
+            match desktop.windows_listed() {
+                0 if had_windows => closed_since = closed_since.or(Some(tokio::time::Instant::now())),
+                0 => {}
+                _ => (had_windows, closed_since) = (true, None),
+            }
+        }
+        let closed = async {
+            match closed_since {
+                Some(since) => tokio::time::sleep_until(since + CLOSED_FOR).await,
+                None => std::future::pending().await,
+            }
+        };
         // what changed goes out once the browser has drawn what went before: states in
         // between are left out, and the picture it gets is always the newest
         if !changed.is_empty() && sent.wrapping_sub(seen) < ON_THEIR_WAY {
@@ -426,10 +462,16 @@ where
                     }
                 }
                 Some(FromBrowser::Seen(number)) => seen = number,
+                Some(FromBrowser::Window { id, does }) => {
+                    if let Err(failed) = desktop.window(id, does).await {
+                        return Ended::Machine(failed.details);
+                    }
+                }
                 Some(FromBrowser::Leaves) => return Ended::Left,
                 Some(_) => {}
                 None => return Ended::BrowserGone,
             },
+            () = closed => return Ended::Closed,
         }
     }
 }
@@ -569,6 +611,7 @@ fn why_word(why: Why) -> &'static str {
         Why::SignInRefused => "sign-in-refused",
         Why::NoPicture => "no-picture",
         Why::SentElsewhere => "sent-elsewhere",
+        Why::ProgramNotStarted => "program-not-started",
         Why::Broken => "broken",
     }
 }

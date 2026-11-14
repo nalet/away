@@ -21,6 +21,8 @@
 //! `MACHINE_PORT` starts a stand-in for a Windows machine at that port, and the gateway
 //! beside the server, so that a desktop opens: `desk-01`, for the account
 //! `CORP\alex.urban` with the password `a password that exists for these tests alone`.
+//! The same stand-in is `apps-01`, which has two programs: `Books`, which the stand-in
+//! publishes and opens in a window, and `Wages`, which it doesn't let be started.
 //! Beside it stand two stand-ins for a farm's broker. One sends whoever signs in on to
 //! that machine, and `Farm Desk` is its collection, whose files name the machine. The
 //! other sends them on to a machine the files don't name: `Lost Desk`. A session's
@@ -150,6 +152,8 @@ async fn main() -> std::io::Result<()> {
             format!(
                 "machines:\n  - name: desk-01\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {at} }}\n  \
                  - name: gone-02\n    kind: windows\n    address: 127.0.0.1\n    groups: [desks]\n    desktop: {{ port: {nothing} }}\n  \
+                 - name: apps-01\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {at} }}\n    \
+                 programs:\n      - name: Books\n        run: \"||ledger\"\n      - Wages\n  \
                  - name: Farm Desk\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {broker_at} }}\n    \
                  collection: Desks\n    served-by: [localhost:{at}]\n  \
                  - name: Lost Desk\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {lost_at} }}\n    \

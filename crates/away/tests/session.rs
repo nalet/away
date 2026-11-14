@@ -145,6 +145,8 @@ async fn world(name: &str) -> Option<World> {
     std::fs::create_dir_all(&folder.0).expect("a folder");
     let files = format!(
         "machines:\n  - name: desk-01\n    kind: windows\n    address: {host}\n    desktop: {{ port: {port} }}\n  \
+         - name: apps-01\n    kind: windows\n    address: {host}\n    desktop: {{ port: {port} }}\n    programs:\n      \
+         - name: Ledger\n        run: \"||ledger\"\n      - Payroll\n  \
          - name: gone-02\n    kind: windows\n    address: 127.0.0.1\n    desktop: {{ port: {nothing} }}\n  \
          - name: build-01\n    kind: linux\n    address: build-01.corp.example\n    shell: true\n  \
          - name: Desktops\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {broker_port} }}\n    collection: Desktops\n    \
@@ -155,7 +157,7 @@ async fn world(name: &str) -> Option<World> {
          - name: Alone\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {alone_port} }}\n    collection: Alone\n  \
          - name: Anywhere\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {port} }}\n    collection: Anywhere\n  \
          - name: hidden-09\n    kind: windows\n    address: hidden-09.corp.example\n    desktop: true\n\
-         rules:\n  - name: staff-desks\n    who: [staff]\n    reaches: [desk-01, gone-02, build-01, Desktops, Elsewhere, Unnamed, Alone, Anywhere]\n"
+         rules:\n  - name: staff-desks\n    who: [staff]\n    reaches: [desk-01, apps-01, gone-02, build-01, Desktops, Elsewhere, Unnamed, Alone, Anywhere]\n"
     );
     std::fs::write(folder.0.join("machines.yaml"), files).expect("the files");
 
@@ -286,6 +288,11 @@ impl Browser {
     fn open(&mut self, world: &World, machine: &str) -> (u16, String) {
         let (status, _, body) = self.ask("POST", &format!("{}/api/sessions?machine={machine}", world.away), true);
         (status, body)
+    }
+
+    /// Asks to open a program of a machine, and gives the ticket.
+    fn ticket_for_a_program(&mut self, world: &World, machine: &str, program: &str) -> String {
+        self.ticket(world, &format!("{machine}&program={program}"))
     }
 
     /// The same, where it is granted: the ticket.
@@ -495,7 +502,10 @@ async fn only_what_a_rule_gives_is_opened_and_a_ticket_is_good_once_for_the_brow
         assert_eq!(browser.open(&world, machine), (404, "Nothing of that name is there for you.\n".to_string()));
     }
     // what Away doesn't open yet says so: a shell
-    assert_eq!(browser.open(&world, "build-01"), (501, "Away opens Windows desktops so far, and this machine offers none.\n".to_string()));
+    assert_eq!(
+        browser.open(&world, "build-01"),
+        (501, "Away opens Windows desktops and programs so far, and this machine offers neither.\n".to_string())
+    );
     assert_eq!(browser.ask("GET", &format!("{}/api/sessions?machine=desk-01", world.away), true).0, 405);
 
     let sign_in = browser.signed_in_as(&world);
@@ -666,6 +676,89 @@ async fn the_desktop_of_a_farm_opens_on_the_machine_its_broker_names_where_the_f
     let seen = world.machine.seen();
     assert_eq!((seen.len(), seen[1].sent_on_to), (2, None));
     assert_eq!(world.machine.said_first().last(), Some(&Some(b"tsv://MS Terminal Services Plugin.1.Anywhere".to_vec())));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_program_opens_in_a_window_of_its_own_and_closing_it_ends_the_session() {
+    let Some(world) = world("program").await else { return };
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+    // a program the machine doesn't have, for whoever asks, is not there
+    assert_eq!(browser.open(&world, "apps-01&program=Nothing"), (404, "Nothing of that name is there for you.\n".to_string()));
+
+    // the same steps as for a desktop, and then the program's window in the place of one
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket_for_a_program(&world, "apps-01", "Ledger")).await;
+    assert_eq!(session.steps().await.0, ["reaching", "checking", "signing-in"]);
+    session.say(credentials(KNOWN, PASSWORD)).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!(steps, ["first-picture"]);
+    assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120}}"#);
+    // where the window is comes before what is drawn in it
+    let windows = session.next().await.expect("the windows");
+    assert_eq!(
+        windows.write(),
+        r#"{"windows":[{"id":65537,"title":"ledger","shown":"as-it-is","listed":true,"seen":[[20,10,180,110]]}],"in_front":65537}"#
+    );
+    // what is drawn is the window, where it is on the machine's desktop, and nothing beside it
+    let shows = stand_in::desktop();
+    let inside = |x: usize, y: usize| (20..180).contains(&x) && (10..110).contains(&y);
+    let is_the_window = |session: &Session| {
+        let picture = session.picture.as_ref().expect("a picture");
+        (0..120).all(|y| {
+            (0..200).all(|x| {
+                let at = (y * 200 + x) * 4;
+                let expected = if inside(x, y) { &shows.pixels[at..at + 3] } else { &[0, 0, 0][..] };
+                &picture.pixels[at..at + 3] == expected
+            })
+        })
+    };
+    while !is_the_window(&session) {
+        let drawn = session.until("drawn").await.get("drawn").and_then(Json::count).expect("a number");
+        session.say(Json::object([("seen", drawn.into())])).await;
+    }
+    // the machine was told that the connection is for a program, and which
+    let seen = world.machine.seen();
+    let last = seen.last().expect("a client came");
+    assert!(last.for_a_program);
+    assert_eq!(
+        last.about_programs.last(),
+        Some(&away_rdp::rail::stand_in::Asked::Start(away_rdp::rail::Program { run: "||ledger".to_string(), arguments: String::new() }))
+    );
+
+    // the person closes the window: it is gone, and with its last window the program's session ends
+    session.say(Json::object([("window", 65537u64.into()), ("does", "close".into())])).await;
+    assert_eq!(session.until("windows").await.write(), r#"{"windows":[],"in_front":null}"#);
+    assert_eq!(session.until("ended").await.write(), r#"{"ended":"closed"}"#);
+    assert!(session.next().await.is_none());
+
+    // the records say that it was a program, and which
+    let kept = records(&world.database).await;
+    let of_sessions: Vec<_> = kept.iter().filter(|(kind, ..)| kind.starts_with("session-")).collect();
+    assert_eq!(
+        of_sessions.iter().map(|(kind, ..)| kind.as_str()).collect::<Vec<_>>(),
+        ["session-asked", "session-opened", "session-ended"]
+    );
+    assert_eq!((of_sessions[0].3.text_of("way"), of_sessions[0].3.text_of("program")), (Some("program"), Some("Ledger")));
+    assert_eq!(of_sessions[2].3.text_of("why"), Some("closed"));
+
+    // a program the machine doesn't publish is not started, and the session says so
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket_for_a_program(&world, "apps-01", "Payroll")).await;
+    assert_eq!(session.steps().await.0, ["reaching", "checking", "signing-in"]);
+    session.say(credentials(KNOWN, PASSWORD)).await;
+    let (steps, failed) = session.steps().await;
+    assert_eq!(steps, ["first-picture"]);
+    let failed = failed.get("failed").expect("a step that failed").clone();
+    assert_eq!((failed.text_of("step"), failed.text_of("why")), (Some("first-picture"), Some("program-not-started")));
+    assert!(failed.text_of("details").is_some_and(|details| details.contains("not among those it publishes")));
+
+    // and a desktop of the same machine opens as before
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "apps-01")).await;
+    assert_eq!(session.steps().await.0, ["reaching", "checking", "signing-in"]);
+    session.say(credentials(KNOWN, PASSWORD)).await;
+    let (_, desktop) = session.steps().await;
+    assert!(desktop.get("desktop").is_some());
+    assert!(!world.machine.seen().last().expect("a client came").for_a_program);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

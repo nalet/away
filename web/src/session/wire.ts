@@ -11,7 +11,19 @@ export type Said =
   | { desktop: { width: number; height: number } }
   | { drawn: number }
   | { failed: { step: Step; why: string; details: string } }
-  | { ended: string };
+  | { ended: string }
+  | { windows: WindowOf[]; in_front: number | null };
+
+// A window of a program: what names it, its title, how it shows, whether it is a window
+// of its own that a list names, and the parts of it that can be seen, each by its left,
+// top, right and bottom edge on the desktop.
+export interface WindowOf {
+  id: number;
+  title: string;
+  shown: 'as-it-is' | 'maximized' | 'minimized' | 'hidden';
+  listed: boolean;
+  seen: [number, number, number, number][];
+}
 
 // A rectangle of the picture: where it goes, and its pixels as a PNG picture.
 export interface Rectangle {
@@ -52,6 +64,11 @@ export function seen(number: number): string {
 
 export function leaves(): string {
   return JSON.stringify({ leaves: true });
+}
+
+// What a person does with a window of a program as a whole.
+export function windowDoes(id: number, does: 'front' | 'minimize' | 'maximize' | 'restore' | 'close'): string {
+  return JSON.stringify({ window: id, does });
 }
 
 // One thing a person did with the keys or the pointer. A button is numbered as a

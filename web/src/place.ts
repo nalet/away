@@ -31,12 +31,18 @@ export function desktopOf(name: string): string {
   return `/machines/${encodeURIComponent(name)}/desktop`;
 }
 
-// The machine whose desktop a page's address opens, where it opens one.
-export function sessionAt(path: string): string | null {
-  const name = /^\/machines\/([^/]+)\/desktop$/.exec(path)?.[1];
-  if (!name) return null;
+// Where a program of a machine is open.
+export function programOf(machine: string, program: string): string {
+  return `/machines/${encodeURIComponent(machine)}/programs/${encodeURIComponent(program)}`;
+}
+
+// What a page's address opens, where it opens something: a machine's desktop, or one of
+// its programs.
+export function sessionAt(path: string): { machine: string; program: string | null } | null {
+  const [, machine, program] = /^\/machines\/([^/]+)\/(?:desktop|programs\/([^/]+))$/.exec(path) ?? [];
+  if (!machine) return null;
   try {
-    return decodeURIComponent(name);
+    return { machine: decodeURIComponent(machine), program: program ? decodeURIComponent(program) : null };
   } catch {
     return null;
   }

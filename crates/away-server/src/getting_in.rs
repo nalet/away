@@ -472,9 +472,10 @@ impl GettingIn {
         }
     }
 
-    /// Asks to open a machine's desktop for whoever asks. The record is written before
-    /// anything is opened, and nothing is opened where it can't be written. The answer
-    /// is the ticket that the page's connection to the gateway begins with.
+    /// Asks to open a machine's desktop, or one of its programs, for whoever asks. The
+    /// record is written before anything is opened, and nothing is opened where it can't
+    /// be written. The answer is the ticket that the page's connection to the gateway
+    /// begins with.
     async fn open(&self, request: &Request<Incoming>) -> Answer {
         let Some((signing, person)) = self.signed_in(request) else {
             return plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n");
@@ -494,9 +495,30 @@ impl GettingIn {
         let Some((machine, _)) = reached.iter().find(|(machine, _)| machine.name == name) else {
             return plain(StatusCode::NOT_FOUND, "Nothing of that name is there for you.\n");
         };
-        // what Away opens so far: a Windows desktop, of one machine or of a farm's collection
-        let Some((Over::Rdp, port)) = machine.desktop else {
-            return plain(StatusCode::NOT_IMPLEMENTED, "Away opens Windows desktops so far, and this machine offers none.\n");
+        // what Away opens so far: a Windows desktop and the programs of a Windows machine, of
+        // one machine or of a farm's collection
+        let asked_for = named.iter().find(|(its, value)| its == "program" && !value.is_empty()).map(|(_, value)| value.as_str());
+        let (port, program) = match asked_for {
+            None => {
+                let Some((Over::Rdp, port)) = machine.desktop else {
+                    return plain(
+                        StatusCode::NOT_IMPLEMENTED,
+                        "Away opens Windows desktops and programs so far, and this machine offers neither.\n",
+                    );
+                };
+                (port, None)
+            }
+            Some(asked_for) => {
+                let Some(program) = machine.programs.iter().find(|program| program.name == asked_for) else {
+                    return plain(StatusCode::NOT_FOUND, "Nothing of that name is there for you.\n");
+                };
+                // a program is started where the machine's desktop is opened
+                let port = match machine.desktop {
+                    Some((Over::Rdp, port)) => port,
+                    _ => 3389,
+                };
+                (port, Some((program.name.clone(), program.run.clone())))
+            }
         };
         if !self.records.are_kept() {
             return plain(StatusCode::SERVICE_UNAVAILABLE, "Away opens no machine here: it is given no database to keep its records in.\n");
@@ -514,7 +536,8 @@ impl GettingIn {
             person: Some((person.subject.clone(), person.name.clone())),
             machine: Some(machine.name.clone()),
             details: Json::object([
-                ("way", "desktop".into()),
+                ("way", if program.is_some() { "program" } else { "desktop" }.into()),
+                ("program", program.as_ref().map_or(Json::Null, |(name, _)| name.as_str().into())),
                 ("address", machine.address.as_str().into()),
                 ("port", u64::from(port).into()),
             ]),
@@ -537,6 +560,7 @@ impl GettingIn {
             port,
             collection: machine.collection.clone(),
             served_by: machine.served_by.clone(),
+            program,
             at: time::now().as_secs(),
         };
         match self.sessions.ask(asked) {
@@ -584,6 +608,12 @@ impl GettingIn {
                             ("port", u64::from(asked.port).into()),
                             ("collection", asked.collection.as_deref().map_or(Json::Null, Json::from)),
                             ("served_by", Json::List(asked.served_by.iter().map(|served| served.as_str().into()).collect())),
+                            (
+                                "program",
+                                asked.program.as_ref().map_or(Json::Null, |(name, run)| {
+                                    Json::object([("name", name.as_str().into()), ("run", run.as_str().into())])
+                                }),
+                            ),
                         ]),
                     ),
                 ]);

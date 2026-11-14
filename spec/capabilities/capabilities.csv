@@ -1,8 +1,8 @@
 key,area,capability,who,rdp,vnc,ssh,away,note
 open-desktop,open,Open a machine's desktop,person,partial,v1,—,—,
-open-program,open,"Open one program of a Windows machine, without its desktop",person,v1,—,—,—,a program the machine publishes for remote use
+open-program,open,"Open one program of a Windows machine, without its desktop",person,built,—,—,—,a program the machine publishes for remote use
 switch-programs,open,"Switch between the programs open on a machine, each in a window of its own",person,v1,—,—,—,one sign-in on the machine holds them all
-list-open-windows,open,"See a machine's open windows in a list beside them, and bring one to the front, also one made small",person,v1,—,—,—,"programs bring no task bar of the machine's, so the list is how a window that was made small is reached"
+list-open-windows,open,"See a machine's open windows in a list beside them, and bring one to the front, also one made small",person,partial,—,—,—,"programs bring no task bar of the machine's, so the list is how a window that was made small is reached"
 open-shell,open,Open a shell on a machine,person,—,—,v1,—,
 open-several,open,Keep several machines open at once and move between them,person,v1,v1,v1,—,
 open-in-own-tab,open,Open a session in a browser tab or window of its own,person,v1,v1,v1,—,
@@ -94,7 +94,7 @@ see-groups,find,See the machines in the groups an administrator made,person,—,
 see-last-used,find,See the machines used last,person,—,—,—,v1,
 keep-favourites,find,"Mark machines and programs as favourites, and see them on home",person,—,—,—,built,
 see-machine-details,find,"See what a machine is: its kind, its address, how one gets in",person,—,—,—,built,
-see-programs,find,"See the programs a Windows machine offers, and open one",person,—,—,—,v1,
+see-programs,find,"See the programs a Windows machine offers, and open one",person,—,—,—,built,
 see-all-programs,find,"See every program one may open on a page of their own, each as an entry, and find it by its name",person,—,—,—,built,"the programs of every machine one reaches, whichever machine offers them"
 choose-way-in,find,"Choose how to open a machine that offers more than one way: its desktop, its programs, its shell",person,—,—,—,v1,
 open-by-address,find,Open a machine from a link or a bookmark,person,—,—,—,built,
@@ -120,7 +120,7 @@ group-machines,register,Put machines in groups,admin,—,—,—,built,
 set-sign-in-way,register,"Say for a machine how people are signed in: as themselves, with a kept secret, or by typing",admin,—,—,—,v1,
 keep-secret,register,"Keep a name and password or a key for a machine, never shown again",admin,—,—,—,v1,in the first release the machine's file names a secret that the cluster holds; typing one in the browser comes with adding machines there
 change-kept-secret,register,Change a kept password on the machine by itself from time to time,system,—,—,—,no,Away keeps the secrets it needs and manages no others
-offer-programs,register,Say which programs of a Windows machine people may open,admin,—,—,—,v1,
+offer-programs,register,Say which programs of a Windows machine people may open,admin,—,—,—,built,
 give-program-icons,register,"Give a program an icon of its own, which people know it by",admin,—,—,—,built,"a picture among the files; Away serves it itself"
 read-programs-from-host,register,"Read the desktops and programs a farm of Windows machines publishes from the farm itself, as it changes",system,—,—,—,built,"the files name the farm's feed; Away asks it as an account of its own"
 set-connection-options,register,"Set how a machine is reached: its port, its screen, what may pass",admin,—,—,—,v1,

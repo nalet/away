@@ -33,6 +33,9 @@ pub struct Asked {
     pub collection: Option<String>,
     /// The machines that serve the collection, by their addresses.
     pub served_by: Vec<String>,
+    /// The program the session is for, where it is for one and not for the desktop: its
+    /// name, and what the machine is asked to start.
+    pub program: Option<(String, String)>,
     /// When it was asked for, in seconds since 1970.
     pub at: u64,
 }
@@ -116,6 +119,7 @@ mod tests {
             port: 3389,
             collection: None,
             served_by: Vec::new(),
+            program: None,
             at,
         }
     }

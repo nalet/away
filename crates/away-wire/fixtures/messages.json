@@ -8,7 +8,8 @@
     {"says": "a rectangle at 64, 128, 200 wide and 120 high, as a PNG picture that begins 89 50 4e 47", "bytes": "010040008000c800780189504e47"},
     {"says": "the rectangles up to here are number 7", "text": "{\"drawn\":7}"},
     {"says": "reaching failed: no answer", "text": "{\"failed\":{\"step\":\"reaching\",\"why\":\"no-answer\",\"details\":\"no answer within 10 seconds\"}}"},
-    {"says": "the session ended because the person left", "text": "{\"ended\":\"left\"}"}
+    {"says": "the session ended because the person left", "text": "{\"ended\":\"left\"}"},
+    {"says": "the windows of the programs: one, Ledger, shown as it is, a window of its own, all of it seen from 20, 10 to 180, 110, and it is in front", "text": "{\"windows\":[{\"id\":65537,\"title\":\"Ledger\",\"shown\":\"as-it-is\",\"listed\":true,\"seen\":[[20,10,180,110]]}],\"in_front\":65537}"}
   ],
   "from_browser": [
     {"says": "the session begins: its ticket, a desktop of 1280 by 800, and a keyboard with the Swiss German layout (2055)", "text": "{\"ticket\":\"7f3a\",\"width\":1280,\"height\":800,\"layout\":2055}"},
@@ -16,6 +17,7 @@
     {"says": "the rectangles up to number 7 are drawn", "text": "{\"seen\":7}"},
     {"says": "the person leaves", "text": "{\"leaves\":true}"},
     {"says": "the pointer moved to 640, 400", "bytes": "0102800190"},
-    {"says": "the main button down at 640, 400; the second button up at 1, 2; the wheel one notch towards the person, and one to the right, at 3, 4; the key A down; the arrow to the right up; the character for the euro; the number lock and the capitals lock on", "bytes": "020001028001900202000001000203ff8800000300040300780100030004041e0001044d01000520ac010606"}
+    {"says": "the main button down at 640, 400; the second button up at 1, 2; the wheel one notch towards the person, and one to the right, at 3, 4; the key A down; the arrow to the right up; the character for the euro; the number lock and the capitals lock on", "bytes": "020001028001900202000001000203ff8800000300040300780100030004041e0001044d01000520ac010606"},
+    {"says": "the person closes the window 65537", "text": "{\"window\":65537,\"does\":\"close\"}"}
   ]
 }

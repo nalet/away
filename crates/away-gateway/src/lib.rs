@@ -15,6 +15,7 @@ pub mod machine;
 pub mod session;
 #[cfg(feature = "stand-in")]
 pub mod stand_in;
+pub mod windows;
 
 use std::sync::Arc;
 

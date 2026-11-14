@@ -15,14 +15,18 @@ use away_rdp::input::Input;
 use away_rdp::negotiation::{self, Security};
 use away_rdp::ntlm::{Account, Fresh};
 use away_rdp::picture::Picture;
+use away_rdp::rail::{Command, Program};
 use away_rdp::redirection::Redirection;
 use away_rdp::sign_in::{self, New, Next, SignIn};
 use away_rdp::tpkt::Frames;
 use away_rdp::{der, licence};
+use away_wire::Does;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;
 use tokio_rustls::TlsConnector;
+
+use crate::windows::Windows;
 
 /// How long a machine gets to answer, at each step on the way to its desktop.
 pub const WITHIN: Duration = Duration::from_secs(10);
@@ -59,6 +63,8 @@ pub enum Why {
     NoPicture,
     /// A farm's broker sent the connection to a machine the files don't name for it.
     SentElsewhere,
+    /// The machine did not start the program.
+    ProgramNotStarted,
     /// The connection broke, or the machine said something Away can't go on with.
     Broken,
 }
@@ -183,7 +189,8 @@ impl Secured {
     /// Signs the account in, and opens the desktop at this size, for a keyboard of this
     /// layout, as Windows numbers them. On the machine a farm's broker sent the client
     /// on to, the session the broker named is said. A broker opens nothing: it says
-    /// where the connection belongs.
+    /// where the connection belongs. With a program, no desktop is opened: the machine
+    /// is asked to start the program, and shows its windows.
     pub async fn sign_in(
         mut self,
         account: Account,
@@ -191,6 +198,7 @@ impl Secured {
         height: u16,
         layout: u32,
         sent_on_to: Option<u32>,
+        program: Option<Program>,
     ) -> Result<Opened, Failure> {
         let signing_in = async {
             let random =
@@ -236,8 +244,7 @@ impl Secured {
             };
 
             // what Away is, the channels, the licence, and what each side can do
-            let client =
-                Client { width, height, security: self.security.number(), name: "away".to_string(), layout, sent_on_to, program: None };
+            let client = Client { width, height, security: self.security.number(), name: "away".to_string(), layout, sent_on_to, program };
             let mut fresh = [0u8; 80];
             getrandom::fill(&mut fresh).map_err(random(Step::SigningIn))?;
             let for_a_licence = licence::New {
@@ -257,6 +264,8 @@ impl Secured {
                 is_open: false,
                 sent_on: None,
                 drawn: Vec::new(),
+                windows: Windows::default(),
+                windows_changed: false,
                 scratch: vec![0u8; 32 * 1024],
             };
             while !desktop.is_open {
@@ -313,6 +322,10 @@ pub struct Desktop {
     sent_on: Option<Redirection>,
     /// The areas that were drawn and not yet taken.
     drawn: Vec<Area>,
+    /// The windows of the programs, where the session is for a program.
+    windows: Windows,
+    /// Whether the machine said something of the windows since they were last asked for.
+    windows_changed: bool,
     scratch: Vec<u8>,
 }
 
@@ -374,13 +387,46 @@ impl Desktop {
                         }
                     }
                     Happened::SentOn(to) => self.sent_on = Some(to),
+                    Happened::Windows(changes) => {
+                        self.windows.take(changes);
+                        self.windows_changed = true;
+                    }
+                    Happened::NotStarted { result, raw } => {
+                        let details = format!("{} (its own code {raw:#010x})", away_rdp::rail::why(result));
+                        return Err(failure(Step::FirstPicture, Why::ProgramNotStarted, details));
+                    }
                     Happened::Channels { .. } | Happened::Licensed | Happened::AsksToTakeALicence { .. } | Happened::LicenceTaken(_) => {}
-                    // programs come with the next step: a desktop asks for none
-                    Happened::AskedForTheProgram | Happened::Started | Happened::NotStarted { .. } | Happened::Windows(_) => {}
+                    Happened::AskedForTheProgram | Happened::Started => {}
                 }
             }
         }
         Ok(())
+    }
+
+    /// The windows of the programs from the front one back, and the one in front, where
+    /// the machine said something of them since this was last asked.
+    pub fn windows(&mut self) -> Option<(Vec<away_wire::Window>, Option<u32>)> {
+        std::mem::take(&mut self.windows_changed).then(|| self.windows.told())
+    }
+
+    /// How many windows of their own are open.
+    pub fn windows_listed(&self) -> usize {
+        self.windows.listed()
+    }
+
+    /// Tells the machine what the person does with a window as a whole.
+    pub async fn window(&mut self, id: u32, does: Does) -> Result<(), Failure> {
+        let told = match does {
+            Does::Front => self.open.activate(id, true),
+            Does::Minimize => self.open.command(id, Command::Minimize),
+            Does::Maximize => self.open.command(id, Command::Maximize),
+            Does::Restore => self.open.command(id, Command::Restore),
+            Does::Close => self.open.command(id, Command::Close),
+        };
+        self.writer
+            .write_all(&told)
+            .await
+            .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
     }
 
     /// Tells the machine of keys and of the pointer.

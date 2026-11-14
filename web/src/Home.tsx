@@ -1,14 +1,14 @@
 // What one may open: on home everything, on a page of their own the programs, and on
 // another the machines in the groups an administrator made; and a page for each
-// machine. This version shows them and opens none yet.
+// machine. A click opens a Windows desktop or a program.
 import { Banner, Button, Card, Chevron, Code, EmptyState, Input } from '@nalet/design-system';
 import { AppWindow, ArrowLeft, Monitor, Search, SquareTerminal, Star } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import { entriesOf, found, opensDesktop, pageOf, useFavourites, useMachines } from './machines';
+import { entriesOf, found, opensDesktop, opensPrograms, pageOf, useFavourites, useMachines } from './machines';
 import type { Entry, Machine, Stars } from './machines';
-import { addressOf, desktopOf, inPlace } from './place';
+import { addressOf, desktopOf, inPlace, programOf } from './place';
 import { texts } from './texts';
 
 // What a machine is, in one line: its desktop, its programs, its shell.
@@ -165,12 +165,13 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
             </h2>
             <ul className="mgrid">
               {group.entries.map(({ machine, program }) => {
-                // a program is an entry of its own; it leads to its machine's page. A machine
-                // that offers its desktop and nothing else, where Away opens it, is opened by a
+                // a program is an entry of its own, and a click on it opens it. A machine that
+                // offers its desktop and nothing else, where Away opens it, is opened by a
                 // click on it; one that offers more leads to its page, where each way in is
                 const Icon = program === null ? iconOf(machine) : AppWindow;
                 const only = program === null && opensDesktop(machine) && machine.programs.length === 0 && !machine.shell;
-                const to = only ? desktopOf(machine.name) : pageOf(machine.name);
+                const opens = program !== null && opensPrograms(machine);
+                const to = only ? desktopOf(machine.name) : opens ? programOf(machine.name, program.name) : pageOf(machine.name);
                 return (
                   <li key={`${machine.name} ${program?.name ?? ''}`}>
                     <a className="m" href={to} onClick={inPlace(go, to)}>
@@ -236,7 +237,9 @@ export function MachinePage({ name, go }: { name: string; go: (to: string) => vo
         <h1 className="asis">{machine.name}</h1>
         <StarOf stars={stars} machine={machine.name} program={null} />
       </div>
-      {!(opensDesktop(machine) && machine.programs.length === 0 && !machine.shell) && <Banner state="information">{texts.machine.notYet}</Banner>}
+      {(machine.shell !== null || (machine.desktop !== null && !opensDesktop(machine)) || (machine.programs.length > 0 && !opensPrograms(machine))) && (
+        <Banner state="information">{texts.machine.notYet}</Banner>
+      )}
       <div className="cols rev">
         <div>
           {machine.desktop && (
@@ -269,15 +272,31 @@ export function MachinePage({ name, go }: { name: string; go: (to: string) => vo
                 {texts.machine.programs} <span className="n">{machine.programs.length}</span>
               </h2>
               <ul className="mgrid">
-                {machine.programs.map((program) => (
-                  <li key={program.name} className="m prog still">
-                    {program.icon ? <img className="icon" src={program.icon} alt="" width={24} height={24} /> : <AppWindow size={22} aria-hidden="true" />}
-                    <span className="main">
-                      <span className="name">{program.name}</span>
-                    </span>
-                    <StarOf stars={stars} machine={machine.name} program={program.name} />
-                  </li>
-                ))}
+                {machine.programs.map((program) => {
+                  const shows = (
+                    <>
+                      {program.icon ? <img className="icon" src={program.icon} alt="" width={24} height={24} /> : <AppWindow size={22} aria-hidden="true" />}
+                      <span className="main">
+                        <span className="name">{program.name}</span>
+                      </span>
+                    </>
+                  );
+                  // a program that Away opens is opened by a click on it
+                  const to = programOf(machine.name, program.name);
+                  return opensPrograms(machine) ? (
+                    <li key={program.name}>
+                      <a className="m prog" href={to} onClick={inPlace(go, to)}>
+                        {shows}
+                      </a>
+                      <StarOf stars={stars} machine={machine.name} program={program.name} />
+                    </li>
+                  ) : (
+                    <li key={program.name} className="m prog still">
+                      {shows}
+                      <StarOf stars={stars} machine={machine.name} program={program.name} />
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           )}

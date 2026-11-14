@@ -19,7 +19,7 @@ Which machines there are, how each is reached and how people are signed in on it
 | Say for a machine how people are signed in: as themselves, with a kept secret, or by typing | admin | v1 | `set-sign-in-way` |
 | Keep a name and password or a key for a machine, never shown again | admin | v1 | `keep-secret` |
 | Change a kept password on the machine by itself from time to time | system | no | `change-kept-secret` |
-| Say which programs of a Windows machine people may open | admin | v1 | `offer-programs` |
+| Say which programs of a Windows machine people may open | admin | built | `offer-programs` |
 | Give a program an icon of its own, which people know it by | admin | built | `give-program-icons` |
 | Read the desktops and programs a farm of Windows machines publishes from the farm itself, as it changes | system | built | `read-programs-from-host` |
 | Set how a machine is reached: its port, its screen, what may pass | admin | v1 | `set-connection-options` |

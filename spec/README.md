@@ -35,8 +35,8 @@ every product shares. The specification doesn't repeat them.
 |---|---|---|
 | Goals | 8 | 3 what people want, 4 what that takes, 1 what being open adds |
 | Qualities | 35 | 35 with a target, 35 with a proposal |
-| Expectations | 99 | 19 there, 19 partly, 18 first release, 8 first release in part, 27 later, 8 not planned |
-| Capabilities | 202 | in 19 areas: 44 built, 9 partly built, 65 first release, 71 later, 13 not planned |
+| Expectations | 99 | 20 there, 19 partly, 17 first release, 8 first release in part, 27 later, 8 not planned |
+| Capabilities | 202 | in 19 areas: 47 built, 10 partly built, 61 first release, 71 later, 13 not planned |
 | Figures | 85 | in 15 chapters; they show 62 of the 68 capabilities the first release holds for a person or an administrator |
 | Components | 31 | in 6 layers: 11 there, 19 first release, 1 later |
 | Connections | 45 | of 16 kinds |

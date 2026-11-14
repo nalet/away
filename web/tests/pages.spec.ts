@@ -188,10 +188,8 @@ test('home shows the machines a rule gives, in their groups, and a person sees n
   expect(await icon.evaluate((picture: HTMLImageElement) => picture.complete && picture.naturalWidth)).toBe(32);
   await expect(page.getByRole('link', { name: /^Payroll/ }).locator('img')).toHaveCount(0);
   await expect(page.getByRole('link', { name: /^Payroll/ }).locator('svg')).toHaveCount(1);
-  // a program leads to the page of its machine
-  await page.getByRole('link', { name: /^Ledger/ }).click();
-  await expect(page).toHaveURL(`${AWAY}/machines/fin-app-02`);
-  await page.goBack();
+  // a program is opened by a click on it: its address names its machine and itself
+  await expect(page.getByRole('link', { name: /^Ledger/ })).toHaveAttribute('href', '/machines/fin-app-02/programs/Ledger');
   expect(await tiles(page, 'design 1')).toEqual([['mac-design-01', 'Mac desktop']]);
   expect(await tiles(page, 'other machines 1')).toEqual([['Desktops', 'Windows desktop']]);
   expect(complaints).toEqual([]);
@@ -245,7 +243,9 @@ test('a machine has a page of its own, which says what it offers and what it is'
   await expect(page.getByRole('heading', { level: 1, name: 'fin-app-02' })).toBeVisible();
   // it is a page of the machines
   await expect(page.getByRole('navigation', { name: 'views' }).getByRole('link', { name: 'machines' })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByText("This version of Away opens Windows desktops. It doesn't open programs, shells or other desktops yet.")).toBeVisible();
+  // everything it offers is opened by a click, so nothing is said of what Away doesn't open
+  await expect(page.getByText("It doesn't open shells or other desktops yet.")).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'programs 4' }).getByRole('link', { name: 'Ledger' })).toHaveAttribute('href', '/machines/fin-app-02/programs/Ledger');
   await expect(page.getByRole('region', { name: 'desktop' })).toContainText('Windows desktop');
   const programs = page.getByRole('region', { name: 'programs 4' });
   await expect(programs.getByRole('listitem')).toHaveText(['Ledger', 'Payroll', 'Reports', 'Mail']);
@@ -265,6 +265,8 @@ test('a machine has a page of its own, which says what it offers and what it is'
   await page.goto('/machines/dev-linux-03');
   await expect(page.getByRole('region', { name: 'shell' })).toContainText('A shell on the machine');
   await expect(page.getByRole('region', { name: 'desktop' })).toContainText('Linux desktop');
+  // a machine that offers what Away doesn't open yet says so
+  await expect(page.getByText("This version of Away opens Windows desktops and the programs of Windows machines. It doesn't open shells or other desktops yet.")).toBeVisible();
 
   // on a phone nothing is wider than the screen
   await page.setViewportSize({ width: 390, height: 844 });
@@ -935,6 +937,72 @@ test.describe('a session', () => {
     expect(seen.complaints).toEqual([]);
   });
 
+  test("a program opens in a window of its own on Away's ground, and closing the window ends it", async ({ page }) => {
+    const seen = watch(page);
+    // a program is opened by a click on it
+    await page.goto(`${AWAY_THAT_KEEPS}/programs`);
+    await page.getByRole('link', { name: /^Books/ }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/apps-01/programs/Books`);
+    await expect(page).toHaveTitle('Books · away');
+    await expect(page.getByRole('heading', { level: 1, name: 'Books' })).toBeVisible();
+    await expect(page.getByText('program on apps-01')).toBeVisible();
+    await expect(page.getByText("apps-01 asks for a name and a password. Away passes them on and doesn't keep them.")).toBeVisible();
+    await accessible(page);
+    await page.getByLabel('Name').fill('CORP\\alex.urban');
+    await page.getByLabel('Password').fill('a password that exists for these tests alone');
+    await page.getByRole('button', { name: 'sign in' }).click();
+
+    // the window is where the machine has it on its desktop, and what is around it is not the machine's
+    const screen = page.getByRole('application', { name: 'the windows of Books' });
+    await expect(screen).toBeVisible();
+    await expect.poll(() => pixel(page, 25, 15)).toEqual([241, 242, 243]);
+    await expect.poll(() => pixel(page, 175, 105)).not.toEqual([0, 0, 0]);
+    expect([await pixel(page, 5, 5), await pixel(page, 190, 115)]).toEqual([
+      [0, 0, 0],
+      [0, 0, 0],
+    ]);
+    const part = page.locator('#seen-parts rect');
+    await expect(part).toHaveCount(1);
+    expect(await part.evaluate((rect) => ['x', 'y', 'width', 'height'].map((name) => Number(rect.getAttribute(name)).toFixed(3)))).toEqual(['0.100', '0.083', '0.800', '0.833']);
+    // only the window takes the pointer: beside it is Away's ground
+    const hit = (x: number, y: number) =>
+      screen.evaluate((canvas: HTMLCanvasElement, [x, y]) => {
+        const shown = canvas.getBoundingClientRect();
+        return document.elementFromPoint(shown.left + x!, shown.top + y!) === canvas;
+      }, [x, y]);
+    expect([await hit(25, 15), await hit(5, 5)]).toEqual([true, false]);
+    await screen.click({ position: { x: 50, y: 60 } });
+    await expect.poll(() => pixel(page, 55, 65)).toEqual([224, 64, 32]);
+
+    // the session's bar names the program and lists its windows: each is brought to the front, or closed
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    const bar = page.getByRole('toolbar', { name: "the session's bar" });
+    await expect(bar).toContainText('Books');
+    const windows = bar.getByRole('list', { name: 'windows' }).getByRole('listitem');
+    await expect(windows).toHaveCount(1);
+    await expect(windows.getByRole('button', { name: 'ledger', exact: true })).toHaveAttribute('title', 'bring to the front: ledger');
+    await accessible(page);
+    // closing the program's last window ends the session, and leads back to the machine
+    await windows.getByRole('button', { name: 'close: ledger' }).click();
+    await expect(windows).toHaveCount(0);
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/apps-01`, { timeout: 15000 });
+    // its page offers the desktop and each program, and says nothing of what Away doesn't open
+    await expect(page.getByRole('region', { name: 'programs 2' }).getByRole('link')).toHaveText(['Books', 'Wages']);
+    await expect(page.getByText("It doesn't open shells or other desktops yet.")).toHaveCount(0);
+
+    // a program the machine doesn't let be started says so, with the machine's reason behind it
+    await page.getByRole('region', { name: 'programs 2' }).getByRole('link', { name: 'Wages' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/apps-01/programs/Wages`);
+    await page.getByLabel('Name').fill('CORP\\alex.urban');
+    await page.getByLabel('Password').fill('a password that exists for these tests alone');
+    await page.getByRole('button', { name: 'sign in' }).click();
+    await expect(page.getByRole('alert')).toHaveText("It took the sign-in and didn't start the program.");
+    await page.getByText('details', { exact: true }).click();
+    await expect(page.locator('.dtl p')).toContainText('it is not among those it publishes');
+    await accessible(page);
+    expect(seen.complaints).toEqual([]);
+  });
+
   test('a machine that is not there fails at its step and says why, and what Away does not open yet says so', async ({ page }) => {
     await page.goto(`${AWAY_THAT_KEEPS}/machines/gone-02/desktop`);
     const steps = page.getByRole('list', { name: 'the steps to gone-02' }).getByRole('listitem');
@@ -954,7 +1022,7 @@ test.describe('a session', () => {
     // a shell, which this version doesn't open
     await page.goto(`${AWAY_THAT_KEEPS}/machines/build-01/desktop`);
     await expect(page.getByRole('heading', { name: "build-01 can't be opened yet" })).toBeVisible();
-    await expect(page.getByText('This version of Away opens Windows desktops, and nothing else yet.')).toBeVisible();
+    await expect(page.getByText('This version of Away opens Windows desktops and programs, and nothing else yet.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'try again' })).toHaveCount(0);
     await accessible(page);
     // and a machine no rule gives is not there
@@ -976,7 +1044,7 @@ test('without a database no machine is opened, and the page says why', async ({ 
 });
 
 test("the session's messages are written and read as the examples say that the gateway is tried against too", async () => {
-  const { begins, credentials, did, leaves, readRectangle, readSaid, seen } = await import('../src/session/wire');
+  const { begins, credentials, did, leaves, readRectangle, readSaid, seen, windowDoes } = await import('../src/session/wire');
   const examples = JSON.parse(readFileSync('../crates/away-wire/fixtures/messages.json', 'utf8')) as Record<string, { text?: string; bytes?: string }[]>;
   const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   const bytes = (written: string) => new Uint8Array((written.match(/../g) ?? []).map((pair) => parseInt(pair, 16)));
@@ -985,7 +1053,8 @@ test("the session's messages are written and read as the examples say that the g
   const said = (examples.to_browser ?? []).map((example) => (example.text ? readSaid(example.text) : readRectangle(bytes(example.bytes!).buffer)));
   expect(said.slice(0, 5)).toEqual([{ step: 'reaching' }, { step: 'first-picture' }, { asks: { again: false } }, { asks: { again: true } }, { desktop: { width: 1280, height: 800 } }]);
   expect(said[5]).toEqual({ left: 64, top: 128, width: 200, height: 120, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) });
-  expect(said.slice(6)).toEqual([{ drawn: 7 }, { failed: { step: 'reaching', why: 'no-answer', details: 'no answer within 10 seconds' } }, { ended: 'left' }]);
+  expect(said.slice(6, 9)).toEqual([{ drawn: 7 }, { failed: { step: 'reaching', why: 'no-answer', details: 'no answer within 10 seconds' } }, { ended: 'left' }]);
+  expect(said.slice(9)).toEqual([{ windows: [{ id: 65537, title: 'Ledger', shown: 'as-it-is', listed: true, seen: [[20, 10, 180, 110]] }], in_front: 65537 }]);
   expect([readSaid('no JSON'), readSaid('7'), readRectangle(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0, 1]).buffer)]).toEqual([null, null, null]);
 
   // what the pages say
@@ -1007,6 +1076,7 @@ test("the session's messages are written and read as the examples say that the g
         { locks: { scroll: false, num: true, caps: true } },
       ]),
     ),
+    windowDoes(65537, 'close'),
   ];
   expect(written).toEqual((examples.from_browser ?? []).map((example) => example.text ?? example.bytes));
 });

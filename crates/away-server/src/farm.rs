@@ -75,7 +75,9 @@ pub fn publish(farm: &Farm, host: &str, items: &[Item]) -> Published {
                 published.pictures.entry(name.clone()).or_insert_with(|| picture.clone());
                 name
             });
-            programs.push(Program { name: item.resource.title.clone(), icon });
+            // the farm starts it as what its file names, or as its title
+            let run = format!("||{}", item.reached.program.as_deref().unwrap_or(&item.resource.title));
+            programs.push(Program { name: item.resource.title.clone(), icon, run });
         }
     }
     // the programs are those of one machine, which has the farm's name

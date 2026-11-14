@@ -6,9 +6,10 @@ as they change. Nothing in the browser changes them.
 
 This version reads the files, tells each person the machines a rule gives
 them, shows those who administer Away what is in force, and opens Windows
-desktops: that of one machine, and that of a farm of machines
-([opening a desktop](#opening-a-desktop)). It doesn't open programs, shells
-or other desktops yet.
+desktops and the programs of Windows machines: those of one machine, and
+those of a farm of machines ([opening a desktop](#opening-a-desktop),
+[opening a program](#opening-a-program)). It doesn't open shells or other
+desktops yet.
 
 ## The files
 
@@ -133,7 +134,8 @@ rules:
   it. It is opened through the farm's broker
   ([opening a desktop](#opening-a-desktop)).
 - **The farm's programs are the programs of one machine**, which has the
-  farm's name. Each keeps the icon the farm gives it.
+  farm's name. Each keeps the icon the farm gives it, and is started as the
+  farm publishes it ([opening a program](#opening-a-program)).
 - **The rules give them like everything else.** A rule reaches the farm by
   its name, or by a group the farm names.
 - **Away asks every five minutes.** What the farm changed shows the next time
@@ -273,6 +275,48 @@ machine that offers more is opened from its own page, where each way in is.
 It needs a database ([installing Away](./install.md#the-database)), and the
 gateway has to reach the machines
 ([what opening a machine needs](./install.md#opening-machines)).
+
+## Opening a program
+
+A click on a program opens it: on home, on the programs' page, and on its
+machine's page. The steps, the machine's question for a name and a password,
+and the records are those of a desktop.
+
+- **A program opens in windows of its own, and no desktop is around them.**
+  The windows are where the machine has them, on Away's ground. Keys, clicks
+  and the wheel go to the window they are over.
+- **The session's bar lists the program's windows.** A click on one brings it
+  to the front, and each can be closed there. Dialogues and menus belong to
+  their window and are in no list.
+- **Closing the program's last window ends the session**, and the person is
+  back on the machine's page. Ending the session from the bar leaves the
+  program running on the machine, for the account to come back to.
+- **Programs of one machine share one sign-in there.** A program that is
+  opened while another of the same machine still runs for the account shows
+  beside it, and the bar lists the windows of both.
+- **The machine decides which programs it starts.** A Windows machine starts
+  the programs that are published on it for remote use, each under the name
+  it is published as; a farm's feed says those names itself. A program that
+  the machine doesn't let be started fails at its step, with the machine's
+  reason behind *details*.
+
+In the files a program is its name, or its name with its icon and with what
+the machine is asked to start:
+
+```yaml
+    programs:
+      - Ledger
+      - name: Payroll
+        icon: icons/payroll.png
+      - name: Reports
+        run: '||reports-2026'
+```
+
+| Part | Means | |
+|---|---|---|
+| `name` | what people know the program by | needed |
+| `icon` | its picture: a PNG among the files, named by where it is in the folder | none |
+| `run` | what the machine is asked to start: the name the program is published under, with `\|\|` before it, or the path of a program on the machine | `\|\|` and the program's name |
 
 ## What people and administrators see
 

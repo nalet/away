@@ -94,6 +94,9 @@ pub struct Program {
     /// Its icon, where the files give it one: the name the picture is asked for by,
     /// which is made from the picture itself.
     pub icon: Option<String>,
+    /// What the machine is asked to start: the name the program is published under, with
+    /// `||` before it, or the path of a program on the machine.
+    pub run: String,
 }
 
 /// The largest a picture of the files may be, in bytes.
@@ -485,17 +488,18 @@ fn programs(
     };
     let mut programs: Vec<Program> = Vec::new();
     for node in listed {
-        let (name, icon) = match &node.value {
+        let (name, icon, run) = match &node.value {
             Value::Thing(_) => {
-                let parts = Parts::of(file, node, &["name", "icon"], "a program", "")?;
+                let parts = Parts::of(file, node, &["name", "icon", "run"], "a program", "")?;
                 let Some((name, _)) = parts.text("name", &format!("a program of {of}"))? else {
                     return Err(refused(file, node.line, format!("a program of {of} has no name")));
                 };
                 let icon = parts.text("icon", &format!("the program {name}"))?;
-                (name, icon)
+                let run = parts.text("run", &format!("the program {name}"))?.map(|(run, _)| run);
+                (name, icon, run)
             }
             Value::Text(text) if !text.trim().is_empty() && text.chars().count() <= LONGEST && !text.chars().any(char::is_control) => {
-                (text.trim().to_string(), None)
+                (text.trim().to_string(), None, None)
             }
             _ => return Err(refused(file, node.line, format!("a program of {of} is a name, or a name with its icon"))),
         };
@@ -518,7 +522,9 @@ fn programs(
                 Some(sum)
             }
         };
-        programs.push(Program { name, icon });
+        // a program is started as what the files say, or as what its name is published as
+        let run = run.unwrap_or_else(|| format!("||{name}"));
+        programs.push(Program { name, icon, run });
     }
     Ok(programs)
 }
