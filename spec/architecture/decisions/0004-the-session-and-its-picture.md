@@ -1,6 +1,6 @@
 # ADR-0004: One connection a session, and the gateway keeps the picture
 
-**Status:** Accepted · 2026-11-14. Nothing of it is built. The targets for the picture are measured before the design is taken as settled (see [Validation](#validation)).
+**Status:** Accepted · 2026-11-14. The session's connection and the gateway's picture are built for a Windows desktop: the browser gets what changed as rectangles in the exact format, only as fast as it confirms them, and its keys and pointer go to the machine. The format that gives up detail, copies, the pointer's shape and a session that outlives its connection are not built. The targets for the picture are measured before the design is taken as settled (see [Validation](#validation)).
 
 ## Context
 

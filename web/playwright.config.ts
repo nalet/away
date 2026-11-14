@@ -25,7 +25,14 @@ export const AWAY_WITHOUT_SERVICE = 'http://127.0.0.1:18082';
 export const FARM = 'http://127.0.0.1:18083';
 // a third server, which is given a database, and so keeps what people star
 export const AWAY_THAT_KEEPS = 'http://127.0.0.1:18084';
-const keeps = { command: server, env: { PORT: '18084', SIGN_IN_PORT: '18085', DATABASE }, url: `${AWAY_THAT_KEEPS}/api/who`, reuseExistingServer: !inThePipeline };
+// beside it a stand-in for a Windows machine, and the gateway: a desktop opens there
+const FILES_KEPT = '../target/pages-test-files-kept';
+const keeps = {
+  command: `rm -rf ${FILES_KEPT} && cp -R ${fixtures} ${FILES_KEPT} && exec ${server}`,
+  env: { PORT: '18084', SIGN_IN_PORT: '18085', DATABASE, MACHINE_PORT: '18086', FILES: FILES_KEPT },
+  url: `${AWAY_THAT_KEEPS}/api/who`,
+  reuseExistingServer: !inThePipeline,
+};
 
 export default defineConfig({
   testDir: 'tests',

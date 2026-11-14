@@ -96,6 +96,14 @@ jobs:
             | grep -q 'path: icons/ledger.png'
           helm template away chart --namespace away --set filesConfigMap=away-files | grep -q 'name: AWAY_FILES'
           ! helm template away chart --namespace away --set filesConfigMap=away-files --set 'files.a\.yaml=x' 2> /dev/null
+          # between the parts: an authority of the installation's own, a certificate for the address the
+          # gateway asks the server at, and the way from the gateway to the server and to the machines
+          helm template away chart --namespace away --set 'networkRules.machinePorts={3389,3390}' > "$RUNNER_TEMP/parts.yaml"
+          grep -q 'name: away-between-parts' "$RUNNER_TEMP/parts.yaml"
+          grep -A1 'name: AWAY_SERVER$' "$RUNNER_TEMP/parts.yaml" | grep -q 'value: https://away-server:8082'
+          grep -q 'name: AWAY_INTERNAL_CERTIFICATE_FILE' "$RUNNER_TEMP/parts.yaml"
+          grep -q 'name: away-gateway-to-server-and-machines' "$RUNNER_TEMP/parts.yaml"
+          grep -q 'port: 3390' "$RUNNER_TEMP/parts.yaml"
           # the account that reads the farms' feeds: its secret, its authorities, and the way out to the farms
           helm template away chart --namespace away --set 'farms.account=CORP\\svc-away' --set farms.secretName=away-farms \
             --set farms.authoritiesConfigMap=away-farms-authorities > "$RUNNER_TEMP/farms.yaml"

@@ -150,13 +150,13 @@ decided, why, what follows from it, and what it rules out.
 <!-- generated: state -->
 | Layer | Components | there | first release | later |
 |---|---|---|---|---|
-| In the browser | 2 |  | 2 |  |
+| In the browser | 2 | 1 | 1 |  |
 | Away's parts | 4 | 3 |  | 1 |
-| Away's own protocol code | 7 |  | 7 |  |
+| Away's own protocol code | 7 | 1 | 6 |  |
 | What Away rests on | 4 |  | 4 |  |
 | Outside Away | 7 |  | 7 |  |
 | Making and shipping it | 7 | 6 | 1 |  |
-| all | 31 | 9 | 21 | 1 |
+| all | 31 | 11 | 19 | 1 |
 
 | Connections | Rows | Means |
 |---|---|---|

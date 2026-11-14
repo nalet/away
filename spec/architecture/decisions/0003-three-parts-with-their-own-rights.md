@@ -1,6 +1,6 @@
 # ADR-0003: Three parts, each with its own rights
 
-**Status:** Accepted · 2026-11-14. Nothing of it is built.
+**Status:** Accepted · 2026-11-14. The three parts run, each with its own rights, and the cluster refuses what the model doesn't list. The gateway asks the server over TLS, at an address of the server's own that an authority of the installation certifies; that a call is also signed with the caller's own key is not built. The issuer does nothing yet.
 
 ## Context
 

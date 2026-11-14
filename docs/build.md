@@ -6,10 +6,10 @@ do both.
 
 What exists today: the program with its three parts, the pages, the chart
 that installs it, and the pipelines. The parts say whether they are well, and
-the server signs people in through a sign-in service and shows them the frame
-of Away's pages, which have no machine to open yet. Away's own RDP code is
-proven by a test program. [The work packages](../spec/plan/README.md) say what
-comes next.
+the server signs people in through a sign-in service and shows them the
+machines a rule gives them. The gateway opens the desktop of a Windows machine
+with Away's own RDP code, which a test program proves against real machines.
+[The work packages](../spec/plan/README.md) say what comes next.
 
 ## Building it
 
@@ -214,6 +214,20 @@ AWAY_TEST_DATABASE=localhost:15432 make test-pages
 
 Without the variable those tests say that they found no database, and pass.
 The pipeline always has one, and fails where a test finds none.
+
+With a database, a whole session is tried on every change: the server, the
+gateway and a stand-in for a Windows machine run as they do in an installation,
+and a browser opens the machine's desktop, types the account's password, sees
+the machine's picture pixel for pixel, clicks and types, and ends the session.
+The same world is there to work on the pages with:
+
+```sh
+KEEP=1 tests/machines/database/real.sh
+DATABASE=localhost:15432 MACHINE_PORT=18096 cargo run --package away-server --example pages --features stand-in
+```
+
+The machine is `desk-01`, for the account `CORP\alex.urban` with the password
+`a password that exists for these tests alone`.
 
 ## Trying a farm's feed
 

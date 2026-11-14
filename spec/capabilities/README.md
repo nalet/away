@@ -115,18 +115,18 @@ has the steps.
 <!-- generated: overview -->
 | Part | Areas | Capabilities | built | partly built | first release | later | not planned |
 |---|---|---|---|---|---|---|---|
-| [in a session](./session.md) | 7 | 64 | 1 | 0 | 38 | 21 | 4 |
-| [around the sessions](./app.md) | 5 | 49 | 14 | 0 | 14 | 17 | 4 |
-| [administration](./admin.md) | 4 | 56 | 11 | 0 | 16 | 26 | 3 |
+| [in a session](./session.md) | 7 | 64 | 1 | 3 | 35 | 21 | 4 |
+| [around the sessions](./app.md) | 5 | 49 | 15 | 3 | 10 | 17 | 4 |
+| [administration](./admin.md) | 4 | 56 | 11 | 2 | 14 | 26 | 3 |
 | [the platform](./platform.md) | 3 | 33 | 15 | 1 | 8 | 7 | 2 |
-| all | 19 | 202 | 41 | 1 | 76 | 71 | 13 |
+| all | 19 | 202 | 42 | 9 | 67 | 71 | 13 |
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
-| a session over RDP | 0 | 0 | 37 | 23 | 4 | 138 |
+| a session over RDP | 3 | 2 | 32 | 23 | 4 | 138 |
 | a session over VNC | 0 | 0 | 26 | 11 | 13 | 152 |
 | a session over SSH | 0 | 0 | 27 | 12 | 2 | 161 |
-| Away itself | 41 | 1 | 32 | 45 | 9 | 74 |
+| Away itself | 42 | 4 | 28 | 45 | 9 | 74 |
 
 An expectation names 164 of the 202 capabilities; no expectation names the other 38.
 <!-- end: overview -->
@@ -140,15 +140,15 @@ the capabilities that meet it, and says how the states are worked out.
 <!-- generated: expected -->
 | Expected, for the goal | Expectations | there | partly | first release | first release in part | later | not planned |
 |---|---|---|---|---|---|---|---|
-| [Work on a machine that is somewhere else](./expectations.md#work-on-a-machine-that-is-somewhere-else) | 24 | 2 | 2 | 10 | 3 | 5 | 2 |
-| [Get in without another password](./expectations.md#get-in-without-another-password) | 16 | 3 | 2 | 6 | 2 | 2 | 1 |
+| [Work on a machine that is somewhere else](./expectations.md#work-on-a-machine-that-is-somewhere-else) | 24 | 2 | 6 | 6 | 3 | 5 | 2 |
+| [Get in without another password](./expectations.md#get-in-without-another-password) | 16 | 3 | 4 | 5 | 1 | 2 | 1 |
 | [Look at a machine together](./expectations.md#look-at-a-machine-together) | 4 | 0 | 0 | 0 | 0 | 3 | 1 |
 | [Know the machines](./expectations.md#know-the-machines) | 13 | 3 | 2 | 1 | 0 | 6 | 1 |
 | [Decide who reaches what](./expectations.md#decide-who-reaches-what) | 13 | 3 | 0 | 4 | 2 | 4 | 0 |
-| [Know what happened](./expectations.md#know-what-happened) | 9 | 1 | 0 | 2 | 1 | 5 | 0 |
+| [Know what happened](./expectations.md#know-what-happened) | 9 | 1 | 1 | 1 | 1 | 5 | 0 |
 | [Run it oneself](./expectations.md#run-it-oneself) | 16 | 4 | 5 | 1 | 1 | 2 | 3 |
 | [Trust it](./expectations.md#trust-it) | 4 | 3 | 1 | 0 | 0 | 0 | 0 |
-| all | 99 | 19 | 12 | 24 | 9 | 27 | 8 |
+| all | 99 | 19 | 19 | 18 | 8 | 27 | 8 |
 <!-- end: expected -->
 
 ## Pages

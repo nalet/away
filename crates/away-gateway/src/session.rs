@@ -119,8 +119,10 @@ where
 {
     // which session this is: the ticket the server gave for it
     let begun = tokio::time::timeout(BEGINS_WITHIN, said(&mut browser)).await;
-    let (ticket, width, height) = match begun {
-        Ok(Some(FromBrowser::Begins { ticket, width, height })) => (ticket, width, height),
+    let (ticket, width, height, layout) = match begun {
+        Ok(Some(FromBrowser::Begins { ticket, width, height, layout })) => {
+            (ticket, width, height, layout.unwrap_or(away_rdp::gcc::LAYOUT_US))
+        }
         _ => return end(&mut browser, "no-session").await,
     };
     let (Some(server), Some(sign_in)) = (&around.server, sign_in) else { return end(&mut browser, "no-session").await };
@@ -136,7 +138,7 @@ where
         .lines
         .info("a session was taken over", &[("session", taken.session.as_str().into()), ("machine", taken.machine.as_str().into())]);
 
-    let opened = open(&mut browser, server, &taken, width, height).await;
+    let opened = open(&mut browser, server, &taken, width, height, layout).await;
     let (why, details) = match opened {
         Ok(Some(mut desktop)) => {
             let picture = desktop.picture();
@@ -197,6 +199,7 @@ async fn open<Connection>(
     taken: &Taken,
     width: u16,
     height: u16,
+    layout: u32,
 ) -> Result<Option<Desktop>, Failure>
 where
     Connection: AsyncRead + AsyncWrite + Unpin,
@@ -258,7 +261,7 @@ where
                     details: "it showed another identity than a moment before".to_string(),
                 });
             }
-            match secured.sign_in(Account::named(&name, password), width, height).await {
+            match secured.sign_in(Account::named(&name, password), width, height, layout).await {
                 Ok(desktop) => break 'asked desktop,
                 Err(Failure { why: Why::SignInRefused, .. }) => again = true,
                 Err(failed) => return Err(failed),

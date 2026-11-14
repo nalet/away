@@ -68,7 +68,7 @@ export const texts = {
     notHere: 'no machine of that name for you',
     notHereWhy: "It doesn't exist, or no rule gives it to you.",
     home: 'go home',
-    notYet: 'This version of Away shows the machines you may reach. It opens none yet.',
+    notYet: "This version of Away opens the desktop of a Windows machine that is reached at its own address. It doesn't open programs, shells, other desktops or the desktop of a farm yet.",
     desktop: 'desktop',
     programs: 'programs',
     shell: 'shell',
@@ -98,6 +98,61 @@ export const texts = {
   },
   sessions: {
     title: 'no sessions are open',
+  },
+  // a session with a machine: the steps of the connection, what the machine asks, and how it ends
+  session: {
+    stepsOf: (machine: string) => `the steps to ${machine}`,
+    steps: {
+      reaching: (machine: string) => `Reaching ${machine}`,
+      checking: (machine: string) => `Checking that it is ${machine}`,
+      'signing-in': (machine: string) => `Signing in on ${machine}`,
+      'first-picture': () => 'Waiting for its first picture',
+    },
+    done: 'done',
+    running: 'running',
+    failedAt: 'failed',
+    asks: (machine: string) => `${machine} asks for a name and a password. Away passes them on and doesn't keep them.`,
+    asksAgain: (machine: string) => `${machine} didn't accept that name and password.`,
+    name: 'Name',
+    password: 'Password',
+    signIn: 'sign in',
+    cancel: 'cancel',
+    machines: 'machines',
+    tryAgain: 'try again',
+    openAgain: 'open again',
+    details: 'details',
+    // a step that failed: what it says, and whether trying again can help
+    failed: (step: string, why: string, machine: string, address: string): { says: string; again: boolean } => {
+      const known: Record<string, { says: string; again: boolean }> = {
+        'reaching no-answer': { says: "It didn't answer within 10 seconds. It may be switched off, or its address may have changed.", again: true },
+        'reaching no-address': { says: `Its name, ${address}, leads to no address.`, again: true },
+        'reaching refused': { says: 'It refused the connection. Remote access may be switched off there.', again: true },
+        'checking another-identity': { says: "It showed another identity than the one Away knows, so Away doesn't connect to it.", again: false },
+        'signing-in sign-in-refused': { says: `${machine} didn't accept that name and password.`, again: true },
+        'first-picture no-picture': { says: 'It took the sign-in and showed nothing within 30 seconds.', again: true },
+      };
+      return known[`${step} ${why}`] ?? { says: 'Something went wrong on the way to it.', again: true };
+    },
+    // the server didn't begin the session: what the page says, and whether trying again can help
+    refused: (status: number, machine: string): { title: string; why: string; again: boolean } => {
+      if (status === 404) return { title: 'no machine of that name for you', why: "It doesn't exist, or no rule gives it to you.", again: false };
+      if (status === 501) return { title: `${machine} can't be opened yet`, why: 'This version of Away opens the desktop of a Windows machine that is reached at its own address.', again: false };
+      if (status === 503) return { title: "away can't open machines right now", why: "No machine is opened without a record, and Away can't write its records right now.", again: true };
+      return { title: `couldn't open ${machine}`, why: 'Away did not begin the session.', again: true };
+    },
+    // a session that ended: what the page says, and whether it can be opened again
+    ended: (why: string, machine: string): { title: string; why: string; again: boolean } => {
+      if (why === 'machine') return { title: `${machine} closed this session`, why: 'It was shut down or restarted, or you were signed out there.', again: true };
+      if (why === 'lost') return { title: 'this session ended', why: `The connection to it was lost. What you had open on ${machine} is as you left it.`, again: true };
+      return { title: `couldn't open ${machine}`, why: 'Away did not begin the session.', again: true };
+    },
+    screenOf: (machine: string) => `the desktop of ${machine}`,
+    openBar: "open the session's bar",
+    bar: "the session's bar",
+    fill: 'fill the screen',
+    unfill: 'leave the full screen',
+    end: 'end',
+    closeBar: 'close the bar',
   },
   administration: {
     tabs: { machines: 'machines', rules: 'rules', farms: 'farms' },

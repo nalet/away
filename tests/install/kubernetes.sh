@@ -148,9 +148,13 @@ YAML
 # probe <namespace> <name> [labels] [apart]: a pod that waits, to try connections from
 probe() { pod "$1" "$2" "${3:-}" "$PROBE_IMAGE" 'command: [sleep, "3600"]' IfNotPresent "${4:-}"; }
 
-# reaches <namespace> <pod> <address>: whether a connection from the pod is taken
+# reaches <namespace> <pod> <address>: whether a connection from the pod is taken. An
+# address whose connections are secured is asked as such, whoever certified it: the
+# question is whether the connection is let through, not who is at its end.
 reaches() {
-  kubectl --namespace "$1" exec "$2" -- curl --silent --output /dev/null --max-time 4 "http://$3" >/dev/null 2>&1
+  local how=http
+  case "$3" in *:8082) how=https ;; esac
+  kubectl --namespace "$1" exec "$2" -- curl --silent --insecure --output /dev/null --max-time 4 "$how://$3" >/dev/null 2>&1
 }
 
 part_pod() {
@@ -256,8 +260,9 @@ pages "http://127.0.0.1:$port" || fail "the server's page"
 [ "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$port/livez")" = 404 ] || fail "the server says whether it is well on the address Away is reached at"
 ok "the server's page, and nothing of its health beside it"
 port=$(forward "$gateway" 8081)
-[ "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$port/session")" = 404 ] || fail "the gateway's address"
-ok "the gateway holds no session yet, and says so"
+[ "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$port/session")" = 400 ] || fail "the gateway's address"
+[ "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$port/")" = 404 ] || fail "the gateway answers where no session's connection arrives"
+ok "the gateway takes a session's connection at its address, and nothing else"
 
 if [ -n "$ADDRESS" ]; then
   say "The way in, from outside the cluster, at https://$ADDRESS"
@@ -283,7 +288,7 @@ if [ -n "$ADDRESS" ]; then
   else
     ok "the server's page, over a certificate this machine trusts"
   fi
-  [ "$(curl --silent --max-time 20 "https://$ADDRESS/session")" = "No session is at this address." ] || fail "https://$ADDRESS/session does not lead to the gateway"
+  [ "$(curl --silent --max-time 20 "https://$ADDRESS/session")" = "A session's connection is a WebSocket." ] || fail "https://$ADDRESS/session does not lead to the gateway"
   ok "a session's address leads to the gateway"
   [ "$(curl --silent --max-time 20 --output /dev/null --write-out '%{http_code}' "https://$ADDRESS/metrics")" = 404 ] || fail "the measures are on the address Away is reached at"
   ok "no measures on Away's address"
@@ -341,13 +346,17 @@ refused "$other" outsider "$server_ip:9090"  "a pod that is not of Away, to the 
 refused "$other" outsider "$gateway_ip:9090" "a pod that is not of Away, to the gateway's measures"
 refused "$other" outsider "$issuer_ip:9090"  "a pod that is not of Away, to the issuer"
 [ -n "$INSTALLED" ] || refused "$NAMESPACE" stranger "$issuer_ip:9090" "another pod of Away's own namespace, to the issuer"
-# out of Away: nothing yet, for any part
+refused "$other" outsider "$server_ip:8082"  "a pod that is not of Away, to the address the gateway asks the server at"
+# out of Away: nothing for the server and the issuer. The gateway opens machines, on the
+# ports their desktops are opened on and on no other
 refused "$NAMESPACE" as-server  "$elsewhere_ip:8080" "the server, to something outside Away"
-refused "$NAMESPACE" as-gateway "$elsewhere_ip:8080" "the gateway, to something outside Away"
+refused "$NAMESPACE" as-gateway "$elsewhere_ip:8080" "the gateway, to something outside Away that is no machine's desktop"
 refused "$NAMESPACE" as-issuer  "$elsewhere_ip:8080" "the issuer, to something outside Away"
-# between the parts: nothing yet
+# between the parts: the gateway asks the server, at the server's own address for it, and nothing else
+allowed "$NAMESPACE" as-gateway "$server_ip:8082"    "the gateway, to the address it asks the server at"
+refused "$NAMESPACE" as-issuer  "$server_ip:8082"    "the issuer, to the address the gateway asks the server at"
 refused "$NAMESPACE" as-gateway "$issuer_ip:9090"    "the gateway, to the issuer"
-refused "$NAMESPACE" as-gateway "$server_ip:8080"    "the gateway, to the server"
+refused "$NAMESPACE" as-gateway "$server_ip:8080"    "the gateway, to the server's pages"
 refused "$NAMESPACE" as-server  "$gateway_ip:8081"   "the server, to the gateway"
 refused "$NAMESPACE" as-issuer  "$server_ip:8080"    "the issuer, to the server"
 

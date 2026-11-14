@@ -11,7 +11,7 @@
     {"says": "the session ended because the person left", "text": "{\"ended\":\"left\"}"}
   ],
   "from_browser": [
-    {"says": "the session begins: its ticket, and a desktop of 1280 by 800", "text": "{\"ticket\":\"7f3a\",\"width\":1280,\"height\":800}"},
+    {"says": "the session begins: its ticket, a desktop of 1280 by 800, and a keyboard with the Swiss German layout (2055)", "text": "{\"ticket\":\"7f3a\",\"width\":1280,\"height\":800,\"layout\":2055}"},
     {"says": "a name and a password", "text": "{\"name\":\"CORP\\\\alex.urban\",\"password\":\"a \\\"password\\\"\"}"},
     {"says": "the rectangles up to number 7 are drawn", "text": "{\"seen\":7}"},
     {"says": "the person leaves", "text": "{\"leaves\":true}"},

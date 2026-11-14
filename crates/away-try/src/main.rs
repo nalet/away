@@ -294,7 +294,8 @@ fn rdp(address: &str, account: Option<Account>, save: Option<&str>) -> Result<()
     };
 
     println!("Saying what Away is, and taking the channels");
-    let client = Client { width: 1280, height: 800, security: answer.security.number(), name: "away".to_string() };
+    let client =
+        Client { width: 1280, height: 800, security: answer.security.number(), name: "away".to_string(), layout: away_rdp::gcc::LAYOUT_US };
     let mut random = [0u8; 80];
     getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
     let for_a_licence = licence::New {

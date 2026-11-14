@@ -1,5 +1,9 @@
 {{- /* The gateway: the sessions. The way in leads a session's connection here. */ -}}
-{{ include "away.part" (dict "root" . "part" "gateway" "port" 8081 "named" "sessions") }}
+{{- /* the gateway asks the server at an address of the server's own, and trusts the installation's own authority for it */ -}}
+{{- $told := list (dict "name" "AWAY_SERVER" "value" (printf "https://%s-server:8082" (include "away.name" .))) (dict "name" "AWAY_SERVER_AUTHORITIES_FILE" "value" "/run/away/between-parts/authority.pem") -}}
+{{- $trusts := dict "secretName" (printf "%s-between-parts" (include "away.name" .)) "items" (list (dict "key" "authority.pem" "path" "authority.pem")) -}}
+{{- $mounts := list (dict "at" "/run/away/between-parts" "volume" (dict "name" "between-parts" "secret" $trusts)) -}}
+{{ include "away.part" (dict "root" . "part" "gateway" "port" 8081 "named" "sessions" "told" $told "mounts" $mounts) }}
 ---
 apiVersion: v1
 kind: Service

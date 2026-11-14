@@ -6,9 +6,9 @@ import { AppWindow, ArrowLeft, Monitor, Search, SquareTerminal, Star } from 'luc
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import { entriesOf, found, pageOf, useFavourites, useMachines } from './machines';
+import { entriesOf, found, opensDesktop, pageOf, useFavourites, useMachines } from './machines';
 import type { Entry, Machine, Stars } from './machines';
-import { addressOf, inPlace } from './place';
+import { addressOf, desktopOf, inPlace } from './place';
 import { texts } from './texts';
 
 // What a machine is, in one line: its desktop, its programs, its shell.
@@ -165,11 +165,15 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
             </h2>
             <ul className="mgrid">
               {group.entries.map(({ machine, program }) => {
-                // a program is an entry of its own; it leads to its machine's page
+                // a program is an entry of its own; it leads to its machine's page. A machine
+                // that offers its desktop and nothing else, where Away opens it, is opened by a
+                // click on it; one that offers more leads to its page, where each way in is
                 const Icon = program === null ? iconOf(machine) : AppWindow;
+                const only = program === null && opensDesktop(machine) && machine.programs.length === 0 && !machine.shell;
+                const to = only ? desktopOf(machine.name) : pageOf(machine.name);
                 return (
                   <li key={`${machine.name} ${program?.name ?? ''}`}>
-                    <a className="m" href={pageOf(machine.name)} onClick={inPlace(go, pageOf(machine.name))}>
+                    <a className="m" href={to} onClick={inPlace(go, to)}>
                       {program?.icon ? <img className="icon" src={program.icon} alt="" width={24} height={24} /> : <Icon size={22} aria-hidden="true" />}
                       <span className="main">
                         <span className="name">{program?.name ?? machine.name}</span>
@@ -232,7 +236,7 @@ export function MachinePage({ name, go }: { name: string; go: (to: string) => vo
         <h1 className="asis">{machine.name}</h1>
         <StarOf stars={stars} machine={machine.name} program={null} />
       </div>
-      <Banner state="information">{texts.machine.notYet}</Banner>
+      {!(opensDesktop(machine) && machine.programs.length === 0 && !machine.shell) && <Banner state="information">{texts.machine.notYet}</Banner>}
       <div className="cols rev">
         <div>
           {machine.desktop && (
@@ -241,12 +245,21 @@ export function MachinePage({ name, go }: { name: string; go: (to: string) => vo
                 <Chevron size={14} aria-hidden="true" />
                 {texts.machine.desktop}
               </h2>
-              <div className="m still">
-                <Monitor size={22} aria-hidden="true" />
-                <span className="main">
-                  <span className="name">{texts.machine.desktopOf[machine.kind]}</span>
-                </span>
-              </div>
+              {opensDesktop(machine) ? (
+                <a className="m still" href={desktopOf(machine.name)} onClick={inPlace(go, desktopOf(machine.name))}>
+                  <Monitor size={22} aria-hidden="true" />
+                  <span className="main">
+                    <span className="name">{texts.machine.desktopOf[machine.kind]}</span>
+                  </span>
+                </a>
+              ) : (
+                <div className="m still">
+                  <Monitor size={22} aria-hidden="true" />
+                  <span className="main">
+                    <span className="name">{texts.machine.desktopOf[machine.kind]}</span>
+                  </span>
+                </div>
+              )}
             </section>
           )}
           {machine.programs.length > 0 && (

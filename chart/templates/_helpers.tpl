@@ -41,6 +41,7 @@ capabilities, so it fits the strictest profile a cluster has.
   part   server, gateway or issuer
   port     where it answers what it is there for, if it has such an address
   named    that port's name
+  more     further ports it answers on: a list, each with its name and its number
   told     what it is told through its environment: a list of names and values
   mounts   the files it is given: a list of volumes, each with where it is mounted
 */}}
@@ -89,6 +90,10 @@ spec:
           ports:
             {{- if .port }}
             - name: {{ .named }}
+              containerPort: {{ .port }}
+            {{- end }}
+            {{- range .more }}
+            - name: {{ .name }}
               containerPort: {{ .port }}
             {{- end }}
             - name: health

@@ -24,7 +24,7 @@ Which machines there are, how each is reached and how people are signed in on it
 | Read the desktops and programs a farm of Windows machines publishes from the farm itself, as it changes | system | built | `read-programs-from-host` |
 | Set how a machine is reached: its port, its screen, what may pass | admin | v1 | `set-connection-options` |
 | Test a machine: is it reached, does signing in work, and if not, which step fails | admin | v1 | `test-machine` |
-| Say how a machine proves who it is, and accept a changed identity on purpose | admin | v1 | `know-machine-identity` |
+| Say how a machine proves who it is, and accept a changed identity on purpose | admin | partial | `know-machine-identity` |
 | Take machines over from the organisation's directory, and keep them in step | system | later | `take-from-directory` |
 | Take virtual machines over from a hypervisor | system | later | `take-from-hypervisor` |
 | Close a machine for a while, and say why | admin | later | `close-for-upkeep` |
@@ -86,7 +86,7 @@ The records of every connection and change, and the recordings of sessions. For 
 
 | Capability | Who | RDP | VNC | SSH | Away | Key |
 |---|---|---|---|---|---|---|
-| Keep a record of every connection: who, which machine, as whom, when, from where, how it ended | system | — | — | — | v1 | `record-connections` |
+| Keep a record of every connection: who, which machine, as whom, when, from where, how it ended | system | — | — | — | partial | `record-connections` |
 | Keep a record of every sign-in Away made on a machine for someone | system | — | — | — | v1 | `record-sign-ins-made` |
 | Keep a record of every change to machines, rules and settings | system | — | — | — | built | `record-changes` |
 | Read the records and search them | admin | — | — | — | v1 | `read-records` |

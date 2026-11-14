@@ -24,6 +24,8 @@ tokio-postgres-rustls.workspace = true
 
 [dev-dependencies]
 away-server = { workspace = true, features = ["stand-in"] }
+away-gateway = { workspace = true, features = ["stand-in"] }
+tokio = { workspace = true, features = ["io-util"] }
 
 [[example]]
 name = "pages"

@@ -5,8 +5,10 @@ act in one namespace. It asks for no rights over the cluster.
 
 > **What this version is.** Away's three parts run and say whether they are
 > well. Someone who opens Away is signed in through the organisation's sign-in
-> service and sees the frame of Away's pages: home, the sessions, the settings,
-> and signing out. There is no machine to open yet.
+> service, sees the machines and the programs a rule gives them, stars what
+> they use, and opens the desktop of a Windows machine that is reached at its
+> own address, with a name and a password they type. It doesn't open programs,
+> shells, other desktops or the desktop of a farm yet.
 > [The work packages](../spec/plan/README.md) say what comes next.
 
 ## What it needs
@@ -167,6 +169,28 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
 
 Away is tried against PostgreSQL 17 on every change.
 
+## Opening machines
+
+The gateway opens the machines. Three things have to be there:
+
+- **A database.** No machine is opened without a record, and the records are
+  in the database ([the database](#the-database)).
+- **A way from the gateway to the machines.** With the network rules on, the
+  gateway reaches the ports the desktops are opened on, 3389 unless
+  `networkRules.machinePorts` says otherwise, and the cluster's name service.
+  `networkRules.machinesAt` narrows that to the addresses it names. A machine
+  whose file names another port needs that port in `networkRules.machinePorts`.
+- **A way in that passes WebSockets on**, as every ingress controller and the
+  OpenShift router do. A session's connection arrives at `/session` on Away's
+  address and is passed on to the gateway.
+
+The gateway asks the server on an address of the server's own, which no
+browser reaches: to take a session over, and to say what became of it. The
+chart makes an authority for this installation alone and a certificate of it
+for that address, in the secret `<name>-between-parts`, and keeps both as they
+are through every update. The authority's key is kept nowhere. To have new
+ones, remove the secret and update.
+
 ## The farms' feeds
 
 A farm of Windows machines that the files name says itself what it publishes
@@ -201,6 +225,7 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
 | three workloads from the one image: the server, the gateway, the issuer | Away's parts, each with an account that may ask the cluster for nothing |
 | an ingress, or two routes | the way in: on Away's address, a session's connection goes to the gateway and everything else to the server |
 | network rules | nothing reaches a part and a part reaches nothing, except the connections [the architecture lists](../spec/architecture/connections.md) |
+| a secret, `<name>-between-parts` | an authority of this installation's own and a certificate of it, which secure what the gateway asks the server ([opening machines](#opening-machines)) |
 | a ServiceMonitor and alert rules, if asked | for a cluster that runs the Prometheus operator |
 
 Every container runs as an ordinary user and never as root, can't write to its
@@ -247,6 +272,7 @@ Everything an installation is told is one of these. The chart's
 | `networkRules.wayInFrom` | who may reach Away's address, as the peers of a NetworkPolicy | the cluster's router with a route; every namespace otherwise |
 | `networkRules.measuresFrom` | who may read the measures | nobody |
 | `networkRules.signInServiceAt`, `networkRules.signInServicePort` | where the sign-in service is, as the peers of a NetworkPolicy, and its port | any address, port 443 |
+| `networkRules.machinesAt`, `networkRules.machinePorts` | where the machines are, as the peers of a NetworkPolicy, and the ports their desktops are opened on ([opening machines](#opening-machines)) | any address, port 3389 |
 | `networkRules.databaseAt` | where the database is, as the peers of a NetworkPolicy; used once `database.host` is set | any address, at `database.port` |
 | `networkRules.farmsAt`, `networkRules.farmsPort` | where the farms' web access is, as the peers of a NetworkPolicy, and its port; used once `farms.account` is set | any address, port 443 |
 | `monitoring.serviceMonitor`, `monitoring.alerts` | make a ServiceMonitor, and alert rules | no |

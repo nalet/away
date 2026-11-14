@@ -36,7 +36,8 @@ async fn a_desktop_opens_shows_the_machines_picture_and_takes_keys_and_the_point
     // what the machine shows of itself is what it is known by
     assert_eq!(secured.identity().fingerprint_text(), machine.fingerprint());
     assert!(!secured.signs_in_itself());
-    let mut desktop = secured.sign_in(Account::named(KNOWN, Secret::new(PASSWORD)), 1280, 800).await.expect("the account is signed in");
+    let mut desktop =
+        secured.sign_in(Account::named(KNOWN, Secret::new(PASSWORD)), 1280, 800, 0x0807).await.expect("the account is signed in");
 
     // the picture is the machine's, pixel for pixel, and every area of it was drawn
     let shows = stand_in::desktop();
@@ -93,7 +94,7 @@ async fn a_machine_that_does_not_take_the_password_or_is_not_there_says_at_which
     let machine = Machine::start(KNOWN, PASSWORD, stand_in::desktop()).await;
     let (host, port) = machine.address();
     let secured = reach(&host, port).await.unwrap().secure().await.unwrap();
-    let Err(refused) = secured.sign_in(Account::named(KNOWN, Secret::new("another password")), 1280, 800).await else {
+    let Err(refused) = secured.sign_in(Account::named(KNOWN, Secret::new("another password")), 1280, 800, 0x0409).await else {
         panic!("a wrong password")
     };
     assert_eq!((refused.step, refused.why), (Step::SigningIn, Why::SignInRefused), "{}", refused.details);

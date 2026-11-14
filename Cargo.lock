@@ -119,6 +119,7 @@ version = "0.1.0"
 name = "away-server"
 version = "0.1.0"
 dependencies = [
+ "away-gateway",
  "away-part",
  "away-rdp",
  "away-secret",

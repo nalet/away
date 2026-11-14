@@ -131,6 +131,14 @@ export function useFavourites(): Stars {
   return { asking: answer === 'asking', kept, favourites, has: (machine, program) => favourites.some((one) => same(one, machine, program)), star };
 }
 
+// Whether this version of Away opens a machine's desktop: the desktop of a Windows
+// machine, or of another that speaks RDP, reached at its own address. The desktop of a
+// farm, which a broker hands out, is not opened yet.
+export function opensDesktop(machine: Machine): boolean {
+  const over = machine.desktop?.over ?? (machine.kind === 'windows' ? 'rdp' : 'vnc');
+  return machine.desktop !== null && over === 'rdp' && machine.collection === null;
+}
+
 // Where a machine's own page is.
 export function pageOf(name: string): string {
   return `/machines/${encodeURIComponent(name)}`;

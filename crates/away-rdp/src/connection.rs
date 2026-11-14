@@ -190,7 +190,7 @@ impl Connection {
                         return Err(Error::NotYet("offers its desktop at 8, 15 or 24 bits a pixel"));
                     }
                     self.share_id = share_id;
-                    let mut answers = vec![pdu::confirm(self.user, share_id, width, height, bits)];
+                    let mut answers = vec![pdu::confirm(self.user, share_id, width, height, bits, self.client.layout)];
                     answers.extend(pdu::finish(self.user, share_id));
                     for answer in answers {
                         send.extend(tpkt::data_frame(&mcs::send(self.user, self.machine.io_channel, &answer)));

@@ -39,10 +39,10 @@ For the goal [Work on a machine that is somewhere else](../goals/README.md#work-
 
 | Expected | State | Met by | Note |
 |---|---|---|---|
-| A Windows desktop in the browser | first release | [`open-desktop`](./session.md#opening-a-machine) first release, [`fit-to-window`](./session.md#the-picture) first release, [`desktop-as-at-machine`](./session.md#the-picture) first release | — |
+| A Windows desktop in the browser | partly | [`open-desktop`](./session.md#opening-a-machine) partly built, [`fit-to-window`](./session.md#the-picture) first release, [`desktop-as-at-machine`](./session.md#the-picture) first release | — |
 | One program of a Windows machine, without its desktop | partly | [`open-program`](./session.md#opening-a-machine) first release, [`see-programs`](./app.md#finding-a-machine) first release, [`see-all-programs`](./app.md#finding-a-machine) built, [`offer-programs`](./admin.md#the-register-of-machines) first release | — |
 | Several programs side by side, with a way to switch between them | first release | [`switch-programs`](./session.md#opening-a-machine) first release, [`list-open-windows`](./session.md#opening-a-machine) first release | — |
-| A Mac or a Linux desktop in the browser | first release | [`open-desktop`](./session.md#opening-a-machine) first release, [`fit-to-window`](./session.md#the-picture) first release, [`pointer-without-delay`](./session.md#the-picture) first release | — |
+| A Mac or a Linux desktop in the browser | partly | [`open-desktop`](./session.md#opening-a-machine) partly built, [`fit-to-window`](./session.md#the-picture) first release, [`pointer-without-delay`](./session.md#the-picture) first release | — |
 | A shell in the browser | first release | [`open-shell`](./session.md#opening-a-machine) first release, [`run-full-screen-programs`](./session.md#the-shell) first release, [`scroll-back`](./session.md#the-shell) first release, [`select-shell-text`](./session.md#the-shell) first release | — |
 | Copy and paste between the machine and one's own device | first release in part | [`copy-paste-text`](./session.md#clipboard-files-and-printing) first release, [`copy-paste-rich`](./session.md#clipboard-files-and-printing) later, [`copy-paste-files`](./session.md#clipboard-files-and-printing) later | — |
 | Move files to and from the machine | later | [`move-files`](./session.md#clipboard-files-and-printing) later, [`drop-file`](./session.md#clipboard-files-and-printing) later | — |
@@ -50,13 +50,13 @@ For the goal [Work on a machine that is somewhere else](../goals/README.md#work-
 | Print from the machine | later | [`print-to-own-device`](./session.md#clipboard-files-and-printing) later | — |
 | The whole screen, and more than one | first release in part | [`fill-screen`](./session.md#the-picture) first release, [`several-screens`](./session.md#the-picture) later | — |
 | A sharp picture that stays smooth, on a slow line too | first release in part | [`exact-at-rest`](./session.md#the-picture) first release, [`adapt-to-line`](./session.md#the-picture) first release, [`sharp-on-dense-screen`](./session.md#the-picture) first release, [`play-video-smoothly`](./session.md#the-picture) later | — |
-| Every key and shortcut reaches the machine | first release | [`type-in-own-layout`](./session.md#keyboard-and-pointer) first release, [`send-kept-keys`](./session.md#keyboard-and-pointer) first release, [`give-all-keys`](./session.md#keyboard-and-pointer) first release, [`map-modifier-keys`](./session.md#keyboard-and-pointer) first release | — |
+| Every key and shortcut reaches the machine | partly | [`type-in-own-layout`](./session.md#keyboard-and-pointer) partly built, [`send-kept-keys`](./session.md#keyboard-and-pointer) first release, [`give-all-keys`](./session.md#keyboard-and-pointer) first release, [`map-modifier-keys`](./session.md#keyboard-and-pointer) first release | — |
 | Scrolling feels right, on a Mac too | first release | [`scroll-as-used-to`](./session.md#keyboard-and-pointer) first release, [`use-mouse-fully`](./session.md#keyboard-and-pointer) first release | — |
 | Usable on a phone or a tablet | partly | [`use-on-phone`](./session.md#on-a-phone-or-a-tablet) built, [`work-by-touch`](./session.md#on-a-phone-or-a-tablet) first release, [`zoom-by-touch`](./session.md#on-a-phone-or-a-tablet) first release, [`use-extra-keys`](./session.md#on-a-phone-or-a-tablet) first release | — |
 | A dropped connection comes back by itself | first release | [`reconnect-by-itself`](./session.md#opening-a-machine) first release, [`keep-while-away`](./session.md#opening-a-machine) first release | — |
 | Several machines open at once | first release | [`open-several`](./session.md#opening-a-machine) first release, [`open-in-own-tab`](./session.md#opening-a-machine) first release, [`see-open-sessions`](./app.md#the-frame) first release | — |
 | A link or a bookmark that opens a machine | there | [`open-by-address`](./app.md#finding-a-machine) built | — |
-| A connection that fails says which step failed | first release | [`see-connecting-steps`](./session.md#opening-a-machine) first release, [`test-machine`](./admin.md#the-register-of-machines) first release | — |
+| A connection that fails says which step failed | partly | [`see-connecting-steps`](./session.md#opening-a-machine) partly built, [`test-machine`](./admin.md#the-register-of-machines) first release | — |
 | A session that ends says why, and opens again from there | first release | [`see-why-ended`](./session.md#opening-a-machine) first release | — |
 | The interface in one's own language | later | [`choose-language`](./app.md#the-frame) later | — |
 | Usable with the keyboard alone and with a screen reader | there | [`use-without-mouse`](./app.md#the-frame) built | — |
@@ -77,11 +77,11 @@ For the goal [Get in without another password](../goals/README.md#get-in-without
 | From any device, also one the organisation does not manage | partly | [`sign-in`](./app.md#signing-in) built, [`be-oneself-on-machine`](./app.md#signing-in) first release | — |
 | For every person, not for administrators only | first release | [`be-oneself-on-machine`](./app.md#signing-in) first release | An ordinary account is enough |
 | A machine that knows no directory opens too, with a secret nobody sees | first release | [`use-kept-secret`](./app.md#signing-in) first release, [`keep-secret`](./admin.md#the-register-of-machines) first release | — |
-| Typing a name and a password works where nothing else does | first release in part | [`type-credentials`](./app.md#signing-in) first release, [`remember-typed-credentials`](./app.md#signing-in) later | — |
+| Typing a name and a password works where nothing else does | partly | [`type-credentials`](./app.md#signing-in) partly built, [`remember-typed-credentials`](./app.md#signing-in) later | — |
 | Signed in onwards too: on a file share, on a further machine | first release in part | [`reach-network-as-oneself`](./app.md#signing-in) first release, [`go-on-without-password`](./app.md#signing-in) not planned | — |
 | A locked desktop opens again without the password | first release | [`unlock-without-password`](./app.md#signing-in) first release | — |
 | A second factor where the organisation asks for one | partly | [`sign-in`](./app.md#signing-in) built, [`ask-again-first`](./admin.md#who-reaches-what) later | The identity provider asks for it at sign-in |
-| The machine is the one it claims to be | first release | [`check-machine-identity`](./app.md#signing-in) first release, [`know-machine-identity`](./admin.md#the-register-of-machines) first release | — |
+| The machine is the one it claims to be | partly | [`check-machine-identity`](./app.md#signing-in) partly built, [`know-machine-identity`](./admin.md#the-register-of-machines) partly built | — |
 | Signing in through SAML | not planned | [`sign-in-with-saml`](./app.md#signing-in) not planned | — |
 | Signing out ends what was opened | there | [`sign-out`](./app.md#signing-in) built | — |
 | Choosing between one's ordinary and one's administrator account | later | [`choose-account`](./app.md#signing-in) later | — |
@@ -144,7 +144,7 @@ For the goal [Know what happened](../goals/README.md#know-what-happened).
 
 | Expected | State | Met by | Note |
 |---|---|---|---|
-| A record of who connected to what, when, from where and as whom | first release | [`record-connections`](./admin.md#what-happened) first release, [`record-sign-ins-made`](./admin.md#what-happened) first release, [`read-records`](./admin.md#what-happened) first release | — |
+| A record of who connected to what, when, from where and as whom | partly | [`record-connections`](./admin.md#what-happened) partly built, [`record-sign-ins-made`](./admin.md#what-happened) first release, [`read-records`](./admin.md#what-happened) first release | — |
 | A record of every change an administrator made | there | [`record-changes`](./admin.md#what-happened) built | — |
 | Sessions recorded and played back | later | [`record-session`](./admin.md#what-happened) later, [`play-recording`](./admin.md#what-happened) later, [`tell-when-recorded`](./admin.md#what-happened) later | — |
 | Find a moment in a recording by what was typed or shown | later | [`search-recording`](./admin.md#what-happened) later | — |
@@ -160,7 +160,7 @@ For the goal [Run it oneself](../goals/README.md#run-it-oneself).
 
 | Expected | State | Met by | Note |
 |---|---|---|---|
-| It runs where there is no Windows domain | partly | [`use-own-provider`](./platform.md#installing-and-configuring) built, [`make-shells-trust`](./platform.md#installing-and-configuring) first release, [`use-kept-secret`](./app.md#signing-in) first release, [`type-credentials`](./app.md#signing-in) first release | people come from the sign-in service; a Windows domain is a part one turns on |
+| It runs where there is no Windows domain | partly | [`use-own-provider`](./platform.md#installing-and-configuring) built, [`make-shells-trust`](./platform.md#installing-and-configuring) first release, [`use-kept-secret`](./app.md#signing-in) first release, [`type-credentials`](./app.md#signing-in) partly built | people come from the sign-in service; a Windows domain is a part one turns on |
 | Install it in one step | partly | [`install-with-chart`](./platform.md#installing-and-configuring) built, [`install-as-one-container`](./platform.md#installing-and-configuring) later | — |
 | Runs on Kubernetes and OpenShift, without special rights | there | [`install-with-chart`](./platform.md#installing-and-configuring) built, [`run-without-special-rights`](./platform.md#installing-and-configuring) built | — |
 | Works with the identity provider that is there | partly | [`use-own-provider`](./platform.md#installing-and-configuring) built, [`name-account-claim`](./platform.md#installing-and-configuring) first release | — |

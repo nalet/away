@@ -18,14 +18,14 @@ Signing in to Away once, and from there on each machine. For the goal [Get in wi
 | Sign out, and end the sessions Away opened | person | — | — | — | built | `sign-out` |
 | Be signed in on the machine as oneself, with nothing asked | system | v1 | no | v1 | — | `be-oneself-on-machine` |
 | Be signed in with a name and password or a key that Away keeps for the machine | system | v1 | v1 | v1 | — | `use-kept-secret` |
-| Type a name and a password when the machine asks for them | person | v1 | v1 | v1 | — | `type-credentials` |
+| Type a name and a password when the machine asks for them | person | built | v1 | v1 | — | `type-credentials` |
 | Have Away remember what one typed for a machine | person | later | later | later | — | `remember-typed-credentials` |
 | Choose which of one's accounts to be on the machine as | person | later | — | later | — | `choose-account` |
 | Reach file shares and printers from the machine as oneself | system | v1 | — | — | — | `reach-network-as-oneself` |
 | Go on from the machine to a further one with nothing asked | person | no | — | no | — | `go-on-without-password` |
 | Open a locked desktop again with nothing asked | person | v1 | later | — | — | `unlock-without-password` |
 | Be signed in as oneself on a Windows machine that is joined to a cloud directory only | system | later | — | — | — | `be-oneself-cloud-joined` |
-| Check that a machine is the one it claims to be, and refuse one that changed | system | v1 | later | v1 | — | `check-machine-identity` |
+| Check that a machine is the one it claims to be, and refuse one that changed | system | built | later | v1 | — | `check-machine-identity` |
 
 - *Sign in through the organisation's identity provider*: over OpenID Connect.
 - *Sign in through an identity provider that speaks SAML only*: OpenID Connect is the one way in.
@@ -43,8 +43,8 @@ What is around every page: the rail, the top bar, the search, and the bar of a s
 | See the sessions that are open, and go to one | person | v1 | `see-open-sessions` |
 | Find a machine by its name from any page | person | v1 | `find-from-anywhere` |
 | See which account is signed in | person | built | `see-who-is-signed-in` |
-| Reach a session's own controls without leaving it: keys, clipboard, files, size, ending it | person | v1 | `use-session-bar` |
-| Give the machine the whole window while a session is open | system | v1 | `give-session-the-window` |
+| Reach a session's own controls without leaving it: keys, clipboard, files, size, ending it | person | partial | `use-session-bar` |
+| Give the machine the whole window while a session is open | system | built | `give-session-the-window` |
 | Use every page around a session with the keyboard alone, and with a screen reader | person | built | `use-without-mouse` |
 | Use Away in one's own language | person | later | `choose-language` |
 | Be told what happened meanwhile: a session ended, a request was answered | person | later | `see-notices` |

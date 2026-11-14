@@ -1,6 +1,6 @@
 key,component,layer,kind,release,code,runs,keeps,note
 web,the web app: Away's pages around the sessions,browser,web,v1,web/,served by the server,"in the browser's own storage, which sessions this browser has open and how wide the list of windows was left",Built from the design system's components; the frame is Away's own until the design system has it
-session-view,"the session view: the picture, the keys and the pointer, the shell's screen",browser,web,v1,web/src/session/,part of the web app,,"Drawn on a canvas, apart from the pages"
+session-view,"the session view: the picture, the keys and the pointer, the shell's screen",browser,web,built,web/src/session/,part of the web app,,"Drawn on a canvas, apart from the pages"
 server,"the server: the pages, the requests, people's sign-ins, the rules, the records",parts,service,built,crates/away-server/,"run by the chart, as server",nothing itself; what it holds is in the database,The only part that reaches the database and the sign-in service; it reaches no machine
 gateway,"the gateway: the sessions, each with one connection to the browser and one to the machine",parts,service,built,crates/away-gateway/,"run by the chart, as gateway","in memory and for as long as a session lasts, its picture, a shell's last bytes and what signed it in",The only part that reaches machines; the first release runs one
 issuer,the issuer: makes the sign-ins on machines,parts,service,built,crates/away-issuer/,"run by the chart, as issuer",nothing itself; its authority's keys and the kept accounts are the cluster's,It checks a person's sign-in itself before it signs anything; the status page calls it signing in on machines
@@ -10,7 +10,7 @@ vnc,the VNC code,code,library,v1,crates/away-vnc/,in the gateway,,
 ssh,the SSH code,code,library,v1,crates/away-ssh/,in the gateway,,
 shell-screen,the shell's screen: turns what a shell writes into what it shows,code,library,v1,crates/away-term/,"in the browser, as WebAssembly",,"What is elsewhere called a terminal emulator; later it runs in the gateway too, to hold a shell while the browser is closed"
 picture,"the picture: a desktop as the gateway keeps it, and the rectangles it sends",code,library,v1,crates/away-picture/,in the gateway,,
-wire,the session's messages between the browser and the gateway,code,contract,v1,crates/away-wire/,in the gateway and in the browser,,One description that both sides are built from
+wire,the session's messages between the browser and the gateway,code,contract,built,crates/away-wire/,in the gateway and in the browser,,"Written once for each side, and both are tried against the same examples"
 database,the database,rests,database,v1,,"run by the chart, or brought by the operator","the sign-ins, each person's settings, favourites and last used, the machines' identities, the sessions as they run, the records",PostgreSQL
 files,"the files: the machines, the groups, the rules and the settings",rests,files,v1,,"mounted into the server, from a ConfigMap",what is in force,Written by the operator and kept where they keep their configuration
 cluster-secrets,the cluster's secrets,rests,store,v1,,,"the kept accounts, the issuer's authority keys, each part's own keys",Each part has its own mounted; the issuer alone reads the kept accounts

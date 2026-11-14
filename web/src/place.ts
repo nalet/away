@@ -26,6 +26,22 @@ export function viewAt(path: string): View | null {
   return found ?? null;
 }
 
+// Where a machine's desktop is open.
+export function desktopOf(name: string): string {
+  return `/machines/${encodeURIComponent(name)}/desktop`;
+}
+
+// The machine whose desktop a page's address opens, where it opens one.
+export function sessionAt(path: string): string | null {
+  const name = /^\/machines\/([^/]+)\/desktop$/.exec(path)?.[1];
+  if (!name) return null;
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return null;
+  }
+}
+
 export function usePlace(): [string, (to: string) => void] {
   const [path, setPath] = useState(window.location.pathname);
   useEffect(() => {

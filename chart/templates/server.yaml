@@ -104,7 +104,13 @@ binaryData:
 {{- $told = append $told (dict "name" "AWAY_FILES" "value" "/etc/away/files") -}}
 {{- $mounts = append $mounts (dict "at" "/etc/away/files" "volume" (dict "name" "files" "configMap" (dict "name" .Values.filesConfigMap))) -}}
 {{- end }}
-{{ include "away.part" (dict "root" . "part" "server" "port" 8080 "named" "http" "told" $told "mounts" $mounts) }}
+{{- /* where the gateway asks the server, secured with the certificate of the installation's own authority */ -}}
+{{- $told = append $told (dict "name" "AWAY_INTERNAL_ADDRESS" "value" "0.0.0.0:8082") -}}
+{{- $told = append $told (dict "name" "AWAY_INTERNAL_CERTIFICATE_FILE" "value" "/run/away/between-parts/server.pem") -}}
+{{- $told = append $told (dict "name" "AWAY_INTERNAL_KEY_FILE" "value" "/run/away/between-parts/server-key.pem") -}}
+{{- $own := dict "secretName" (printf "%s-between-parts" (include "away.name" .)) "items" (list (dict "key" "server.pem" "path" "server.pem") (dict "key" "server-key.pem" "path" "server-key.pem")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/between-parts" "volume" (dict "name" "between-parts" "secret" $own)) -}}
+{{ include "away.part" (dict "root" . "part" "server" "port" 8080 "named" "http" "more" (list (dict "name" "internal" "port" 8082)) "told" $told "mounts" $mounts) }}
 ---
 apiVersion: v1
 kind: Service
@@ -119,3 +125,6 @@ spec:
     - name: http
       port: 8080
       targetPort: http
+    - name: internal
+      port: 8082
+      targetPort: internal

@@ -194,6 +194,9 @@ pub enum FromBrowser {
         width: u16,
         /// How high.
         height: u16,
+        /// The layout of the person's keyboard, as Windows numbers them, where the
+        /// browser can tell.
+        layout: Option<u32>,
     },
     /// The name and the password the machine asked for.
     Credentials {
@@ -222,7 +225,8 @@ impl FromBrowser {
                     let (Some(width), Some(height)) = (width, height) else {
                         return Err(NotThis("a session begins with the size of its desktop"));
                     };
-                    return Ok(FromBrowser::Begins { ticket: Secret::new(ticket), width, height });
+                    let layout = said.get("layout").and_then(Json::count).and_then(|layout| u32::try_from(layout).ok());
+                    return Ok(FromBrowser::Begins { ticket: Secret::new(ticket), width, height, layout });
                 }
                 if let (Some(name), Some(password)) = (said.text_of("name"), said.text_of("password")) {
                     return Ok(FromBrowser::Credentials { name: name.to_string(), password: Secret::new(password) });
@@ -360,7 +364,9 @@ mod tests {
             })
             .collect();
         assert_eq!(read.len(), 6);
-        assert!(matches!(&read[0], FromBrowser::Begins { ticket, width: 1280, height: 800 } if ticket.expose() == "7f3a"));
+        assert!(
+            matches!(&read[0], FromBrowser::Begins { ticket, width: 1280, height: 800, layout: Some(0x0807) } if ticket.expose() == "7f3a")
+        );
         assert!(
             matches!(&read[1], FromBrowser::Credentials { name, password } if name == "CORP\\alex.urban" && password.expose() == "a \"password\"")
         );

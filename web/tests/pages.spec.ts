@@ -245,7 +245,7 @@ test('a machine has a page of its own, which says what it offers and what it is'
   await expect(page.getByRole('heading', { level: 1, name: 'fin-app-02' })).toBeVisible();
   // it is a page of the machines
   await expect(page.getByRole('navigation', { name: 'views' }).getByRole('link', { name: 'machines' })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByText('This version of Away shows the machines you may reach. It opens none yet.')).toBeVisible();
+  await expect(page.getByText("This version of Away opens the desktop of a Windows machine that is reached at its own address. It doesn't open programs, shells, other desktops or the desktop of a farm yet.")).toBeVisible();
   await expect(page.getByRole('region', { name: 'desktop' })).toContainText('Windows desktop');
   const programs = page.getByRole('region', { name: 'programs 4' });
   await expect(programs.getByRole('listitem')).toHaveText(['Ledger', 'Payroll', 'Reports', 'Mail']);
@@ -794,6 +794,178 @@ test.describe('with a database', () => {
     expect(seen.asked.filter((request) => !request.url().startsWith(AWAY_THAT_KEEPS) && !request.url().startsWith('http://127.0.0.1:18085')).map((request) => request.url())).toEqual([]);
     expect(seen.complaints).toEqual([]);
   });
+});
+
+// A pixel of a session's screen: red, green, blue. It is read off a copy, so that the
+// page's own canvas is asked nothing it is not made for.
+async function pixel(page: Page, x: number, y: number): Promise<number[]> {
+  return page.getByRole('application').evaluate(
+    (screen: HTMLCanvasElement, [left, top]) => {
+      const copy = document.createElement('canvas');
+      copy.width = 1;
+      copy.height = 1;
+      const drawn = copy.getContext('2d', { willReadFrequently: true })!;
+      drawn.drawImage(screen, left, top, 1, 1, 0, 0, 1, 1);
+      return Array.from(drawn.getImageData(0, 0, 1, 1).data.slice(0, 3));
+    },
+    [x, y] as const,
+  );
+}
+
+test.describe('a session', () => {
+  test.skip(!DATABASE, 'no database to test against: AWAY_TEST_DATABASE is not set');
+
+  test("a desktop opens: the steps, the machine's question, its screen, keys and the pointer, and its end", async ({ page }) => {
+    const seen = watch(page);
+    // a machine that offers its desktop and nothing else is opened by a click on its tile
+    await page.goto(`${AWAY_THAT_KEEPS}/machines`);
+    await page.getByRole('link', { name: /^desk-01/ }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/desk-01/desktop`);
+    await expect(page).toHaveTitle('desk-01 · away');
+    await expect(page.getByRole('heading', { level: 1, name: 'desk-01' })).toBeVisible();
+    await expect(page.getByText('Windows desktop')).toBeVisible();
+
+    // the steps, and the machine's question for a name and a password
+    const steps = page.getByRole('list', { name: 'the steps to desk-01' }).getByRole('listitem');
+    await expect(page.getByText("desk-01 asks for a name and a password. Away passes them on and doesn't keep them.")).toBeVisible();
+    await expect(steps).toHaveText([/^Reaching desk-01$/, /^Checking that it is desk-01$/, /^Signing in on desk-01/, /^Waiting for its first picture$/]);
+    await expect(steps.nth(2)).toHaveAttribute('aria-current', 'step');
+    await expect(page.getByLabel('Name')).toBeFocused();
+    await expect(page.getByRole('button', { name: 'sign in' })).toBeDisabled();
+    await accessible(page);
+
+    // a password the machine doesn't take: it is asked for again, and the name stays
+    await page.getByLabel('Name').fill('CORP\\alex.urban');
+    await page.getByLabel('Password').fill('another password');
+    await page.getByLabel('Password').press('Enter');
+    await expect(page.getByRole('alert')).toHaveText("desk-01 didn't accept that name and password.");
+    await expect(page.getByLabel('Name')).toHaveValue('CORP\\alex.urban');
+    await expect(page.getByLabel('Password')).toHaveValue('');
+    await expect(page.getByLabel('Password')).toBeFocused();
+    await page.getByLabel('Password').fill('a password that exists for these tests alone');
+    await page.getByRole('button', { name: 'sign in' }).click();
+
+    // the machine's screen, pixel for pixel, and nothing of Away's around it but the handle
+    const screen = page.getByRole('application', { name: 'the desktop of desk-01' });
+    await expect(screen).toBeVisible();
+    await expect(screen).toBeFocused();
+    await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
+    await expect.poll(() => pixel(page, 60, 20)).toEqual([80, 60, 40]);
+    expect([await pixel(page, 160, 0), await pixel(page, 160, 1)]).toEqual([
+      [0, 0, 0],
+      [255, 255, 255],
+    ]);
+    expect(await screen.evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height])).toEqual([200, 120]);
+    await expect(page.getByRole('navigation', { name: 'views' })).toHaveCount(0);
+    await accessible(page);
+
+    // a click and a key go to the machine, and what the machine draws for them shows
+    await screen.click({ position: { x: 50, y: 60 } });
+    await expect.poll(() => pixel(page, 55, 65)).toEqual([224, 64, 32]);
+    await page.keyboard.press('a');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 225, 30]);
+
+    // the session's bar: by its handle, and by Ctrl + Alt + Shift pressed and let go alone
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    const bar = page.getByRole('toolbar', { name: "the session's bar" });
+    await expect(bar).toContainText('desk-01');
+    expect(await bar.getByRole('button').evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))).toEqual([
+      'fill the screen',
+      'end',
+      'close the bar',
+    ]);
+    await accessible(page);
+    await page.keyboard.press('Escape');
+    await expect(bar).toHaveCount(0);
+    await expect(screen).toBeFocused();
+    for (const key of ['Control', 'Alt', 'Shift']) await page.keyboard.down(key);
+    for (const key of ['Shift', 'Alt', 'Control']) await page.keyboard.up(key);
+    await expect(bar).toBeVisible();
+
+    // ending it leads back to the machine
+    await bar.getByRole('button', { name: 'end' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/desk-01`);
+
+    // nothing was asked of anyone but Away, and the browser complained of nothing
+    const elsewhere = seen.asked.map((request) => request.url()).filter((url) => !url.startsWith(AWAY_THAT_KEEPS) && !url.startsWith('http://127.0.0.1:18085'));
+    expect(elsewhere).toEqual([]);
+    expect(seen.complaints).toEqual([]);
+  });
+
+  test('a machine that is not there fails at its step and says why, and what Away does not open yet says so', async ({ page }) => {
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/gone-02/desktop`);
+    const steps = page.getByRole('list', { name: 'the steps to gone-02' }).getByRole('listitem');
+    await expect(page.getByRole('alert')).toHaveText('It refused the connection. Remote access may be switched off there.');
+    await expect(steps.nth(0)).toContainText('Reaching gone-02');
+    await expect(page.getByText('Questions go to it-help@example.com.')).toBeVisible();
+    // the technical reason, for whoever is asked for help
+    await page.getByText('details', { exact: true }).click();
+    await expect(page.locator('.dtl p')).toContainText('refused the connection');
+    await accessible(page);
+    // trying again tries again, and the machines are a click away
+    await page.getByRole('button', { name: 'try again' }).click();
+    await expect(page.getByRole('alert')).toHaveText('It refused the connection. Remote access may be switched off there.');
+    await page.getByRole('button', { name: 'machines' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/gone-02`);
+
+    // a shell, which this version doesn't open
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/build-01/desktop`);
+    await expect(page.getByRole('heading', { name: "build-01 can't be opened yet" })).toBeVisible();
+    await expect(page.getByText('This version of Away opens the desktop of a Windows machine that is reached at its own address.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'try again' })).toHaveCount(0);
+    await accessible(page);
+    // and a machine no rule gives is not there
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/nowhere/desktop`);
+    await expect(page.getByRole('heading', { name: 'no machine of that name for you' })).toBeVisible();
+    await page.getByRole('button', { name: 'machines' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines`);
+  });
+});
+
+test('without a database no machine is opened, and the page says why', async ({ page }) => {
+  await page.goto('/machines/fin-app-02');
+  // a machine that offers more than its desktop is opened from its page
+  await page.getByRole('link', { name: 'Windows desktop' }).click();
+  await expect(page).toHaveURL(`${AWAY}/machines/fin-app-02/desktop`);
+  await expect(page.getByRole('heading', { name: "away can't open machines right now" })).toBeVisible();
+  await expect(page.getByText("No machine is opened without a record, and Away can't write its records right now.")).toBeVisible();
+  await accessible(page);
+});
+
+test("the session's messages are written and read as the examples say that the gateway is tried against too", async () => {
+  const { begins, credentials, did, leaves, readRectangle, readSaid, seen } = await import('../src/session/wire');
+  const examples = JSON.parse(readFileSync('../crates/away-wire/fixtures/messages.json', 'utf8')) as Record<string, { text?: string; bytes?: string }[]>;
+  const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  const bytes = (written: string) => new Uint8Array((written.match(/../g) ?? []).map((pair) => parseInt(pair, 16)));
+
+  // what the gateway says
+  const said = (examples.to_browser ?? []).map((example) => (example.text ? readSaid(example.text) : readRectangle(bytes(example.bytes!).buffer)));
+  expect(said.slice(0, 5)).toEqual([{ step: 'reaching' }, { step: 'first-picture' }, { asks: { again: false } }, { asks: { again: true } }, { desktop: { width: 1280, height: 800 } }]);
+  expect(said[5]).toEqual({ left: 64, top: 128, width: 200, height: 120, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) });
+  expect(said.slice(6)).toEqual([{ drawn: 7 }, { failed: { step: 'reaching', why: 'no-answer', details: 'no answer within 10 seconds' } }, { ended: 'left' }]);
+  expect([readSaid('no JSON'), readSaid('7'), readRectangle(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0, 1]).buffer)]).toEqual([null, null, null]);
+
+  // what the pages say
+  const written = [
+    begins('7f3a', 1280, 800, 2055),
+    credentials('CORP\\alex.urban', 'a "password"'),
+    seen(7),
+    leaves(),
+    hex(did([{ moved: { x: 640, y: 400 } }])),
+    hex(
+      did([
+        { button: { button: 0, down: true, x: 640, y: 400 } },
+        { button: { button: 2, down: false, x: 1, y: 2 } },
+        { wheel: { by: -120, sideways: false, x: 3, y: 4 } },
+        { wheel: { by: 120, sideways: true, x: 3, y: 4 } },
+        { key: { code: 0x1e, extended: false, down: true } },
+        { key: { code: 0x4d, extended: true, down: false } },
+        { character: { unit: 0x20ac, down: true } },
+        { locks: { scroll: false, num: true, caps: true } },
+      ]),
+    ),
+  ];
+  expect(written).toEqual((examples.from_browser ?? []).map((example) => example.text ?? example.bytes));
 });
 
 test('without a database nothing can be starred, and the pages show no stars', async ({ page }) => {

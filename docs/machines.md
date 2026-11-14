@@ -5,8 +5,10 @@ where an operator keeps configuration, are reviewed like code, and are applied
 as they change. Nothing in the browser changes them.
 
 This version reads the files, tells each person the machines a rule gives
-them, and shows those who administer Away what is in force. It opens no
-machine yet.
+them, shows those who administer Away what is in force, and opens the desktop
+of a Windows machine that is reached at its own address
+([opening a desktop](#opening-a-desktop)). It doesn't open programs, shells,
+other desktops or the desktop of a farm yet.
 
 ## The files
 
@@ -227,6 +229,36 @@ change or to remove one. Each is also a line on the server's output at the
 moment it is written, `record`, with its kind and its details, so that the
 organisation's log system holds a copy. A server that starts anew and finds
 the files as they were adds no record.
+
+## Opening a desktop
+
+A click on a machine that offers its desktop and nothing else opens it. A
+machine that offers more is opened from its own page, where each way in is.
+
+- **The steps show as they happen**: reaching the machine, checking that it is
+  the one Away knows, signing in, its first picture. A step that fails says
+  why, with the technical reason behind *details*.
+- **The machine is known by what it showed the first time.** A machine that
+  shows another identity later is not connected to.
+- **The person types a name and a password** when the machine asks. Away
+  passes them on to the machine and keeps them nowhere. A Windows machine
+  takes them before it shows anything, so a wrong one is asked for again.
+- **The machine has the whole window.** Every key, every click and the wheel go
+  to it. A small handle at the top edge opens the session's bar, and so does
+  Ctrl + Alt + Shift, pressed and let go with no other key. The bar fills the
+  screen and ends the session.
+- **A key writes what it writes at home.** The session is given the layout of
+  the person's keyboard: where the browser says what the keys write, by that;
+  elsewhere by the language the browser is set to.
+- **Ending a session leaves the desktop running** on the machine, for the
+  account to come back to.
+- **No machine is opened without a record.** That a desktop was asked for,
+  that it is open, and how it ended or failed is each kept as a record, with
+  who it was and which machine. Without a database, no machine is opened.
+
+It needs a database ([installing Away](./install.md#the-database)), and the
+gateway has to reach the machines
+([what opening a machine needs](./install.md#opening-machines)).
 
 ## What people and administrators see
 

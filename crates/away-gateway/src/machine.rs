@@ -172,8 +172,9 @@ impl Secured {
         self.security == Security::Tls
     }
 
-    /// Signs the account in, and opens the desktop at this size.
-    pub async fn sign_in(mut self, account: Account, width: u16, height: u16) -> Result<Desktop, Failure> {
+    /// Signs the account in, and opens the desktop at this size, for a keyboard of this
+    /// layout, as Windows numbers them.
+    pub async fn sign_in(mut self, account: Account, width: u16, height: u16, layout: u32) -> Result<Desktop, Failure> {
         let signing_in = async {
             let random =
                 |step: Step| move |error: getrandom::Error| failure(step, Why::Broken, format!("the system gave no random bytes: {error}"));
@@ -218,7 +219,7 @@ impl Secured {
             };
 
             // what Away is, the channels, the licence, and what each side can do
-            let client = Client { width, height, security: self.security.number(), name: "away".to_string() };
+            let client = Client { width, height, security: self.security.number(), name: "away".to_string(), layout };
             let mut fresh = [0u8; 80];
             getrandom::fill(&mut fresh).map_err(random(Step::SigningIn))?;
             let for_a_licence = licence::New {

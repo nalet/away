@@ -18,6 +18,11 @@
 //! `tests/machines/database/real.sh` starts. Without it Away keeps nothing. The server
 //! makes a database of its own there each time it starts, so that it starts with
 //! nothing kept; `DATABASE_NAME` names one to keep using in its place.
+//! `MACHINE_PORT` starts a stand-in for a Windows machine at that port, and the gateway
+//! beside the server, so that a desktop opens: `desk-01`, for the account
+//! `CORP\alex.urban` with the password `a password that exists for these tests alone`.
+//! A session's connection then goes to the gateway and everything else to the server,
+//! as a way in passes them on. No machine opens without a database.
 
 use std::time::Duration;
 
@@ -27,7 +32,7 @@ use away_secret::Secret;
 use away_server::service;
 use away_server::stand_in::farm::Farm;
 use away_server::stand_in::{person, SignInService};
-use away_server::told::{Database, DatabaseConnection, Farms, SignIn, Told};
+use away_server::told::{Database, DatabaseConnection, Farms, Internal, SignIn, Told};
 use away_server::Server;
 
 #[tokio::main]
@@ -110,6 +115,29 @@ async fn main() -> std::io::Result<()> {
         });
     }
 
+    // a machine beside the server, for the tests that open a desktop: it is in a file of
+    // the folder, with one that is not there, and a rule gives both to everyone of staff
+    let mut machine = None;
+    if let Some(at) = said("MACHINE_PORT").and_then(|port| port.parse::<u16>().ok()) {
+        let stand_in = away_gateway::stand_in::Machine::start_at(
+            &format!("127.0.0.1:{at}"),
+            "CORP\\alex.urban",
+            "a password that exists for these tests alone",
+            away_gateway::stand_in::desktop(),
+        )
+        .await;
+        let nothing = std::net::TcpListener::bind("127.0.0.1:0")?.local_addr()?.port();
+        std::fs::write(
+            std::path::Path::new(&files).join("desks.yaml"),
+            format!(
+                "machines:\n  - name: desk-01\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {at} }}\n  \
+                 - name: gone-02\n    kind: windows\n    address: 127.0.0.1\n    groups: [desks]\n    desktop: {{ port: {nothing} }}\n\
+                 rules:\n  - name: staff-desks\n    who: [staff]\n    reaches: [desks]\n"
+            ),
+        )?;
+        machine = Some(stand_in);
+    }
+
     let told = Told {
         sign_in: Some(SignIn {
             public: Address::read(&away).expect("Away's address on this machine"),
@@ -130,15 +158,56 @@ async fn main() -> std::io::Result<()> {
         files: Some(files.into()),
         farms,
         database,
-        internal: None,
+        internal: machine.as_ref().map(|_| Internal { address: "127.0.0.1:0".to_string(), certificate: None }),
     };
 
     let lines = Lines::to_output("server");
     let (stopper, stop) = stop::pair();
     tokio::spawn(stop::on_signal(stopper, lines.clone()));
-    let settings = Settings { address: format!("127.0.0.1:{port}"), health_address: "127.0.0.1:0".to_string() };
-    let server = Server::bind(&settings, told, Part::new("server", lines, stop)).await?;
+    // with a machine to open, the server listens beside the gateway, and Away's address
+    // passes a session's connection on to the gateway and everything else to the server
+    let at = if machine.is_some() { "127.0.0.1:0".to_string() } else { format!("127.0.0.1:{port}") };
+    let settings = Settings { address: at, health_address: "127.0.0.1:0".to_string() };
+    let server = Server::bind(&settings, told, Part::new("server", lines.clone(), stop.clone())).await?;
+    if machine.is_some() {
+        let pages = server.bound().address.expect("the server's address");
+        let internal = server.internal_address().expect("the address the gateway asks the server at");
+        let told = away_gateway::Told {
+            server: Some(Address::read(&format!("http://127.0.0.1:{}", internal.port())).expect("the server's address")),
+            authorities: None,
+        };
+        let settings = Settings { address: "127.0.0.1:0".to_string(), health_address: "127.0.0.1:0".to_string() };
+        let gateway = away_gateway::Gateway::bind(&settings, told, Part::new("gateway", Lines::to_output("gateway"), stop)).await?;
+        let sessions = gateway.bound().address.expect("the gateway's address");
+        tokio::spawn(gateway.run());
+        let way_in = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
+        tokio::spawn(async move {
+            while let Ok((connection, _)) = way_in.accept().await {
+                tokio::spawn(pass_on(connection, pages, sessions));
+            }
+        });
+    }
     server.run().await;
-    drop(farm);
+    drop((farm, machine));
     Ok(())
+}
+
+/// Passes a connection on as a way in does: one that begins as a session's goes to the
+/// gateway, and every other to the server.
+async fn pass_on(mut from: tokio::net::TcpStream, pages: std::net::SocketAddr, sessions: std::net::SocketAddr) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    // the request's first line says where it is for
+    let mut begins = Vec::new();
+    while !begins.windows(2).any(|pair| pair == b"\r\n") && begins.len() < 8192 {
+        let mut bytes = [0u8; 1024];
+        match from.read(&mut bytes).await {
+            Ok(count) if count > 0 => begins.extend_from_slice(&bytes[..count]),
+            _ => return,
+        }
+    }
+    let to = if begins.starts_with(b"GET /session ") { sessions } else { pages };
+    let Ok(mut to) = tokio::net::TcpStream::connect(to).await else { return };
+    if to.write_all(&begins).await.is_ok() {
+        let _ = tokio::io::copy_bidirectional(&mut from, &mut to).await;
+    }
 }

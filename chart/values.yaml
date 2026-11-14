@@ -131,6 +131,11 @@ networkRules:
   # farms.account is set.
   farmsAt: []
   farmsPort: 443
+  # Where the machines are, as the peers of a NetworkPolicy, and the ports their
+  # desktops are opened on. Empty takes any address: the gateway reaches those ports
+  # and nothing else. A machine whose file names another port needs that port here.
+  machinesAt: []
+  machinePorts: [3389]
   # Where the database is, as the peers of a NetworkPolicy. Empty takes any address: the
   # server reaches database.port and nothing else. It is used once database.host is set.
   databaseAt: []

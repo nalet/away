@@ -17,7 +17,7 @@ What a person's browser runs.
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
 | `web` | the web app: Away's pages around the sessions | web | first release | 44 |
-| `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | first release | 38 |
+| `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | there | 38 |
 
 - `web`: Built from the design system's components; the frame is Away's own until the design system has it. Keeps: in the browser's own storage, which sessions this browser has open and how wide the list of windows was left. Code: `web/`. Runs: served by the server. Governed by [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](./decisions/0011-the-web-app.md).
 - `session-view`: Drawn on a canvas, apart from the pages. Code: `web/src/session/`. Runs: part of the web app. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0011](./decisions/0011-the-web-app.md).
@@ -50,7 +50,7 @@ The libraries the parts and the session view are built from.
 | `ssh` | the SSH code | library | first release | 3 |
 | `shell-screen` | the shell's screen: turns what a shell writes into what it shows | library | first release | 7 |
 | `picture` | the picture: a desktop as the gateway keeps it, and the rectangles it sends | library | first release | 5 |
-| `wire` | the session's messages between the browser and the gateway | contract | first release | 1 |
+| `wire` | the session's messages between the browser and the gateway | contract | there | 1 |
 
 - `rdp`: For a Windows desktop and its programs, and for desktops of other systems that speak RDP. Code: `crates/away-rdp/`. Runs: in the gateway. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md).
 - `windows-sign-in`: Code: `crates/away-winauth/`. Runs: in the gateway. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0007](./decisions/0007-short-lived-certificates.md).
@@ -58,7 +58,7 @@ The libraries the parts and the session view are built from.
 - `ssh`: Code: `crates/away-ssh/`. Runs: in the gateway. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0007](./decisions/0007-short-lived-certificates.md).
 - `shell-screen`: What is elsewhere called a terminal emulator; later it runs in the gateway too, to hold a shell while the browser is closed. Code: `crates/away-term/`. Runs: in the browser, as WebAssembly. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md).
 - `picture`: Code: `crates/away-picture/`. Runs: in the gateway. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md).
-- `wire`: One description that both sides are built from. Code: `crates/away-wire/`. Runs: in the gateway and in the browser. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md).
+- `wire`: Written once for each side, and both are tried against the same examples. Code: `crates/away-wire/`. Runs: in the gateway and in the browser. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md).
 
 ## What Away rests on
 

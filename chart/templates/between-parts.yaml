@@ -1,0 +1,30 @@
+{{- /*
+What secures what Away's parts ask of each other: an authority of this installation's
+own, and a certificate of it for the address the gateway asks the server at. Both are
+made when the chart is installed and kept as they are by every update. The authority's
+key is kept nowhere, so nothing else can ever be certified by it. To have new ones,
+remove the secret and update.
+*/ -}}
+{{- $name := printf "%s-between-parts" (include "away.name" .) -}}
+{{- $server := printf "%s-server" (include "away.name" .) -}}
+{{- $held := dict -}}
+{{- with lookup "v1" "Secret" .Release.Namespace $name }}
+{{- $held = .data | default dict -}}
+{{- end }}
+{{- if not (and (index $held "authority.pem") (index $held "server.pem") (index $held "server-key.pem")) }}
+{{- $authority := genCA "away, between its parts" 3650 -}}
+{{- $names := list $server (printf "%s.%s" $server .Release.Namespace) (printf "%s.%s.svc" $server .Release.Namespace) -}}
+{{- $certificate := genSignedCert $server nil $names 3650 $authority -}}
+{{- $held = dict "authority.pem" ($authority.Cert | b64enc) "server.pem" ($certificate.Cert | b64enc) "server-key.pem" ($certificate.Key | b64enc) -}}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+type: Opaque
+data:
+  authority.pem: {{ index $held "authority.pem" }}
+  server.pem: {{ index $held "server.pem" }}
+  server-key.pem: {{ index $held "server-key.pem" }}

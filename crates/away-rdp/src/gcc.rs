@@ -18,7 +18,14 @@ pub struct Client {
     pub security: u32,
     /// The name the client gives itself, of which the first 15 characters travel.
     pub name: String,
+    /// The layout of the person's keyboard, as Windows numbers them: `0x0409` is the
+    /// one of the United States. A machine gives the session this layout, so that a key
+    /// writes there what it writes at the person's own device.
+    pub layout: u32,
 }
+
+/// The keyboard layout of the United States, which a client has where nothing says otherwise.
+pub const LAYOUT_US: u32 = 0x0409;
 
 /// A length as the conference standard writes it: one byte, or two with the top bit set.
 fn length(out: &mut Vec<u8>, length: usize) {
@@ -46,7 +53,7 @@ pub fn request(client: &Client) -> Vec<u8> {
     core.extend(client.height.to_le_bytes());
     core.extend(0xca01u16.to_le_bytes()); // a colour depth that the later field replaces
     core.extend(0xaa03u16.to_le_bytes());
-    core.extend(0x0409u32.to_le_bytes()); // the keyboard layout, US: keys travel as what they mean
+    core.extend(client.layout.to_le_bytes()); // the layout of the person's keyboard: keys travel by their place
     core.extend(1u32.to_le_bytes()); // the client's build
     let mut name: Vec<u8> = client.name.encode_utf16().take(15).flat_map(u16::to_le_bytes).collect();
     name.resize(32, 0);
@@ -146,7 +153,7 @@ mod tests {
     use super::*;
 
     fn client() -> Client {
-        Client { width: 1280, height: 800, security: 8, name: "away".to_string() }
+        Client { width: 1280, height: 800, security: 8, name: "away".to_string(), layout: LAYOUT_US }
     }
 
     #[test]

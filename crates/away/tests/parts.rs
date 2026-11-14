@@ -145,11 +145,14 @@ fn the_server_answers_on_its_address_and_says_it_is_well() {
 }
 
 #[test]
-fn the_gateway_holds_no_session_yet_and_says_it_is_well() {
+fn the_gateway_takes_a_sessions_connection_at_its_address_and_says_it_is_well() {
     let gateway = start("gateway", 2);
+    // a session's connection is a WebSocket: a request that is none is told so
     let (status, head, body) = ask(gateway.address("sessions"), "GET", "/session");
-    assert_eq!(status, 404);
-    assert_eq!(body, "No session is at this address.\n");
+    assert_eq!(status, 400);
+    assert_eq!(body, "A session's connection is a WebSocket.\n");
+    let (status, _, body) = ask(gateway.address("sessions"), "GET", "/elsewhere");
+    assert_eq!((status, body.as_str()), (404, "No session is at this address.\n"));
     assert!(head.contains("content-security-policy: default-src 'none'"));
     assert_eq!(ask(gateway.address("health"), "GET", "/livez").0, 200);
     assert_eq!(ask(gateway.address("health"), "GET", "/readyz").0, 200);
