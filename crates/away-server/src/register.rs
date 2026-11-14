@@ -133,7 +133,8 @@ impl std::fmt::Display for Refused {
     }
 }
 
-/// What is in force: every machine and every rule, each in the order of its name.
+/// What is in force: every machine and every rule, in the order the files have them. The
+/// files come in the order of their names, and inside a file things keep their place.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct InForce {
     /// The machines.
@@ -344,13 +345,11 @@ impl InForce {
                 }
             }
         }
-        machines.sort_by_key(|machine| machine.name.to_lowercase());
-        rules.sort_by_key(|rule| rule.name.to_lowercase());
         Ok(InForce { machines, rules })
     }
 
     /// The machines that someone of these groups reaches, each with the rules that give
-    /// it to them, in the order of the machines' names.
+    /// it to them, in the order the files have the machines.
     pub fn reached_by(&self, groups: &[String]) -> Vec<(&Machine, Vec<&str>)> {
         let mut reached: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
         for rule in self.rules.iter().filter(|rule| rule.who.iter().any(|who| groups.contains(who))) {
@@ -590,7 +589,8 @@ rules:
     fn the_files_say_the_machines_and_the_rules() {
         let in_force = in_force();
         let names: Vec<&str> = in_force.machines.iter().map(|machine| machine.name.as_str()).collect();
-        assert_eq!(names, ["build-01", "Desktops", "dev-linux-03", "fin-app-02", "hr-app-01", "mac-design-01"]);
+        // in the order of the files' names, and inside a file as they are written
+        assert_eq!(names, ["fin-app-02", "hr-app-01", "build-01", "dev-linux-03", "mac-design-01", "Desktops"]);
         let named = |name: &str| in_force.machines.iter().find(|machine| machine.name == name).unwrap();
         let fin = named("fin-app-02");
         assert_eq!((fin.kind, fin.address.as_str(), fin.desktop), (Kind::Windows, "fin-app-02.corp.example", Some((Over::Rdp, 3389))));
@@ -607,8 +607,8 @@ rules:
         let farm = named("Desktops");
         assert_eq!((farm.collection.as_deref(), farm.served_by.len(), farm.groups.is_empty()), (Some("Desktops"), 2, true));
         assert_eq!(in_force.rules.len(), 5);
-        assert_eq!(in_force.rules[0].name, "audit-finance");
-        assert_eq!(in_force.rules[2].written_in, ("rules/access.yaml".to_string(), 5));
+        assert_eq!(in_force.rules[0].name, "finance-desktops");
+        assert_eq!(in_force.rules[1].written_in, ("rules/access.yaml".to_string(), 5));
     }
 
     /// Every person of the tests against every machine: exactly the machines a rule
@@ -635,7 +635,7 @@ rules:
             (
                 "who reads the records of finance",
                 &["away-audit", "finance"],
-                &[("fin-app-02", &["audit-finance", "finance-desktops"]), ("hr-app-01", &["finance-desktops"])],
+                &[("fin-app-02", &["finance-desktops", "audit-finance"]), ("hr-app-01", &["finance-desktops"])],
             ),
             ("in marketing", &["marketing"], &[]),
             ("in no group", &[], &[]),

@@ -100,7 +100,7 @@ and nothing built by then is lost.
 | 2 | [RDP, proven without a browser](#2-rdp-proven-without-a-browser) | proof | done | 1 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md) | — |
 | 3 | [The Windows sign-in, proven without a browser](#3-the-windows-sign-in-proven-without-a-browser) | proof | agreed | 2 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | — |
 | 4 | [Getting in, and the frame](#4-getting-in-and-the-frame) | build | done | 1 | [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 17 capabilities |
-| 5 | [The register, the rules, and home](#5-the-register-the-rules-and-home) | build | begun | 4 | [ADR‑0009](../architecture/decisions/0009-one-database-and-files.md) | 18 capabilities |
+| 5 | [The register, the rules, and home](#5-the-register-the-rules-and-home) | build | begun | 4 | [ADR‑0009](../architecture/decisions/0009-one-database-and-files.md) | 19 capabilities |
 | 6 | [A shell](#6-a-shell) | build | agreed | 5 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0005](../architecture/decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0010](../architecture/decisions/0010-secrets-live-in-the-cluster.md) | 29 capabilities |
 | 7 | [Sessions as they run](#7-sessions-as-they-run) | build | agreed | 6 | [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md) | 12 capabilities |
 | 8 | [A shell as oneself](#8-a-shell-as-oneself) | build | agreed | 6 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md) | 4 capabilities |
@@ -113,7 +113,7 @@ and nothing built by then is lost.
 | 15 | [Status, and the check of the setup](#15-status-and-the-check-of-the-setup) | build | agreed | 11 | [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md) | 2 capabilities |
 | 16 | [Ready to release](#16-ready-to-release) | build | agreed | 12, 13, 14, 15 | [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 1 capability |
 
-16 packages: 2 proofs and 14 builds. Together the builds deliver 115 of the 115 capabilities of the first release.
+16 packages: 2 proofs and 14 builds. Together the builds deliver 116 of the 116 capabilities of the first release.
 <!-- end: packages -->
 
 ## What the build needs first
@@ -183,7 +183,7 @@ A build, after package 4. It rests on [ADR‑0009](../architecture/decisions/000
 | Area | What it delivers |
 |---|---|
 | [The frame](../capabilities/app.md#the-frame) | Find a machine by its name from any page |
-| [Finding a machine](../capabilities/app.md#finding-a-machine) | See the machines one may reach; Find a machine by its name, its address or its group; See the machines in the groups an administrator made; Mark machines as favourites and see them first; See what a machine is: its kind, its address, how one gets in; Choose how to open a machine that offers more than one way: its desktop, its programs, its shell; Open a machine from a link or a bookmark |
+| [Finding a machine](../capabilities/app.md#finding-a-machine) | See the machines one may reach; Find a machine by its name, its address or its group; See the machines in the groups an administrator made; See every program one may open as an entry of its own beside the machines, and find it by its name; Mark machines as favourites and see them first; See what a machine is: its kind, its address, how one gets in; Choose how to open a machine that offers more than one way: its desktop, its programs, its shell; Open a machine from a link or a bookmark |
 | [The register of machines](../capabilities/admin.md#the-register-of-machines) | Keep machines, groups and rules as files, applied as they change; See the machines, groups and rules that are in force, and the file each comes from; See that a changed file was refused, and why, while what was in force stays; Put machines in groups; Say for a machine how people are signed in: as themselves, with a kept secret, or by typing; Set how a machine is reached: its port, its screen, what may pass |
 | [Who reaches what](../capabilities/admin.md#who-reaches-what) | Allow a group of people to reach a machine or a group of machines; Show a person only the machines a rule gives them; See what a person reaches, and by which rule |
 | [What happened](../capabilities/admin.md#what-happened) | Keep a record of every change to machines, rules and settings |

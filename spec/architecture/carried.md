@@ -126,6 +126,7 @@ says which.
 | Mark machines as favourites and see them first | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `keep-favourites` |
 | See what a machine is: its kind, its address, how one gets in | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `see-machine-details` |
 | See the programs a Windows machine offers, and open one | `web` `server` | [13](../plan/README.md#13-programs) | `see-programs` |
+| See every program one may open as an entry of its own beside the machines, and find it by its name | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `see-programs-beside-machines` |
 | Choose how to open a machine that offers more than one way: its desktop, its programs, its shell | `web` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `choose-way-in` |
 | Open a machine from a link or a bookmark | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `open-by-address` |
 

@@ -68,12 +68,14 @@ The machines a person may reach: the list, its groups, the search, what was used
 | Mark machines as favourites and see them first | person | v1 | `keep-favourites` |
 | See what a machine is: its kind, its address, how one gets in | person | v1 | `see-machine-details` |
 | See the programs a Windows machine offers, and open one | person | v1 | `see-programs` |
+| See every program one may open as an entry of its own beside the machines, and find it by its name | person | v1 | `see-programs-beside-machines` |
 | Choose how to open a machine that offers more than one way: its desktop, its programs, its shell | person | v1 | `choose-way-in` |
 | Open a machine from a link or a bookmark | person | v1 | `open-by-address` |
 | See whether a machine is on and can be reached | person | later | `see-machine-state` |
 | Wake a machine that sleeps or is off, and connect once it is up | person | later | `wake-machine` |
 | Add a machine of one's own that nobody else sees | person | later | `add-own-machine` |
 
+- *See every program one may open as an entry of its own beside the machines, and find it by its name*: a machine that offers programs alone is seen as its programs.
 - *Wake a machine that sleeps or is off, and connect once it is up*: needs a way into the machine's own network segment, or to its hypervisor.
 
 ## Working together

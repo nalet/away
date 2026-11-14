@@ -110,7 +110,7 @@ flowchart TD
 | [Work on a machine that is somewhere else](#work-on-a-machine-that-is-somewhere-else) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself) | 24: 1 there, 1 partly, 12 first release, 3 first release in part, 5 later, 2 not planned | 79 in 9 areas: 4 built, 43 first release, 27 later, 5 not planned | 9, 9 with a target |
 | [Get in without another password](#get-in-without-another-password) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself), [Know what happened](#know-what-happened) | 16: 3 there, 2 partly, 6 first release, 2 first release in part, 2 later, 1 not planned | 15 in 1 area: 4 built, 6 first release, 3 later, 2 not planned | 5, 5 with a target |
 | [Look at a machine together](#look-at-a-machine-together) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself) | 4: 3 later, 1 not planned | 6 in 1 area: 5 later, 1 not planned | 1, 1 with a target |
-| [Know the machines](#know-the-machines) | what that takes | [Run it oneself](#run-it-oneself) | 13: 5 first release, 7 later, 1 not planned | 30 in 2 areas: 19 first release, 8 later, 3 not planned | 2, 2 with a target |
+| [Know the machines](#know-the-machines) | what that takes | [Run it oneself](#run-it-oneself) | 13: 5 first release, 7 later, 1 not planned | 31 in 2 areas: 20 first release, 8 later, 3 not planned | 2, 2 with a target |
 | [Decide who reaches what](#decide-who-reaches-what) | what that takes | [Run it oneself](#run-it-oneself) | 13: 1 there, 1 partly, 5 first release, 2 first release in part, 4 later | 24 in 2 areas: 2 built, 8 first release, 14 later | 2, 2 with a target |
 | [Know what happened](#know-what-happened) | what that takes | [Run it oneself](#run-it-oneself) | 9: 3 first release, 1 first release in part, 5 later | 13 in 1 area: 5 first release, 8 later | 3, 3 with a target |
 | [Run it oneself](#run-it-oneself) | what that takes | [Trust it](#trust-it) | 16: 4 there, 4 partly, 1 first release, 2 first release in part, 2 later, 3 not planned | 26 in 2 areas: 9 built, 1 partly built, 7 first release, 7 later, 2 not planned | 7, 7 with a target |
@@ -168,7 +168,7 @@ Two people look at the same session from wherever each is: one shows, helps or t
 To open a machine, Away has to know it: what it is, where it is, how it is reached and signed in to, whether it is on. It needs: [Run it oneself](#run-it-oneself). Needed by: [Work on a machine that is somewhere else](#work-on-a-machine-that-is-somewhere-else), [Get in without another password](#get-in-without-another-password), [Look at a machine together](#look-at-a-machine-together).
 
 - **Expected of it:** [13 expectations](../capabilities/expectations.md#know-the-machines): 5 first release, 7 later, 1 not planned.
-- **Capabilities:** [Finding a machine](../capabilities/app.md#finding-a-machine) (12), [The register of machines](../capabilities/admin.md#the-register-of-machines) (18). Of the 30: 19 first release, 8 later, 3 not planned.
+- **Capabilities:** [Finding a machine](../capabilities/app.md#finding-a-machine) (13), [The register of machines](../capabilities/admin.md#the-register-of-machines) (18). Of the 31: 20 first release, 8 later, 3 not planned.
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|

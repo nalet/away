@@ -185,7 +185,8 @@ fn every_person_is_told_the_machines_a_rule_gives_them_and_no_others() {
     // an administrator, who is in staff and in away-admins: what both rules give
     browser.sign_in(&world, "/");
     let told = browser.get(&machines).says();
-    assert_eq!(names(&told, "machines"), ["build-01", "build-02", "Desktops", "dev-linux-03", "fin-app-02", "hr-app-01", "mac-design-01"]);
+    // in the order of the files: the engineers' file comes before the finance department's
+    assert_eq!(names(&told, "machines"), ["build-01", "build-02", "dev-linux-03", "mac-design-01", "Desktops", "fin-app-02", "hr-app-01"]);
     let Some(Json::List(listed)) = told.get("machines") else { panic!() };
     let fin = listed.iter().find(|machine| machine.text_of("name") == Some("fin-app-02")).expect("fin-app-02");
     assert_eq!(
@@ -222,7 +223,7 @@ fn those_who_administer_see_what_is_in_force_and_where_it_is_written() {
     assert_eq!(says.get("refused"), Some(&Json::Null));
     assert!(says.get("since").and_then(Json::count).is_some_and(|since| since > 1_700_000_000));
     assert_eq!(names(&says, "machines").len(), 7);
-    assert_eq!(names(&says, "rules"), ["admins-engineering", "staff-finance"]);
+    assert_eq!(names(&says, "rules"), ["staff-finance", "admins-engineering"]);
     let Some(Json::List(machines)) = says.get("machines") else { panic!() };
     let farm = machines.iter().find(|machine| machine.text_of("name") == Some("Desktops")).expect("the farm");
     assert_eq!(farm.text_of("file"), Some("machines/engineering.yaml"));
@@ -231,7 +232,7 @@ fn those_who_administer_see_what_is_in_force_and_where_it_is_written() {
     assert_eq!(farm.get("served_by").map(Json::write).as_deref(), Some(r#"["rdsh-01.corp.example","rdsh-02.corp.example"]"#));
     let Some(Json::List(rules)) = says.get("rules") else { panic!() };
     assert_eq!(
-        rules[1].write(),
+        rules[0].write(),
         r#"{"name":"staff-finance","who":["staff"],"reaches":["finance","Desktops"],"file":"rules/access.yaml","line":4}"#
     );
 

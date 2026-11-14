@@ -95,6 +95,7 @@ see-last-used,find,See the machines used last,person,—,—,—,v1,
 keep-favourites,find,Mark machines as favourites and see them first,person,—,—,—,v1,
 see-machine-details,find,"See what a machine is: its kind, its address, how one gets in",person,—,—,—,v1,
 see-programs,find,"See the programs a Windows machine offers, and open one",person,—,—,—,v1,
+see-programs-beside-machines,find,"See every program one may open as an entry of its own beside the machines, and find it by its name",person,—,—,—,v1,"a machine that offers programs alone is seen as its programs"
 choose-way-in,find,"Choose how to open a machine that offers more than one way: its desktop, its programs, its shell",person,—,—,—,v1,
 open-by-address,find,Open a machine from a link or a bookmark,person,—,—,—,v1,
 see-machine-state,find,See whether a machine is on and can be reached,person,—,—,—,later,

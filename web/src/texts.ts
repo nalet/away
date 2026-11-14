@@ -44,7 +44,7 @@ export const texts = {
     others: 'other machines',
     machines: 'machines',
     noMatch: (sought: string) => `No machine matches “${sought}”.`,
-    looksAt: 'The search looks at the names, the addresses and the groups of the machines you can reach.',
+    looksAt: 'The search looks at the names, the addresses and the groups of the machines you can reach, and at the names of their programs.',
   },
   machine: {
     back: 'machines',
@@ -69,6 +69,7 @@ export const texts = {
   // what a machine is, in one line under its name
   kindNames: { windows: 'Windows', linux: 'Linux', mac: 'Mac' },
   programCount: (count: number) => (count === 1 ? '1 program' : `${count} programs`),
+  programOn: (machine: string) => `program on ${machine}`,
   sessions: {
     title: 'no sessions are open',
   },

@@ -95,3 +95,26 @@ export function matches(machine: Machine, sought: string): boolean {
   const words = sought.trim().toLowerCase();
   return [machine.name, machine.address, ...machine.groups].some((text) => text.toLowerCase().includes(words));
 }
+
+// What people open: a machine, by its desktop or its shell, or one program of a machine.
+export interface Entry {
+  machine: Machine;
+  program: string | null;
+}
+
+// Everything one may open on these machines, each as an entry of its own: the machines
+// that have a desktop or a shell, and then every program. Both keep the order the
+// administrator's files have them in. A machine that offers programs alone is seen as
+// its programs.
+export function entriesOf(machines: Machine[]): Entry[] {
+  const whole = machines.filter((machine) => machine.desktop || machine.shell).map((machine) => ({ machine, program: null }));
+  const programs = machines.flatMap((machine) => machine.programs.map((program) => ({ machine, program })));
+  return [...whole, ...programs];
+}
+
+// Whether an entry is what is looked for: a program by its name, and anything by its
+// machine's name, address or groups.
+export function found(entry: Entry, sought: string): boolean {
+  const words = sought.trim().toLowerCase();
+  return (entry.program?.toLowerCase().includes(words) ?? false) || matches(entry.machine, sought);
+}

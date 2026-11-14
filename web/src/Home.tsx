@@ -5,8 +5,8 @@ import { AppWindow, ArrowLeft, Monitor, Search, SquareTerminal } from 'lucide-re
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import { matches, pageOf, useMachines } from './machines';
-import type { Machine } from './machines';
+import { entriesOf, found, pageOf, useMachines } from './machines';
+import type { Entry, Machine } from './machines';
 import { inPlace } from './place';
 import { texts } from './texts';
 
@@ -24,12 +24,13 @@ export function iconOf(machine: Machine): LucideIcon {
   return machine.desktop ? Monitor : machine.programs.length > 0 ? AppWindow : SquareTerminal;
 }
 
-// The machines by their groups, in the order of the groups' names, and last those in none.
-function grouped(machines: Machine[]): { name: string | null; machines: Machine[] }[] {
-  const names = [...new Set(machines.flatMap((machine) => machine.groups))].sort((one, other) => one.localeCompare(other, undefined, { sensitivity: 'base' }));
-  const groups: { name: string | null; machines: Machine[] }[] = names.map((name) => ({ name, machines: machines.filter((machine) => machine.groups.includes(name)) }));
-  const others = machines.filter((machine) => machine.groups.length === 0);
-  if (others.length > 0) groups.push({ name: null, machines: others });
+// What one may open, by the groups of the machines, in the order the administrator's
+// files first name each group, and last what is in no group.
+function grouped(entries: Entry[]): { name: string | null; entries: Entry[] }[] {
+  const names = [...new Set(entries.flatMap((entry) => entry.machine.groups))];
+  const groups: { name: string | null; entries: Entry[] }[] = names.map((name) => ({ name, entries: entries.filter((entry) => entry.machine.groups.includes(name)) }));
+  const others = entries.filter((entry) => entry.machine.groups.length === 0);
+  if (others.length > 0) groups.push({ name: null, entries: others });
   return groups;
 }
 
@@ -56,8 +57,9 @@ export function Home({ go, contact }: { go: (to: string) => void; contact: strin
     );
   }
 
-  const found = sought.trim() ? machines.filter((machine) => matches(machine, sought)) : machines;
-  const groups = grouped(found);
+  const all = entriesOf(machines);
+  const shown = sought.trim() ? all.filter((entry) => found(entry, sought)) : all;
+  const groups = grouped(shown);
   const named = groups.some((group) => group.name !== null);
   return (
     <div className="pg wide">
@@ -73,7 +75,7 @@ export function Home({ go, contact }: { go: (to: string) => void; contact: strin
           onChange={(event) => setSought(event.target.value)}
         />
       </div>
-      {found.length === 0 && (
+      {shown.length === 0 && (
         <div className="nomatch" role="status">
           <p>{texts.home.noMatch(sought.trim())}</p>
           <p className="small">{texts.home.looksAt}</p>
@@ -86,18 +88,19 @@ export function Home({ go, contact }: { go: (to: string) => void; contact: strin
           <section className="grp" key={id} aria-labelledby={id}>
             <h2 className="gh" id={id}>
               <Chevron size={14} aria-hidden="true" />
-              {title} <span className="n">{group.machines.length}</span>
+              {title} <span className="n">{group.entries.length}</span>
             </h2>
             <ul className="mgrid">
-              {group.machines.map((machine) => {
-                const Icon = iconOf(machine);
+              {group.entries.map(({ machine, program }) => {
+                // a program is an entry of its own; it leads to its machine's page
+                const Icon = program === null ? iconOf(machine) : AppWindow;
                 return (
-                  <li key={machine.name}>
+                  <li key={`${machine.name} ${program ?? ''}`}>
                     <a className="m" href={pageOf(machine.name)} onClick={inPlace(go, pageOf(machine.name))}>
                       <Icon size={22} aria-hidden="true" />
                       <span className="main">
-                        <span className="name">{machine.name}</span>
-                        <span className="sub">{whatItIs(machine)}</span>
+                        <span className="name">{program ?? machine.name}</span>
+                        <span className="sub">{program === null ? whatItIs(machine) : texts.programOn(machine.name)}</span>
                       </span>
                     </a>
                   </li>

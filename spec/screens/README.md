@@ -85,7 +85,7 @@ release holds for a person or an administrator and no figure shows.
 |---|---|---|---|
 | 2 | [The frame](./frame.md) | 5 | 8 |
 | 3 | [Getting in](./start.md) | 6 | 6 |
-| 4 | [Machines](./machines.md) | 7 | 12 |
+| 4 | [Machines](./machines.md) | 7 | 13 |
 | 5 | [Opening a machine](./opening.md) | 7 | 8 |
 | 6 | [A desktop](./desktop.md) | 10 | 14 |
 | 7 | [Programs](./programs.md) | 6 | 7 |
@@ -98,9 +98,9 @@ release holds for a person or an administrator and no figure shows.
 | 14 | [Administration: sessions and records](./admin-records.md) | 4 | 7 |
 | 15 | [Administration: status](./admin-status.md) | 2 | 8 |
 | 16 | [When something goes wrong](./errors.md) | 6 | 8 |
-|  | all | 83 | 84 |
+|  | all | 83 | 85 |
 
-The first release holds 66 capabilities for a person or an administrator. A figure shows 60 of them.
+The first release holds 67 capabilities for a person or an administrator. A figure shows 61 of them.
 <!-- end: figures -->
 
 A capability with nothing to see is in no figure: typing in one's own keyboard

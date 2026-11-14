@@ -23,8 +23,8 @@ It draws what the first release holds of
 4. **The menu** holds the other ways in and what else can be done with the
    machine (4.2).
 5. **Favourites**: the machines one starred.
-6. **A group**, as an administrator made it, with the number of its machines
-   that one may reach.
+6. **A group**, as an administrator made it, with the number of what one may
+   open in it: its machines, and their programs.
 
 - A click on a tile opens the machine in the way that is listed first for it.
   From opening Away to a session on a machine used before takes two steps.
@@ -37,6 +37,10 @@ It draws what the first release holds of
 - A tile says what the machine is in one of four ways: Windows desktop, Mac
   desktop, Linux desktop, shell. A machine with more ways in names them, as in
   “Windows desktop, 4 programs”.
+- A program is an entry of its own. Every program of a machine has a tile in
+  the machine's groups, after the machines, named with its machine: “program
+  on fin-app-02”. A machine that offers programs and neither a desktop nor a
+  shell has no tile: it is seen as its programs.
 - Favourites are kept with the account, so they are the same on every device.
   A program has no star.
 - A person sees the machines a rule gives them, and no others: not here, and
@@ -171,11 +175,11 @@ It draws what the first release holds of
 <!-- generated: draws -->
 | Figure | Draws |
 |---|---|
-| 4.1 Home, on a computer | [See the machines one may reach](../capabilities/app.md#finding-a-machine), [See the machines used last](../capabilities/app.md#finding-a-machine), [Mark machines as favourites and see them first](../capabilities/app.md#finding-a-machine), [See the machines in the groups an administrator made](../capabilities/app.md#finding-a-machine) |
+| 4.1 Home, on a computer | [See the machines one may reach](../capabilities/app.md#finding-a-machine), [See the machines used last](../capabilities/app.md#finding-a-machine), [Mark machines as favourites and see them first](../capabilities/app.md#finding-a-machine), [See the machines in the groups an administrator made](../capabilities/app.md#finding-a-machine), [See every program one may open as an entry of its own beside the machines, and find it by its name](../capabilities/app.md#finding-a-machine) |
 | 4.2 A machine's menu | [Choose how to open a machine that offers more than one way: its desktop, its programs, its shell](../capabilities/app.md#finding-a-machine), [Open a session in a browser tab or window of its own](../capabilities/session.md#opening-a-machine), [Open a machine from a link or a bookmark](../capabilities/app.md#finding-a-machine), [See what a machine is: its kind, its address, how one gets in](../capabilities/app.md#finding-a-machine) |
 | 4.3 The search, with what it found | [Find a machine by its name, its address or its group](../capabilities/app.md#finding-a-machine), [Find a machine by its name from any page](../capabilities/app.md#the-frame) |
 | 4.4 The search found nothing | [Find a machine by its name, its address or its group](../capabilities/app.md#finding-a-machine) |
 | 4.5 A machine's own page | [See what a machine is: its kind, its address, how one gets in](../capabilities/app.md#finding-a-machine), [See the programs a Windows machine offers, and open one](../capabilities/app.md#finding-a-machine), [Choose how to open a machine that offers more than one way: its desktop, its programs, its shell](../capabilities/app.md#finding-a-machine), [Open a machine from a link or a bookmark](../capabilities/app.md#finding-a-machine), [Mark machines as favourites and see them first](../capabilities/app.md#finding-a-machine) |
-| 4.6 Home on a phone | [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet), [See the machines one may reach](../capabilities/app.md#finding-a-machine), [See the machines used last](../capabilities/app.md#finding-a-machine), [Mark machines as favourites and see them first](../capabilities/app.md#finding-a-machine), [See the machines in the groups an administrator made](../capabilities/app.md#finding-a-machine) |
+| 4.6 Home on a phone | [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet), [See the machines one may reach](../capabilities/app.md#finding-a-machine), [See the machines used last](../capabilities/app.md#finding-a-machine), [Mark machines as favourites and see them first](../capabilities/app.md#finding-a-machine), [See the machines in the groups an administrator made](../capabilities/app.md#finding-a-machine), [See every program one may open as an entry of its own beside the machines, and find it by its name](../capabilities/app.md#finding-a-machine) |
 | 4.7 Home could not load | [See the machines one may reach](../capabilities/app.md#finding-a-machine) |
 <!-- end: draws -->

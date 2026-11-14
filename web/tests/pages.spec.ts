@@ -167,16 +167,25 @@ test('home shows the machines a rule gives, in their groups, and a person sees n
   const { complaints } = watch(page);
   await page.goto('/');
   // an administrator of the tests is in staff and in away-admins: both rules give
-  await expect(page.locator('section.grp h2')).toHaveText(['design 1', 'engineering 3', 'finance 2', 'other machines 1']);
+  await expect(page.locator('section.grp h2')).toHaveText(['engineering 3', 'design 1', 'finance 6', 'other machines 1']);
   expect(await tiles(page, 'engineering 3')).toEqual([
     ['build-01', 'shell'],
     ['build-02', 'shell'],
     ['dev-linux-03', 'Linux desktop, shell'],
   ]);
-  expect(await tiles(page, 'finance 2')).toEqual([
+  // the machines first, and then every program as an entry of its own
+  expect(await tiles(page, 'finance 6')).toEqual([
     ['fin-app-02', 'Windows desktop, 4 programs'],
     ['hr-app-01', 'Windows desktop'],
+    ['Ledger', 'program on fin-app-02'],
+    ['Payroll', 'program on fin-app-02'],
+    ['Reports', 'program on fin-app-02'],
+    ['Mail', 'program on fin-app-02'],
   ]);
+  // a program leads to the page of its machine
+  await page.getByRole('link', { name: /^Ledger/ }).click();
+  await expect(page).toHaveURL(`${AWAY}/machines/fin-app-02`);
+  await page.goBack();
   expect(await tiles(page, 'design 1')).toEqual([['mac-design-01', 'Mac desktop']]);
   expect(await tiles(page, 'other machines 1')).toEqual([['Desktops', 'Windows desktop']]);
   expect(complaints).toEqual([]);
@@ -186,7 +195,7 @@ test('home shows the machines a rule gives, in their groups, and a person sees n
   await service({ person: 'person' });
   await page.goto('/sign-in?to=/');
   await expect(page.getByRole('button', { name: 'Robin Meyer, your account' })).toBeVisible();
-  await expect(page.locator('section.grp h2')).toHaveText(['finance 2', 'other machines 1']);
+  await expect(page.locator('section.grp h2')).toHaveText(['finance 6', 'other machines 1']);
   await expect(page.getByRole('link', { name: /build-01/ })).toHaveCount(0);
   // and a machine that no rule gives them is not there for them, by its address either
   await page.goto('/machines/build-01');
@@ -197,7 +206,7 @@ test('home shows the machines a rule gives, in their groups, and a person sees n
   await expect(page).toHaveTitle('home · away');
 });
 
-test('a machine is found by its name, its address or its group', async ({ page }) => {
+test('a machine is found by its name, its address or its group, and a program by its name', async ({ page }) => {
   await page.goto('/');
   const find = page.getByRole('searchbox', { name: 'find a machine…' });
   const shown = () => page.locator('a.m .name').allTextContents();
@@ -206,17 +215,20 @@ test('a machine is found by its name, its address or its group', async ({ page }
   expect(await shown()).toEqual(['build-01', 'build-02']);
   // a group's name finds its machines
   await find.fill('finance');
-  expect(await shown()).toEqual(['fin-app-02', 'hr-app-01']);
-  await expect(page.locator('section.grp h2')).toHaveText(['finance 2']);
+  expect(await shown()).toEqual(['fin-app-02', 'hr-app-01', 'Ledger', 'Payroll', 'Reports', 'Mail']);
+  await expect(page.locator('section.grp h2')).toHaveText(['finance 6']);
+  // a program is found by its own name
+  await find.fill('ledg');
+  expect(await shown()).toEqual(['Ledger']);
   // and an address its machine
   await find.fill('farm.corp');
   expect(await shown()).toEqual(['Desktops']);
   await find.fill('xyz');
   await expect(page.getByRole('status')).toContainText('No machine matches “xyz”.');
-  await expect(page.getByRole('status')).toContainText('The search looks at the names, the addresses and the groups of the machines you can reach.');
+  await expect(page.getByRole('status')).toContainText('The search looks at the names, the addresses and the groups of the machines you can reach, and at the names of their programs.');
   await accessible(page);
   await find.fill('');
-  expect((await shown()).length).toBe(7);
+  expect((await shown()).length).toBe(11);
 });
 
 test('a machine has a page of its own, which says what it offers and what it is', async ({ page }) => {
@@ -280,7 +292,7 @@ test('those who administer see what is in force and the file each thing comes fr
   await expect(page).toHaveURL(`${AWAY}/administration/rules`);
   await expect(page.getByRole('navigation', { name: 'views' }).getByRole('link', { name: 'administration' })).toHaveAttribute('aria-current', 'page');
   const rules = page.getByRole('table', { name: 'rules' });
-  await expect(rules.getByRole('row')).toHaveText([/rule\s*who\s*reaches\s*file/, /admins-engineering\s*away-admins\s*engineering, mac-design-01\s*rules\/access\.yaml:8/, /staff-finance\s*staff\s*finance, Desktops\s*rules\/access\.yaml:4/]);
+  await expect(rules.getByRole('row')).toHaveText([/rule\s*who\s*reaches\s*file/, /staff-finance\s*staff\s*finance, Desktops\s*rules\/access\.yaml:4/, /admins-engineering\s*away-admins\s*engineering, mac-design-01\s*rules\/access\.yaml:8/]);
   await expect(page.getByText('To change a rule, change its file.')).toBeVisible();
   await accessible(page);
   await page.reload();
@@ -304,13 +316,13 @@ test('a changed file with a mistake in it is refused with its line and its reaso
     await accessible(page);
     // and people go on seeing what they saw
     await page.goto('/');
-    await expect(page.locator('section.grp h2')).toHaveText(['design 1', 'engineering 3', 'finance 2', 'other machines 1']);
+    await expect(page.locator('section.grp h2')).toHaveText(['engineering 3', 'design 1', 'finance 6', 'other machines 1']);
 
     // the mistake put right: the machine is there, and nothing is refused any more
     writeFileSync(file, `${before}\n  - name: fin-app-03\n    kind: windows\n    address: fin-app-03.corp.example\n    groups: [finance]\n    desktop: true\n`);
     await expect(async () => {
       await page.reload();
-      await expect(page.locator('section.grp h2')).toHaveText(['design 1', 'engineering 3', 'finance 3', 'other machines 1'], { timeout: 1000 });
+      await expect(page.locator('section.grp h2')).toHaveText(['engineering 3', 'design 1', 'finance 7', 'other machines 1'], { timeout: 1000 });
     }).toPass({ timeout: 20_000 });
     await page.goto('/administration');
     await expect(page.getByRole('table', { name: 'machines' }).getByRole('row')).toHaveCount(9);
@@ -321,7 +333,7 @@ test('a changed file with a mistake in it is refused with its line and its reaso
   // as it was before, for the tests that follow
   await expect(async () => {
     await page.goto('/');
-    await expect(page.locator('section.grp h2')).toHaveText(['design 1', 'engineering 3', 'finance 2', 'other machines 1'], { timeout: 1000 });
+    await expect(page.locator('section.grp h2')).toHaveText(['engineering 3', 'design 1', 'finance 6', 'other machines 1'], { timeout: 1000 });
   }).toPass({ timeout: 20_000 });
 });
 

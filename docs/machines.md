@@ -137,9 +137,15 @@ are put right.
 
 ## What people and administrators see
 
-- **Home** shows a person their machines in the groups of the files, with a
-  field that finds a machine by its name, its address or its group. A machine
-  in no group is under *other machines*.
+- **Home** shows a person what they may open, in the groups of the files:
+  each machine that has a desktop or a shell, and after the machines every
+  program as an entry of its own, named with its machine. A machine that
+  offers programs alone is seen as its programs. A field finds a machine by its
+  name, its address or its group, and a program by its name. What is in no
+  group is under *other machines*.
+- **The order is the files' own.** The files are read in the order of their
+  names, and inside a file the machines and their programs keep their place.
+  A group comes where a machine first names it.
 - **A machine's page**, at `/machines/<name>`, says what the machine offers
   and what it is. A link to it works for everyone the machine is given to.
 - **The administration**, for the groups in `administrators`, lists the
