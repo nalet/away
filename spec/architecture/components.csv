@@ -25,7 +25,7 @@ chart,the chart that installs Away,making,chart,built,chart/,,,No kinds of its o
 pipelines,"the pipelines: build, test, sign, list, publish",making,pipeline,built,.github/workflows/,on GitHub,,
 site-pipeline,the pipeline that checks the model and publishes the site,making,pipeline,built,.github/workflows/site.yml,on GitHub,,
 test-program,"the test program: tries a machine with Away's own protocol code, with no browser",making,tests,built,crates/away-try/,"by hand, and by the pipeline: against a stand-in and the test servers",,What the two proofs are shown with; it is not in the image
-test-servers,"the servers the tests run against: a shell, a desktop over VNC, a desktop over RDP",making,tests,v1,tests/machines/,started by the pipeline,,"A desktop over RDP on Linux is there; a Windows machine in a domain needs a place of its own"
+test-servers,"the servers the tests run against: a shell, a desktop over VNC, a desktop over RDP",making,tests,v1,tests/machines/,started by the pipeline,,"A desktop over RDP on Linux and a sign-in service are there; a Windows machine in a domain needs a place of its own"
 registry,the registry the project publishes to,making,registry,built,,,"the image and the chart, their signatures, the records of their builds, the lists of their contents",
 docs,"the documentation, the specification and the site",making,docs,built,docs/ ; spec/ ; site/,the site is built and published by its pipeline,,
 relay,a relay placed in a network Away is not in,parts,relay,later,,,,For machines the gateway can't reach itself

@@ -62,6 +62,24 @@ make test-pages
 The tests run the server beside the stand-in for a sign-in service, and tell
 the stand-in how to behave. The pipeline runs them on every change.
 
+### Against a real sign-in service
+
+`tests/machines/sign-in/real.sh` starts a real sign-in service in a container,
+with a realm that knows Away as a client and holds one person, behind a
+certificate of an authority made for that run. It starts Away's server beside
+it, told to trust that authority, and a browser signs in by typing the
+person's name and password on the service's own page. Then the person is
+taken out of the administrators' group at the service, and Away has to know
+with the next renewal; and the account is closed there, and Away has to ask
+for a new sign-in.
+
+```sh
+make
+tests/machines/sign-in/real.sh
+```
+
+It needs docker, openssl and curl. The pipeline runs it on every change.
+
 The program is one file. Its first word chooses the part it runs as:
 
 ```sh
@@ -257,8 +275,8 @@ On every change, [the pipeline](../.github/workflows/build.yml):
 5. checks the libraries' licences, known security holes and sources;
 6. builds the image, checks that it holds the program and nothing else, and
    installs it on a fresh Kubernetes cluster, where the test above tries it;
-7. tries Away's own protocol code against a real server that it starts itself:
-   a desktop over RDP on Linux.
+7. tries Away against real servers that it starts itself: a desktop over RDP
+   on Linux, and a sign-in service.
 
 On the main branch and on a version's tag it then publishes the image and the
 chart, and checks what it published the way anyone can. Every tool the pipeline
