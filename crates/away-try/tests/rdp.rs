@@ -76,6 +76,10 @@ enum Then {
     SignsInFirst([u8; 4]),
     /// It secures the connection and draws its desktop for the account the client names.
     SignsInItself,
+    /// It secures the connection, takes the sign-in before the desktop, and goes on as
+    /// a Windows Server for many people does: it asks the client to take a licence,
+    /// hands one over or doesn't, and draws its desktop at 16 bits a pixel.
+    AsAServerForMany { hands_a_licence_over: bool },
 }
 
 /// A stand-in for a machine: it takes one connection, reads the first request, answers
@@ -94,8 +98,16 @@ fn machine_then(answer: &'static [u8], then: Then) -> (String, JoinHandle<Ended>
         connection.write_all(answer).expect("the answer goes out");
         let seen = match then {
             Then::Ends => None,
-            Then::SignsInFirst(verdict) => secure(&mut connection, Some(verdict)),
-            Then::SignsInItself => secure(&mut connection, None),
+            Then::SignsInFirst(verdict) => secure(&mut connection, Some(verdict), Desktop::new(desktop())),
+            Then::SignsInItself => secure(&mut connection, None, Desktop::new(desktop())),
+            Then::AsAServerForMany { hands_a_licence_over: true } => {
+                secure(&mut connection, Some(MAY_COME_IN), Desktop::new(desktop()).at_16_bits().that_hands_out_licences())
+            }
+            Then::AsAServerForMany { hands_a_licence_over: false } => secure(
+                &mut connection,
+                Some(MAY_COME_IN),
+                Desktop::new(desktop()).at_16_bits().that_asks_for_a_licence_and_hands_none_over(),
+            ),
         };
         Ended { request: request.to_vec(), seen }
     });
@@ -103,8 +115,8 @@ fn machine_then(answer: &'static [u8], then: Then) -> (String, JoinHandle<Ended>
 }
 
 /// Secures the connection, takes the sign-in before the desktop where a verdict is given
-/// to end it with, and draws the desktop for as long as the client stays.
-fn secure(connection: &mut TcpStream, verdict: Option<[u8; 4]>) -> Option<Seen> {
+/// to end it with, and lets this desktop answer for as long as the client stays.
+fn secure(connection: &mut TcpStream, verdict: Option<[u8; 4]>, mut desktop: Desktop) -> Option<Seen> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let config = ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
@@ -153,7 +165,6 @@ fn secure(connection: &mut TcpStream, verdict: Option<[u8; 4]>) -> Option<Seen> 
         let _ = secured.write_all(&verdict);
     }
     // then the desktop, for as long as the client stays
-    let mut desktop = Desktop::new(desktop());
     let mut frames = Frames::new();
     loop {
         while let Ok(Some(carried)) = frames.next_frame() {
@@ -299,8 +310,85 @@ fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
             bits: 32,
             takes_instructions: false,
             left: true,
+            licence: None,
         }
     );
+}
+
+/// The SHA-256 away-try says of the stand-in's desktop when it travels at 16 bits a
+/// pixel: of every colour cut to those bits and made whole again.
+fn sum_at_16_bits() -> String {
+    use away_rdp::interleaved::{from_16_bits, to_16_bits};
+    use sha2::{Digest, Sha256};
+    let mut sum = Sha256::new();
+    desktop().pixels.as_chunks::<4>().0.iter().for_each(|pixel| sum.update(&from_16_bits(to_16_bits(pixel))[..3]));
+    sum.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+#[test]
+fn a_server_for_many_people_hands_out_a_licence_and_the_client_takes_it() {
+    let (address, running) = machine_then(&CHOSEN, Then::AsAServerForMany { hands_a_licence_over: true });
+    let tried = try_rdp_as(&address, KNOWN, PASSWORD);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    let seen = running.join().expect("the stand-in ends").seen.expect("the connection went on to the desktop");
+    assert!(tried.status.success(), "{said}");
+    let lines: Vec<&str> = said.lines().skip(17).collect();
+    assert_eq!(
+        lines[..9],
+        [
+            "Saying what Away is, and taking the channels",
+            "   It gave the channel 1004 to this client, and 1003 is the desktop's.",
+            "   It hands out licences, and asks the client to take one: for A02, of A stand-in.",
+            "   It handed over a licence of 23 bytes, from example.com.",
+            "   The licence is not kept: the next connection takes one again.",
+            "Agreeing on what each side can do",
+            "   It offers a desktop of 200 by 120, at 16 bits a pixel.",
+            "   Both sides have said what they can do, and it draws from now on.",
+            "Taking what it draws, until it has drawn nothing for 3 seconds",
+        ],
+        "{said}"
+    );
+    // eight rectangles: two as they are, their rows filled up to whole words, and six in runs
+    assert_eq!(lines[9], "   2 rectangles at 16 bits a pixel, as they are, 15840 bytes in all.", "{said}");
+    assert!(lines[10].starts_with("   6 rectangles at 16 bits a pixel, compressed, "), "{said}");
+    // the desktop behind the licence is the one the stand-in drew, in the colours that travelled
+    assert_eq!(lines[12], format!("   200 by 120 pixels. Their SHA-256: {}", sum_at_16_bits()), "{said}");
+    // the licence was taken in the account's name, by a client that is the same device on every run
+    let licence = seen.licence.expect("the stand-in handed out a licence");
+    assert_eq!(licence.names, ("alex.urban".to_string(), "away".to_string()));
+    let known_by = {
+        use sha2::{Digest, Sha256};
+        Sha256::digest(b"away-try")[..16].to_vec()
+    };
+    assert_eq!(licence.known_by, [&[0, 0, 1, 4][..], &known_by].concat());
+    assert_eq!(seen.bits, 16, "the client answers at the bits a pixel the machine offers");
+    assert!(seen.left);
+    assert!(!said.contains(PASSWORD), "the password is never said");
+}
+
+#[test]
+fn a_server_that_counts_people_asks_for_a_licence_and_goes_on_without_one() {
+    let (address, running) = machine_then(&CHOSEN, Then::AsAServerForMany { hands_a_licence_over: false });
+    let tried = try_rdp_as(&address, KNOWN, PASSWORD);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    let seen = running.join().expect("the stand-in ends").seen.expect("the connection went on to the desktop");
+    assert!(tried.status.success(), "{said}");
+    let lines: Vec<&str> = said.lines().skip(18).collect();
+    assert_eq!(
+        lines[..5],
+        [
+            "   It gave the channel 1004 to this client, and 1003 is the desktop's.",
+            "   It hands out licences, and asks the client to take one: for A02, of A stand-in.",
+            "   It took the client's answer, handed no licence over, and goes on.",
+            "Agreeing on what each side can do",
+            "   It offers a desktop of 200 by 120, at 16 bits a pixel.",
+        ],
+        "{said}"
+    );
+    assert_eq!(said.lines().rev().nth(1), Some(format!("   200 by 120 pixels. Their SHA-256: {}", sum_at_16_bits()).as_str()), "{said}");
+    let licence = seen.licence.expect("the stand-in asked for a licence to be taken");
+    assert_eq!(licence.names, ("alex.urban".to_string(), "away".to_string()));
+    assert!(licence.known_by.is_empty());
 }
 
 #[test]

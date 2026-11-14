@@ -15,14 +15,21 @@
 //! | [`ntlm`] | the messages of the way of signing in that needs no directory |
 //! | [`der`] | reads and writes the encoding certificates and the sign-in are written in |
 //! | [`secret`] | a value that can be used and can't be printed |
+//! | [`licence`] | takes the licence that a machine for many people hands every client |
+//! | [`planar`] | unpacks the rectangles a machine draws at 32 bits a pixel |
+//! | [`interleaved`] | unpacks the rectangles a machine draws at 16 bits a pixel |
+//! | [`picture`] | puts the rectangles together as the desktop's picture |
 //!
 //! The cryptography is never this crate's own: TLS is done by whoever holds the
-//! connection, and a hash comes from a library.
+//! connection, and a hash, a cipher and the arithmetic of large numbers come from
+//! libraries.
 
 pub mod connection;
 pub mod der;
 pub mod gcc;
 pub mod identity;
+pub mod interleaved;
+pub mod licence;
 pub mod mcs;
 pub mod negotiation;
 pub mod ntlm;

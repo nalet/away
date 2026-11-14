@@ -16,6 +16,11 @@
 
   A session nobody is connected to has no screen: the lines begin when away-try connects.
 
+  A Windows Server draws at 16 bits a pixel unless it is set otherwise, and away-try says
+  at how many bits a machine offers its desktop. The screen itself has all its colours,
+  so for such a machine name the bits: each colour is then cut to the bits that travel,
+  as the machine cuts it, before the sum is made.
+
 .PARAMETER ForAccount
   The account whose screen is taken, as DOMAIN\name. Without it: the screen of the
   session this runs in.
@@ -27,8 +32,14 @@
   A folder to keep every screen in as well, as PNG files, to look at where a picture
   differs. It is made if it isn't there.
 
+.PARAMETER Bits
+  At how many bits a pixel the machine offers its desktop: 32, or 16.
+
 .EXAMPLE
   .\windows-screen.ps1 -ForAccount 'CORP\alex.urban' -Seconds 40
+
+.EXAMPLE
+  .\windows-screen.ps1 -ForAccount 'CORP\alex.urban' -Seconds 40 -Bits 16
 
 .EXAMPLE
   Invoke-Command -ComputerName fin-app-02.example.com -FilePath .\windows-screen.ps1 -ArgumentList 'CORP\alex.urban', 40
@@ -38,7 +49,8 @@ param(
   [int]$Seconds = 30,
   [string]$Pictures,
   # where the lines go when this runs as the task it started itself
-  [string]$Lines
+  [string]$Lines,
+  [ValidateSet(16, 32)][int]$Bits = 32
 )
 
 $ErrorActionPreference = 'Stop'
@@ -53,7 +65,7 @@ if ($ForAccount) {
   Set-Content -Path $script -Value $MyInvocation.MyCommand.ScriptBlock.ToString() -Encoding UTF8
   Set-Content -Path $lines -Value $head
   icacls $folder /grant "${ForAccount}:(OI)(CI)M" | Out-Null
-  $words = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`" -Seconds $Seconds -Lines `"$lines`""
+  $words = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`" -Seconds $Seconds -Lines `"$lines`" -Bits $Bits"
   if ($Pictures) {
     New-Item -ItemType Directory -Force $Pictures | Out-Null
     icacls $Pictures /grant "${ForAccount}:(OI)(CI)M" | Out-Null
@@ -74,10 +86,33 @@ if ($ForAccount) {
   return
 }
 
+# what keeps this from starting is a line too, so that it shows where the lines are read
+trap {
+  $failed = 'failed: ' + ($_ | Out-String).Trim() -replace '\s+', ' '
+  if ($Lines) { Add-Content -Path $Lines -Value $failed } else { $failed }
+  break
+}
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms
 # without this a session that enlarges its screen would give a picture of another size
 Add-Type -Namespace AwayScreen -Name Native -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();'
 [AwayScreen.Native]::SetProcessDPIAware() | Out-Null
+# a colour cut to 16 bits and made whole again as away-try makes it: five bits of blue and
+# of red, six of green, each filled up by repeating its highest
+Add-Type -TypeDefinition @'
+public static class AwayScreenColours {
+  public static void CutTo16Bits(byte[] bytes, int stride, int width, int height) {
+    for (int row = 0; row < height; row++) {
+      int at = row * stride;
+      for (int column = 0; column < width; column++, at += 3) {
+        int blue = bytes[at] >> 3, green = bytes[at + 1] >> 2, red = bytes[at + 2] >> 3;
+        bytes[at] = (byte)((blue << 3) | (blue >> 2));
+        bytes[at + 1] = (byte)((green << 2) | (green >> 4));
+        bytes[at + 2] = (byte)((red << 3) | (red >> 2));
+      }
+    }
+  }
+}
+'@
 if ($Pictures) { New-Item -ItemType Directory -Force $Pictures | Out-Null }
 if (-not $Lines) { $head }
 
@@ -98,6 +133,7 @@ while ((Get-Date) -lt $until) {
     $bytes = New-Object byte[] ($held.Stride * $held.Height)
     [System.Runtime.InteropServices.Marshal]::Copy($held.Scan0, $bytes, 0, $bytes.Length)
     $bitmap.UnlockBits($held)
+    if ($Bits -eq 16) { [AwayScreenColours]::CutTo16Bits($bytes, $held.Stride, $bitmap.Width, $held.Height) }
     $sha = [System.Security.Cryptography.SHA256]::Create()
     for ($row = 0; $row -lt $held.Height; $row++) {
       [void]$sha.TransformBlock($bytes, $row * $held.Stride, $bitmap.Width * 3, $null, 0)

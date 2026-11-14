@@ -59,7 +59,7 @@ pub fn request(client: &Client) -> Vec<u8> {
     core.extend(1u16.to_le_bytes());
     core.extend(0u32.to_le_bytes());
     core.extend(24u16.to_le_bytes()); // the most this field can say; 32 bits are asked for below
-    core.extend(0x000fu16.to_le_bytes()); // it takes 15, 16, 24 and 32 bits a pixel
+    core.extend(0x000au16.to_le_bytes()); // it takes 16 and 32 bits a pixel
                                           // it reads the machine's reason when the machine ends the connection, wants 32 bits a
                                           // pixel, and says what kind of line it is on
     core.extend(0x0023u16.to_le_bytes());

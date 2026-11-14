@@ -96,8 +96,9 @@ stops when it is sent the signal a cluster sends.
 and nothing else of Away around it, and says what happened at each step. It
 goes as far as that code goes. Today, over RDP, it asks a machine which
 security it takes, secures the connection, reads the certificate the machine
-shows, signs an account in before the desktop, opens the desktop, and takes
-what the machine draws until the machine has drawn nothing for three seconds.
+shows, signs an account in before the desktop, takes the licence a machine for
+many people asks it to take, opens the desktop, and takes what the machine
+draws until the machine has drawn nothing for three seconds.
 Then it says the size of the desktop's picture and the SHA-256 of its pixels
 and, given a file, saves the picture there as a BMP.
 
@@ -117,6 +118,12 @@ account in itself, as RDP servers on Linux do, is told the name and the
 password once the connection is secured. `away-try` takes whatever certificate
 a machine shows and says its fingerprint, so use it with accounts that exist
 for testing.
+
+A Windows machine that serves desktops to many people asks every client to
+take a licence before it shows anything. One that counts the people who use it
+takes the client's answer and goes on; one that counts devices hands a licence
+over. `away-try` says which happened. It keeps no licence, and it is the same
+device to such a machine wherever it runs.
 
 Leaving doesn't sign the account out: what runs on the desktop stays on the
 machine for the account to come back to, until the account is signed out
@@ -156,8 +163,20 @@ of the machine's lines in the seconds before it left. With `-Pictures <folder>`
 the script keeps each screen as a PNG file as well, to look at where a picture
 differs.
 
-The script runs in the account's own session, so the account has to have
-signed in on the machine once before. It leaves nothing on the machine.
+A Windows Server offers its desktop at 16 bits a pixel unless it is set
+otherwise, and a workstation at 32: `away-try` says which. The screen itself
+has all its colours, so for a machine that offers 16, tell the script, and it
+cuts each colour to the bits that travel before it makes the sum:
+
+```powershell
+.\windows-screen.ps1 -ForAccount 'CORP\alex.urban' -Seconds 40 -Bits 16
+```
+
+The script runs in the account's own session, so the account has to be signed
+in on the machine when the script starts: take a picture once before. What
+keeps the script from starting is a line as well. A machine that doesn't let
+the account run PowerShell gives no lines at all. The script leaves nothing on
+the machine; the account stays signed in until it is signed out there.
 
 ### Against an RDP server on Linux
 

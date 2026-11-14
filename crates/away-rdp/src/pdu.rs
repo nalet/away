@@ -54,22 +54,6 @@ pub fn client_info(domain: &str, name: &str, password: Option<&Secret>) -> Vec<u
     info
 }
 
-/// Reads the machine's word on a licence. A workstation takes a client as it is; a
-/// machine that hands out licences does not, and that is not built yet.
-pub fn read_licence(message: &[u8]) -> Result<(), Error> {
-    const WRONG: Error = Error::NotRdp("the machine's word on a licence is not built as one");
-    if number16(message, 0).ok_or(WRONG)? & 0x0080 == 0 {
-        return Err(WRONG);
-    }
-    match message.get(4) {
-        // an error message that is none: the client is valid, and nothing changes
-        Some(0xff) if number32(message, 8) == Some(7) => Ok(()),
-        Some(0xff) => Err(Error::NotYet("refuses the client for want of a licence")),
-        Some(_) => Err(Error::NotYet("hands out licences, and asks the client to take one")),
-        None => Err(WRONG),
-    }
-}
-
 /// A message with the head every message of an open connection has.
 pub(crate) fn share(kind: u16, user: u16, holds: &[u8]) -> Vec<u8> {
     let mut message = Vec::with_capacity(holds.len() + 6);
@@ -104,14 +88,14 @@ pub(crate) fn words(numbers: &[u16]) -> Vec<u8> {
 }
 
 /// The client's answer to what the machine can do: what the client can do. It takes
-/// pictures and nothing that has to be drawn from instructions, at 32 bits a pixel, with
-/// every pixel as the machine has it.
-pub fn confirm(user: u16, share_id: u32, width: u16, height: u16) -> Vec<u8> {
+/// pictures and nothing that has to be drawn from instructions, at the bits a pixel the
+/// machine offers, with every pixel as the machine has it.
+pub fn confirm(user: u16, share_id: u32, width: u16, height: u16, bits: u16) -> Vec<u8> {
     let mut sets = Vec::new();
     // in general: the short frames for what is drawn, and pictures without a head of their own
     sets.push(capability(0x0001, &words(&[1, 3, 0x0200, 0, 0, 0x041d, 0, 0, 0, 0])));
-    // pictures: 32 bits a pixel, any size, compressed, and never with colours left out
-    let mut pictures = words(&[32, 1, 1, 1, width, height, 0, 1, 1]);
+    // pictures: at the machine's bits a pixel, any size, compressed, and never with colours left out
+    let mut pictures = words(&[bits, 1, 1, 1, width, height, 0, 1, 1]);
     pictures.extend([0, 0x08]);
     pictures.extend(words(&[1, 0]));
     sets.push(capability(0x0002, &pictures));
@@ -284,22 +268,8 @@ mod tests {
     }
 
     #[test]
-    fn a_workstation_takes_the_client_as_it_is() {
-        let mut valid = vec![0x80, 0, 0, 0, 0xff, 0x03, 0x10, 0x00];
-        valid.extend(7u32.to_le_bytes());
-        valid.extend(2u32.to_le_bytes());
-        valid.extend([4, 0, 0, 0]);
-        assert_eq!(read_licence(&valid), Ok(()));
-        let mut asks = valid.clone();
-        asks[4] = 0x01;
-        assert_eq!(read_licence(&asks), Err(Error::NotYet("hands out licences, and asks the client to take one")));
-        assert!(read_licence(&[0, 0, 0, 0, 0xff]).is_err());
-        assert!(read_licence(&[]).is_err());
-    }
-
-    #[test]
     fn the_clients_answer_holds_its_sets_and_says_their_lengths() {
-        let answer = confirm(1007, 0x0001_03ea, 1280, 800);
+        let answer = confirm(1007, 0x0001_03ea, 1280, 800, 32);
         assert_eq!(usize::from(u16::from_le_bytes([answer[0], answer[1]])), answer.len());
         assert_eq!(&answer[2..6], &[0x13, 0x00, 0xef, 0x03]);
         assert_eq!(&answer[6..12], &[0xea, 0x03, 0x01, 0x00, 0xea, 0x03]);

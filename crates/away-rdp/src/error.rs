@@ -41,6 +41,8 @@ pub enum Error {
     /// The machine took the sign-in and says this account may not come in over RDP, with
     /// this code of its own.
     MayNotComeIn(u32),
+    /// The machine hands out licences and gave this client none, with this code of its own.
+    NoLicence(u32),
     /// The machine did something this version of Away's code doesn't speak yet.
     NotYet(&'static str),
     /// The machine ended the connection, with this reason of its own where it gave one.
@@ -88,6 +90,16 @@ impl fmt::Display for Error {
                 Some(why) => write!(out, "It refused the sign-in: {why} (its own code {code:#010x})."),
                 None => write!(out, "It refused the sign-in, with its own code {code:#010x}."),
             },
+            Error::NoLicence(code) => {
+                let why = match code {
+                    2 => "it has none for this client",
+                    3 => "it found the check on what this client sent wrong",
+                    6 => "it reaches nobody that hands them out",
+                    8 => "it doesn't take this client for one it gives a licence",
+                    _ => "it gave a reason this version doesn't know",
+                };
+                write!(out, "It hands out licences and gave this client none: {why} (its own code {code}).")
+            }
             Error::NotYet(what) => write!(out, "It {what}, which this version doesn't speak yet."),
             Error::Ended(0) => out.write_str("It ended the connection and gave no reason."),
             Error::Ended(code) => write!(out, "It ended the connection, with its own reason {code:#010x}."),

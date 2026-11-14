@@ -6,6 +6,7 @@
 //! happened. It holds no connection itself.
 
 use crate::gcc::{self, Client, Machine};
+use crate::licence::{self, Said, Taking};
 use crate::mcs::{self, Arrived};
 use crate::pdu::{self, FromMachine};
 use crate::secret::Secret;
@@ -25,6 +26,15 @@ pub enum Happened {
     },
     /// The machine takes the client without a licence.
     Licensed,
+    /// The machine hands out licences, and asks the client to take one.
+    AsksToTakeALicence {
+        /// Who made what the licence is for.
+        company: String,
+        /// What the licence is for.
+        product: String,
+    },
+    /// The machine handed over a licence, and the client took it.
+    LicenceTaken(licence::Taken),
     /// The machine offers a desktop of this size.
     Desktop {
         /// How wide, in pixels.
@@ -57,6 +67,8 @@ pub struct Connection {
     domain: String,
     name: String,
     password: Option<Secret>,
+    for_a_licence: Option<licence::New>,
+    taking: Option<Taking>,
     machine: Machine,
     user: u16,
     share_id: u32,
@@ -68,8 +80,9 @@ impl Connection {
     /// Begins: what the client says of itself, to send first. The domain and the name are
     /// of the account the desktop is for. The password is given only where the machine
     /// signs the account in itself: where the account signed in before the desktop, the
-    /// machine has it already.
-    pub fn begin(client: Client, domain: &str, name: &str, password: Option<Secret>) -> (Connection, Vec<u8>) {
+    /// machine has it already. What a licence is taken with is used only where the
+    /// machine hands out licences.
+    pub fn begin(client: Client, domain: &str, name: &str, password: Option<Secret>, for_a_licence: licence::New) -> (Connection, Vec<u8>) {
         let first = tpkt::data_frame(&mcs::connect(&gcc::request(&client)));
         let connection = Connection {
             state: State::AwaitsMachine,
@@ -77,6 +90,8 @@ impl Connection {
             domain: domain.to_string(),
             name: name.to_string(),
             password,
+            for_a_licence: Some(for_a_licence),
+            taking: None,
             machine: Machine::default(),
             user: 0,
             share_id: 0,
@@ -137,17 +152,44 @@ impl Connection {
 
     fn on_the_desktops_channel(&mut self, arrived: &[u8]) -> Result<(Vec<u8>, Vec<Happened>), Error> {
         if matches!(self.state, State::AwaitsLicence) {
-            pdu::read_licence(arrived)?;
-            self.state = State::AwaitsWhatItCanDo;
-            return Ok((Vec::new(), vec![Happened::Licensed]));
+            const OUT_OF_ORDER: Error = Error::NotRdp("the machine's words on a licence come in no order they have");
+            let to_the_machine = |answer: &[u8]| tpkt::data_frame(&mcs::send(self.user, self.machine.io_channel, answer));
+            return match licence::read(arrived)? {
+                Said::Valid => {
+                    self.state = State::AwaitsWhatItCanDo;
+                    Ok((Vec::new(), vec![Happened::Licensed]))
+                }
+                Said::Asks(asked) => {
+                    // what a licence is taken with is used here, once, and kept no longer
+                    let new = self.for_a_licence.take().ok_or(OUT_OF_ORDER)?;
+                    let (taking, answer) = Taking::begin(&asked, new, &self.name, &self.client.name)?;
+                    let send = to_the_machine(&answer);
+                    self.taking = Some(taking);
+                    Ok((send, vec![Happened::AsksToTakeALicence { company: asked.company, product: asked.product }]))
+                }
+                Said::Challenges(challenge, check) => {
+                    let answer = self.taking.as_ref().ok_or(OUT_OF_ORDER)?.answer(&challenge, &check)?;
+                    Ok((to_the_machine(&answer), Vec::new()))
+                }
+                Said::Hands(sealed, check) => {
+                    let taken = self.taking.take().ok_or(OUT_OF_ORDER)?.open(&sealed, &check)?;
+                    self.state = State::AwaitsWhatItCanDo;
+                    Ok((Vec::new(), vec![Happened::LicenceTaken(taken)]))
+                }
+                Said::Refuses(why) => Err(Error::NoLicence(why)),
+            };
         }
         let mut send = Vec::new();
         let mut happened = Vec::new();
         for message in pdu::read_from_machine(arrived)? {
             match message {
                 FromMachine::CanDo { share_id, width, height, bits } => {
+                    // a Windows Server offers 16 bits a pixel unless it is told otherwise, a workstation 32
+                    if !matches!(bits, 16 | 32) {
+                        return Err(Error::NotYet("offers its desktop at 8, 15 or 24 bits a pixel"));
+                    }
                     self.share_id = share_id;
-                    let mut answers = vec![pdu::confirm(self.user, share_id, width, height)];
+                    let mut answers = vec![pdu::confirm(self.user, share_id, width, height, bits)];
                     answers.extend(pdu::finish(self.user, share_id));
                     for answer in answers {
                         send.extend(tpkt::data_frame(&mcs::send(self.user, self.machine.io_channel, &answer)));

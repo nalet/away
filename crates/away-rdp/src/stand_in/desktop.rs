@@ -1,9 +1,11 @@
 //! The machine's side of a connection once the person is signed in, for tests: it gives
-//! the channels, takes the client without a licence, says what it can do, and draws one
-//! picture, in each of the ways a machine sends rectangles that Away reads.
+//! the channels, takes the client without a licence or hands it one, says what it can
+//! do, and draws one picture, in each of the ways a machine sends rectangles that Away
+//! reads.
 
+use crate::licence::stand_in::HandsOut;
 use crate::picture::Picture;
-use crate::{der, mcs, ntlm, pdu, tpkt, Error};
+use crate::{der, interleaved, mcs, ntlm, pdu, tpkt, Error};
 
 const WRONG: Error = Error::NotRdp("the client's message is not built as one");
 
@@ -35,26 +37,59 @@ pub struct Seen {
     pub takes_instructions: bool,
     /// Whether the client said that it leaves.
     pub left: bool,
+    /// What the client took a licence as, where the stand-in handed one out.
+    pub licence: Option<crate::licence::stand_in::Seen>,
 }
 
 enum State {
     AwaitsClient,
     AwaitsUser,
     AwaitsAccount,
+    HandsOutALicence,
     Open,
+}
+
+/// What a stand-in does about licences once the client has answered its asking.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Licences {
+    /// It challenges the client, and hands a licence over.
+    HandedOver,
+    /// It takes the client as it is.
+    NoneHandedOver,
 }
 
 /// A stand-in for a machine's desktop.
 pub struct Desktop {
     state: State,
     picture: Picture,
+    bits: u16,
     seen: Seen,
+    hands_out: Option<(HandsOut, Licences)>,
 }
 
 impl Desktop {
-    /// A stand-in that offers a desktop of the picture's size, and draws the picture.
+    /// A stand-in that offers a desktop of the picture's size, and draws the picture at
+    /// 32 bits a pixel, as a workstation does.
     pub fn new(picture: Picture) -> Desktop {
-        Desktop { state: State::AwaitsClient, picture, seen: Seen::default() }
+        Desktop { state: State::AwaitsClient, picture, bits: 32, seen: Seen::default(), hands_out: None }
+    }
+
+    /// The same, drawing at 16 bits a pixel, as a Windows Server does unless it is set
+    /// otherwise.
+    pub fn at_16_bits(self) -> Desktop {
+        Desktop { bits: 16, ..self }
+    }
+
+    /// The same, as a machine for many people that counts their devices: before it
+    /// shows anything it asks the client to take a licence, and hands one over.
+    pub fn that_hands_out_licences(self) -> Desktop {
+        Desktop { hands_out: Some((HandsOut::new([0x4c; 32]), Licences::HandedOver)), ..self }
+    }
+
+    /// The same, as a machine for many people that counts the people: it asks the
+    /// client to take a licence, and after the client's answer takes it as it is.
+    pub fn that_asks_for_a_licence_and_hands_none_over(self) -> Desktop {
+        Desktop { hands_out: Some((HandsOut::new([0x4c; 32]), Licences::NoneHandedOver)), ..self }
     }
 
     /// What it saw of the client so far.
@@ -89,7 +124,7 @@ impl Desktop {
             (State::AwaitsAccount, [0x38, user_high, user_low, high, low]) => {
                 Ok(tpkt::data_frame(&[0x3e, 0, *user_high, *user_low, *high, *low, *high, *low]))
             }
-            (State::AwaitsAccount | State::Open, [0x64, _, _, high, low, _, rest @ ..]) => {
+            (State::AwaitsAccount | State::HandsOutALicence | State::Open, [0x64, _, _, high, low, _, rest @ ..]) => {
                 let arrived = match rest {
                     [first, second, arrived @ ..] if first & 0x80 != 0 => {
                         arrived.get(..(usize::from(first & 0x7f) << 8) | usize::from(*second)).ok_or(WRONG)?
@@ -102,6 +137,7 @@ impl Desktop {
                 }
                 match self.state {
                     State::AwaitsAccount => self.account(arrived),
+                    State::HandsOutALicence => self.licence(arrived),
                     _ => self.open(arrived),
                 }
             }
@@ -113,7 +149,8 @@ impl Desktop {
         }
     }
 
-    /// Who the desktop is for. The answer: no licence is needed, and what the machine can do.
+    /// Who the desktop is for. The answer: no licence is needed, and what the machine can
+    /// do; or, from a machine that hands out licences, that the client is to take one.
     fn account(&mut self, arrived: &[u8]) -> Result<Vec<u8>, Error> {
         if number16(arrived, 0)? != 0x0040 {
             return Err(WRONG);
@@ -124,16 +161,44 @@ impl Desktop {
             (ntlm::utf16(texts.get(..domain).ok_or(WRONG)?), ntlm::utf16(texts.get(domain + 2..domain + 2 + name).ok_or(WRONG)?));
         let travelled = texts.get(domain + name + 4..domain + name + 4 + usize::from(password)).ok_or(WRONG)?;
         self.seen.password = (password != 0).then(|| ntlm::utf16(travelled));
+        if let Some((machine, _)) = &self.hands_out {
+            self.state = State::HandsOutALicence;
+            return Ok(to_the_client(&machine.asks()));
+        }
         self.state = State::Open;
 
         let mut licence = vec![0x80, 0, 0, 0, 0xff, 0x03, 0x10, 0x00];
         licence.extend(7u32.to_le_bytes());
         licence.extend(2u32.to_le_bytes());
         licence.extend([4, 0, 0, 0]);
+        let mut send = to_the_client(&licence);
+        send.extend(self.can_do());
+        Ok(send)
+    }
 
+    /// The client's answers on the way to a licence: the first is challenged, and after
+    /// the second it is handed the licence and told what the machine can do. A machine
+    /// that hands none over goes on after the first.
+    fn licence(&mut self, arrived: &[u8]) -> Result<Vec<u8>, Error> {
+        let (machine, licences) = self.hands_out.as_mut().ok_or(WRONG)?;
+        let last = match (arrived.get(4), *licences) {
+            (Some(0x13), Licences::HandedOver) => return Ok(to_the_client(&machine.challenges(arrived)?)),
+            (Some(0x13), Licences::NoneHandedOver) => machine.goes_on(arrived)?,
+            (Some(0x15), Licences::HandedOver) => machine.hands(arrived)?,
+            _ => return Err(WRONG),
+        };
+        self.seen.licence = Some(machine.seen.clone());
+        self.state = State::Open;
+        let mut send = to_the_client(&last);
+        send.extend(self.can_do());
+        Ok(send)
+    }
+
+    /// What the machine can do, as it tells the client.
+    fn can_do(&self) -> Vec<u8> {
         let (width, height) = (self.picture.width as u16, self.picture.height as u16);
         let mut sets = pdu::capability(1, &pdu::words(&[1, 3, 0x0200, 0, 0, 0x041d, 0, 0, 0, 0]));
-        sets.extend(pdu::capability(2, &pdu::words(&[32, 1, 1, 1, width, height, 0, 1, 1, 0, 1, 0])));
+        sets.extend(pdu::capability(2, &pdu::words(&[self.bits, 1, 1, 1, width, height, 0, 1, 1, 0, 1, 0])));
         let mut can = Vec::new();
         can.extend(SHARING.to_le_bytes());
         can.extend(pdu::words(&[4, (sets.len() + 4) as u16]));
@@ -141,10 +206,7 @@ impl Desktop {
         can.extend(pdu::words(&[2, 0]));
         can.extend(sets);
         can.extend(0u32.to_le_bytes());
-
-        let mut send = to_the_client(&licence);
-        send.extend(to_the_client(&pdu::share(1, mcs::MACHINE, &can)));
-        Ok(send)
+        to_the_client(&pdu::share(1, mcs::MACHINE, &can))
     }
 
     /// The messages of the open connection: each of the client's last steps is answered,
@@ -233,8 +295,13 @@ impl Desktop {
     /// One rectangle of the picture, in the way its number chooses.
     fn rectangle(&self, left: usize, top: usize, wide: usize, high: usize, nth: usize) -> Vec<u8> {
         // every fourth carries more columns than it has room for, as a machine does to
-        // keep its rows at whole words
-        let carried = if nth % 4 == 3 { wide + 4 } else { wide };
+        // keep its rows at whole words; at 16 bits one that travels as it is carries one
+        // more, so that its rows have to be filled up
+        let carried = match (nth % 4, self.bits) {
+            (3, _) => wide + 4,
+            (1, 16) => wide + 1,
+            _ => wide,
+        };
         let mut pixels = Vec::with_capacity(carried * high * 4);
         for row in top..top + high {
             let from = (row * self.picture.width + left) * 4;
@@ -243,14 +310,44 @@ impl Desktop {
             pixels.extend((0..(carried - wide) * 4).map(|at| (at * 37 + row) as u8));
         }
         let (flags, carries): (u16, Vec<u8>) = match nth % 4 {
+            _ if self.bits == 16 => {
+                // the pixels cut to 16 bits, as they travel: from the bottom row up
+                let cut: Vec<u16> = pixels
+                    .chunks_exact(carried * 4)
+                    .rev()
+                    .flatten()
+                    .copied()
+                    .collect::<Vec<u8>>()
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|pixel| interleaved::to_16_bits(pixel))
+                    .collect();
+                match nth % 4 {
+                    1 => {
+                        let filled = |row: &[u16]| {
+                            row.iter()
+                                .flat_map(|pixel| pixel.to_le_bytes())
+                                .chain([0xaa; 4])
+                                .take((carried * 2).next_multiple_of(4))
+                                .collect::<Vec<u8>>()
+                        };
+                        (0, cut.chunks_exact(carried).flat_map(filled).collect())
+                    }
+                    // with a head of its own before what it carries
+                    2 => (0x0001, [&[0; 8][..], &interleaved::pack(&cut, carried)].concat()),
+                    _ => (0x0401, interleaved::pack(&cut, carried)),
+                }
+            }
             0 => (0x0401, pack(&pixels, carried, high, true)),
             1 => (0x0401, pack(&pixels, carried, high, false)),
             2 => (0, pixels.chunks_exact(carried * 4).rev().flatten().copied().collect()),
             // with a head of its own before what it carries
             _ => (0x0001, [&[0; 8][..], &pack(&pixels, carried, high, true)].concat()),
         };
-        let numbers =
-            [left, top, left + wide - 1, top + high - 1, carried, high, 32, usize::from(flags), carries.len()].map(|number| number as u16);
+        let bits = usize::from(self.bits);
+        let numbers = [left, top, left + wide - 1, top + high - 1, carried, high, bits, usize::from(flags), carries.len()]
+            .map(|number| number as u16);
         let mut rectangle = pdu::words(&numbers);
         rectangle.extend(carries);
         rectangle

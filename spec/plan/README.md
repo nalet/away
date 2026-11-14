@@ -149,7 +149,7 @@ A build, with nothing before it. It rests on [ADR‑0002](../architecture/decisi
 
 ### 2 RDP, proven without a browser
 
-A proof, after package 1. It rests on [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md). The gate of ADR-0001.
+A proof, after package 1. It rests on [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md). The gate of ADR-0001. The pictures matched on all three on 2026-11-14; the owner's word is open.
 
 **Its gate.** A test program built from Away's own RDP code signs in with a typed name and password on Windows 11, on Windows Server 2025 and on an RDP server on Linux, and saves the desktop's picture. The picture is the machine's screen, pixel for pixel. The owner then says whether the RDP code stays Away's own.
 

@@ -2,7 +2,7 @@
 //! where it belongs.
 
 use crate::update::Rectangle;
-use crate::{planar, Error};
+use crate::{interleaved, planar, Error};
 
 /// A picture: rows from the top down, four bytes a pixel: blue, green, red, and a fourth
 /// that is always full.
@@ -44,7 +44,20 @@ impl Picture {
                 rows.as_chunks_mut::<4>().0.iter_mut().for_each(|pixel| pixel[3] = 0xff);
                 rows
             }
-            _ => return Err(Error::NotYet("draws with fewer than 32 bits a pixel")),
+            (16, true) => interleaved::unpack(&rectangle.carries, carried_width, carried_height)?,
+            (16, false) => {
+                // as it is: rows from the bottom up, each filled up to whole words
+                let row = (carried_width * 2).next_multiple_of(4);
+                if row == 0 || rectangle.carries.len() < row * carried_height {
+                    return Err(Error::NotRdp("a rectangle carries less than its size"));
+                }
+                rectangle.carries[..row * carried_height]
+                    .rchunks_exact(row)
+                    .flat_map(|row| row[..carried_width * 2].as_chunks::<2>().0)
+                    .flat_map(|pixel| interleaved::from_16_bits(u16::from_le_bytes(*pixel)))
+                    .collect()
+            }
+            _ => return Err(Error::NotYet("draws with 8, 15 or 24 bits a pixel")),
         };
         let (left, top) = (usize::from(rectangle.left), usize::from(rectangle.top));
         if rectangle.right < rectangle.left || rectangle.bottom < rectangle.top {
@@ -104,6 +117,32 @@ mod tests {
     }
 
     #[test]
+    fn a_rectangle_of_16_bits_a_pixel_is_drawn_in_full_colours() {
+        let mut picture = Picture::new(4, 3);
+        // three by two as it is: the bottom row first, each row filled up to whole words
+        let (red, green, blue, white) = ([0x00, 0xf8], [0xe0, 0x07], [0x1f, 0x00], [0xff, 0xff]);
+        let carries = [&blue[..], &blue, &white, &[0xaa, 0xaa], /* the top row */ &red, &green, &blue, &[0xaa, 0xaa]].concat();
+        let mut as_it_is = rectangle(1, 0, 3, 2, false, &carries);
+        as_it_is.bits = 16;
+        picture.draw(&as_it_is).unwrap();
+        assert_eq!(pixel(&picture, 1, 0), [0, 0, 255, 255]);
+        assert_eq!(pixel(&picture, 2, 0), [0, 255, 0, 255]);
+        assert_eq!(pixel(&picture, 3, 0), [255, 0, 0, 255]);
+        assert_eq!(pixel(&picture, 3, 1), [255, 255, 255, 255]);
+        assert_eq!(pixel(&picture, 0, 0), [0, 0, 0, 255], "the rest is as it was");
+        // the same in runs: the bottom row written out, the top row one colour
+        let packed = [0x83, 0x1f, 0x00, 0x1f, 0x00, 0xff, 0xff, /* three times red */ 0x63, 0x00, 0xf8];
+        let mut in_runs = rectangle(0, 1, 3, 2, true, &packed);
+        in_runs.bits = 16;
+        picture.draw(&in_runs).unwrap();
+        assert_eq!(pixel(&picture, 0, 1), [0, 0, 255, 255]);
+        assert_eq!(pixel(&picture, 2, 2), [255, 255, 255, 255]);
+        // one row short
+        as_it_is.carries.truncate(15);
+        assert!(picture.draw(&as_it_is).is_err());
+    }
+
+    #[test]
     fn what_lies_outside_the_picture_is_left_out() {
         let mut picture = Picture::new(3, 2);
         picture.draw(&rectangle(2, 1, 2, 2, false, &[9; 16])).unwrap();
@@ -126,8 +165,8 @@ mod tests {
         let mut picture = Picture::new(4, 4);
         assert!(picture.draw(&rectangle(0, 0, 2, 2, false, &[1; 15])).is_err());
         let mut deep = rectangle(0, 0, 2, 2, false, &[1; 16]);
-        deep.bits = 16;
-        assert_eq!(picture.draw(&deep), Err(Error::NotYet("draws with fewer than 32 bits a pixel")));
+        deep.bits = 24;
+        assert_eq!(picture.draw(&deep), Err(Error::NotYet("draws with 8, 15 or 24 bits a pixel")));
         let mut backwards = rectangle(2, 2, 1, 1, false, &[1; 4]);
         backwards.right = 1;
         assert!(picture.draw(&backwards).is_err());

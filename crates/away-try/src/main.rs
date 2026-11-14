@@ -21,6 +21,7 @@ use away_rdp::connection::{Connection, Happened};
 use away_rdp::der;
 use away_rdp::gcc::Client;
 use away_rdp::identity::Identity;
+use away_rdp::licence;
 use away_rdp::negotiation::{self, Security};
 use away_rdp::ntlm::{self, Account, Challenge, Fresh};
 use away_rdp::picture::Picture;
@@ -48,6 +49,8 @@ away-try rdp <address> [--as <account> --password-file <file> [--save <file>]]
 
   It says the SHA-256 of the picture's pixels: three bytes each (blue, green, red), row
   by row from the top. A screenshot taken on the machine at that moment has the same.
+  Where a machine offers its desktop at 16 bits a pixel, as a Windows Server does unless
+  it is set otherwise, the screenshot has the same once its colours are cut to those bits.
 ";
 
 /// How long a machine gets to answer, at each step.
@@ -56,6 +59,12 @@ const WITHIN: Duration = Duration::from_secs(10);
 const QUIET_FOR: Duration = Duration::from_secs(3);
 /// How long what a machine draws is taken at most.
 const DRAWS_AT_MOST: Duration = Duration::from_secs(45);
+
+/// What this program is known by to a machine that hands out licences: the same wherever
+/// it runs, so that all its runs are one device to whoever counts them.
+fn known_by() -> [u8; 16] {
+    Sha256::digest(b"away-try")[..16].try_into().expect("16 bytes")
+}
 
 /// What the program was asked to do.
 struct Asked {
@@ -286,13 +295,21 @@ fn rdp(address: &str, account: Option<Account>, save: Option<&str>) -> Result<()
 
     println!("Saying what Away is, and taking the channels");
     let client = Client { width: 1280, height: 800, security: answer.security.number(), name: "away".to_string() };
-    let (mut open, first) = Connection::begin(client, &domain, &name, password);
+    let mut random = [0u8; 80];
+    getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
+    let for_a_licence = licence::New {
+        random: random[..32].try_into().expect("32 bytes"),
+        secret: random[32..].try_into().expect("48 bytes"),
+        known_by: known_by(),
+    };
+    let (mut open, first) = Connection::begin(client, &domain, &name, password, for_a_licence);
     secured.write_all(&first).map_err(|error| format!("It couldn't be sent: {error}."))?;
     let mut frames = Frames::new();
     let mut picture: Option<Picture> = None;
     let mut opened: Option<Instant> = None;
     let mut last_drawn: Option<Instant> = None;
     let mut drawn: std::collections::BTreeMap<(u16, bool), (usize, usize)> = std::collections::BTreeMap::new();
+    let mut asked_to_take_a_licence = false;
     loop {
         while let Some(frame) = frames.next_of_either_kind().map_err(|error| error.to_string())? {
             let (send, happened) = open.receive(frame).map_err(|error| error.to_string())?;
@@ -305,7 +322,19 @@ fn rdp(address: &str, account: Option<Account>, save: Option<&str>) -> Result<()
                         println!("   It gave the channel {user} to this client, and {desktop} is the desktop's.")
                     }
                     Happened::Licensed => {
-                        println!("   It takes the client as it is, without a licence.");
+                        match asked_to_take_a_licence {
+                            false => println!("   It takes the client as it is, without a licence."),
+                            true => println!("   It took the client's answer, handed no licence over, and goes on."),
+                        }
+                        println!("Agreeing on what each side can do");
+                    }
+                    Happened::AsksToTakeALicence { company, product } => {
+                        println!("   It hands out licences, and asks the client to take one: for {product}, of {company}.");
+                        asked_to_take_a_licence = true;
+                    }
+                    Happened::LicenceTaken(taken) => {
+                        println!("   It handed over a licence of {} bytes, from {}.", taken.licence.len(), taken.scope);
+                        println!("   The licence is not kept: the next connection takes one again.");
                         println!("Agreeing on what each side can do");
                     }
                     Happened::Desktop { width, height, bits } => {
