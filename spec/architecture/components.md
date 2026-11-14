@@ -105,6 +105,7 @@ What builds, tests, installs and describes Away.
 | `chart` | the chart that installs Away | chart | there | 12 |
 | `pipelines` | the pipelines: build, test, sign, list, publish | pipeline | there | 6 |
 | `site-pipeline` | the pipeline that checks the model and publishes the site | pipeline | there | — |
+| `test-program` | the test program: tries a machine with Away's own protocol code, with no browser | tests | there | — |
 | `test-servers` | the servers the tests run against: a shell, a desktop over VNC, a desktop over RDP | tests | first release | 1 |
 | `registry` | the registry the project publishes to | registry | there | — |
 | `docs` | the documentation, the specification and the site | docs | there | 5 |
@@ -112,6 +113,7 @@ What builds, tests, installs and describes Away.
 - `chart`: No kinds of its own and no rights beyond its namespace. Code: `chart/`. Governed by [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](./decisions/0012-one-chart-no-special-rights.md).
 - `pipelines`: Code: `.github/workflows/`. Runs: on GitHub. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
 - `site-pipeline`: Code: `.github/workflows/site.yml`. Runs: on GitHub. Governed by [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
+- `test-program`: What the two proofs are shown with; it is not in the image. Code: `crates/away-try/`. Runs: by hand, and by the pipeline against a stand-in for a machine.
 - `test-servers`: A Windows machine in a domain needs a place of its own. Code: `tests/servers/`. Runs: started by the pipeline. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
 - `registry`: Keeps: the image and the chart, their signatures, the records of their builds, the lists of their contents. Governed by [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
 - `docs`: Code: `docs/`, `spec/`, `site/`. Runs: the site is built and published by its pipeline. Governed by [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).

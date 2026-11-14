@@ -82,4 +82,5 @@ first release unless its note begins with *There* or *Later*.
 | `pipelines` | publishes | `registry` | the image and the chart, signed | There. |
 | `pipelines` | tests | `test-servers` | on every change | — |
 | `site-pipeline` | publishes | `docs` | the site | There. |
+| `test-program` | uses | `rdp` | — | — |
 <!-- end: connections -->

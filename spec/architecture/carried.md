@@ -190,8 +190,8 @@ says which.
 | Run with no special rights on the cluster | `chart` | [1](../plan/README.md#1-the-ground) | `run-without-special-rights` |
 | Use the identity provider that is there, over OpenID Connect | `server` `chart` | [4](../plan/README.md#4-getting-in-and-the-frame) | `use-own-provider` |
 | Say which part of a person's sign-in names their account on the machines | `server` `issuer` | [8](../plan/README.md#8-a-shell-as-oneself), [11](../plan/README.md#11-windows-as-oneself) | `name-account-claim` |
-| Set the address it answers on, behind the reverse proxy that is there | `server` `chart` | [1](../plan/README.md#1-the-ground) | `set-address` |
-| Use the cluster's certificates, or one's own | `chart` | [1](../plan/README.md#1-the-ground) | `use-own-certificates` |
+| Set the address it answers on, behind the reverse proxy that is there | `server` `chart` | [1](../plan/README.md#1-the-ground), [4](../plan/README.md#4-getting-in-and-the-frame) | `set-address` |
+| Use the cluster's certificates, or one's own | `chart` | [1](../plan/README.md#1-the-ground), [4](../plan/README.md#4-getting-in-and-the-frame) | `use-own-certificates` |
 | Choose who issues the sign-ins on a Windows domain's machines: Away's own authority or the organisation's | `issuer` `chart` | [11](../plan/README.md#11-windows-as-oneself), [12](../plan/README.md#12-the-organisations-own-authority) | `connect-domain-authority` |
 | Give a domain's controllers the certificates they need, where the domain has no authority of its own | `issuer` `docs` | [11](../plan/README.md#11-windows-as-oneself) | `certify-domain-controllers` |
 | Have the shells trust Away's sign-in, with one line on each machine | `issuer` `docs` | [8](../plan/README.md#8-a-shell-as-oneself) | `make-shells-trust` |
@@ -206,7 +206,7 @@ says which.
 |---|---|---|---|
 | Update to a new version in one step, with people told and their desktops back by themselves | `session-view` `gateway` `chart` | [9](../plan/README.md#9-a-desktop-over-vnc) | `update-in-one-step` |
 | See whether Away and what it rests on are well | `web` `server` `gateway` `issuer` | [15](../plan/README.md#15-status-and-the-check-of-the-setup) | `see-health` |
-| Give the monitoring that is there its measures: sessions, sign-ins, failures, delay | `server` `gateway` `issuer` `chart` | [1](../plan/README.md#1-the-ground) | `give-measures` |
+| Give the monitoring that is there its measures: sessions, sign-ins, failures, delay | `server` `gateway` `issuer` `chart` | [1](../plan/README.md#1-the-ground), [7](../plan/README.md#7-sessions-as-they-run), [8](../plan/README.md#8-a-shell-as-oneself) | `give-measures` |
 | Write what happens as lines a log collector reads | `server` `gateway` `issuer` | [1](../plan/README.md#1-the-ground) | `write-logs` |
 
 ### Checking it

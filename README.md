@@ -6,9 +6,10 @@ and then signed in on the machine too.
 
 **Specified, and being built. Nothing can be installed yet.** What Away is for,
 what it has to do, what it looks like, how it is built and in what order are
-written down, drawn and agreed. It is built one work package at a time, and
-the first has begun: the program with its three parts, the chart that installs
-it and the pipelines.
+written down, drawn and agreed. It is built one work package at a time. The
+first is done: the program with its three parts, the chart that installs it and
+the pipelines. The second has begun: Away's own RDP code, proven against real
+machines with no browser.
 <https://nalet.github.io/away/>
 
 | | In this repository | On the site |

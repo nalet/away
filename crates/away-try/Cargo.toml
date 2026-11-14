@@ -1,0 +1,16 @@
+[package]
+name = "away-try"
+description = "Tries a machine with Away's own protocol code, as far as that code goes, and says what happened at each step. For the people who build Away; it is not in the image."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+away-rdp.workspace = true
+rustls.workspace = true
+
+[lints]
+workspace = true

@@ -96,22 +96,22 @@ and nothing built by then is lost.
 <!-- generated: packages -->
 | No. | Package | Is | State | After | Rests on | Delivers |
 |---|---|---|---|---|---|---|
-| 1 | [The ground](#1-the-ground) | build | begun | — | [ADR‑0002](../architecture/decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md), [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 11 capabilities |
-| 2 | [RDP, proven without a browser](#2-rdp-proven-without-a-browser) | proof | agreed | 1 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md) | — |
-| 3 | [The Windows sign-in, proven without a browser](#3-the-windows-sign-in-proven-without-a-browser) | proof | proposed | 2 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | — |
-| 4 | [Getting in, and the frame](#4-getting-in-and-the-frame) | build | agreed | 1 | [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 15 capabilities |
-| 5 | [The register, the rules, and home](#5-the-register-the-rules-and-home) | build | proposed | 4 | [ADR‑0009](../architecture/decisions/0009-one-database-and-files.md) | 18 capabilities |
-| 6 | [A shell](#6-a-shell) | build | proposed | 5 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0005](../architecture/decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0010](../architecture/decisions/0010-secrets-live-in-the-cluster.md) | 29 capabilities |
-| 7 | [Sessions as they run](#7-sessions-as-they-run) | build | proposed | 6 | [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md) | 11 capabilities |
-| 8 | [A shell as oneself](#8-a-shell-as-oneself) | build | proposed | 6 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md) | 3 capabilities |
-| 9 | [A desktop over VNC](#9-a-desktop-over-vnc) | build | proposed | 7 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 24 capabilities |
-| 10 | [A desktop over RDP](#10-a-desktop-over-rdp) | build | proposed | 2, 9 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 26 capabilities |
-| 11 | [Windows as oneself](#11-windows-as-oneself) | build | proposed | 3, 8, 10 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 6 capabilities |
-| 12 | [The organisation's own authority](#12-the-organisations-own-authority) | build | proposed | 11 | [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 1 capability |
-| 13 | [Programs](#13-programs) | build | proposed | 10 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 5 capabilities |
-| 14 | [By touch](#14-by-touch) | build | proposed | 10 | [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 3 capabilities |
-| 15 | [Status, and the check of the setup](#15-status-and-the-check-of-the-setup) | build | proposed | 11 | [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md) | 2 capabilities |
-| 16 | [Ready to release](#16-ready-to-release) | build | proposed | 12, 13, 14, 15 | [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 1 capability |
+| 1 | [The ground](#1-the-ground) | build | done | — | [ADR‑0002](../architecture/decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md), [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 11 capabilities |
+| 2 | [RDP, proven without a browser](#2-rdp-proven-without-a-browser) | proof | begun | 1 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md) | — |
+| 3 | [The Windows sign-in, proven without a browser](#3-the-windows-sign-in-proven-without-a-browser) | proof | agreed | 2 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | — |
+| 4 | [Getting in, and the frame](#4-getting-in-and-the-frame) | build | agreed | 1 | [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 17 capabilities |
+| 5 | [The register, the rules, and home](#5-the-register-the-rules-and-home) | build | agreed | 4 | [ADR‑0009](../architecture/decisions/0009-one-database-and-files.md) | 18 capabilities |
+| 6 | [A shell](#6-a-shell) | build | agreed | 5 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0005](../architecture/decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0010](../architecture/decisions/0010-secrets-live-in-the-cluster.md) | 29 capabilities |
+| 7 | [Sessions as they run](#7-sessions-as-they-run) | build | agreed | 6 | [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md) | 12 capabilities |
+| 8 | [A shell as oneself](#8-a-shell-as-oneself) | build | agreed | 6 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md) | 4 capabilities |
+| 9 | [A desktop over VNC](#9-a-desktop-over-vnc) | build | agreed | 7 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 24 capabilities |
+| 10 | [A desktop over RDP](#10-a-desktop-over-rdp) | build | agreed | 2, 9 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 26 capabilities |
+| 11 | [Windows as oneself](#11-windows-as-oneself) | build | agreed | 3, 8, 10 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 6 capabilities |
+| 12 | [The organisation's own authority](#12-the-organisations-own-authority) | build | agreed | 11 | [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 1 capability |
+| 13 | [Programs](#13-programs) | build | agreed | 10 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 5 capabilities |
+| 14 | [By touch](#14-by-touch) | build | agreed | 10 | [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 3 capabilities |
+| 15 | [Status, and the check of the setup](#15-status-and-the-check-of-the-setup) | build | agreed | 11 | [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md) | 2 capabilities |
+| 16 | [Ready to release](#16-ready-to-release) | build | agreed | 12, 13, 14, 15 | [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 1 capability |
 
 16 packages: 2 proofs and 14 builds. Together the builds deliver 113 of the 113 capabilities of the first release.
 <!-- end: packages -->
@@ -139,12 +139,12 @@ needs them.
 
 A build, with nothing before it. It rests on [ADR‑0002](../architecture/decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md), [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md). The repository's layout, the one program with its three parts, the chart, the pipelines.
 
-**Its gate.** On a fresh Kubernetes cluster and on a fresh OpenShift cluster, one command installs Away with no rights beyond its namespace. Its three parts answer whether they are well, give their measures and write their lines. The image's signature, the record of its build and the list of what it holds can be checked by anyone. A connection the model doesn't list is refused by the cluster.
+**Its gate.** On a fresh Kubernetes cluster and in a fresh namespace of an OpenShift cluster, one command installs Away with no rights beyond its namespace. Its three parts answer whether they are well, give their measures and write their lines. The image's signature, the record of its build and the list of what it holds can be checked by anyone. A connection the model doesn't list is refused by the cluster.
 
 | Area | What it delivers |
 |---|---|
-| [Installing and configuring](../capabilities/platform.md#installing-and-configuring) | Install it on Kubernetes or OpenShift with one chart; Run with no special rights on the cluster; Set the address it answers on, behind the reverse proxy that is there; Use the cluster's certificates, or one's own; Run the part that signs people in on machines apart from the rest, with rights of its own |
-| [Running it](../capabilities/platform.md#running-it) | Give the monitoring that is there its measures: sessions, sign-ins, failures, delay; Write what happens as lines a log collector reads |
+| [Installing and configuring](../capabilities/platform.md#installing-and-configuring) | Install it on Kubernetes or OpenShift with one chart; Run with no special rights on the cluster; Set the address it answers on, behind the reverse proxy that is there: behind OpenShift's router, with routes; Use the cluster's certificates, or one's own: with the cluster's own certificate; Run the part that signs people in on machines apart from the rest, with rights of its own |
+| [Running it](../capabilities/platform.md#running-it) | Give the monitoring that is there its measures: sessions, sign-ins, failures, delay: each part's own measures; Write what happens as lines a log collector reads |
 | [Checking it](../capabilities/platform.md#checking-it) | Check that an image is the one the project built; See what an image holds: every part, its version, its licence; Build it from its source with one command; Report a security hole in private, and learn what happens next |
 
 ### 2 RDP, proven without a browser
@@ -163,7 +163,7 @@ A proof, after package 2. It rests on [ADR‑0007](../architecture/decisions/000
 
 A build, after package 1. It rests on [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](../architecture/decisions/0011-the-web-app.md).
 
-**Its gate.** A person signs in through the organisation's sign-in service and sees the frame on a computer and on a phone, with no token in the page. The sign-in renews itself, and signing out ends it. Every page is used with the keyboard alone and passes the accessibility checks. The pages load nothing from outside.
+**Its gate.** A person signs in through the organisation's sign-in service and sees the frame on a computer and on a phone, with no token in the page. The sign-in renews itself, and signing out ends it. Every page is used with the keyboard alone and passes the accessibility checks. The pages load nothing from outside. Behind an ingress controller on Kubernetes, Away answers on its address with a certificate of one's own.
 
 | Area | What it delivers |
 |---|---|
@@ -171,7 +171,7 @@ A build, after package 1. It rests on [ADR‑0006](../architecture/decisions/000
 | [Signing in](../capabilities/app.md#signing-in) | Sign in through the organisation's identity provider; Stay signed in while the sign-in renews itself; Sign in again when the sign-in has run out, with the open sessions kept; Sign out, and end the sessions Away opened |
 | [The frame](../capabilities/app.md#the-frame) | Move between the machines, the open sessions and the settings; See which account is signed in; Use every page around a session with the keyboard alone, and with a screen reader |
 | [Who reaches what](../capabilities/admin.md#who-reaches-what) | Take people and their groups from the identity provider, and keep none of its own; Say who administers Away, who reads its records, and who only connects |
-| [Installing and configuring](../capabilities/platform.md#installing-and-configuring) | Use the identity provider that is there, over OpenID Connect; Keep what has to stay secret encrypted, with the key kept elsewhere; Say whom people turn to, and show it wherever something fails |
+| [Installing and configuring](../capabilities/platform.md#installing-and-configuring) | Use the identity provider that is there, over OpenID Connect; Keep what has to stay secret encrypted, with the key kept elsewhere; Say whom people turn to, and show it wherever something fails; Set the address it answers on, behind the reverse proxy that is there: behind an ingress controller on Kubernetes; Use the cluster's certificates, or one's own: with one's own certificate |
 | [Checking it](../capabilities/platform.md#checking-it) | See in Away itself which version runs, where its source is and the licences of what it is built from; Run it with no call to anyone outside: no fonts, scripts, statistics or update checks |
 
 ### 5 The register, the rules, and home
@@ -222,6 +222,7 @@ A build, after package 6. It rests on [ADR‑0003](../architecture/decisions/000
 | [Who reaches what](../capabilities/admin.md#who-reaches-what) | End a session nobody has used for a set time, with a warning before |
 | [Sessions as they run](../capabilities/admin.md#sessions-as-they-run) | See who is connected to what right now; End a session, or all of a person's; End a person's sessions as soon as their right or their account is gone |
 | [What happened](../capabilities/admin.md#what-happened) | Read the records and search them; Send every record on to the organisation's own log system as it is written |
+| [Running it](../capabilities/platform.md#running-it) | Give the monitoring that is there its measures: sessions, sign-ins, failures, delay: the measures of sessions |
 
 ### 8 A shell as oneself
 
@@ -233,6 +234,7 @@ A build, after package 6. It rests on [ADR‑0007](../architecture/decisions/000
 |---|---|
 | [Signing in](../capabilities/app.md#signing-in) | Be signed in on the machine as oneself, with nothing asked (SSH) |
 | [Installing and configuring](../capabilities/platform.md#installing-and-configuring) | Have the shells trust Away's sign-in, with one line on each machine; Say which part of a person's sign-in names their account on the machines: the name of a person's account on a shell |
+| [Running it](../capabilities/platform.md#running-it) | Give the monitoring that is there its measures: sessions, sign-ins, failures, delay: the measures of the sign-ins made on machines |
 
 ### 9 A desktop over VNC
 

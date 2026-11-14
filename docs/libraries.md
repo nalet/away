@@ -12,8 +12,10 @@ library has no line that says what it is for.
 | [hyper](https://crates.io/crates/hyper) | speaks HTTP to browsers and to the cluster's checks | 1.12.0 | `http1`, `server` |
 | [hyper-util](https://crates.io/crates/hyper-util) | lets hyper use tokio's connections and timers | 0.1.21 | `tokio` |
 | [http-body-util](https://crates.io/crates/http-body-util) | holds the body of an HTTP answer | 0.1.5 | — |
+| [rustls](https://crates.io/crates/rustls) | secures the connection to a machine: TLS is never Away's own | 0.23.46 | `ring`, `std`, `tls12` |
+| [sha2](https://crates.io/crates/sha2) | makes the fingerprint a machine is known by | 0.11.1 | — |
 
-Away names 4 libraries. They bring 23 more with them, which makes 27 in all.
+Away names 6 libraries. They bring 51 more with them, which makes 57 in all.
 <!-- end: libraries -->
 
 ## What the build refuses

@@ -1,6 +1,6 @@
 # ADR-0008: Who issues Windows sign-ins is a setting, and without a domain nobody has to
 
-**Status:** Proposed · 2026-11-14. Revised on the owner's word: who issues has to be a setting, and Away has to work where there is no Active Directory. Nothing of it is built. Each way is proven on a real domain before it is built on (see [Validation](#validation)).
+**Status:** Accepted · 2026-11-14. Revised on the owner's word before it was accepted: who issues has to be a setting, and Away has to work where there is no Active Directory. Nothing of it is built. Each way is proven on a real domain before it is built on (see [Validation](#validation)).
 
 ## Context
 

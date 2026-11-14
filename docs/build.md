@@ -34,6 +34,19 @@ target/release/away help
 A part writes what happens as lines on its output, one object a line, and
 stops when it is sent the signal a cluster sends.
 
+## Trying a machine
+
+`away-try` reaches a machine with Away's own protocol code, with no browser
+and nothing else of Away around it, and says what happened at each step. It
+goes as far as that code goes: today it asks an RDP machine which security it
+takes, secures the connection, and reads the certificate the machine shows.
+
+```sh
+cargo run --package away-try -- rdp fin-app-02.example.com
+```
+
+It is for the people who build Away, and it is not in the image.
+
 ## What a part answers
 
 Every part answers three addresses on a listener of its own, port 9090, which

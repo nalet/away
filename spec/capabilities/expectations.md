@@ -161,8 +161,8 @@ For the goal [Run it oneself](../goals/README.md#run-it-oneself).
 | Expected | State | Met by | Note |
 |---|---|---|---|
 | It runs where there is no Windows domain | first release | [`use-own-provider`](./platform.md#installing-and-configuring) first release, [`make-shells-trust`](./platform.md#installing-and-configuring) first release, [`use-kept-secret`](./app.md#signing-in) first release, [`type-credentials`](./app.md#signing-in) first release | people come from the sign-in service; a Windows domain is a part one turns on |
-| Install it in one step | partly | [`install-with-chart`](./platform.md#installing-and-configuring) partly built, [`install-as-one-container`](./platform.md#installing-and-configuring) later | — |
-| Runs on Kubernetes and OpenShift, without special rights | partly | [`install-with-chart`](./platform.md#installing-and-configuring) partly built, [`run-without-special-rights`](./platform.md#installing-and-configuring) partly built | — |
+| Install it in one step | partly | [`install-with-chart`](./platform.md#installing-and-configuring) built, [`install-as-one-container`](./platform.md#installing-and-configuring) later | — |
+| Runs on Kubernetes and OpenShift, without special rights | there | [`install-with-chart`](./platform.md#installing-and-configuring) built, [`run-without-special-rights`](./platform.md#installing-and-configuring) built | — |
 | Works with the identity provider that is there | first release | [`use-own-provider`](./platform.md#installing-and-configuring) first release, [`name-account-claim`](./platform.md#installing-and-configuring) first release | — |
 | An identity provider comes along for those who have none | not planned | [`bring-provider-along`](./platform.md#installing-and-configuring) not planned | — |
 | Works behind the reverse proxy and with the certificates that are there | partly | [`set-address`](./platform.md#installing-and-configuring) partly built, [`use-own-certificates`](./platform.md#installing-and-configuring) partly built | — |

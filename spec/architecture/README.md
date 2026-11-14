@@ -153,8 +153,8 @@ decided, why, what follows from it, and what it rules out.
 | Away's own protocol code | 7 |  | 7 |  |
 | What Away rests on | 4 |  | 4 |  |
 | Outside Away | 6 |  | 6 |  |
-| Making and shipping it | 6 | 5 | 1 |  |
-| all | 29 | 8 | 20 | 1 |
+| Making and shipping it | 7 | 6 | 1 |  |
+| all | 30 | 9 | 20 | 1 |
 
 | Connections | Rows | Means |
 |---|---|---|
@@ -171,14 +171,14 @@ decided, why, what follows from it, and what it rules out.
 | passes on | 2 | it hands what arrives on to the other |
 | puts out | 3 | it writes lines that the other collects |
 | measures | 3 | it reads the other's measures |
-| uses | 9 | it is built from the other's code |
+| uses | 10 | it is built from the other's code |
 | publishes | 2 | it puts what it built where the other holds or shows it |
 | tests | 1 | it runs its tests against the other |
-| all | 43 |  |
+| all | 44 |  |
 
 | Decision records | Proposed | Accepted | Superseded | Rejected |
 |---|---|---|---|---|
-| 13 | 1 | 12 |  |  |
+| 13 |  | 13 |  |  |
 
 The first release holds 113 capabilities, and a component of Away's own carries each: 28 are carried by one component, the others by up to 6.
 <!-- end: state -->

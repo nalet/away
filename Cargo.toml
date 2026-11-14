@@ -1,7 +1,15 @@
 # Away, as one workspace: the program, its three parts, and the libraries they are built from.
 [workspace]
 resolver = "2"
-members = ["crates/away", "crates/away-part", "crates/away-server", "crates/away-gateway", "crates/away-issuer"]
+members = [
+    "crates/away",
+    "crates/away-part",
+    "crates/away-server",
+    "crates/away-gateway",
+    "crates/away-issuer",
+    "crates/away-rdp",
+    "crates/away-try",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -18,11 +26,14 @@ tokio = { version = "1", default-features = false, features = ["rt-multi-thread"
 hyper = { version = "1", default-features = false, features = ["http1", "server"] } # speaks HTTP to browsers and to the cluster's checks
 hyper-util = { version = "0.1", default-features = false, features = ["tokio"] } # lets hyper use tokio's connections and timers
 http-body-util = { version = "0.1", default-features = false } # holds the body of an HTTP answer
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] } # secures the connection to a machine: TLS is never Away's own
+sha2 = { version = "0.11", default-features = false } # makes the fingerprint a machine is known by
 
 away-part = { path = "crates/away-part" }
 away-server = { path = "crates/away-server" }
 away-gateway = { path = "crates/away-gateway" }
 away-issuer = { path = "crates/away-issuer" }
+away-rdp = { path = "crates/away-rdp" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

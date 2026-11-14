@@ -10,8 +10,8 @@ Away as an operator installs it: where it runs, the identity provider, addresses
 
 | Capability | Who | Away | Key |
 |---|---|---|---|
-| Install it on Kubernetes or OpenShift with one chart | operator | partial | `install-with-chart` |
-| Run with no special rights on the cluster | system | partial | `run-without-special-rights` |
+| Install it on Kubernetes or OpenShift with one chart | operator | built | `install-with-chart` |
+| Run with no special rights on the cluster | system | built | `run-without-special-rights` |
 | Run it as one container on one machine | operator | later | `install-as-one-container` |
 | Use the identity provider that is there, over OpenID Connect | operator | v1 | `use-own-provider` |
 | Say which part of a person's sign-in names their account on the machines | operator | v1 | `name-account-claim` |
@@ -28,12 +28,10 @@ Away as an operator installs it: where it runs, the identity provider, addresses
 | Reach machines in a network Away is not in, through a relay placed there | operator | later | `reach-other-networks` |
 | Carry other traffic to the machines' network, as a private network would | operator | no | `carry-other-traffic` |
 
-- *Install it on Kubernetes or OpenShift with one chart*: shown on a fresh Kubernetes cluster on every change; an installation on OpenShift is still to be shown.
-- *Run with no special rights on the cluster*: shown on Kubernetes, in a namespace that takes only the strictest profile; still to be shown on OpenShift.
 - *Say which part of a person's sign-in names their account on the machines*: a Windows domain knows a person by a name and an identifier of its own, a shell by another name.
 - *Bring an identity provider along for those who have none*: Away asks an identity provider and is none.
-- *Set the address it answers on, behind the reverse proxy that is there*: the chart makes an ingress or routes for the address; not yet shown behind a real reverse proxy.
-- *Use the cluster's certificates, or one's own*: the chart takes one's own certificate or the cluster's; not yet shown with either.
+- *Set the address it answers on, behind the reverse proxy that is there*: shown behind OpenShift's router, with routes; behind an ingress controller on Kubernetes it is still to be shown.
+- *Use the cluster's certificates, or one's own*: shown with the cluster's own certificate; one's own is still to be shown.
 - *Choose who issues the sign-ins on a Windows domain's machines: Away's own authority or the organisation's*: Away's own is made known to the domain once; the organisation's issues on Away's request; an installation without a domain sets neither.
 - *Give a domain's controllers the certificates they need, where the domain has no authority of its own*: signing in with a certificate needs them, and Away's own authority issues them on the operator's request.
 - *Carry other traffic to the machines' network, as a private network would*: Away carries sessions and no other traffic.

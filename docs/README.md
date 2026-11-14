@@ -19,7 +19,7 @@ how far the build is.
 | change any of it | [changing the model](./model.md) |
 
 What is built so far is the first work package: the program with its three
-parts, the chart and the pipelines.
+parts, the chart and the pipelines. The second has begun: Away's own RDP code.
 
 | To | Read |
 |---|---|

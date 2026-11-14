@@ -1,0 +1,15 @@
+[package]
+name = "away-rdp"
+description = "Away's own RDP code: it takes bytes and gives bytes and what happened, and opens no connection itself."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+sha2.workspace = true
+
+[lints]
+workspace = true

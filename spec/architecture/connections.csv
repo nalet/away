@@ -42,3 +42,4 @@ pipelines,registry,publishes,"the image and the chart, signed",built,
 pipelines,test-servers,tests,on every change,v1,
 site-pipeline,docs,publishes,the site,built,
 gateway,relay,opens,,later,The relay connects out to the gateway and machines are opened through it
+test-program,rdp,uses,,v1,

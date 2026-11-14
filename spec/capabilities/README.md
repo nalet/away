@@ -118,15 +118,15 @@ has the steps.
 | [in a session](./session.md) | 7 | 63 | 0 | 0 | 37 | 22 | 4 |
 | [around the sessions](./app.md) | 5 | 48 | 0 | 0 | 27 | 17 | 4 |
 | [administration](./admin.md) | 4 | 55 | 0 | 0 | 25 | 27 | 3 |
-| [the platform](./platform.md) | 3 | 33 | 6 | 5 | 13 | 7 | 2 |
-| all | 19 | 199 | 6 | 5 | 102 | 73 | 13 |
+| [the platform](./platform.md) | 3 | 33 | 8 | 3 | 13 | 7 | 2 |
+| all | 19 | 199 | 8 | 3 | 102 | 73 | 13 |
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
 | a session over RDP | 0 | 0 | 35 | 24 | 4 | 136 |
 | a session over VNC | 0 | 0 | 26 | 11 | 13 | 149 |
 | a session over SSH | 0 | 0 | 27 | 12 | 2 | 158 |
-| Away itself | 6 | 5 | 60 | 46 | 9 | 73 |
+| Away itself | 8 | 3 | 60 | 46 | 9 | 73 |
 
 An expectation names 163 of the 199 capabilities; no expectation names the other 36.
 <!-- end: overview -->
@@ -146,9 +146,9 @@ the capabilities that meet it, and says how the states are worked out.
 | [Know the machines](./expectations.md#know-the-machines) | 13 | 0 | 0 | 5 | 0 | 7 | 1 |
 | [Decide who reaches what](./expectations.md#decide-who-reaches-what) | 13 | 0 | 0 | 7 | 2 | 4 | 0 |
 | [Know what happened](./expectations.md#know-what-happened) | 9 | 0 | 0 | 3 | 1 | 5 | 0 |
-| [Run it oneself](./expectations.md#run-it-oneself) | 16 | 0 | 5 | 4 | 2 | 2 | 3 |
+| [Run it oneself](./expectations.md#run-it-oneself) | 16 | 1 | 4 | 4 | 2 | 2 | 3 |
 | [Trust it](./expectations.md#trust-it) | 4 | 1 | 2 | 1 | 0 | 0 | 0 |
-| all | 99 | 1 | 7 | 44 | 11 | 28 | 8 |
+| all | 99 | 2 | 6 | 44 | 11 | 28 | 8 |
 <!-- end: expected -->
 
 ## Pages

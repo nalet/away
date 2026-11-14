@@ -165,14 +165,14 @@ tell-when-recorded,records,"Tell a person that their session is recorded, before
 keep-for-set-time,records,"Keep records and recordings for a set time, then remove them",system,—,—,—,later,
 show-tampering,records,Make a changed or missing record show,system,—,—,—,later,
 see-use-over-time,records,"See how Away is used over time: by whom, which machines, for how long",admin,—,—,—,later,
-install-with-chart,install,Install it on Kubernetes or OpenShift with one chart,operator,—,—,—,partial,shown on a fresh Kubernetes cluster on every change; an installation on OpenShift is still to be shown
-run-without-special-rights,install,Run with no special rights on the cluster,system,—,—,—,partial,"shown on Kubernetes, in a namespace that takes only the strictest profile; still to be shown on OpenShift"
+install-with-chart,install,Install it on Kubernetes or OpenShift with one chart,operator,—,—,—,built,
+run-without-special-rights,install,Run with no special rights on the cluster,system,—,—,—,built,
 install-as-one-container,install,Run it as one container on one machine,operator,—,—,—,later,
 use-own-provider,install,"Use the identity provider that is there, over OpenID Connect",operator,—,—,—,v1,
 name-account-claim,install,Say which part of a person's sign-in names their account on the machines,operator,—,—,—,v1,"a Windows domain knows a person by a name and an identifier of its own, a shell by another name"
 bring-provider-along,install,Bring an identity provider along for those who have none,operator,—,—,—,no,Away asks an identity provider and is none
-set-address,install,"Set the address it answers on, behind the reverse proxy that is there",operator,—,—,—,partial,the chart makes an ingress or routes for the address; not yet shown behind a real reverse proxy
-use-own-certificates,install,"Use the cluster's certificates, or one's own",operator,—,—,—,partial,the chart takes one's own certificate or the cluster's; not yet shown with either
+set-address,install,"Set the address it answers on, behind the reverse proxy that is there",operator,—,—,—,partial,"shown behind OpenShift's router, with routes; behind an ingress controller on Kubernetes it is still to be shown"
+use-own-certificates,install,"Use the cluster's certificates, or one's own",operator,—,—,—,partial,shown with the cluster's own certificate; one's own is still to be shown
 connect-domain-authority,install,Choose who issues the sign-ins on a Windows domain's machines: Away's own authority or the organisation's,operator,—,—,—,v1,Away's own is made known to the domain once; the organisation's issues on Away's request; an installation without a domain sets neither
 certify-domain-controllers,install,"Give a domain's controllers the certificates they need, where the domain has no authority of its own",operator,—,—,—,v1,"signing in with a certificate needs them, and Away's own authority issues them on the operator's request"
 make-shells-trust,install,"Have the shells trust Away's sign-in, with one line on each machine",operator,—,—,—,v1,

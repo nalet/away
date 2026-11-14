@@ -1,10 +1,10 @@
 package,capability,ways,note
 p01,install-with-chart,,
 p01,run-without-special-rights,,
-p01,set-address,,
-p01,use-own-certificates,,
+p01,set-address,,"Behind OpenShift's router, with routes"
+p01,use-own-certificates,,With the cluster's own certificate
 p01,sign-apart,,
-p01,give-measures,,
+p01,give-measures,,Each part's own measures
 p01,write-logs,,
 p01,verify-image,,
 p01,see-image-contents,,
@@ -25,6 +25,8 @@ p04,use-on-phone,,
 p04,see-version-and-licences,,
 p04,name-support-contact,,
 p04,call-nobody-else,,
+p04,set-address,,Behind an ingress controller on Kubernetes
+p04,use-own-certificates,,With one's own certificate
 p05,keep-as-files,,
 p05,see-what-is-in-force,,
 p05,see-refused-change,,
@@ -83,9 +85,11 @@ p07,end-session,,
 p07,end-on-lost-right,,
 p07,read-records,,
 p07,send-records-on,,
+p07,give-measures,,The measures of sessions
 p08,be-oneself-on-machine,ssh,
 p08,make-shells-trust,,
 p08,name-account-claim,,The name of a person's account on a shell
+p08,give-measures,,The measures of the sign-ins made on machines
 p09,open-desktop,vnc,
 p09,see-connecting-steps,vnc,
 p09,type-credentials,vnc,

@@ -6,9 +6,9 @@ people who build it, and every release is checked against it.
 
 > **Agreed on 14 November 2026.** The owner reviewed this specification and
 > agreed to it: the goals, the cut between the first release and later, the
-> screens, a target for every quality, and every decision but one, which was
-> revised and waits. It stays a model: where building shows a row wrong, the
-> row is changed here first, and what is built follows it.
+> screens, a target for every quality, every decision, and the work packages in
+> their order. It stays a model: where building shows a row wrong, the row is
+> changed here first, and what is built follows it.
 
 It has five parts:
 
@@ -35,13 +35,13 @@ every product shares. The specification doesn't repeat them.
 |---|---|---|
 | Goals | 8 | 3 what people want, 4 what that takes, 1 what being open adds |
 | Qualities | 35 | 35 with a target, 35 with a proposal |
-| Expectations | 99 | 1 there, 7 partly, 44 first release, 11 first release in part, 28 later, 8 not planned |
-| Capabilities | 199 | in 19 areas: 6 built, 5 partly built, 102 first release, 73 later, 13 not planned |
+| Expectations | 99 | 2 there, 6 partly, 44 first release, 11 first release in part, 28 later, 8 not planned |
+| Capabilities | 199 | in 19 areas: 8 built, 3 partly built, 102 first release, 73 later, 13 not planned |
 | Figures | 83 | in 15 chapters; they show 60 of the 66 capabilities the first release holds for a person or an administrator |
-| Components | 29 | in 6 layers: 8 there, 20 first release, 1 later |
-| Connections | 43 | of 16 kinds |
-| Decision records | 13 | 1 proposed, 12 accepted |
-| Work packages | 16 | 2 proofs and 14 builds: 13 proposed, 2 agreed, 1 begun |
+| Components | 30 | in 6 layers: 9 there, 20 first release, 1 later |
+| Connections | 44 | of 16 kinds |
+| Decision records | 13 | 13 accepted |
+| Work packages | 16 | 2 proofs and 14 builds: 14 agreed, 1 begun, 1 done |
 <!-- end: state -->
 
 A capability counts once, by the soonest it is planned for any kind of
@@ -52,11 +52,11 @@ connection. How the words are meant is in
 ## Before the first release is built
 
 The five parts say what the first release is, how it is built and in what
-order. What still stands between them and a release:
+order, and every decision is accepted. What still stands between them and a
+release:
 
 | Open | What it takes |
 |---|---|
-| One decision | [ADR-0008](./architecture/decisions/0008-the-authority-for-windows-sign-ins.md), on who issues the sign-ins for Windows machines, was revised on the owner's word and waits to be accepted. Work packages 3, 11 and 12 rest on it. The others are accepted. |
 | Two proofs | Whether Away's own code reaches a Windows desktop, and whether it signs an ordinary account in there with a short-lived certificate that a domain accepts. The first release rests on both, so [work packages](./plan/README.md) 2 and 3 prove them with no browser, before anything is built around them. |
 | Machines to test against | The tests run against a real server of each protocol. A build can start some of them by itself: a shell, a desktop over VNC, a desktop over RDP on Linux. Windows machines it cannot, and the sign-in needs a domain that exists for testing. [What the build needs first](./plan/README.md#what-the-build-needs-first) lists them. |
 | The work packages | [Sixteen](./plan/README.md), each ending at a gate. A package begins when the owner names it, and the table there says how far each is. |
