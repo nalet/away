@@ -18,6 +18,7 @@ use std::time::{Duration, Instant};
 use away_rdp::identity::Identity;
 use away_rdp::negotiation::{self, Security};
 use away_rdp::tpkt::Frames;
+use away_rdp::{der, sign_in};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, CryptoProvider};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
@@ -147,10 +148,40 @@ fn rdp(address: &str) -> Result<(), String> {
     println!("   Valid from {} until {}.", identity.valid_from, identity.valid_until);
     println!("   Its fingerprint (SHA-256): {}", identity.fingerprint_text());
 
-    match answer.security {
-        Security::SignInFirst { .. } => println!("The next step is the sign-in before the desktop, which this version doesn't speak yet."),
-        Security::Tls => println!("The next step is what a client says of itself, which this version doesn't speak yet."),
+    if answer.security == Security::Tls {
+        println!("The next step is what a client says of itself, which this version doesn't speak yet.");
+        return Ok(());
     }
+
+    println!("Signing in, before the desktop");
+    let mut secured = rustls::Stream::new(&mut secured, &mut connection);
+    secured.write_all(&sign_in::begin()).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
+    let mut held = Vec::new();
+    let length = loop {
+        match der::whole(&held).map_err(|error| error.to_string())? {
+            Some(length) if held.len() >= length => break length,
+            _ => {}
+        }
+        let mut bytes = [0u8; 2048];
+        match secured.read(&mut bytes) {
+            Ok(0) => return Err("It closed the connection in the middle of the sign-in.".to_string()),
+            Ok(count) => held.extend_from_slice(&bytes[..count]),
+            Err(_) => return Err(format!("It gave no answer to the sign-in within {} seconds.", WITHIN.as_secs())),
+        }
+    };
+    let (version, challenge) = sign_in::read_challenge(&held[..length]).map_err(|error| error.to_string())?;
+    let computer = challenge.computer.as_deref().unwrap_or("a machine without a name");
+    match (&challenge.domain, &challenge.computer_dns) {
+        (Some(domain), _) if domain == computer => println!("   It answers as {computer}, which is in no domain."),
+        (Some(domain), Some(full)) => println!("   It answers as {computer} of the domain {domain}, in full {full}."),
+        (Some(domain), None) => println!("   It answers as {computer} of the domain {domain}."),
+        (None, _) => println!("   It answers as {computer}."),
+    }
+    if let Some(windows) = challenge.version {
+        println!("   It says it runs Windows {}.{}, build {}.", windows.major, windows.minor, windows.build);
+    }
+    println!("   It speaks version {version} of the sign-in.");
+    println!("The next step is proving who one is, with a name and a password, which this version doesn't speak yet.");
     Ok(())
 }
 

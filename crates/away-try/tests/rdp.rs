@@ -54,9 +54,28 @@ fn secure(connection: &mut TcpStream) {
             return;
         }
     }
+    // the sign-in before the desktop: read its first message, and answer as a Windows
+    // machine of a domain does, saying who it is
+    let mut secured = rustls::Stream::new(&mut secured, connection);
+    let mut first = Vec::new();
+    loop {
+        match away_rdp::der::whole(&first) {
+            Ok(Some(length)) if first.len() >= length => break,
+            Ok(_) => {}
+            Err(_) => return,
+        }
+        let mut bytes = [0u8; 512];
+        match secured.read(&mut bytes) {
+            Ok(count) if count > 0 => first.extend_from_slice(&bytes[..count]),
+            _ => return,
+        }
+    }
+    assert_eq!(first, away_rdp::sign_in::begin(), "the first message of the sign-in");
+    let challenge = away_rdp::ntlm::challenge_for_tests("FIN-APP-02", "CORP", "corp.example.com", 26_100);
+    let _ = secured.write_all(&away_rdp::sign_in::request(6, &challenge));
     // the test program has nothing more to say: wait until it leaves
     let mut rest = Vec::new();
-    let _ = rustls::Stream::new(&mut secured, connection).read_to_end(&mut rest);
+    let _ = secured.read_to_end(&mut rest);
 }
 
 fn try_rdp(address: &str) -> Output {
@@ -85,8 +104,12 @@ fn it_reaches_a_machine_secures_the_connection_and_says_what_the_machine_shows()
         lines[10],
         "   Its fingerprint (SHA-256): 21:1c:8d:21:3d:84:d9:75:86:5d:58:a0:04:0e:0c:10:08:be:f0:af:5e:5c:cd:49:71:1e:46:1d:fc:97:a6:c3"
     );
-    assert_eq!(lines[11], "The next step is the sign-in before the desktop, which this version doesn't speak yet.");
-    assert_eq!(lines.len(), 12);
+    assert_eq!(lines[11], "Signing in, before the desktop");
+    assert_eq!(lines[12], "   It answers as FIN-APP-02 of the domain CORP, in full FIN-APP-02.corp.example.com.");
+    assert_eq!(lines[13], "   It says it runs Windows 10.0, build 26100.");
+    assert_eq!(lines[14], "   It speaks version 6 of the sign-in.");
+    assert_eq!(lines[15], "The next step is proving who one is, with a name and a password, which this version doesn't speak yet.");
+    assert_eq!(lines.len(), 16);
 }
 
 #[test]

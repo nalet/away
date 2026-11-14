@@ -11,7 +11,9 @@
 //! | [`tpkt`] | cuts the bytes of a connection into the frames RDP travels in |
 //! | [`negotiation`] | asks a machine which security it takes, and reads its answer |
 //! | [`identity`] | reads what a machine shows of itself: its certificate |
-//! | [`der`] | reads the encoding certificates are written in |
+//! | [`sign_in`] | the sign-in before the desktop, as far as the machine saying who it is |
+//! | [`ntlm`] | the messages of the way of signing in that needs no directory |
+//! | [`der`] | reads and writes the encoding certificates and the sign-in are written in |
 //!
 //! The cryptography is never this crate's own: TLS is done by whoever holds the
 //! connection, and a hash comes from a library.
@@ -19,6 +21,8 @@
 pub mod der;
 pub mod identity;
 pub mod negotiation;
+pub mod ntlm;
+pub mod sign_in;
 pub mod tpkt;
 
 mod error;

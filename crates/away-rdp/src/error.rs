@@ -34,6 +34,10 @@ pub enum Error {
     NotAskedFor(u32),
     /// The certificate can't be read.
     Certificate(&'static str),
+    /// A message of the sign-in before the desktop is not what such a message is.
+    SignIn(&'static str),
+    /// The machine refused the sign-in before the desktop, with this code of its own.
+    SignInRefused(u32),
 }
 
 impl fmt::Display for Error {
@@ -52,6 +56,8 @@ impl fmt::Display for Error {
             Error::OldSecurityOnly => out.write_str("It offers only RDP's own old encryption, which Away doesn't use."),
             Error::NotAskedFor(chosen) => write!(out, "It chose a security it was not asked for: {chosen}."),
             Error::Certificate(what) => write!(out, "Its certificate can't be read: {what}."),
+            Error::SignIn(what) => write!(out, "What it sent for the sign-in is not what the sign-in is: {what}."),
+            Error::SignInRefused(code) => write!(out, "It refused the sign-in, with its own code {code:#010x}."),
         }
     }
 }

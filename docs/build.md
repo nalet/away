@@ -39,7 +39,8 @@ stops when it is sent the signal a cluster sends.
 `away-try` reaches a machine with Away's own protocol code, with no browser
 and nothing else of Away around it, and says what happened at each step. It
 goes as far as that code goes: today it asks an RDP machine which security it
-takes, secures the connection, and reads the certificate the machine shows.
+takes, secures the connection, reads the certificate the machine shows, and
+begins the sign-in before the desktop, as far as the machine saying who it is.
 
 ```sh
 cargo run --package away-try -- rdp fin-app-02.example.com
