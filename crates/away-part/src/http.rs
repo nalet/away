@@ -2,11 +2,13 @@
 //! request is answered by one function.
 
 use std::convert::Infallible;
+use std::future::Future;
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use http_body_util::Full;
+use http_body_util::{BodyExt, Full, Limited};
 use hyper::body::{Bytes, Incoming};
 use hyper::header::{HeaderValue, CONTENT_TYPE};
 use hyper::server::conn::http1;
@@ -23,8 +25,24 @@ use crate::stop::Stop;
 /// An answer to a request.
 pub type Answer = Response<Full<Bytes>>;
 
+/// An answer that is on its way: whatever answers may first ask somebody else.
+pub type Answering = Pin<Box<dyn Future<Output = Answer> + Send>>;
+
 /// What answers the requests of a listener.
-pub type Answers = Arc<dyn Fn(&Request<Incoming>) -> Answer + Send + Sync>;
+pub type Answers = Arc<dyn Fn(Request<Incoming>) -> Answering + Send + Sync>;
+
+/// Answers that are there at once, from the request's head alone.
+pub fn at_once(answers: impl Fn(&Request<Incoming>) -> Answer + Send + Sync + 'static) -> Answers {
+    Arc::new(move |request| {
+        let answer = answers(&request);
+        Box::pin(async move { answer })
+    })
+}
+
+/// What a request carries, if it is no longer than this many bytes.
+pub async fn carried(request: Request<Incoming>, at_most: usize) -> Option<Bytes> {
+    Limited::new(request.into_body(), at_most).collect().await.ok().map(|whole| whole.to_bytes())
+}
 
 /// How long a connection may take to send the head of a request.
 const HEAD_WITHIN: Duration = Duration::from_secs(10);
@@ -104,9 +122,13 @@ impl Listener {
             let mut stop = stop.clone();
             connections.spawn(async move {
                 let service = service_fn(move |request: Request<Incoming>| {
-                    let answer = answers(&request);
-                    counted.count(answer.status());
-                    async move { Ok::<_, Infallible>(answer) }
+                    let answering = answers(request);
+                    let counted = counted.clone();
+                    async move {
+                        let answer = answering.await;
+                        counted.count(answer.status());
+                        Ok::<_, Infallible>(answer)
+                    }
                 });
                 let connection = http1::Builder::new()
                     .timer(TokioTimer::new())

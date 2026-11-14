@@ -9,10 +9,12 @@ library has no line that says what it is for.
 | Library | What it is for | Version in this build | With |
 |---|---|---|---|
 | [tokio](https://crates.io/crates/tokio) | runs many connections at once | 1.54.1 | `rt-multi-thread`, `net`, `signal`, `macros`, `time`, `sync` |
-| [hyper](https://crates.io/crates/hyper) | speaks HTTP to browsers and to the cluster's checks | 1.12.0 | `http1`, `server` |
+| [hyper](https://crates.io/crates/hyper) | speaks HTTP to browsers, to the cluster's checks and to the sign-in service | 1.12.0 | `http1`, `server`, `client` |
 | [hyper-util](https://crates.io/crates/hyper-util) | lets hyper use tokio's connections and timers | 0.1.21 | `tokio` |
 | [http-body-util](https://crates.io/crates/http-body-util) | holds the body of an HTTP answer | 0.1.5 | — |
-| [rustls](https://crates.io/crates/rustls) | secures the connection to a machine: TLS is never Away's own | 0.23.46 | `ring`, `std`, `tls12` |
+| [rustls](https://crates.io/crates/rustls) | secures the connection to a machine and to the sign-in service: TLS is never Away's own | 0.23.46 | `ring`, `std`, `tls12` |
+| [tokio-rustls](https://crates.io/crates/tokio-rustls) | lets rustls secure tokio's connections | 0.26.6 | `ring`, `tls12` |
+| [webpki-roots](https://crates.io/crates/webpki-roots) | the public authorities a sign-in service's certificate is checked against, since the image holds no others | 1.0.12 | — |
 | [sha2](https://crates.io/crates/sha2) | makes the fingerprint a machine is known by, and binds a sign-in to its connection | 0.11.1 | — |
 | [md4](https://crates.io/crates/md4) | turns a password into the key Windows knows it by: part of signing in with a name and a password | 0.11.0 | — |
 | [md-5](https://crates.io/crates/md-5) | the hash that signing in with a name and a password is built on | 0.11.0 | — |
@@ -20,7 +22,7 @@ library has no line that says what it is for.
 | [rc4](https://crates.io/crates/rc4) | the cipher that signing in with a name and a password seals its messages with | 0.2.0 | — |
 | [getrandom](https://crates.io/crates/getrandom) | takes random bytes from the system, for keys and for numbers used once | 0.2.17, 0.4.3 | — |
 
-Away names 11 libraries. With what they bring with them, a build holds 67 in all, each in the version Cargo.lock names.
+Away names 13 libraries. With what they bring with them, a build holds 71 in all, each in the version Cargo.lock names.
 <!-- end: libraries -->
 
 ## What the build refuses

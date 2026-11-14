@@ -1,7 +1,8 @@
 //! A secret: a value that can be used and can't be printed.
 //!
-//! A password is held in one of these from the moment it is read. It has no way to be
-//! written to a line, a record or a page: asking to print it gives three dots.
+//! A password, a key or a token is held in one of these from the moment it is read. It
+//! has no way to be written to a line, a record or a page: asking to print it gives
+//! three dots.
 
 use std::fmt;
 

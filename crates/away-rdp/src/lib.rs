@@ -29,7 +29,10 @@ pub mod ntlm;
 pub mod pdu;
 pub mod picture;
 pub mod planar;
-pub mod secret;
+/// A value that can be used and can't be printed.
+pub mod secret {
+    pub use away_secret::Secret;
+}
 pub mod sign_in;
 #[cfg(any(test, feature = "stand-in"))]
 pub mod stand_in;

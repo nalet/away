@@ -1,0 +1,12 @@
+[package]
+name = "away-secret"
+description = "A value that can be used and can't be printed: what every password, key and token in Away is held in."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

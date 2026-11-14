@@ -41,7 +41,7 @@ every product shares. The specification doesn't repeat them.
 | Components | 30 | in 6 layers: 9 there, 20 first release, 1 later |
 | Connections | 44 | of 16 kinds |
 | Decision records | 13 | 13 accepted |
-| Work packages | 16 | 2 proofs and 14 builds: 14 agreed, 1 begun, 1 done |
+| Work packages | 16 | 2 proofs and 14 builds: 13 agreed, 2 begun, 1 done |
 <!-- end: state -->
 
 A capability counts once, by the soonest it is planned for any kind of

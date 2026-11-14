@@ -7,6 +7,7 @@ members = [
     "crates/away-server",
     "crates/away-gateway",
     "crates/away-issuer",
+    "crates/away-secret",
     "crates/away-rdp",
     "crates/away-try",
 ]
@@ -23,10 +24,12 @@ publish = false
 # writes docs/libraries.md from these lines and fails when one says nothing.
 [workspace.dependencies]
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "net", "signal", "macros", "time", "sync"] } # runs many connections at once
-hyper = { version = "1", default-features = false, features = ["http1", "server"] } # speaks HTTP to browsers and to the cluster's checks
+hyper = { version = "1", default-features = false, features = ["http1", "server", "client"] } # speaks HTTP to browsers, to the cluster's checks and to the sign-in service
 hyper-util = { version = "0.1", default-features = false, features = ["tokio"] } # lets hyper use tokio's connections and timers
 http-body-util = { version = "0.1", default-features = false } # holds the body of an HTTP answer
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] } # secures the connection to a machine: TLS is never Away's own
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] } # secures the connection to a machine and to the sign-in service: TLS is never Away's own
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] } # lets rustls secure tokio's connections
+webpki-roots = { version = "1", default-features = false } # the public authorities a sign-in service's certificate is checked against, since the image holds no others
 sha2 = { version = "0.11", default-features = false } # makes the fingerprint a machine is known by, and binds a sign-in to its connection
 md4 = { version = "0.11", default-features = false } # turns a password into the key Windows knows it by: part of signing in with a name and a password
 md-5 = { version = "0.11", default-features = false } # the hash that signing in with a name and a password is built on
@@ -34,6 +37,7 @@ hmac = { version = "0.13", default-features = false } # makes the proofs and the
 rc4 = { version = "0.2", default-features = false } # the cipher that signing in with a name and a password seals its messages with
 getrandom = { version = "0.4", default-features = false } # takes random bytes from the system, for keys and for numbers used once
 
+away-secret = { path = "crates/away-secret" }
 away-part = { path = "crates/away-part" }
 away-server = { path = "crates/away-server" }
 away-gateway = { path = "crates/away-gateway" }

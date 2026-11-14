@@ -3,9 +3,7 @@
 //! In this version it answers on the address Away is reached at, with one page that says
 //! Away is installed, and says whether it is well. It reaches nothing yet.
 
-use std::sync::Arc;
-
-use away_part::http::{answer, for_a_browser, plain, Answers, Listener};
+use away_part::http::{answer, at_once, for_a_browser, plain, Answers, Listener};
 use away_part::part::Bound;
 use away_part::{Part, Settings};
 use hyper::{Method, StatusCode};
@@ -58,7 +56,7 @@ impl Server {
 
 /// What answers on the address Away is reached at.
 fn public() -> Answers {
-    Arc::new(|request| {
+    at_once(|request| {
         let reading = matches!(*request.method(), Method::GET | Method::HEAD);
         for_a_browser(match request.uri().path() {
             "/" if reading => answer(StatusCode::OK, "text/html; charset=utf-8", INSTALLED),

@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use hyper::{Method, StatusCode};
 
-use crate::http::{answer, plain, Answers, Listener};
+use crate::http::{answer, at_once, plain, Answers, Listener};
 use crate::lines::Lines;
 use crate::measures::Measures;
 use crate::stop::Stop;
@@ -112,7 +112,7 @@ impl Part {
     /// What answers on the listener that says whether the part is well.
     pub fn health(&self) -> Answers {
         let part = self.clone();
-        Arc::new(move |request| {
+        at_once(move |request| {
             if request.method() != Method::GET {
                 return plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers GET.\n");
             }
