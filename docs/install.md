@@ -32,6 +32,20 @@ helm install away oci://ghcr.io/nalet/charts/away --version <version> \
   --set ingress.enabled=true
 ```
 
+With a certificate of one's own for the address, keep it in the namespace as
+a secret of the kind `kubernetes.io/tls` and name it:
+
+```sh
+kubectl --namespace away create secret tls away-address --cert=address.pem --key=address.key
+helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
+  --namespace away --reuse-values \
+  --set ingress.tlsSecret=away-address
+```
+
+Away is reached over https alone. An ingress controller decides by itself what
+it does with a request that arrives without TLS: set it to send such a request
+on to https.
+
 On OpenShift, with a route:
 
 ```sh
@@ -152,7 +166,7 @@ networkRules:
   wayInFrom:
     - namespaceSelector:
         matchLabels:
-          kubernetes.io/metadata.name: ingress-nginx
+          kubernetes.io/metadata.name: ingress
 ```
 
 ## Seeing that it runs

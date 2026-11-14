@@ -231,9 +231,19 @@ tries the way in from outside the cluster:
 INSTALLED=1 NAMESPACE=away ADDRESS=away.example.com WAY_IN=router tests/install/kubernetes.sh
 ```
 
-It needs kubectl, helm, curl and jq, and a cluster that enforces network
-rules. The pipeline runs it on every change, on a cluster it starts for the
-purpose.
+With `INGRESS`, the ingress controller's service as `namespace/name`, it
+installs Away behind that controller, on an address and with a certificate
+that it makes for the test from an authority of its own. It then tries the way
+in through the controller, trusting that authority and no other, and checks
+that no pod but the controller's reaches Away's address:
+
+```sh
+INGRESS=ingress/traefik INGRESS_CLASS=traefik tests/install/kubernetes.sh
+```
+
+It needs kubectl, helm, curl, jq and openssl, and a cluster that enforces
+network rules. The pipeline runs it on every change, on a cluster it starts
+for the purpose: once by itself, and once behind an ingress controller.
 
 ## Checking a published image
 

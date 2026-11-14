@@ -6,6 +6,8 @@
 #     into a namespace that takes only the strictest profile;
 #   - its three parts say that they are well, give their measures, and write their lines;
 #   - the server answers on its address and the gateway on its own;
+#   - behind an ingress controller, Away answers on its address with a certificate of
+#     one's own, and nothing but that controller reaches it;
 #   - the cluster refuses every connection the architecture doesn't list.
 #
 # By itself it installs Away into a namespace it makes, and removes it again:
@@ -17,7 +19,12 @@
 #
 #   INSTALLED=1 NAMESPACE=away ADDRESS=away.example.com WAY_IN=router tests/install/kubernetes.sh
 #
-# It needs kubectl, helm, curl and jq, and a cluster that enforces network rules.
+# With INGRESS it installs Away behind the cluster's ingress controller, on an address
+# and with a certificate that it makes for the test, from an authority of its own:
+#
+#   INGRESS=ingress/traefik INGRESS_CLASS=traefik tests/install/kubernetes.sh
+#
+# It needs kubectl, helm, curl, jq and openssl, and a cluster that enforces network rules.
 #
 #   NAMESPACE          where Away is installed                         (away-test)
 #   RELEASE            the installation's name                         (away)
@@ -28,11 +35,14 @@
 #   IMAGE_REPOSITORY   the image, without its tag                      (ghcr.io/nalet/away)
 #   IMAGE_TAG          its tag                                         (main)
 #   IMAGE_PULL_POLICY  IfNotPresent, or Never for an image the cluster already holds
+#   INGRESS            the ingress controller's service, as namespace/name: Away is then
+#                      installed behind it, and tried through it
+#   INGRESS_CLASS      the ingress controller's class                  (the cluster's default)
 # for an installation that is there:
 #   ADDRESS            the address it answers on: the way in is then tried from outside
 #   WAY_IN             who the way in lets through to Away's address: any (every
-#                      namespace, as with an ingress) or router (the cluster's router
-#                      alone, as with a route)                         (any)
+#                      namespace, as with an ingress that names nobody) or router (the
+#                      cluster's router alone, as with a route)        (any)
 set -euo pipefail
 
 INSTALLED=${INSTALLED:-}
@@ -40,6 +50,8 @@ NAMESPACE=${NAMESPACE:-away-test}
 RELEASE=${RELEASE:-away}
 ADDRESS=${ADDRESS:-}
 WAY_IN=${WAY_IN:-any}
+INGRESS=${INGRESS:-}
+INGRESS_CLASS=${INGRESS_CLASS:-}
 IMAGE_REPOSITORY=${IMAGE_REPOSITORY:-ghcr.io/nalet/away}
 IMAGE_TAG=${IMAGE_TAG:-main}
 IMAGE_PULL_POLICY=${IMAGE_PULL_POLICY:-IfNotPresent}
@@ -77,10 +89,11 @@ else
   RUN_AS="runAsUser: 65532"
 fi
 
-# forward <pod> <port>: a way to one port of one pod, on a port of this machine
-forward() {
-  local log="$WORK/forward-$1-$2.log"
-  kubectl --namespace "$NAMESPACE" port-forward "pod/$1" ":$2" >"$log" 2>&1 &
+# forward_to <namespace> <pod/name or service/name> <port>: a way to one port of a pod or
+# of a service, on a port of this machine
+forward_to() {
+  local log="$WORK/forward-$1-${2//\//-}-$3.log"
+  kubectl --namespace "$1" port-forward "$2" ":$3" >"$log" 2>&1 &
   FORWARDS+=($!)
   for _ in $(seq 1 50); do
     if grep -q 'Forwarding from 127.0.0.1:' "$log"; then
@@ -89,8 +102,11 @@ forward() {
     fi
     sleep 0.2
   done
-  fail "no way to port $2 of $1: $(cat "$log")"
+  fail "no way to port $3 of $2: $(cat "$log")"
 }
+
+# forward <pod> <port>: a way to one port of one of Away's pods
+forward() { forward_to "$NAMESPACE" "pod/$1" "$2"; }
 
 # pod <namespace> <name> <labels> <image> <what it runs> [pull policy] [apart]: a pod of
 # this test, under the strictest profile. One that is "apart" never says it is ready, so
@@ -159,10 +175,29 @@ if [ -z "$INSTALLED" ]; then
   fi
   ok "the installer may act in $NAMESPACE and nowhere else"
 
+  BEHIND=()
+  if [ -n "$INGRESS" ]; then
+    say "A certificate of one's own for Away's address, from an authority that exists for this test"
+    ADDRESS=away.example.com
+    WAY_IN=ingress
+    openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=An authority of one's own" -addext basicConstraints=critical,CA:TRUE \
+      -keyout "$WORK/authority.key" -out "$WORK/authority.pem" 2>/dev/null || fail "the authority"
+    openssl req -newkey rsa:2048 -nodes -subj "/CN=$ADDRESS" -keyout "$WORK/address.key" -out "$WORK/address.csr" 2>/dev/null || fail "the request for a certificate"
+    printf 'subjectAltName=DNS:%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n' "$ADDRESS" > "$WORK/address.ext"
+    openssl x509 -req -in "$WORK/address.csr" -CA "$WORK/authority.pem" -CAkey "$WORK/authority.key" -CAcreateserial -days 2 \
+      -extfile "$WORK/address.ext" -out "$WORK/address.pem" 2>/dev/null || fail "the certificate"
+    KUBECONFIG="$WORK/installer.kubeconfig" kubectl create secret tls away-address --cert="$WORK/address.pem" --key="$WORK/address.key" >/dev/null \
+      || fail "the installer can't keep the certificate in $NAMESPACE"
+    ok "a certificate for $ADDRESS, kept in $NAMESPACE by the installer"
+    BEHIND=(--set ingress.enabled=true --set address="$ADDRESS" --set ingress.tlsSecret=away-address
+            --set "networkRules.wayInFrom[0].namespaceSelector.matchLabels.kubernetes\.io/metadata\.name=${INGRESS%%/*}")
+    [ -z "$INGRESS_CLASS" ] || BEHIND+=(--set ingress.className="$INGRESS_CLASS")
+  fi
+
   say "One command installs it"
   KUBECONFIG="$WORK/installer.kubeconfig" helm install "$RELEASE" "$CHART" ${CHART_VERSION:+--version "$CHART_VERSION"} --namespace "$NAMESPACE" \
     --set image.repository="$IMAGE_REPOSITORY" --set image.tag="$IMAGE_TAG" --set image.pullPolicy="$IMAGE_PULL_POLICY" \
-    --wait --timeout 240s >/dev/null || {
+    ${BEHIND[@]+"${BEHIND[@]}"} --wait --timeout 240s >/dev/null || {
       kubectl --namespace "$NAMESPACE" get pods,events >&2 || true
       fail "helm install"
     }
@@ -226,9 +261,28 @@ ok "the gateway holds no session yet, and says so"
 
 if [ -n "$ADDRESS" ]; then
   say "The way in, from outside the cluster, at https://$ADDRESS"
+  if [ -n "$INGRESS" ] && [ -z "$INSTALLED" ]; then
+    # the address leads to the ingress controller, and the one authority that is trusted
+    # is the test's own: a certificate of the controller's would be refused
+    https=$(forward_to "${INGRESS%%/*}" "service/${INGRESS##*/}" 443)
+    http=$(forward_to "${INGRESS%%/*}" "service/${INGRESS##*/}" 80)
+    mkdir -p "$WORK/home"
+    printf 'connect-to = "%s:443:127.0.0.1:%s"\nconnect-to = "%s:80:127.0.0.1:%s"\ncacert = "%s"\n' \
+      "$ADDRESS" "$https" "$ADDRESS" "$http" "$WORK/authority.pem" > "$WORK/home/.curlrc"
+    export CURL_HOME="$WORK/home"
+    # the controller takes a moment to learn of a new ingress and its certificate
+    for _ in $(seq 1 30); do
+      curl --silent --max-time 5 --output /dev/null "https://$ADDRESS/" && break
+      sleep 2
+    done
+  fi
   curl --silent --show-error --max-time 20 "https://$ADDRESS/" > "$WORK/page" || fail "https://$ADDRESS/ gives no answer, or a certificate that is not trusted"
   pages "https://$ADDRESS" || fail "https://$ADDRESS/ is not the server's page"
-  ok "the server's page, over a certificate this machine trusts"
+  if [ -n "${CURL_HOME:-}" ]; then
+    ok "the server's page, behind the ingress controller, over the certificate of one's own"
+  else
+    ok "the server's page, over a certificate this machine trusts"
+  fi
   [ "$(curl --silent --max-time 20 "https://$ADDRESS/session")" = "No session is at this address." ] || fail "https://$ADDRESS/session does not lead to the gateway"
   ok "a session's address leads to the gateway"
   [ "$(curl --silent --max-time 20 --output /dev/null --write-out '%{http_code}' "https://$ADDRESS/metrics")" = 404 ] || fail "the measures are on the address Away is reached at"
@@ -241,6 +295,7 @@ if [ -n "$ADDRESS" ]; then
     30[1278]\ https://*) ok "what arrives without TLS is sent on to https" ;;
     *) fail "http://$ADDRESS/ is answered without TLS" ;;
   esac
+  unset CURL_HOME
 fi
 
 say "The cluster refuses what the architecture doesn't list"
@@ -273,9 +328,10 @@ refused() {
 
 # what is allowed, so that a refusal below means a rule and not a broken network
 allowed "$other" outsider "$elsewhere_ip:8080" "a pod that no rule covers, to another one"
-if [ "$WAY_IN" = router ]; then
-  refused "$other" outsider "$server_ip:8080"  "a pod that is not the cluster's router, to the server's address"
-  refused "$other" outsider "$gateway_ip:8081" "a pod that is not the cluster's router, to the gateway's address"
+if [ "$WAY_IN" = router ] || [ "$WAY_IN" = ingress ]; then
+  if [ "$WAY_IN" = router ]; then lets="the cluster's router"; else lets="the ingress controller"; fi
+  refused "$other" outsider "$server_ip:8080"  "a pod that is not $lets, to the server's address"
+  refused "$other" outsider "$gateway_ip:8081" "a pod that is not $lets, to the gateway's address"
 else
   allowed "$other" outsider "$server_ip:8080"  "the way in, to the server's address"
   allowed "$other" outsider "$gateway_ip:8081" "the way in, to the gateway's address"

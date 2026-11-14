@@ -120,6 +120,27 @@ jobs:
           IMAGE_TAG: test
           IMAGE_PULL_POLICY: Never
 
+      # an ingress controller as a cluster has one, set to send on to https what arrives without
+      - name: Give the cluster an ingress controller
+        run: |
+          helm install traefik traefik --repo https://traefik.github.io/charts --version 42.4.0 \
+            --namespace ingress --create-namespace \
+            --set service.spec.type=ClusterIP \
+            --set ports.web.http.redirections.entryPoint.to=websecure \
+            --set ports.web.http.redirections.entryPoint.scheme=https \
+            --set ports.web.http.redirections.entryPoint.permanent=true \
+            --wait --timeout 240s
+
+      - name: Install Away behind it, with a certificate of one's own, and try it
+        run: tests/install/kubernetes.sh
+        env:
+          NAMESPACE: away-behind
+          INGRESS: ingress/traefik
+          INGRESS_CLASS: traefik
+          IMAGE_REPOSITORY: away
+          IMAGE_TAG: test
+          IMAGE_PULL_POLICY: Never
+
   machines:
     name: try real servers
     runs-on: ubuntu-24.04
