@@ -126,7 +126,7 @@ struct Inner {
     back: String,
     says: Json,
     good_for: u64,
-    sends_back_with: Option<&'static str>,
+    sends_back_with: Option<String>,
     refuses_renewals: bool,
     codes: HashMap<String, (String, String)>,
     renewals: Vec<String>,
@@ -146,7 +146,17 @@ impl SignInService {
     /// Starts one that knows Away by this name and this secret, and sends people back
     /// to this address.
     pub async fn start(client: &str, secret: &str, back: &str) -> SignInService {
-        let listener = Listener::bind("sign-in service", "127.0.0.1:0").await.expect("an address");
+        SignInService::start_at("127.0.0.1:0", client, secret, back).await
+    }
+
+    /// The same, at an address that is chosen: `127.0.0.1:18081`.
+    ///
+    /// Tests that run in a browser tell it how to behave by sending it a form:
+    /// `POST /stand-in?refuses_renewals=true`. The names are `refuses_renewals` (true or
+    /// false), `sends_back_with` (an error, or nothing), `signs_for` (seconds), `person`
+    /// (`administrator` or `person`) and `reset`, which makes it as it was when it started.
+    pub async fn start_at(at: &str, client: &str, secret: &str, back: &str) -> SignInService {
+        let listener = Listener::bind("sign-in service", at).await.expect("an address");
         let address = format!("http://127.0.0.1:{}", listener.address().port());
         let inner = Arc::new(Mutex::new(Inner {
             at: address.clone(),
@@ -154,12 +164,7 @@ impl SignInService {
             signer: Signer::curve(),
             client: (client.to_string(), secret.to_string()),
             back: back.to_string(),
-            says: Json::object([
-                ("sub", "7c1f".into()),
-                ("name", "Alex Urban".into()),
-                ("email", "alex.urban@example.com".into()),
-                ("groups", Json::List(vec!["staff".into(), "away-admins".into()])),
-            ]),
+            says: administrator(),
             good_for: 300,
             sends_back_with: None,
             refuses_renewals: false,
@@ -186,6 +191,10 @@ impl SignInService {
                         ("/keys", true) => json(StatusCode::OK, inner.signer.published()),
                         ("/authorize", true) => inner.sign_in_page(&read_form(&asked).unwrap_or_default()),
                         ("/token", false) => inner.tokens(named.as_deref(), &sent),
+                        ("/stand-in", false) => {
+                            inner.told(&read_form(&asked).unwrap_or_default());
+                            json(StatusCode::OK, Json::object([]))
+                        }
                         ("/revoke", false) => {
                             inner.forgotten.extend(sent.iter().filter(|(name, _)| name == "token").map(|(_, token)| token.clone()));
                             json(StatusCode::OK, Json::object([]))
@@ -220,8 +229,8 @@ impl SignInService {
 
     /// From now on it sends people back with this error and without signing them in,
     /// as when somebody gives up on the sign-in page.
-    pub fn sends_back_with(&self, error: Option<&'static str>) {
-        self.inner().sends_back_with = error;
+    pub fn sends_back_with(&self, error: Option<&str>) {
+        self.inner().sends_back_with = error.map(str::to_string);
     }
 
     /// Whether it refuses every renewal from now on, as when an account is closed.
@@ -260,6 +269,26 @@ impl SignInService {
     }
 }
 
+/// The person the stand-in signs in unless it is told otherwise: an administrator.
+pub fn administrator() -> Json {
+    Json::object([
+        ("sub", "7c1f".into()),
+        ("name", "Alex Urban".into()),
+        ("email", "alex.urban@example.com".into()),
+        ("groups", Json::List(vec!["staff".into(), "away-admins".into()])),
+    ])
+}
+
+/// A person who administers nothing.
+pub fn person() -> Json {
+    Json::object([
+        ("sub", "9d2e".into()),
+        ("name", "Robin Meyer".into()),
+        ("email", "robin.meyer@example.com".into()),
+        ("groups", Json::List(vec!["staff".into()])),
+    ])
+}
+
 fn json(status: StatusCode, says: Json) -> Answer {
     answer(status, "application/json", says.write())
 }
@@ -269,6 +298,25 @@ fn refusal(status: StatusCode, error: &str, more: &str) -> Answer {
 }
 
 impl Inner {
+    /// Behaves from now on as a test tells it to.
+    fn told(&mut self, told: &[(String, String)]) {
+        for (name, value) in told {
+            match name.as_str() {
+                "reset" => {
+                    self.says = administrator();
+                    self.good_for = 300;
+                    self.sends_back_with = None;
+                    self.refuses_renewals = false;
+                }
+                "refuses_renewals" => self.refuses_renewals = value == "true",
+                "sends_back_with" => self.sends_back_with = Some(value.clone()).filter(|error| !error.is_empty()),
+                "signs_for" => self.good_for = value.parse().unwrap_or(300),
+                "person" => self.says = if value == "person" { person() } else { administrator() },
+                _ => {}
+            }
+        }
+    }
+
     fn says_of_itself(&self) -> Answer {
         let at = |path: &str| Json::Text(format!("{}{path}", self.at));
         json(
@@ -296,7 +344,7 @@ impl Inner {
         if !whole {
             return plain(StatusCode::BAD_REQUEST, "The sign-in page was asked for in a way it doesn't take.\n");
         }
-        let came_with = match self.sends_back_with {
+        let came_with = match &self.sends_back_with {
             Some(error) => format!("error={error}&error_description=said+the+stand-in"),
             None => {
                 let code = random_name();

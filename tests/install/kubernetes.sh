@@ -193,11 +193,23 @@ for part in server gateway issuer; do
   ok "$part: alive, ready, $(grep -c '^away_' "$WORK/$part.measures") measures, $(wc -l < "$WORK/$part.lines" | tr -d ' ') lines${user:+, as the user $user that the cluster gave it}"
 done
 
+# Whether Away's pages are at an address: the page, sent with the rule that lets a browser
+# load Away's own files and nothing else, the script it names, and the server's word on
+# who is signed in, which is nobody.
+pages() {
+  curl --silent --max-time 20 "$1/" > "$WORK/page" || return 1
+  script=$(grep -o '/assets/[^"]*\.js' "$WORK/page" | head -n 1)
+  [ -n "$script" ] || return 1
+  [ "$(curl --silent --max-time 20 --output /dev/null --write-out '%{http_code}' "$1$script")" = 200 ] || return 1
+  curl --silent --max-time 20 --head "$1/" | tr -d '\r' | grep -qi "^content-security-policy: default-src 'none'; script-src 'self'; " || return 1
+  curl --silent --max-time 20 "$1/api/who" | jq --exit-status '.version != null and .signed_in == false' > /dev/null || return 1
+}
+
 say "The server answers on its address, and the gateway on its own"
 server=$(part_pod server)
 gateway=$(part_pod gateway)
 port=$(forward "$server" 8080)
-curl --silent "http://127.0.0.1:$port/" | grep -q 'Away is installed and running.' || fail "the server's page"
+pages "http://127.0.0.1:$port" || fail "the server's page"
 [ "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$port/livez")" = 404 ] || fail "the server says whether it is well on the address Away is reached at"
 ok "the server's page, and nothing of its health beside it"
 port=$(forward "$gateway" 8081)
@@ -207,7 +219,7 @@ ok "the gateway holds no session yet, and says so"
 if [ -n "$ADDRESS" ]; then
   say "The way in, from outside the cluster, at https://$ADDRESS"
   curl --silent --show-error --max-time 20 "https://$ADDRESS/" > "$WORK/page" || fail "https://$ADDRESS/ gives no answer, or a certificate that is not trusted"
-  grep -q 'Away is installed and running.' "$WORK/page" || fail "https://$ADDRESS/ is not the server's page"
+  pages "https://$ADDRESS" || fail "https://$ADDRESS/ is not the server's page"
   ok "the server's page, over a certificate this machine trusts"
   [ "$(curl --silent --max-time 20 "https://$ADDRESS/session")" = "No session is at this address." ] || fail "https://$ADDRESS/session does not lead to the gateway"
   ok "a session's address leads to the gateway"
