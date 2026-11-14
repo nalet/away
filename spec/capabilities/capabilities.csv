@@ -78,7 +78,7 @@ go-on-without-password,signin,Go on from the machine to a further one with nothi
 unlock-without-password,signin,Open a locked desktop again with nothing asked,person,v1,later,—,—,
 be-oneself-cloud-joined,signin,Be signed in as oneself on a Windows machine that is joined to a cloud directory only,system,later,—,—,—,
 check-machine-identity,signin,"Check that a machine is the one it claims to be, and refuse one that changed",system,v1,later,v1,—,
-move-between-views,frame,"Move between the machines, the open sessions and the settings",person,—,—,—,built,"a rail of icons on a wide screen, a bar of icons on a phone"
+move-between-views,frame,"Move between home, the programs, the machines, the open sessions and the settings",person,—,—,—,built,"a rail of icons on a wide screen, a bar of icons on a phone"
 see-open-sessions,frame,"See the sessions that are open, and go to one",person,—,—,—,v1,
 find-from-anywhere,frame,Find a machine by its name from any page,person,—,—,—,v1,
 see-who-is-signed-in,frame,See which account is signed in,person,—,—,—,built,
@@ -88,14 +88,14 @@ use-without-mouse,frame,"Use every page around a session with the keyboard alone
 choose-language,frame,Use Away in one's own language,person,—,—,—,later,English first
 see-notices,frame,"Be told what happened meanwhile: a session ended, a request was answered",person,—,—,—,later,
 use-installed-app,frame,"Use an installed app instead of the browser, on a computer or a phone",person,—,—,—,no,the browser is the one way in
-see-machines,find,See the machines one may reach,person,—,—,—,v1,
+see-machines,find,"See the machines one may reach, on a page of their own",person,—,—,—,v1,
 search-machines,find,"Find a machine by its name, its address or its group",person,—,—,—,v1,
 see-groups,find,See the machines in the groups an administrator made,person,—,—,—,v1,
 see-last-used,find,See the machines used last,person,—,—,—,v1,
-keep-favourites,find,Mark machines as favourites and see them first,person,—,—,—,v1,
+keep-favourites,find,"Mark machines and programs as favourites, and see them on home",person,—,—,—,v1,
 see-machine-details,find,"See what a machine is: its kind, its address, how one gets in",person,—,—,—,v1,
 see-programs,find,"See the programs a Windows machine offers, and open one",person,—,—,—,v1,
-see-programs-beside-machines,find,"See every program one may open as an entry of its own beside the machines, and find it by its name",person,—,—,—,v1,"a machine that offers programs alone is seen as its programs"
+see-all-programs,find,"See every program one may open on a page of their own, each as an entry, and find it by its name",person,—,—,—,v1,"the programs of every machine one reaches, whichever machine offers them"
 choose-way-in,find,"Choose how to open a machine that offers more than one way: its desktop, its programs, its shell",person,—,—,—,v1,
 open-by-address,find,Open a machine from a link or a bookmark,person,—,—,—,v1,
 see-machine-state,find,See whether a machine is on and can be reached,person,—,—,—,later,

@@ -163,7 +163,7 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 @media (max-height: 480px) and (orientation: landscape) and (min-width: 481px) {
   .frame { grid-template-rows: 48px minmax(0, 1fr); }
   .bar .mark { font-size: 18px; }
-  .rail { justify-content: center; padding: 4px 0; }
+  .rail { justify-content: center; padding: 4px 0; gap: 4px; }
   .rail .gap { display: none; }
   .rail .it-settings { display: none; }
   .pg { padding: 16px 24px; }

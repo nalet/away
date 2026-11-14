@@ -69,7 +69,7 @@
   const logo = `<span class="logo">${chevron}away</span>`;
   const make = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; };
   // the views, in their order, each with its icon; administration only for those who have it
-  const views = (f) => [['home', 'house'], ['sessions', 'layers'], ...(f.dataset.role ? [['administration', 'shield']] : [])];
+  const views = (f) => [['home', 'house'], ['programs', 'app-window'], ['machines', 'monitor'], ['sessions', 'layers'], ...(f.dataset.role ? [['administration', 'shield']] : [])];
   const count = (f, v) => (v === 'sessions' && f.dataset.count && f.dataset.count !== '0' ? `<span class="count">${f.dataset.count}</span>` : '');
   const over = (f, from) => { for (const m of from.querySelectorAll('.nc-modal, .usermenu, [data-over]')) f.appendChild(m); };
 

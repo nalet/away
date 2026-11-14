@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { MouseEvent } from 'react';
 
-export type View = 'home' | 'sessions' | 'administration' | 'settings';
+export type View = 'home' | 'programs' | 'machines' | 'sessions' | 'administration' | 'settings';
 
 export const addressOf: Record<View, string> = {
   home: '/',
+  programs: '/programs',
+  machines: '/machines',
   sessions: '/sessions',
   administration: '/administration',
   settings: '/settings',
@@ -17,8 +19,8 @@ export const ABOUT = '/settings/about';
 
 export function viewAt(path: string): View | null {
   if (path === ABOUT) return 'settings';
-  // a machine's page is a page of home, and the rules are a page of the administration
-  if (/^\/machines\/[^/]+$/.test(path)) return 'home';
+  // a machine's page is a page of the machines, and the rules are a page of the administration
+  if (/^\/machines\/[^/]+$/.test(path)) return 'machines';
   if (path === '/administration/rules') return 'administration';
   const found = (Object.keys(addressOf) as View[]).find((view) => addressOf[view] === path);
   return found ?? null;

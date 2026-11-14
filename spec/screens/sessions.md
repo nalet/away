@@ -109,7 +109,7 @@ sessions at once.
 <!-- generated: draws -->
 | Figure | Draws |
 |---|---|
-| 9.1 The sessions that are open, on a computer | [See the sessions that are open, and go to one](../capabilities/app.md#the-frame), [Keep several machines open at once and move between them](../capabilities/session.md#opening-a-machine), [Move between the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [Open a session in a browser tab or window of its own](../capabilities/session.md#opening-a-machine) |
+| 9.1 The sessions that are open, on a computer | [See the sessions that are open, and go to one](../capabilities/app.md#the-frame), [Keep several machines open at once and move between them](../capabilities/session.md#opening-a-machine), [Move between home, the programs, the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [Open a session in a browser tab or window of its own](../capabilities/session.md#opening-a-machine) |
 | 9.2 A session's menu, for a Windows desktop | [Open a session in a browser tab or window of its own](../capabilities/session.md#opening-a-machine), [Choose between leaving a desktop running and signing out of the machine](../capabilities/session.md#opening-a-machine) |
 | 9.3 The same list on a phone | [See the sessions that are open, and go to one](../capabilities/app.md#the-frame), [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet) |
 | 9.4 No session is open | [See the sessions that are open, and go to one](../capabilities/app.md#the-frame) |

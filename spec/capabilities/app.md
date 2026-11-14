@@ -39,7 +39,7 @@ What is around every page: the rail, the top bar, the search, and the bar of a s
 
 | Capability | Who | Away | Key |
 |---|---|---|---|
-| Move between the machines, the open sessions and the settings | person | built | `move-between-views` |
+| Move between home, the programs, the machines, the open sessions and the settings | person | built | `move-between-views` |
 | See the sessions that are open, and go to one | person | v1 | `see-open-sessions` |
 | Find a machine by its name from any page | person | v1 | `find-from-anywhere` |
 | See which account is signed in | person | built | `see-who-is-signed-in` |
@@ -50,7 +50,7 @@ What is around every page: the rail, the top bar, the search, and the bar of a s
 | Be told what happened meanwhile: a session ended, a request was answered | person | later | `see-notices` |
 | Use an installed app instead of the browser, on a computer or a phone | person | no | `use-installed-app` |
 
-- *Move between the machines, the open sessions and the settings*: a rail of icons on a wide screen, a bar of icons on a phone.
+- *Move between home, the programs, the machines, the open sessions and the settings*: a rail of icons on a wide screen, a bar of icons on a phone.
 - *Give the machine the whole window while a session is open*: a session with programs keeps the list of their windows beside them.
 - *Use Away in one's own language*: English first.
 - *Use an installed app instead of the browser, on a computer or a phone*: the browser is the one way in.
@@ -61,21 +61,21 @@ The machines a person may reach: the list, its groups, the search, what was used
 
 | Capability | Who | Away | Key |
 |---|---|---|---|
-| See the machines one may reach | person | v1 | `see-machines` |
+| See the machines one may reach, on a page of their own | person | v1 | `see-machines` |
 | Find a machine by its name, its address or its group | person | v1 | `search-machines` |
 | See the machines in the groups an administrator made | person | v1 | `see-groups` |
 | See the machines used last | person | v1 | `see-last-used` |
-| Mark machines as favourites and see them first | person | v1 | `keep-favourites` |
+| Mark machines and programs as favourites, and see them on home | person | v1 | `keep-favourites` |
 | See what a machine is: its kind, its address, how one gets in | person | v1 | `see-machine-details` |
 | See the programs a Windows machine offers, and open one | person | v1 | `see-programs` |
-| See every program one may open as an entry of its own beside the machines, and find it by its name | person | v1 | `see-programs-beside-machines` |
+| See every program one may open on a page of their own, each as an entry, and find it by its name | person | v1 | `see-all-programs` |
 | Choose how to open a machine that offers more than one way: its desktop, its programs, its shell | person | v1 | `choose-way-in` |
 | Open a machine from a link or a bookmark | person | v1 | `open-by-address` |
 | See whether a machine is on and can be reached | person | later | `see-machine-state` |
 | Wake a machine that sleeps or is off, and connect once it is up | person | later | `wake-machine` |
 | Add a machine of one's own that nobody else sees | person | later | `add-own-machine` |
 
-- *See every program one may open as an entry of its own beside the machines, and find it by its name*: a machine that offers programs alone is seen as its programs.
+- *See every program one may open on a page of their own, each as an entry, and find it by its name*: the programs of every machine one reaches, whichever machine offers them.
 - *Wake a machine that sleeps or is off, and connect once it is up*: needs a way into the machine's own network segment, or to its hypervisor.
 
 ## Working together

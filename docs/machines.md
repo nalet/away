@@ -137,12 +137,15 @@ are put right.
 
 ## What people and administrators see
 
-- **Home** shows a person what they may open, in the groups of the files:
-  each machine that has a desktop or a shell, and after the machines every
-  program as an entry of its own, named with its machine. A machine that
-  offers programs alone is seen as its programs. A field finds a machine by its
-  name, its address or its group, and a program by its name. What is in no
-  group is under *other machines*.
+- **Programs** is a page of every program a person may open, each an entry of
+  its own, named with its machine, with a field that finds a program by its
+  name.
+- **Machines** is a page of the machines a person may reach, in the groups of
+  the files, with a field that finds a machine by its name, its address or its
+  group. A machine in no group is under *other machines*.
+- **Home** shows both together in this version: the machines that have a
+  desktop or a shell, and after them every program. It becomes the place for
+  what a person opened last and what they starred once Away keeps those.
 - **The order is the files' own.** The files are read in the order of their
   names, and inside a file the machines and their programs keep their place.
   A group comes where a machine first names it.

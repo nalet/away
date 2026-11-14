@@ -4,7 +4,7 @@
 //
 // The design system has no frame yet, so this one is built from its tokens.
 import { Button, Chevron } from '@nalet/design-system';
-import { House, Layers, Settings, Shield } from 'lucide-react';
+import { AppWindow, House, Layers, Monitor, Settings, Shield } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
@@ -13,12 +13,12 @@ import type { View } from './place';
 import { texts } from './texts';
 import { UserMenu } from './UserMenu';
 import { Administration } from './Administration';
-import { Home, MachinePage } from './Home';
+import { MachinePage, Opens } from './Home';
 import { namedBy } from './machines';
 import { About, Nowhere, Sessions, SettingsPage } from './views';
 import type { Who } from './who';
 
-const ICONS: Record<View, LucideIcon> = { home: House, sessions: Layers, administration: Shield, settings: Settings };
+const ICONS: Record<View, LucideIcon> = { home: House, programs: AppWindow, machines: Monitor, sessions: Layers, administration: Shield, settings: Settings };
 
 interface FrameProps {
   who: Who;
@@ -35,7 +35,7 @@ export function Frame({ who, path, go, signOut, signInAgain }: FrameProps) {
   // the administration holds what administrators see; the records come with a later version
   const administers = Boolean(who.administers);
   // the views, in their order; administration only for those who have a role there
-  const views: View[] = administers ? ['home', 'sessions', 'administration'] : ['home', 'sessions'];
+  const views: View[] = administers ? ['home', 'programs', 'machines', 'sessions', 'administration'] : ['home', 'programs', 'machines', 'sessions'];
 
   useEffect(() => {
     const title = path === ABOUT ? texts.about.title : (namedBy(path) ?? (view ? texts.views[view] : texts.nowhere.title));
@@ -99,7 +99,9 @@ export function Frame({ who, path, go, signOut, signInAgain }: FrameProps) {
         {link('settings', 'rail')}
       </nav>
       <main className="page" id="page" tabIndex={-1} ref={page}>
-        {view === 'home' && (machine ? <MachinePage name={machine} go={go} key={machine} /> : <Home go={go} contact={who.contact} />)}
+        {view === 'home' && <Opens which="home" go={go} contact={who.contact} key="home" />}
+        {view === 'programs' && <Opens which="programs" go={go} contact={who.contact} key="programs" />}
+        {view === 'machines' && (machine ? <MachinePage name={machine} go={go} key={machine} /> : <Opens which="machines" go={go} contact={who.contact} key="machines" />)}
         {view === 'sessions' && <Sessions />}
         {view === 'administration' && (administers ? <Administration path={path} go={go} /> : <Nowhere go={go} />)}
         {view === 'settings' && (path === ABOUT ? <About who={who} go={go} /> : <SettingsPage who={who} go={go} />)}

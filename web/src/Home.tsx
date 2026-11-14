@@ -1,5 +1,6 @@
-// Home: the machines one may reach, in the groups an administrator made, and a page for
-// each machine. This version shows them and opens none yet.
+// What one may open: on home everything, on a page of their own the programs, and on
+// another the machines in the groups an administrator made; and a page for each
+// machine. This version shows them and opens none yet.
 import { Banner, Button, Card, Chevron, Code, EmptyState, Input } from '@nalet/design-system';
 import { AppWindow, ArrowLeft, Monitor, Search, SquareTerminal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -7,7 +8,7 @@ import { useState } from 'react';
 
 import { entriesOf, found, pageOf, useMachines } from './machines';
 import type { Entry, Machine } from './machines';
-import { inPlace } from './place';
+import { addressOf, inPlace } from './place';
 import { texts } from './texts';
 
 // What a machine is, in one line: its desktop, its programs, its shell.
@@ -34,55 +35,69 @@ function grouped(entries: Entry[]): { name: string | null; entries: Entry[] }[] 
   return groups;
 }
 
-export function Home({ go, contact }: { go: (to: string) => void; contact: string | null }) {
+// Which of what one may open a page shows: everything on home, the programs alone, or
+// the machines alone.
+export type Which = 'home' | 'programs' | 'machines';
+
+function entriesFor(which: Which, machines: Machine[]): Entry[] {
+  if (which === 'home') return entriesOf(machines);
+  if (which === 'programs') return entriesOf(machines).filter((entry) => entry.program !== null);
+  // every machine, also one that offers programs alone: its page lists them
+  return machines.map((machine) => ({ machine, program: null }));
+}
+
+// A page of what one may open: home, the programs, or the machines.
+export function Opens({ which, go, contact }: { which: Which; go: (to: string) => void; contact: string | null }) {
   const [machines, again] = useMachines();
   const [sought, setSought] = useState('');
+  const t = texts.opens[which];
 
   if (machines === 'asking') return <div className="fill" aria-busy="true" />;
   if (machines === 'unanswered') {
     return (
       <div className="fill">
-        <h1 className="unseen">{texts.views.home}</h1>
+        <h1 className="unseen">{texts.views[which]}</h1>
         <EmptyState illustration="error" size="lg" headingLevel={2} title={texts.home.unanswered} actions={<Button variant="primary" onClick={again}>{texts.home.again}</Button>} />
       </div>
     );
   }
-  if (machines.length === 0) {
+  const all = entriesFor(which, machines);
+  if (all.length === 0) {
     return (
       <div className="fill">
-        <h1 className="unseen">{texts.views.home}</h1>
-        <EmptyState illustration="empty" size="lg" headingLevel={2} title={texts.home.none} />
+        <h1 className="unseen">{texts.views[which]}</h1>
+        <EmptyState illustration="empty" size="lg" headingLevel={2} title={t.none} />
         {contact && <p className="turn-to">{texts.contact(contact)}</p>}
       </div>
     );
   }
 
-  const all = entriesOf(machines);
   const shown = sought.trim() ? all.filter((entry) => found(entry, sought)) : all;
-  const groups = grouped(shown);
+  // the programs are one grid; machines, and home, are in the groups of the files
+  const groups = which === 'programs' ? (shown.length > 0 ? [{ name: null, entries: shown }] : []) : grouped(shown);
   const named = groups.some((group) => group.name !== null);
   return (
     <div className="pg wide">
       <div className="homehead">
-        <h1 className="unseen">{texts.views.home}</h1>
+        <h1 className="unseen">{texts.views[which]}</h1>
         <Input
           type="search"
           className="find"
           leading={<Search size={14} aria-hidden="true" />}
-          placeholder={texts.home.find}
-          aria-label={texts.home.find}
+          placeholder={t.find}
+          aria-label={t.find}
           value={sought}
           onChange={(event) => setSought(event.target.value)}
         />
       </div>
       {shown.length === 0 && (
         <div className="nomatch" role="status">
-          <p>{texts.home.noMatch(sought.trim())}</p>
-          <p className="small">{texts.home.looksAt}</p>
+          <p>{t.noMatch(sought.trim())}</p>
+          <p className="small">{t.looksAt}</p>
         </div>
       )}
       {groups.map((group) => {
-        const title = group.name ?? (named ? texts.home.others : texts.home.machines);
+        const title = which === 'programs' ? texts.views.programs : (group.name ?? (named ? texts.home.others : texts.home.machines));
         const id = `group-${group.name ?? ''}`.replace(/[^a-zA-Z0-9-]/g, '_');
         return (
           <section className="grp" key={id} aria-labelledby={id}>
@@ -150,7 +165,7 @@ export function MachinePage({ name, go }: { name: string; go: (to: string) => vo
   return (
     <div className="pg ab">
       <div className="pghead">
-        <a className="nc-iconbtn nc-iconbtn--ghost nc-iconbtn--md" href="/" aria-label={texts.machine.back} title={texts.machine.back} onClick={inPlace(go, '/')}>
+        <a className="nc-iconbtn nc-iconbtn--ghost nc-iconbtn--md" href={addressOf.machines} aria-label={texts.machine.back} title={texts.machine.back} onClick={inPlace(go, addressOf.machines)}>
           <ArrowLeft size={16} aria-hidden="true" />
         </a>
         <Icon size={22} className="kind" aria-hidden="true" />

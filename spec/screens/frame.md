@@ -11,7 +11,7 @@ icons alone, in a rail on a wide screen and in a tab bar on a phone.
 
 ## 2.1 On a computer
 
-![A page inside the frame: a bar across the top with the mark, a search field and an avatar, and a narrow rail of three icons down the left edge.](img/frame-computer.png)
+![A page inside the frame: a bar across the top with the mark, a search field and an avatar, and a narrow rail of icons down the left edge.](img/frame-computer.png)
 
 **Figure 2.1** The frame on a computer.
 
@@ -29,7 +29,9 @@ The views are few, and the same for everyone:
 
 | View | Its icon | What it is |
 |---|---|---|
-| Home | a house | the machines one may reach ([chapter 4](./machines.md)) |
+| Home | a house | what one opened last, and what one starred ([chapter 4](./machines.md)) |
+| Programs | a window | every program one may open ([chapter 4](./machines.md)) |
+| Machines | a screen | the machines one may reach, in their groups ([chapter 4](./machines.md)) |
 | Sessions | a stack of layers | the sessions that are open ([chapter 9](./sessions.md)) |
 | Administration | a shield | only for an administrator or a reader of the records (chapters 12 to 15) |
 | Settings | a gear | at the rail's foot; on a phone in the avatar's menu |
@@ -43,7 +45,7 @@ The views are few, and the same for everyone:
   then the page.
 - The first release has no notifications, so the bar has no bell.
 
-![The same frame for an administrator: a third icon, a shield, is in the rail and is the current view. The sessions icon carries the number 2.](img/frame-admin-computer.png)
+![The same frame for an administrator: a further icon, a shield, is in the rail and is the current view. The sessions icon carries the number 2.](img/frame-admin-computer.png)
 
 **Figure 2.2** The rail of an administrator, with two sessions open.
 
@@ -65,7 +67,7 @@ The views are few, and the same for everyone:
 
 ## 2.3 On a phone
 
-![A phone: a top bar with the name away, a search icon and an avatar; a page; a bar of two icons at the foot.](img/frame-phone.png)
+![A phone: a top bar with the name away, a search icon and an avatar; a page; a bar of icons at the foot.](img/frame-phone.png)
 
 **Figure 2.4** The frame on a phone held upright.
 
@@ -91,7 +93,7 @@ The views are few, and the same for everyone:
 
 | Where | Text |
 |---|---|
-| The views' names | home · sessions · administration · settings |
+| The views' names | home · programs · machines · sessions · administration · settings |
 | The search field | search machines… |
 | The avatar's menu | settings · sign out |
 | The link before the mark, for the keyboard | skip to the page |
@@ -101,9 +103,9 @@ The views are few, and the same for everyone:
 <!-- generated: draws -->
 | Figure | Draws |
 |---|---|
-| 2.1 The frame on a computer | [Move between the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [Find a machine by its name from any page](../capabilities/app.md#the-frame), [See which account is signed in](../capabilities/app.md#the-frame), [Use every page around a session with the keyboard alone, and with a screen reader](../capabilities/app.md#the-frame) |
-| 2.2 The rail of an administrator, with two sessions open | [Move between the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [See the sessions that are open, and go to one](../capabilities/app.md#the-frame), [Say who administers Away, who reads its records, and who only connects](../capabilities/admin.md#who-reaches-what) |
+| 2.1 The frame on a computer | [Move between home, the programs, the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [Find a machine by its name from any page](../capabilities/app.md#the-frame), [See which account is signed in](../capabilities/app.md#the-frame), [Use every page around a session with the keyboard alone, and with a screen reader](../capabilities/app.md#the-frame) |
+| 2.2 The rail of an administrator, with two sessions open | [Move between home, the programs, the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [See the sessions that are open, and go to one](../capabilities/app.md#the-frame), [Say who administers Away, who reads its records, and who only connects](../capabilities/admin.md#who-reaches-what) |
 | 2.3 The avatar's menu | [See which account is signed in](../capabilities/app.md#the-frame), [Sign out, and end the sessions Away opened](../capabilities/app.md#signing-in) |
-| 2.4 The frame on a phone held upright | [Move between the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [Find a machine by its name from any page](../capabilities/app.md#the-frame), [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet) |
-| 2.5 The frame on a phone held sideways | [Move between the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet) |
+| 2.4 The frame on a phone held upright | [Move between home, the programs, the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [Find a machine by its name from any page](../capabilities/app.md#the-frame), [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet) |
+| 2.5 The frame on a phone held sideways | [Move between home, the programs, the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet) |
 <!-- end: draws -->

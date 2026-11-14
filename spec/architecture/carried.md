@@ -107,7 +107,7 @@ says which.
 
 | Capability | Carried by | Built in package | Key |
 |---|---|---|---|
-| Move between the machines, the open sessions and the settings | `web` | [4](../plan/README.md#4-getting-in-and-the-frame) | `move-between-views` |
+| Move between home, the programs, the machines, the open sessions and the settings | `web` | [4](../plan/README.md#4-getting-in-and-the-frame) | `move-between-views` |
 | See the sessions that are open, and go to one | `web` | [7](../plan/README.md#7-sessions-as-they-run) | `see-open-sessions` |
 | Find a machine by its name from any page | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `find-from-anywhere` |
 | See which account is signed in | `web` `server` | [4](../plan/README.md#4-getting-in-and-the-frame) | `see-who-is-signed-in` |
@@ -119,14 +119,14 @@ says which.
 
 | Capability | Carried by | Built in package | Key |
 |---|---|---|---|
-| See the machines one may reach | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `see-machines` |
+| See the machines one may reach, on a page of their own | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `see-machines` |
 | Find a machine by its name, its address or its group | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `search-machines` |
 | See the machines in the groups an administrator made | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `see-groups` |
 | See the machines used last | `web` `server` | [7](../plan/README.md#7-sessions-as-they-run) | `see-last-used` |
-| Mark machines as favourites and see them first | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `keep-favourites` |
+| Mark machines and programs as favourites, and see them on home | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `keep-favourites` |
 | See what a machine is: its kind, its address, how one gets in | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `see-machine-details` |
 | See the programs a Windows machine offers, and open one | `web` `server` | [13](../plan/README.md#13-programs) | `see-programs` |
-| See every program one may open as an entry of its own beside the machines, and find it by its name | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `see-programs-beside-machines` |
+| See every program one may open on a page of their own, each as an entry, and find it by its name | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `see-all-programs` |
 | Choose how to open a machine that offers more than one way: its desktop, its programs, its shell | `web` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `choose-way-in` |
 | Open a machine from a link or a bookmark | `web` `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `open-by-address` |
 

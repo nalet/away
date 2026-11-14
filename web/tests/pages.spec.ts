@@ -51,7 +51,7 @@ test('someone who opens Away is signed in and sees the frame, and the pages load
   await expect(page.getByRole('banner').getByRole('link', { name: 'away, home' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Alex Urban, your account' }).locator('.av')).toHaveText('AU');
   const rail = page.getByRole('navigation', { name: 'views' });
-  await expect(rail.getByRole('link')).toHaveCount(4);
+  await expect(rail.getByRole('link')).toHaveCount(6);
   await expect(rail.getByRole('link', { name: 'home' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { level: 1, name: 'home' })).toBeAttached();
   await expect(page.getByRole('heading', { level: 2, name: 'engineering 3' })).toBeVisible();
@@ -208,7 +208,7 @@ test('home shows the machines a rule gives, in their groups, and a person sees n
 
 test('a machine is found by its name, its address or its group, and a program by its name', async ({ page }) => {
   await page.goto('/');
-  const find = page.getByRole('searchbox', { name: 'find a machine…' });
+  const find = page.getByRole('searchbox', { name: 'find a machine or a program…' });
   const shown = () => page.locator('a.m .name').allTextContents();
   await find.focus();
   await page.keyboard.type('BUILD');
@@ -224,7 +224,7 @@ test('a machine is found by its name, its address or its group, and a program by
   await find.fill('farm.corp');
   expect(await shown()).toEqual(['Desktops']);
   await find.fill('xyz');
-  await expect(page.getByRole('status')).toContainText('No machine matches “xyz”.');
+  await expect(page.getByRole('status')).toContainText('Nothing matches “xyz”.');
   await expect(page.getByRole('status')).toContainText('The search looks at the names, the addresses and the groups of the machines you can reach, and at the names of their programs.');
   await accessible(page);
   await find.fill('');
@@ -237,8 +237,8 @@ test('a machine has a page of its own, which says what it offers and what it is'
   await expect(page).toHaveURL(`${AWAY}/machines/fin-app-02`);
   await expect(page).toHaveTitle('fin-app-02 · away');
   await expect(page.getByRole('heading', { level: 1, name: 'fin-app-02' })).toBeVisible();
-  // it is a page of home
-  await expect(page.getByRole('navigation', { name: 'views' }).getByRole('link', { name: 'home' })).toHaveAttribute('aria-current', 'page');
+  // it is a page of the machines
+  await expect(page.getByRole('navigation', { name: 'views' }).getByRole('link', { name: 'machines' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByText('This version of Away shows the machines you may reach. It opens none yet.')).toBeVisible();
   await expect(page.getByRole('region', { name: 'desktop' })).toContainText('Windows desktop');
   const programs = page.getByRole('region', { name: 'programs 4' });
@@ -267,7 +267,52 @@ test('a machine has a page of its own, which says what it offers and what it is'
   // and back to the machines, with the keyboard
   await page.getByRole('main').getByRole('link', { name: 'machines' }).focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(`${AWAY}/`);
+  await expect(page).toHaveURL(`${AWAY}/machines`);
+});
+
+test('the programs have a page of their own, and so have the machines', async ({ page }) => {
+  await page.goto('/');
+  const rail = page.getByRole('navigation', { name: 'views' });
+  await rail.getByRole('link', { name: 'programs' }).click();
+  await expect(page).toHaveURL(`${AWAY}/programs`);
+  await expect(page).toHaveTitle('programs · away');
+  await expect(page.getByRole('heading', { level: 1, name: 'programs' })).toBeAttached();
+  // every program one may open, in one grid, in the order of the files
+  await expect(page.locator('section.grp h2')).toHaveText(['programs 4']);
+  expect(await tiles(page, 'programs 4')).toEqual([
+    ['Ledger', 'program on fin-app-02'],
+    ['Payroll', 'program on fin-app-02'],
+    ['Reports', 'program on fin-app-02'],
+    ['Mail', 'program on fin-app-02'],
+  ]);
+  const find = page.getByRole('searchbox', { name: 'find a program…' });
+  await find.fill('pay');
+  await expect(page.locator('a.m .name')).toHaveText(['Payroll']);
+  await find.fill('xyz');
+  await expect(page.getByRole('status')).toContainText('No program matches “xyz”.');
+  await accessible(page);
+
+  // the machines, in the groups of the files, without their programs
+  await rail.getByRole('link', { name: 'machines' }).click();
+  await expect(page).toHaveURL(`${AWAY}/machines`);
+  await expect(page).toHaveTitle('machines · away');
+  await expect(page.locator('section.grp h2')).toHaveText(['engineering 3', 'design 1', 'finance 2', 'other machines 1']);
+  expect(await tiles(page, 'finance 2')).toEqual([
+    ['fin-app-02', 'Windows desktop, 4 programs'],
+    ['hr-app-01', 'Windows desktop'],
+  ]);
+  await page.getByRole('searchbox', { name: 'find a machine…' }).fill('mac');
+  await expect(page.locator('a.m .name')).toHaveText(['mac-design-01']);
+  await accessible(page);
+  await page.getByRole('link', { name: /^mac-design-01/ }).click();
+  await expect(page).toHaveURL(`${AWAY}/machines/mac-design-01`);
+
+  // someone who is in staff alone: the programs and the machines the one rule gives
+  await service({ person: 'person' });
+  await page.goto('/sign-in?to=/machines');
+  await expect(page.locator('section.grp h2')).toHaveText(['finance 2', 'other machines 1']);
+  await page.goto('/programs');
+  await expect(page.locator('section.grp h2')).toHaveText(['programs 4']);
 });
 
 test('those who administer see what is in force and the file each thing comes from', async ({ page }) => {
@@ -385,11 +430,11 @@ test('the whole frame works with the keyboard alone', async ({ page }) => {
   await expect(page).toHaveTitle('home · away');
   // the Tab key goes from the link that skips to the page, to the mark, the avatar, the rail, and then the page
   const order: string[] = [];
-  for (let stop = 0; stop < 7; stop += 1) {
+  for (let stop = 0; stop < 9; stop += 1) {
     await page.keyboard.press('Tab');
     order.push(await focused(page));
   }
-  expect(order).toEqual(['skip to the page', 'away, home', 'AU, Alex Urban, your account', 'home', 'sessions', 'administration', 'settings']);
+  expect(order).toEqual(['skip to the page', 'away, home', 'AU, Alex Urban, your account', 'home', 'programs', 'machines', 'sessions', 'administration', 'settings']);
   // a view under the keyboard's focus says its name
   await expect(page.locator('.rail .it-settings + .nc-tooltip__bubble')).toBeVisible();
   await page.keyboard.press('Enter');
@@ -457,14 +502,14 @@ test('on a phone the views are a bar of icons at the foot, and a rail when it is
   const views = page.getByRole('navigation', { name: 'views' });
   // one navigation shows: the bar at the foot, with the views and without the settings
   await expect(views).toHaveCount(1);
-  await expect(views.getByRole('link')).toHaveText(['', '', '']);
+  await expect(views.getByRole('link')).toHaveText(['', '', '', '', '']);
   const tabs = await views.getByRole('link').evaluateAll((links) =>
     links.map((link) => {
       const box = link.getBoundingClientRect();
       return { name: link.getAttribute('aria-label'), height: box.height, bottom: Math.round(box.bottom), current: link.getAttribute('aria-current') };
     }),
   );
-  expect(tabs.map((tab) => tab.name)).toEqual(['home', 'sessions', 'administration']);
+  expect(tabs.map((tab) => tab.name)).toEqual(['home', 'programs', 'machines', 'sessions', 'administration']);
   expect(tabs[0]?.current).toBe('page');
   for (const tab of tabs) {
     expect(tab.height).toBeGreaterThanOrEqual(48);
@@ -492,7 +537,10 @@ test('on a phone the views are a bar of icons at the foot, and a rail when it is
   const rail = await views.boundingBox();
   expect(rail?.x).toBe(0);
   expect(rail?.width).toBe(80);
-  await expect(views.getByRole('link')).toHaveCount(3);
+  await expect(views.getByRole('link')).toHaveCount(5);
+  // every view is on the screen, also on a low one
+  await page.setViewportSize({ width: 700, height: 320 });
+  for (const link of await views.getByRole('link').all()) await expect(link).toBeInViewport({ ratio: 1 });
   await accessible(page);
 });
 
@@ -501,7 +549,7 @@ test('someone who administers nothing has no administration', async ({ page }) =
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Robin Meyer, your account' }).locator('.av')).toHaveText('RM');
   const rail = page.getByRole('navigation', { name: 'views' });
-  await expect(rail.getByRole('link')).toHaveCount(3);
+  await expect(rail.getByRole('link')).toHaveCount(5);
   await expect(rail.getByRole('link', { name: 'administration' })).toHaveCount(0);
   await page.goto('/administration');
   await expect(page.getByRole('heading', { name: 'nothing is at this address' })).toBeVisible();

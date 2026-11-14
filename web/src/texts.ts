@@ -3,7 +3,7 @@
 export const texts = {
   name: 'away',
   skip: 'skip to the page',
-  views: { home: 'home', sessions: 'sessions', administration: 'administration', settings: 'settings' },
+  views: { home: 'home', programs: 'programs', machines: 'machines', sessions: 'sessions', administration: 'administration', settings: 'settings' },
   gate: {
     how: "You sign in with your organisation's account.",
     signIn: 'sign in',
@@ -37,14 +37,31 @@ export const texts = {
     signOut: 'sign out',
   },
   home: {
-    none: 'no machines for you yet',
     unanswered: "couldn't load the machines",
     again: 'try again',
-    find: 'find a machine…',
     others: 'other machines',
     machines: 'machines',
-    noMatch: (sought: string) => `No machine matches “${sought}”.`,
-    looksAt: 'The search looks at the names, the addresses and the groups of the machines you can reach, and at the names of their programs.',
+  },
+  // the pages of what one may open: home, the programs, the machines
+  opens: {
+    home: {
+      none: 'no machines for you yet',
+      find: 'find a machine or a program…',
+      noMatch: (sought: string) => `Nothing matches “${sought}”.`,
+      looksAt: 'The search looks at the names, the addresses and the groups of the machines you can reach, and at the names of their programs.',
+    },
+    programs: {
+      none: 'no programs for you yet',
+      find: 'find a program…',
+      noMatch: (sought: string) => `No program matches “${sought}”.`,
+      looksAt: 'The search looks at the names of the programs you can open, and at the names, the addresses and the groups of their machines.',
+    },
+    machines: {
+      none: 'no machines for you yet',
+      find: 'find a machine…',
+      noMatch: (sought: string) => `No machine matches “${sought}”.`,
+      looksAt: 'The search looks at the names, the addresses and the groups of the machines you can reach.',
+    },
   },
   machine: {
     back: 'machines',
