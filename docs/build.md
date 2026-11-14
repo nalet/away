@@ -65,6 +65,14 @@ doesn't list. It removes what it installed.
 IMAGE_TAG=main tests/install/kubernetes.sh
 ```
 
+With `INSTALLED=1` it checks an installation that is already there, with rights
+in that namespace alone, and leaves it as it is. Given the address, it also
+tries the way in from outside the cluster:
+
+```sh
+INSTALLED=1 NAMESPACE=away ADDRESS=away.example.com WAY_IN=router tests/install/kubernetes.sh
+```
+
 It needs kubectl, helm, curl and jq, and a cluster that enforces network
 rules. The pipeline runs it on every change, on a cluster it starts for the
 purpose.
