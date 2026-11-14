@@ -26,6 +26,13 @@ const spec = `${BASE}/spec`;
 // three of the drawings: home, a desktop with its bar, a shell
 const shown = ['machines-computer', 'desktop-bar-computer', 'shell-computer'].map((k) => m.screenByKey.get(k)).filter(Boolean);
 const chapters = new Set(m.screens.map((f: any) => f.chapter)).size;
+// how it is built: the decision records by their status, the work packages by their state
+const tally = (xs: any[], by: string) => [...new Set(xs.map((x) => x[by]))].map((k) => `${xs.filter((x) => x[by] === k).length} ${String(k).toLowerCase()}`).join(', ');
+const built = [
+	{ n: m.components.length, name: 'components' },
+	{ n: m.decisions.length, name: `decision records: ${tally(m.decisions, 'status')}` },
+	{ n: m.packages.length, name: `work packages: ${tally(m.packages, 'state')}` },
+];
 ---
 
 <!doctype html>
@@ -187,6 +194,32 @@ const chapters = new Set(m.screens.map((f: any) => f.chapter)).size;
 						<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/capabilities/map/`}>the capability map</a>
 						<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/capabilities/expectations/`}>expectations</a>
 						<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/capabilities/left-out/`}>what is left out</a>
+					</div>
+				</div>
+			</section>
+
+			<section id="built" class="section">
+				<div class="wrap">
+					<h2 class="sec-title"><span class="chev">&gt;</span> how it is to be built</h2>
+					<p class="sec-lede">
+						The architecture names the pieces of Away and which of them carries each capability. Its decisions are
+						records, each proposed until it is accepted. The work packages give the order, and each ends at a gate that
+						anyone can test again.
+					</p>
+					<div class="stats">
+						{
+							built.map((x) => (
+								<div class="stat">
+									<span class="stat-n">{x.n}</span>
+									<span class="stat-is">{x.name}</span>
+								</div>
+							))
+						}
+					</div>
+					<div class="doc-links">
+						<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/architecture/`}>the architecture</a>
+						<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/architecture/decisions/`}>the decisions</a>
+						<a class="nc-btn nc-btn--default nc-btn--md" href={`${spec}/plan/`}>the work packages</a>
 					</div>
 				</div>
 			</section>

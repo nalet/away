@@ -76,10 +76,49 @@ const SECTIONS = [
       ['spec/screens/words.md', '17 words'],
     ],
   },
+  {
+    // how Away is built: its components, what carries each capability, the decisions
+    id: 'architecture',
+    label: 'architecture',
+    pages: [
+      ['spec/architecture/README.md', 'the architecture'],
+      ['spec/architecture/components.md', 'components'],
+      ['spec/architecture/connections.md', 'connections'],
+      ['spec/architecture/carried.md', 'where each capability is carried'],
+      ['spec/architecture/decisions/README.md', 'decisions'],
+      ['spec/architecture/decisions/0001-own-protocol-code.md', '0001 own protocol code'],
+      ['spec/architecture/decisions/0002-rust-one-program-one-repository.md', '0002 rust, one program'],
+      ['spec/architecture/decisions/0003-three-parts-with-their-own-rights.md', '0003 three parts'],
+      ['spec/architecture/decisions/0004-the-session-and-its-picture.md', '0004 the session and its picture'],
+      ['spec/architecture/decisions/0005-the-shells-screen-in-the-browser.md', "0005 the shell's screen"],
+      ['spec/architecture/decisions/0006-the-sign-in-is-held-by-the-server.md', '0006 the sign-in to away'],
+      ['spec/architecture/decisions/0007-short-lived-certificates.md', '0007 on a machine as oneself'],
+      ['spec/architecture/decisions/0008-the-authority-for-windows-sign-ins.md', '0008 the authority for windows'],
+      ['spec/architecture/decisions/0009-one-database-and-files.md', '0009 files and one database'],
+      ['spec/architecture/decisions/0010-secrets-live-in-the-cluster.md', '0010 secrets and keys'],
+      ['spec/architecture/decisions/0011-the-web-app.md', '0011 the web app'],
+      ['spec/architecture/decisions/0012-one-chart-no-special-rights.md', '0012 one chart'],
+      ['spec/architecture/decisions/0013-built-tested-signed-by-the-pipelines.md', '0013 the pipelines'],
+    ],
+  },
+  {
+    // in what order the first release is built
+    id: 'plan',
+    label: 'work packages',
+    pages: [['spec/plan/README.md', 'the work packages']],
+  },
 ];
 
 // the folder whose unlisted pages each section takes
-const FOLDERS = { docs: ['docs'], spec: ['spec'], goals: ['spec/goals'], capabilities: ['spec/capabilities'], screens: ['spec/screens'] };
+const FOLDERS = {
+  docs: ['docs'],
+  spec: ['spec'],
+  goals: ['spec/goals'],
+  capabilities: ['spec/capabilities'],
+  screens: ['spec/screens'],
+  architecture: ['spec/architecture'],
+  plan: ['spec/plan'],
+};
 
 const bySource = new Map(pages.map((p) => [p.source, p]));
 const isAddress = (path) => path.startsWith('/');

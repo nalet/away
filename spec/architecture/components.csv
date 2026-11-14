@@ -1,0 +1,30 @@
+key,component,layer,kind,release,code,runs,keeps,note
+web,the web app: Away's pages around the sessions,browser,web,v1,web/,served by the server,"in the browser's own storage, which sessions this browser has open and how wide the list of windows was left",Built from the design system's components; the frame is Away's own until the design system has it
+session-view,"the session view: the picture, the keys and the pointer, the shell's screen",browser,web,v1,web/src/session/,part of the web app,,"Drawn on a canvas, apart from the pages"
+server,"the server: the pages, the requests, people's sign-ins, the rules, the records",parts,service,v1,crates/away-server/,"run by the chart, as server",nothing itself; what it holds is in the database,The only part that reaches the database and the sign-in service; it reaches no machine
+gateway,"the gateway: the sessions, each with one connection to the browser and one to the machine",parts,service,v1,crates/away-gateway/,"run by the chart, as gateway","in memory and for as long as a session lasts, its picture, a shell's last bytes and what signed it in",The only part that reaches machines; the first release runs one
+issuer,the issuer: makes the sign-ins on machines,parts,service,v1,crates/away-issuer/,"run by the chart, as issuer",nothing itself; its authority's keys and the kept accounts are the cluster's,It checks a person's sign-in itself before it signs anything; the status page calls it signing in on machines
+rdp,the RDP code,code,library,v1,crates/away-rdp/,in the gateway,,"For a Windows desktop and its programs, and for desktops of other systems that speak RDP"
+windows-sign-in,"the Windows sign-in: Kerberos, the sign-in before the desktop, the smart card in memory",code,library,v1,crates/away-winauth/,in the gateway,,
+vnc,the VNC code,code,library,v1,crates/away-vnc/,in the gateway,,
+ssh,the SSH code,code,library,v1,crates/away-ssh/,in the gateway,,
+shell-screen,the shell's screen: turns what a shell writes into what it shows,code,library,v1,crates/away-term/,"in the browser, as WebAssembly",,"What is elsewhere called a terminal emulator; later it runs in the gateway too, to hold a shell while the browser is closed"
+picture,"the picture: a desktop as the gateway keeps it, and the rectangles it sends",code,library,v1,crates/away-picture/,in the gateway,,
+wire,the session's messages between the browser and the gateway,code,contract,v1,crates/away-wire/,in the gateway and in the browser,,One description that both sides are built from
+database,the database,rests,database,v1,,"run by the chart, or brought by the operator","the sign-ins, each person's settings, favourites and last used, the machines' identities, the sessions as they run, the records",PostgreSQL
+files,"the files: the machines, the groups, the rules and the settings",rests,files,v1,,"mounted into the server, from a ConfigMap",what is in force,Written by the operator and kept where they keep their configuration
+cluster-secrets,the cluster's secrets,rests,store,v1,,,"the kept accounts, the issuer's authority keys, each part's own keys",Each part has its own mounted; the issuer alone reads the kept accounts
+way-in,"the way in: the cluster's router or ingress, as it is there",rests,proxy,v1,,,,It passes the pages on to the server and a session's connection on to the gateway
+sign-in-service,the sign-in service: the organisation's identity provider,outside,identity,v1,,,the people and their groups,Any provider that speaks OpenID Connect
+machines,the machines,outside,machine,v1,,,,"Reached the way each already offers: RDP, VNC or SSH; nothing of Away's runs on them"
+domain,the Windows domain: its domain controllers,outside,directory,v1,,,the accounts,For signing in on its machines as oneself
+authority,the organisation's authority: its own certificate authority,outside,authority,v1,,,,"Where the organisation's own authority issues the Windows sign-ins, in place of Away's"
+log-system,the log system: the one that is there,outside,logs,v1,,,,It collects the lines every part puts out
+monitoring,the monitoring: the one that is there,outside,monitoring,v1,,,,It reads every part's measures
+chart,the chart that installs Away,making,chart,v1,chart/,,,No kinds of its own and no rights beyond its namespace
+pipelines,"the pipelines: build, test, sign, list, publish",making,pipeline,v1,.github/workflows/,on GitHub,,Beside the one that is there
+site-pipeline,the pipeline that checks the model and publishes the site,making,pipeline,built,.github/workflows/site.yml,on GitHub,,
+test-servers,"the servers the tests run against: a shell, a desktop over VNC, a desktop over RDP",making,tests,v1,tests/servers/,started by the pipeline,,A Windows machine in a domain needs a place of its own
+registry,the registry the project publishes to,making,registry,v1,,,"the image and the chart, their signatures, the records of their builds, the lists of their contents",
+docs,"the documentation, the specification and the site",making,docs,built,docs/ ; spec/ ; site/,the site is built and published by its pipeline,,
+relay,a relay placed in a network Away is not in,parts,relay,later,,,,For machines the gateway can't reach itself

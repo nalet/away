@@ -4,9 +4,9 @@ Remote access in a browser: a Windows desktop or one of its programs, a Mac or
 a Linux desktop, a shell. Signed in once, with the organisation's own sign-in,
 and then signed in on the machine too.
 
-**Being specified. Nothing is built yet.** What Away is for, what it has to do
-and what it looks like are written down and drawn as a first cut, and under
-review:
+**Being specified. Nothing is built yet.** What Away is for, what it has to do,
+what it looks like, how it is built and in what order are written down and
+drawn as a first cut, and under review:
 <https://nalet.github.io/away/>
 
 | | In this repository | On the site |
@@ -16,6 +16,8 @@ review:
 | What people expect of it | [expectations](spec/capabilities/expectations.md) | |
 | What it leaves out | [what is left out](spec/capabilities/left-out.md) | |
 | What it looks like | [spec/screens](spec/screens/README.md) | [all screens](https://nalet.github.io/away/spec/screens/all/) |
+| How it is built, and why | [spec/architecture](spec/architecture/README.md) | [the architecture](https://nalet.github.io/away/spec/architecture/) |
+| In what order it is built | [spec/plan](spec/plan/README.md) | [the work packages](https://nalet.github.io/away/spec/plan/) |
 
 ## The model
 

@@ -1,6 +1,6 @@
 # Changing the model
 
-The specification is a model: six tables, kept as CSV files, and pages whose
+The specification is a model: twelve tables, kept as CSV files, and pages whose
 tables and numbers a program writes from them. To change what the specification
 says, change a row; never a generated table. The screens are drawings, and
 [changing a drawing](#changing-a-drawing) is below.
@@ -13,11 +13,18 @@ says, change a row; never a generated table. The screens are drawings, and
 | [spec/capabilities/capabilities.csv](../spec/capabilities/capabilities.csv) | a capability: who it is for, and where it stands for RDP, VNC, SSH or Away itself |
 | [spec/capabilities/expectations.csv](../spec/capabilities/expectations.csv) | something people expect of remote access, with the capabilities that meet it |
 | [spec/screens/screens.csv](../spec/screens/screens.csv) | a figure of the screens: its chapter, what it shows, the capabilities it draws |
+| [spec/architecture/components.csv](../spec/architecture/components.csv) | a component: its layer, its kind, when it comes, its code, what runs it, what it keeps |
+| [spec/architecture/connections.csv](../spec/architecture/connections.csv) | a connection from one component to another: its kind, and what it is on |
+| [spec/architecture/carries.csv](../spec/architecture/carries.csv) | a capability of the first release, with the components that carry it |
+| [spec/architecture/decisions.csv](../spec/architecture/decisions.csv) | a decision record, with the components and the capabilities it governs |
+| [spec/plan/packages.csv](../spec/plan/packages.csv) | a work package: a proof or a build, the packages it comes after, the decisions it rests on, its gate |
+| [spec/plan/delivers.csv](../spec/plan/delivers.csv) | a capability that a package delivers, for every kind of connection or for the ones named |
 
 What the columns and their values mean is in
 [how to read the goals](../spec/goals/README.md#how-to-read-it),
-[the capabilities](../spec/capabilities/README.md#how-to-read-it) and
-[the expectations](../spec/capabilities/expectations.md#how-to-read-it).
+[the capabilities](../spec/capabilities/README.md#how-to-read-it),
+[the expectations](../spec/capabilities/expectations.md#how-to-read-it) and
+[the architecture](../spec/architecture/README.md#how-to-read-it).
 
 ## The steps
 
@@ -48,6 +55,11 @@ files say.
 | set a quality's target | fill `target` in `qualities.csv`; `proposal` stays as the suggestion it was |
 | strike a goal | remove its row from `goals.csv`, then the areas, expectations and qualities that are for it: the check names each |
 | add a capability | add a row with a new key, in an area that exists; name it in an expectation if one is met by it |
+| add a capability to the first release, or move one into it | also name the components that carry it in `carries.csv` and the package that delivers it in `delivers.csv`: the check asks for both |
+| accept a decision | change `Proposed` to `Accepted` in the record's status line, with the date |
+| add a decision | write the record under `spec/architecture/decisions/` with the next number, and add its row to `decisions.csv` |
+| move a capability to another work package | change its row in `delivers.csv` |
+| agree to a work package, begin it, end it | change its `state` in `packages.csv` to `agreed`, `begun` or `done`; the check refuses one that has begun before the packages it comes after are done and its decisions accepted |
 
 ## Changing a drawing
 

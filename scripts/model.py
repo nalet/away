@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""model.py [--check] [--json PATH] : the goals of spec/goals and the capability model of
-spec/capabilities, checked, and their tables written into the pages.
+"""model.py [--check] [--json PATH] : the model of the specification, checked, and its tables
+written into the pages: the goals of spec/goals, the capabilities of spec/capabilities, the
+screens of spec/screens, the architecture of spec/architecture and the work packages of
+spec/plan.
 
 What Away is for is two files in spec/goals/:
   goals.csv         one row a goal: what people want of it, what that takes, what being
@@ -18,6 +20,18 @@ What Away looks like is the chapters of spec/screens/ and one file there:
   screens.csv       one row a figure: its chapter, what it shows, its size, and the
                     capabilities it draws. A figure's picture is img/<key>.png, drawn by
                     scripts/render-mockups.mjs from the chapter's img/ch*.html.
+How Away is built is four files in spec/architecture/ and the decision records beside them:
+  components.csv    one row a component: its layer, its kind, when it comes, its code, what
+                    runs it and what it keeps
+  connections.csv   one row a connection: from one component to another, of what kind, on what
+  carries.csv       one row a capability of the first release: the components that carry it
+  decisions.csv     one row a decision record: the components and capabilities it governs
+  decisions/        the records themselves, 0001-<words>.md and so on
+In what order it is built is two files in spec/plan/:
+  packages.csv      one row a work package: a proof or a build, how far it is, the packages it
+                    comes after, the decisions it rests on, and the gate that ends it
+  delivers.csv      one row a capability a package delivers, for every kind of connection it
+                    is planned for or for the ones named
 
 Where a capability stands is one of:
   built     there
@@ -40,6 +54,17 @@ It checks, and names every problem it finds:
   - every figure has its picture and is in its chapter, in the file's order and under its
     number; every picture and every drawing in the chapters' sources is a figure; every
     capability a figure draws exists;
+  - every component is in a layer and of a kind that exist, and a connection names it; every
+    connection is between components that exist, of a kind that exists, there once, and no
+    sooner than both its ends;
+  - every capability of the first release is carried by a component of Away's own, and by none
+    that comes later; every decision record has its number, its status and its sections, and
+    one row; every row names components and capabilities that exist;
+  - every work package comes after packages listed before it and rests on a decision; one
+    that has begun comes after packages that are done and rests on decisions that are
+    accepted; a proof delivers nothing and a build something; every capability of the first release is
+    delivered once for each kind of connection it is planned for, or by rows that say which
+    part of it each delivers;
   - the pages' generated blocks are what the model says (--check), else they are written.
     A block is the text between "<!-- generated: name -->" and "<!-- end: name -->";
     everything outside the blocks is written by hand.
@@ -61,6 +86,9 @@ SPEC = os.path.join(ROOT, 'spec')
 GOALS = os.path.join(SPEC, 'goals')
 CAP = os.path.join(SPEC, 'capabilities')
 SCREENS = os.path.join(SPEC, 'screens')
+ARCH = os.path.join(SPEC, 'architecture')
+RECORDS = os.path.join(ARCH, 'decisions')
+PLAN = os.path.join(SPEC, 'plan')
 
 GOAL_KINDS = [('use', 'what people want'), ('enable', 'what that takes'), ('open', 'what being open adds')]
 CHARACTERISTICS = ['functional suitability', 'performance efficiency', 'compatibility', 'interaction capability',
@@ -88,6 +116,48 @@ SCREEN_COLS = ['key', 'chapter', 'figure', 'size', 'capabilities', 'note']
 SIZES = ['computer', 'phone', 'phone-side']
 # whose capabilities have something to see: a figure can draw them
 SEEN_BY = ['person', 'admin']
+
+# the architecture: a component is in a layer; the layers are the lanes of the picture
+LAYERS = [('browser', 'In the browser', "What a person's browser runs."),
+          ('parts', "Away's parts", "What the chart runs from Away's one image."),
+          ('code', "Away's own protocol code", 'The libraries the parts and the session view are built from.'),
+          ('rests', 'What Away rests on', 'What the cluster gives it, and the database.'),
+          ('outside', 'Outside Away', 'What Away reaches and does not run.'),
+          ('making', 'Making and shipping it', 'What builds, tests, installs and describes Away.')]
+# the layers whose components are Away's own: only they carry a capability
+OWN = ['browser', 'parts', 'code', 'making']
+COMPONENT_KINDS = ['web', 'service', 'relay', 'library', 'contract', 'database', 'files', 'store', 'proxy', 'identity',
+                   'machine', 'directory', 'authority', 'logs', 'monitoring', 'chart', 'pipeline', 'tests', 'registry', 'docs']
+RELEASES = ['built', 'v1', 'later']
+RELEASE_WORD = {'built': 'there', 'v1': 'first release', 'later': 'later'}
+CONNECT = [('loads', "the browser gets the pages' files from the other"),
+           ('calls', 'it sends requests to the other'),
+           ('streams', 'it keeps a connection to the other open for as long as a session lasts, with messages both ways'),
+           ('sends to', "it sends the browser to the other's page"),
+           ('signs in', "it takes people's sign-ins from the other"),
+           ('opens', "it opens the other, speaking the other's own protocol"),
+           ('asks', 'it asks the other to make something for one session'),
+           ('reads', 'it reads what the other holds, and changes nothing'),
+           ('writes', 'it changes what the other holds'),
+           ('fetches', 'it gets a file from the other'),
+           ('passes on', 'it hands what arrives on to the other'),
+           ('puts out', 'it writes lines that the other collects'),
+           ('measures', "it reads the other's measures"),
+           ('uses', "it is built from the other's code"),
+           ('publishes', 'it puts what it built where the other holds or shows it'),
+           ('tests', 'it runs its tests against the other')]
+RECORD_STATES = ['Proposed', 'Accepted', 'Superseded', 'Rejected']
+PACKAGE_KINDS = [('proof', 'a proof'), ('build', 'a build')]
+# a package is proposed until the owner names it, then agreed; begun and done say how far it is
+PACKAGE_STATES = ['proposed', 'agreed', 'begun', 'done']
+COMPONENT_COLS = ['key', 'component', 'layer', 'kind', 'release', 'code', 'runs', 'keeps', 'note']
+CONNECTION_COLS = ['from', 'to', 'kind', 'on', 'release', 'note']
+CARRY_COLS = ['capability', 'components', 'note']
+DECISION_COLS = ['adr', 'components', 'capabilities', 'note']
+PACKAGE_COLS = ['key', 'package', 'kind', 'state', 'after', 'decisions', 'gate', 'note']
+DELIVER_COLS = ['package', 'capability', 'ways', 'note']
+# where a capability stands when it is of the first release
+FIRST = ('built', 'partial', 'v1')
 
 problems = []
 
@@ -376,6 +446,7 @@ class Model:
         self.state = {c['key']: cap_state(c) for c in caps}
         self.expect = {e['key']: expectation_state(e, cap_keys) for e in expectations}
         self.named = {k for e in expectations for k in split(e['capabilities'])}
+        self.build = None
 
     def caps_of(self, area_keys):
         return [c for c in self.caps if c['area'] in area_keys]
@@ -589,6 +660,8 @@ class Model:
                          f'in {count(len({f["chapter"] for f in self.screens}), "chapter")}; they show '
                          f'{sum(1 for c in seen if c["key"] in self.drawn)} of the {len(seen)} capabilities the first '
                          f'release holds for a person or an administrator'])
+        if self.build:
+            rows += self.build.state_rows()
         return table(rows, ['', 'Rows', 'Of them']) + '\n'
 
     # ---- the model, for the site
@@ -617,9 +690,516 @@ class Model:
             'expectStates': EXPECT_STATES,
             'problems': list(problems),
         }
+        if self.build:
+            model.update(self.build.export())
         with open(path, 'w', encoding='utf-8') as fh:
             json.dump(model, fh, ensure_ascii=False, indent=1)
             fh.write('\n')
+
+
+# ------------------------------------------------ the architecture and the plan
+def note_ok(w, column, text, most):
+    if len(text) > most or text.endswith('.'):
+        problem(w, f'{column} is longer than {most} characters or ends with a full stop')
+
+
+def read_records():
+    """the decision records of spec/architecture/decisions/, by their number"""
+    out = {}
+    if not os.path.isdir(RECORDS):
+        return out
+    for name in sorted(os.listdir(RECORDS)):
+        if name == 'README.md' or not name.endswith('.md'):
+            continue
+        w = f'spec/architecture/decisions/{name}'
+        named = re.match(r'(\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$', name)
+        if not named:
+            problem(w, 'is not named "<four digits>-<words>.md"')
+            continue
+        text = open(os.path.join(RECORDS, name), encoding='utf-8').read()
+        head = re.match(r'# ADR-(\d{4}): (.+)\n', text)
+        if not head or head.group(1) != named.group(1):
+            problem(w, f'does not start with "# ADR-{named.group(1)}: <the decision>"')
+            continue
+        status = re.search(r'^\*\*Status:\*\* (\w+) · (\d{4}-\d{2}-\d{2})\.', text, re.M)
+        if not status or status.group(1) not in RECORD_STATES:
+            problem(w, f'has no line "**Status:** <one of {", ".join(RECORD_STATES)}> · <date>."')
+            continue
+        for part in ('## Context', '## Decision', '## Consequences', '### What this rules out'):
+            if f'\n{part}\n' not in text:
+                problem(w, f'has no section "{part}"')
+        if named.group(1) in out:
+            problem(w, f'another record has the number {named.group(1)}')
+        out[named.group(1)] = {'adr': named.group(1), 'title': head.group(2).strip(), 'status': status.group(1),
+                               'date': status.group(2), 'file': name}
+    for i, n in enumerate(sorted(out), 1):
+        if int(n) != i:
+            problem(f'spec/architecture/decisions/{out[n]["file"]}', f'the records are not numbered one after the other: {i:04d} is missing')
+            break
+    return out
+
+
+def check_architecture(components, connections, carries, decisions, recs, cap_keys, first):
+    """first: the keys of the capabilities of the first release"""
+    comp = keys_of(components, 'components.csv')
+    layers = [k for k, _, _ in LAYERS]
+    for c in components:
+        w = f'components.csv {c["key"]}'
+        sentence(w, 'component', c['component'], 120)
+        if c['layer'] not in layers:
+            problem(w, f'layer {c["layer"]!r} is none of {layers}')
+        if c['kind'] not in COMPONENT_KINDS:
+            problem(w, f'kind {c["kind"]!r} is none of {COMPONENT_KINDS}')
+        if c['release'] not in RELEASES:
+            problem(w, f'release {c["release"]!r} is none of {RELEASES}')
+        for column, most in (('runs', 80), ('keeps', 170), ('note', 200)):
+            note_ok(w, column, c[column], most)
+        if c['layer'] not in OWN and c['code']:
+            problem(w, "is not Away's own, and names code")
+        if c['release'] == 'built':
+            if not split(c['code']):
+                problem(w, 'is there, and names no code')
+            for path in split(c['code']):
+                if not os.path.exists(os.path.join(ROOT, path)):
+                    problem(w, f'code: {path} is not in the repository')
+    kinds = [k for k, _ in CONNECT]
+    seen = set()
+    for x in connections:
+        w = f'connections.csv {x["from"]} {x["kind"]} {x["to"]}'
+        ends = [comp[x[e]] for e in ('from', 'to') if x[e] in comp]
+        for e in ('from', 'to'):
+            if x[e] not in comp:
+                problem(w, f'{e}: {x[e]} is not in components.csv')
+        if x['kind'] not in kinds:
+            problem(w, f'kind {x["kind"]!r} is none of {kinds}')
+        if x['from'] == x['to']:
+            problem(w, 'leads to itself')
+        if (x['from'], x['to'], x['kind'], x['on']) in seen:
+            problem(w, 'is there twice')
+        seen.add((x['from'], x['to'], x['kind'], x['on']))
+        note_ok(w, 'note', x['note'], 200)
+        if x['release'] not in RELEASES:
+            problem(w, f'release {x["release"]!r} is none of {RELEASES}')
+        elif len(ends) == 2 and RELEASES.index(x['release']) < max(RELEASES.index(c['release']) for c in ends if c['release'] in RELEASES):
+            problem(w, 'is planned sooner than a component it connects')
+        if x['kind'] != 'uses' and x['release'] != 'later' and not x['on']:
+            problem(w, 'does not say what it is on')
+    linked = {x['from'] for x in connections} | {x['to'] for x in connections}
+    for c in components:
+        if c['key'] not in linked:
+            problem(f'components.csv {c["key"]}', 'no connection names it')
+    carried = {}
+    for r in carries:
+        w = f'carries.csv {r["capability"]}'
+        if r['capability'] not in cap_keys:
+            problem(w, 'is not in capabilities.csv')
+            continue
+        if r['capability'] in carried:
+            problem(w, 'is there twice')
+        carried[r['capability']] = r
+        if not split(r['components']):
+            problem(w, 'names no component')
+        for k in split(r['components']):
+            if k not in comp:
+                problem(w, f'components: {k} is not in components.csv')
+            elif comp[k]['layer'] not in OWN:
+                problem(w, f"components: {k} is not Away's own, so it carries nothing")
+            elif r['capability'] in first and comp[k]['release'] == 'later':
+                problem(w, f'components: {k} comes later than the capability')
+        note_ok(w, 'note', r['note'], 160)
+    for k in first:
+        if k not in carried:
+            problem(f'capabilities.csv {k}', 'is of the first release, and carries.csv names no component that carries it')
+    rows = {}
+    for d in decisions:
+        w = f'decisions.csv {d["adr"]}'
+        if d['adr'] not in recs:
+            problem(w, 'has no record in spec/architecture/decisions/')
+        if d['adr'] in rows:
+            problem(w, 'is there twice')
+        rows[d['adr']] = d
+        if not split(d['components']):
+            problem(w, 'governs no component')
+        for k in split(d['components']):
+            if k not in comp:
+                problem(w, f'components: {k} is not in components.csv')
+        for k in split(d['capabilities']):
+            if k not in cap_keys:
+                problem(w, f'capabilities: {k} is not in capabilities.csv')
+        note_ok(w, 'note', d['note'], 160)
+    for n in recs:
+        if n not in rows:
+            problem(f'spec/architecture/decisions/{recs[n]["file"]}', 'has no row in decisions.csv')
+    return comp
+
+
+def check_plan(packages, delivers, recs, cap_keys, caps):
+    kinds = [k for k, _ in PACKAGE_KINDS]
+    ways = [k for k, _ in WHERE]
+    pk = {}
+    for i, p in enumerate(packages, 1):
+        w = f'packages.csv {p["key"]}'
+        if p['key'] != f'p{i:02d}':
+            problem(w, f'the packages are numbered one after the other: p{i:02d} is expected here')
+        if p['key'] in pk:
+            problem(w, 'key twice')
+        sentence(w, 'package', p['package'], 60)
+        if p['kind'] not in kinds:
+            problem(w, f'kind {p["kind"]!r} is none of {kinds}')
+        if p['state'] not in PACKAGE_STATES:
+            problem(w, f'state {p["state"]!r} is none of {PACKAGE_STATES}')
+        underway = p['state'] in ('begun', 'done')
+        for k in split(p['after']):
+            if k not in pk:
+                problem(w, f'after: {k} is no package listed before it')
+            elif underway and pk[k]['state'] != 'done':
+                problem(w, f'has begun, and {k}, which it comes after, is not done')
+        if not split(p['decisions']):
+            problem(w, 'rests on no decision')
+        for n in split(p['decisions']):
+            if n not in recs:
+                problem(w, f'decisions: {n} is no decision record')
+            elif underway and recs[n]['status'] != 'Accepted':
+                problem(w, f'has begun, and ADR-{n}, which it rests on, is not accepted')
+        sentence(w, 'gate', p['gate'], 640, stop=True)
+        note_ok(w, 'note', p['note'], 160)
+        pk[p['key']] = p
+    cover = {}
+    seen = set()
+    for d in delivers:
+        w = f'delivers.csv {d["package"]} {d["capability"]}'
+        if d['package'] not in pk:
+            problem(w, 'its package is not in packages.csv')
+            continue
+        if pk[d['package']]['kind'] != 'build':
+            problem(w, 'its package is a proof, and a proof delivers no capability')
+        c = cap_keys.get(d['capability'])
+        if not c:
+            problem(w, 'its capability is not in capabilities.csv')
+            continue
+        if (d['package'], d['capability']) in seen:
+            problem(w, 'is there twice')
+        seen.add((d['package'], d['capability']))
+        planned = [k for k in ways if c[k] in FIRST]
+        if not planned:
+            problem(w, 'the capability is not of the first release')
+        for k in split(d['ways']) or planned:
+            if k not in ways:
+                problem(w, f'ways: {k} is none of {ways}')
+            elif k not in planned:
+                problem(w, f'ways: the capability is not of the first release for {k}')
+            else:
+                cover.setdefault((d['capability'], k), []).append(d)
+        note_ok(w, 'note', d['note'], 160)
+    for c in caps:
+        for k, label in WHERE:
+            if c[k] not in FIRST:
+                continue
+            rows = cover.get((c['key'], k), [])
+            where = 'Away itself' if k == 'away' else f'a session over {label}'
+            if not rows:
+                problem(f'capabilities.csv {c["key"]}', f'is of the first release for {where}, and no package delivers it')
+            elif len(rows) > 1 and not all(r['note'] for r in rows):
+                problem(f'delivers.csv {c["key"]}', f'is delivered for {where} by {", ".join(r["package"] for r in rows)}, '
+                                                    'and not every one of those rows says which part of it')
+    for p in packages:
+        n = sum(1 for d in delivers if d['package'] == p['key'])
+        if p['kind'] == 'build' and not n:
+            problem(f'packages.csv {p["key"]}', 'is a build, and delivers no capability')
+    return pk
+
+
+class Build:
+    """the architecture and the plan, with what each says of the capabilities"""
+
+    def __init__(self, m, components, connections, carries, decisions, recs, packages, delivers):
+        self.m, self.components, self.connections, self.recs = m, components, connections, recs
+        self.packages, self.delivers = packages, delivers
+        self.comp = {c['key']: c for c in components}
+        self.first = [c for c in m.caps if m.state[c['key']] in FIRST]
+        # a capability's components, and a component's capabilities of the first release
+        self.carried = {r['capability']: [k for k in split(r['components']) if k in self.comp] for r in carries if r['capability'] in m.cap}
+        self.notes = {r['capability']: r['note'] for r in carries}
+        self.carries = {}
+        for c in self.first:
+            for k in self.carried.get(c['key'], []):
+                self.carries.setdefault(k, []).append(c['key'])
+        self.decisions = [d for d in decisions if d['adr'] in recs]
+        self.governs, self.decides = {}, {}
+        for d in self.decisions:
+            for k in split(d['components']):
+                self.governs.setdefault(k, []).append(d['adr'])
+            for k in split(d['capabilities']):
+                self.decides.setdefault(k, []).append(d['adr'])
+        self.no = {p['key']: int(p['key'][1:]) for p in packages}
+        self.pack = {p['key']: p for p in packages}
+        # the rows that deliver a capability, with the ways each is for
+        self.built_in = {}
+        for d in delivers:
+            c = m.cap.get(d['capability'])
+            if c and d['package'] in self.pack:
+                planned = [k for k, _ in WHERE if c[k] in FIRST]
+                its = [k for k in (split(d['ways']) or planned) if k in planned]
+                self.built_in.setdefault(d['capability'], []).append({'package': d['package'], 'ways': its, 'all': its == planned, 'note': d['note']})
+
+    def short(self, key):
+        return self.comp[key]['component'].split(':')[0]
+
+    def record_link(self, n, base='./decisions/'):
+        # a hyphen that doesn't break, so a narrow column keeps the number whole
+        return f'[ADR\u2011{n}]({base}{self.recs[n]["file"]})'
+
+    def package_link(self, key, base='../plan/'):
+        p = self.pack[key]
+        return f'[{self.no[key]}]({base}README.md#{slug(str(self.no[key]) + " " + p["package"])})'
+
+    # ---- spec/architecture/README.md
+    def picture(self):
+        """the parts that run, and what each reaches: a lane a layer. what Away is built from and
+        made with is left to the tables, and so is the way in, which everything from a browser
+        passes through. what every one of Away's parts does alike says nothing of the shape
+        and is left out; the page says so under the picture."""
+        shown = ['browser', 'parts', 'rests', 'outside']
+        comps = [c for c in self.components if c['layer'] in shown and c['release'] != 'later']
+        keys = {c['key'] for c in comps}
+        edges = {}
+        for x in self.connections:
+            if x['kind'] in ('uses', 'passes on') or x['release'] == 'later' or x['from'] not in keys or x['to'] not in keys:
+                continue
+            kinds = edges.setdefault((x['from'], x['to']), [])
+            if x['kind'] not in kinds:
+                kinds.append(x['kind'])
+        parts = [c['key'] for c in comps if c['layer'] == 'parts']
+        alike = False
+        for other in [c['key'] for c in comps if c['layer'] != 'parts']:
+            for out in (True, False):
+                pairs = [(p, other) if out else (other, p) for p in parts]
+                if len(parts) > 1 and all(pair in edges for pair in pairs) and len({tuple(edges[pair]) for pair in pairs}) == 1:
+                    alike = True
+                    for pair in pairs:
+                        del edges[pair]
+        # two components that reach each other in the same way share one arrow with two heads
+        both = []
+        for (a, b), kinds in list(edges.items()):
+            if (a, b) in edges and (b, a) in edges and edges[(b, a)] == kinds:
+                both.append((a, b, kinds))
+                del edges[(a, b)], edges[(b, a)]
+        linked = {k for pair in edges for k in pair} | {k for a, b, _ in both for k in (a, b)}
+
+        def nid(k):
+            return 'c_' + k.replace('-', '_')
+        pic = ['```mermaid', 'flowchart TB']
+        for layer, label, _ in LAYERS:
+            its = [c for c in comps if c['layer'] == layer and c['key'] in linked]
+            if its:
+                pic.append(f'  subgraph l_{layer}["{label}"]')
+                pic += [f'    {nid(c["key"])}["{self.short(c["key"])}"]' for c in its]
+                pic.append('  end')
+        for (a, b), kinds in edges.items():
+            pic.append(f'  {nid(a)} -- "{", ".join(kinds)}" --> {nid(b)}')
+        for a, b, kinds in both:
+            pic.append(f'  {nid(a)} <-- "{", ".join(kinds)}" --> {nid(b)}')
+        return '\n'.join(pic + ['```']) + '\n'
+
+    def state(self):
+        rows = []
+        for layer, label, _ in LAYERS:
+            n = Counter(c['release'] for c in self.components if c['layer'] == layer)
+            rows.append([label, sum(n.values())] + [n[r] or '' for r in RELEASES])
+        n = Counter(c['release'] for c in self.components)
+        rows.append(['all', len(self.components)] + [n[r] or '' for r in RELEASES])
+        first = table(rows, ['Layer', 'Components'] + [RELEASE_WORD[r] for r in RELEASES])
+        n = Counter(x['kind'] for x in self.connections)
+        second = table([[k, n[k], what] for k, what in CONNECT if n[k]] + [['all', len(self.connections), '']],
+                       ['Connections', 'Rows', 'Means'])
+        n = Counter(r['status'] for r in self.recs.values())
+        third = table([[len(self.recs)] + [n[s] or '' for s in RECORD_STATES]], ['Decision records'] + RECORD_STATES)
+        most = max((len(v) for v in self.carried.values()), default=0)
+        alone = sum(1 for c in self.first if len(self.carried.get(c['key'], [])) == 1)
+        return (f'{first}\n\n{second}\n\n{third}\n\nThe first release holds {len(self.first)} capabilities, and a component '
+                f"of Away's own carries each: {alone} are carried by one component, the others by up to {most}.\n")
+
+    # ---- spec/architecture/components.md
+    def components_block(self):
+        """a table a layer, kept narrow; what else is to say of a component is in a line under it"""
+        out = []
+        for layer, label, intro in LAYERS:
+            its = [c for c in self.components if c['layer'] == layer]
+            if not its:
+                continue
+            out.append(f'## {label}\n\n{intro}\n')
+            rows = [[f'`{c["key"]}`', c['component'], c['kind'], RELEASE_WORD[c['release']],
+                     len(self.carries.get(c['key'], [])) or '—'] for c in its]
+            out.append(table(rows, ['Component', 'Is', 'Kind', 'Comes', 'Carries']) + '\n')
+            said = []
+            for c in its:
+                bits = [c['note'] + '.'] if c['note'] else []
+                if c['keeps']:
+                    bits.append(f'Keeps: {c["keeps"]}.')
+                if c['code']:
+                    bits.append('Code: ' + ', '.join(f'`{x}`' for x in split(c['code'])) + '.')
+                if c['runs']:
+                    bits.append(f'Runs: {c["runs"]}.')
+                if self.governs.get(c['key']):
+                    bits.append('Governed by ' + ', '.join(self.record_link(n) for n in self.governs[c['key']]) + '.')
+                if bits:
+                    said.append(f'- `{c["key"]}`: ' + ' '.join(bits))
+            if said:
+                out.append('\n'.join(said) + '\n')
+        return '\n'.join(out).rstrip() + '\n'
+
+    # ---- spec/architecture/connections.md
+    def connections_block(self):
+        """a table a layer, by the component a connection starts from. nearly every one comes with
+        the first release, so only the others say when they come, before their note."""
+        when = {'built': 'There', 'later': 'Later'}
+        out = []
+        for layer, label, _ in LAYERS:
+            its = [x for x in self.connections if self.comp.get(x['from'], {}).get('layer') == layer]
+            if not its:
+                continue
+            out.append(f'## {label}\n')
+            rows = []
+            for x in its:
+                note = ' '.join(b for b in ([when[x['release']] + '.'] if x['release'] in when else []) + ([x['note'] + '.'] if x['note'] else []))
+                rows.append([f'`{x["from"]}`', x['kind'], f'`{x["to"]}`', x['on'] or '—', note or '—'])
+            out.append(table(rows, ['From', '', 'To', 'On', 'Note']) + '\n')
+        return '\n'.join(out).rstrip() + '\n'
+
+    # ---- spec/architecture/carried.md
+    def built_words(self, key, base='../plan/'):
+        """the packages that deliver a capability: 6, or 9 (VNC), 10 (RDP)"""
+        label = dict(WHERE)
+        bits = []
+        for d in sorted(self.built_in.get(key, []), key=lambda d: self.no[d['package']]):
+            ways = '' if d['all'] else ' (' + ', '.join('Away' if k == 'away' else label[k] for k in d['ways']) + ')'
+            bits.append(self.package_link(d['package'], base) + ways)
+        return ', '.join(bits) or '—'
+
+    def carried_block(self):
+        out = []
+        for p, label, page in PARTS:
+            out.append(f'## {label[0].upper()}{label[1:]}\n')
+            for a in [a for a in self.m.areas if a['part'] == p]:
+                its = [c for c in self.first if c['area'] == a['key']]
+                if not its:
+                    continue
+                out.append(f'### {a["area"]}\n')
+                rows = [[c['capability'], ' '.join(f'`{k}`' for k in self.carried.get(c['key'], [])) or '—',
+                         self.built_words(c['key']), f'`{c["key"]}`'] for c in its]
+                out.append(table(rows, ['Capability', 'Carried by', 'Built in package', 'Key']) + '\n')
+                said = [f'- *{c["capability"]}*: {self.notes[c["key"]]}.' for c in its if self.notes.get(c['key'])]
+                if said:
+                    out.append('\n'.join(said) + '\n')
+        return '\n'.join(out).rstrip() + '\n'
+
+    # ---- spec/architecture/decisions/README.md
+    def decisions_block(self):
+        """two tables: the records with their status and the packages that wait for them, which
+        is what the owner decides by; then what each governs"""
+        first, second = [], []
+        for d in self.decisions:
+            r = self.recs[d['adr']]
+            link = f'[ADR\u2011{d["adr"]}](./{r["file"]})'
+            used = [p['key'] for p in self.packages if d['adr'] in split(p['decisions'])]
+            first.append([link, r['title'], r['status'], ', '.join(self.package_link(k, '../../plan/') for k in used) or '—'])
+            second.append([link, ', '.join(f'`{k}`' for k in split(d['components'])),
+                           ', '.join(f'`{k}`' for k in split(d['capabilities'])) or '—'])
+        return (table(first, ['Record', 'Decision', 'Status', 'Work packages that rest on it']) + '\n\n## What each governs\n\n'
+                'The components a record is about, and the capabilities it decides most. A component\'s key is '
+                'explained on [components](../components.md), a capability\'s on [where each capability is carried](../carried.md).\n\n'
+                + table(second, ['Record', 'Components', 'Capabilities']) + '\n')
+
+    # ---- spec/plan/README.md
+    def order_block(self):
+        pic = ['```mermaid', 'flowchart TD']
+        for p in self.packages:
+            name = f'{self.no[p["key"]]} {p["package"]}'
+            pic.append(f'  {p["key"]}(["{name}"])' if p['kind'] == 'proof' else f'  {p["key"]}["{name}"]')
+        for p in self.packages:
+            pic += [f'  {k} --> {p["key"]}' for k in split(p['after']) if k in self.pack]
+        return '\n'.join(pic + ['```']) + '\n'
+
+    def delivered(self, key):
+        return [d for d in self.delivers if d['package'] == key and d['capability'] in self.m.cap]
+
+    def packages_block(self):
+        rows = []
+        for p in self.packages:
+            n = len(self.delivered(p['key']))
+            rows.append([self.no[p['key']], f'[{p["package"]}](#{slug(str(self.no[p["key"]]) + " " + p["package"])})',
+                         p['kind'], p['state'],
+                         ', '.join(str(self.no[k]) for k in split(p['after']) if k in self.no) or '—',
+                         ', '.join(self.record_link(n_, '../architecture/decisions/') for n_ in split(p['decisions']) if n_ in self.recs),
+                         count(n, 'capability', 'capabilities') if n else '—'])
+        builds = sum(1 for p in self.packages if p['kind'] == 'build')
+        whole = sum(1 for c in self.first if all(any(k in d['ways'] for d in self.built_in.get(c['key'], []))
+                                                 for k, _ in WHERE if c[k] in FIRST))
+        return (table(rows, ['No.', 'Package', 'Is', 'State', 'After', 'Rests on', 'Delivers']) +
+                f'\n\n{count(len(self.packages), "package")}: {count(len(self.packages) - builds, "proof")} and {count(builds, "build")}. '
+                f'Together the builds deliver {whole} of the {len(self.first)} capabilities of the first release.\n')
+
+    def by_package_block(self):
+        label = dict(WHERE)
+        out = []
+        for p in self.packages:
+            no = self.no[p['key']]
+            out.append(f'### {no} {p["package"]}\n')
+            after = [f'package {self.no[k]}' for k in split(p['after']) if k in self.no]
+            rests = [self.record_link(n, '../architecture/decisions/') for n in split(p['decisions']) if n in self.recs]
+            line = f'{dict(PACKAGE_KINDS).get(p["kind"], p["kind"]).capitalize()}'
+            line += f', after {" and ".join(after)}.' if after else ', with nothing before it.'
+            line += f' It rests on {", ".join(rests)}.' if rests else ''
+            line += f' {p["note"]}.' if p['note'] else ''
+            out.append(line + '\n')
+            out.append(f'**Its gate.** {p["gate"]}\n')
+            its = self.delivered(p['key'])
+            if not its:
+                continue
+            rows = []
+            for a in self.m.areas:
+                bits = []
+                for d in its:
+                    c = self.m.cap[d['capability']]
+                    if c['area'] != a['key']:
+                        continue
+                    planned = [k for k, _ in WHERE if c[k] in FIRST]
+                    named = split(d['ways'])
+                    ways = f' ({", ".join(label[k] for k in named if k in label)})' if named and named != planned else ''
+                    bits.append(c['capability'] + ways + (f': {d["note"][0].lower()}{d["note"][1:]}' if d['note'] else ''))
+                if bits:
+                    rows.append([self.m.area_link(a, '../capabilities/'), '; '.join(bits)])
+            out.append(table(rows, ['Area', 'What it delivers']) + '\n')
+        return '\n'.join(out).rstrip() + '\n'
+
+    # ---- spec/README.md
+    def state_rows(self):
+        n = Counter(c['release'] for c in self.components)
+        status = Counter(r['status'] for r in self.recs.values())
+        builds = sum(1 for p in self.packages if p['kind'] == 'build')
+        return [
+            ['Components', len(self.components), f'in {count(len(LAYERS), "layer")}: ' + said(n, RELEASES, RELEASE_WORD)],
+            ['Connections', len(self.connections), f'of {count(len({x["kind"] for x in self.connections}), "kind")}'],
+            ['Decision records', len(self.recs), said(status, RECORD_STATES, {s: s.lower() for s in RECORD_STATES})],
+            ['Work packages', len(self.packages), f'{count(len(self.packages) - builds, "proof")} and {count(builds, "build")}: '
+                                                  + said(Counter(p['state'] for p in self.packages), PACKAGE_STATES)],
+        ]
+
+    # ---- the model, for the site
+    def export(self):
+        return {
+            'layers': [{'key': k, 'label': label, 'intro': intro} for k, label, intro in LAYERS],
+            'components': [{'key': c['key'], 'component': c['component'], 'name': self.short(c['key']), 'layer': c['layer'],
+                            'kind': c['kind'], 'release': c['release'], 'carries': self.carries.get(c['key'], []),
+                            'decisions': self.governs.get(c['key'], [])} for c in self.components],
+            'decisions': [{'adr': d['adr'], 'title': self.recs[d['adr']]['title'], 'status': self.recs[d['adr']]['status'],
+                           'page': f'spec/architecture/decisions/{self.recs[d["adr"]]["file"]}'} for d in self.decisions],
+            'packages': [{'key': p['key'], 'no': self.no[p['key']], 'package': p['package'], 'kind': p['kind'], 'state': p['state'],
+                          'anchor': slug(str(self.no[p['key']]) + ' ' + p['package'])} for p in self.packages],
+            'carried': self.carried,
+            'builtIn': self.built_in,
+            'decides': self.decides,
+        }
 
 
 def fill(path, blocks, write):
@@ -655,8 +1235,25 @@ def main():
               [c for c in caps if c['area'] in area_keys and all(c[k] in STATUS for k, _ in WHERE)],
               [e for e in expectations if e['goal'] in goal_keys], cap_keys, screens, chaps)
     m.caps = [c for c in m.caps if c['area'] in m.area]
+    # how it is built, and in what order
+    components = read('components.csv', COMPONENT_COLS, ARCH)
+    connections = read('connections.csv', CONNECTION_COLS, ARCH)
+    carries = read('carries.csv', CARRY_COLS, ARCH)
+    decisions = read('decisions.csv', DECISION_COLS, ARCH)
+    packages = read('packages.csv', PACKAGE_COLS, PLAN)
+    delivers = read('delivers.csv', DELIVER_COLS, PLAN)
+    recs = read_records()
+    first = [c['key'] for c in m.caps if m.state[c['key']] in FIRST]
+    comp = check_architecture(components, connections, carries, decisions, recs, cap_keys, first)
+    check_plan(packages, delivers, recs, cap_keys, m.caps)
+    b = Build(m, [c for c in components if c['layer'] in [k for k, _, _ in LAYERS] and c['release'] in RELEASES],
+              [x for x in connections if x['from'] in comp and x['to'] in comp], carries, decisions, recs,
+              [p for p in packages if re.match(r'^p\d\d$', p['key'])], delivers)
+    m.build = b
     summary = (f'{len(goals)} goals, {len(qualities)} qualities; {len(caps)} capabilities in {len(areas)} areas, '
-               f'{len(expectations)} expectations; {len(screens)} figures in {len({f["chapter"] for f in screens})} chapters')
+               f'{len(expectations)} expectations; {len(screens)} figures in {len({f["chapter"] for f in screens})} chapters; '
+               f'{len(components)} components, {len(connections)} connections, {len(recs)} decision records; '
+               f'{len(packages)} work packages')
     if '--json' in sys.argv:
         at = sys.argv.index('--json') + 1
         if at >= len(sys.argv):
@@ -675,6 +1272,13 @@ def main():
     for c in m.chapters:
         if any(f['chapter'] == c['key'] for f in m.screens):
             fill(os.path.join(SCREENS, c['file']), {'draws': m.draws_block(c['key'])}, write)
+    fill(os.path.join(ARCH, 'README.md'), {'picture': b.picture(), 'state': b.state()}, write)
+    fill(os.path.join(ARCH, 'components.md'), {'components': b.components_block()}, write)
+    fill(os.path.join(ARCH, 'connections.md'), {'connections': b.connections_block()}, write)
+    fill(os.path.join(ARCH, 'carried.md'), {'carried': b.carried_block()}, write)
+    fill(os.path.join(RECORDS, 'README.md'), {'decisions': b.decisions_block()}, write)
+    fill(os.path.join(PLAN, 'README.md'), {'order': b.order_block(), 'packages': b.packages_block(),
+                                           'by-package': b.by_package_block()}, write)
     for p in problems:
         print(p)
     print(f'{len(problems)} problems; {summary}')

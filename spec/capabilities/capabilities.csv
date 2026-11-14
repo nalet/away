@@ -149,7 +149,7 @@ set-account-by-rule,rules,"Say by rule which account a group is on a machine as:
 get-in-without-provider,rules,Let an administrator in while the identity provider is down,operator,—,—,—,later,
 see-live-sessions,live,See who is connected to what right now,admin,—,—,—,v1,
 end-session,live,"End a session, or all of a person's",admin,—,—,—,v1,
-end-on-lost-right,live,End a person's sessions as soon as their right or their account is gone,system,—,—,—,v1,
+end-on-lost-right,live,End a person's sessions as soon as their right or their account is gone,system,—,—,—,v1,an account that is gone shows as a sign-in that can't be renewed: its sessions stop at once and end after the time the operator set
 watch-session,live,Watch a running session without taking part,admin,—,—,—,later,
 message-session,live,Send a message to the people in a session,admin,—,—,—,later,
 record-connections,records,"Keep a record of every connection: who, which machine, as whom, when, from where, how it ended",system,—,—,—,v1,

@@ -1,0 +1,44 @@
+from,to,kind,on,release,note
+web,server,loads,/,v1,The pages' files: nothing is loaded from anywhere else
+web,server,calls,/api,v1,With the sign-in's cookie; a request that changes something also carries a header that only Away's own page can set
+web,sign-in-service,sends to,the organisation's sign-in page,v1,The browser goes there to sign in and comes back with a code for the server
+web,session-view,uses,,v1,
+session-view,gateway,streams,/session,v1,"One WebSocket a session, with the sign-in's cookie and a ticket the server gave for this session"
+session-view,shell-screen,uses,,v1,
+session-view,wire,uses,,v1,
+way-in,server,passes on,/,v1,
+way-in,gateway,passes on,/session,v1,The chart sets the way in's time limits for connections that stay open
+server,sign-in-service,signs in,OpenID Connect,v1,"A code for tokens, their renewal, the sign-out"
+server,database,writes,the database away,v1,
+server,files,reads,the mounted files,v1,At its start and on every change
+server,cluster-secrets,reads,"its own: the client's secret, the key for what the database holds encrypted, its signing key",v1,Mounted
+server,gateway,calls,internal,v1,"End a session, test a machine, announce an update"
+gateway,server,calls,internal,v1,"Take over a session with its ticket; report its steps, its use and its end"
+gateway,issuer,asks,internal,v1,"For one session: a certificate for its key, a kept password, or a signature with a kept key"
+gateway,machines,opens,RDP,v1,Port 3389 unless the machine's file says otherwise
+gateway,machines,opens,VNC,v1,Port 5900 unless the machine's file says otherwise
+gateway,machines,opens,SSH,v1,Port 22 unless the machine's file says otherwise
+gateway,domain,calls,Kerberos,v1,It proves the person with their certificate and gets the ticket for the machine
+gateway,cluster-secrets,reads,its own signing key,v1,Mounted
+gateway,rdp,uses,,v1,
+gateway,vnc,uses,,v1,
+gateway,ssh,uses,,v1,
+gateway,picture,uses,,v1,
+gateway,wire,uses,,v1,
+rdp,windows-sign-in,uses,,v1,
+issuer,sign-in-service,fetches,the provider's public keys,v1,To check a person's sign-in itself
+issuer,cluster-secrets,reads,its authority's keys and the kept accounts,v1,The one part that may read the kept accounts
+issuer,authority,asks,one of the authority's published interfaces,v1,Only where the organisation's own authority issues the Windows sign-ins; a proof settles which interface
+issuer,server,calls,internal,v1,"What is public of it: its state, the names of the kept accounts that exist, its authority's certificate and the list of those it withdrew"
+domain,server,fetches,/authority,v1,"Only where Away's own authority issues them: the list of certificates it withdrew, which a domain asks for before it accepts one"
+server,log-system,puts out,lines on its output,v1,"What happens, and every record as it is written"
+gateway,log-system,puts out,lines on its output,v1,
+issuer,log-system,puts out,lines on its output,v1,A line of its own for every sign-in it makes
+monitoring,server,measures,/metrics,v1,
+monitoring,gateway,measures,/metrics,v1,
+monitoring,issuer,measures,/metrics,v1,
+chart,registry,fetches,the image,v1,
+pipelines,registry,publishes,"the image and the chart, signed",v1,
+pipelines,test-servers,tests,on every change,v1,
+site-pipeline,docs,publishes,the site,built,
+gateway,relay,opens,,later,The relay connects out to the gateway and machines are opened through it

@@ -1,4 +1,5 @@
-// the model of this repository (spec/goals, spec/capabilities, spec/screens), for the maps
+// the model of this repository (spec/goals, spec/capabilities, spec/screens,
+// spec/architecture, spec/plan), for the maps
 // (src/pages/spec/) and the product page. scripts/sync.mjs has scripts/model.py write
 // it, with every state worked out, to src/generated/model.json.
 import { existsSync, readFileSync } from 'node:fs';
@@ -32,6 +33,21 @@ function index(m) {
   for (const c of m.chapters) c.url = route(c.page);
   for (const f of m.screens) f.url = `${m.chapterByKey.get(f.chapter).url}#fig-${f.key}`;
   for (const c of m.capabilities) c.figures = (c.drawn ?? []).map((k) => m.screenByKey.get(k)).filter(Boolean);
+  // how it is built: the components that carry a capability, the work packages that
+  // deliver it and the decision records that govern it
+  m.components ??= [];
+  m.packages ??= [];
+  m.decisions ??= [];
+  m.componentByKey = new Map(m.components.map((c) => [c.key, c]));
+  m.packageByKey = new Map(m.packages.map((p) => [p.key, p]));
+  m.decisionByNo = new Map(m.decisions.map((d) => [d.adr, d]));
+  for (const p of m.packages) p.url = `${BASE}/spec/plan/#${p.anchor}`;
+  for (const d of m.decisions) d.url = route(d.page);
+  for (const c of m.capabilities) {
+    c.carriedBy = (m.carried?.[c.key] ?? []).map((k) => m.componentByKey.get(k)).filter(Boolean);
+    c.builtIn = (m.builtIn?.[c.key] ?? []).map((b) => ({ ...b, pack: m.packageByKey.get(b.package) })).filter((b) => b.pack);
+    c.decidedBy = (m.decides?.[c.key] ?? []).map((n) => m.decisionByNo.get(n)).filter(Boolean);
+  }
   for (const g of m.goals) {
     g.url = `${BASE}/spec/goals/#${slug(g.goal)}`;
     g.neededBy = m.goals.filter((o) => o.needs.includes(g.key)).map((o) => o.key);

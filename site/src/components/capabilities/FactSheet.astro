@@ -1,7 +1,8 @@
 ---
 // one capability's fact sheet: where it stands for each kind of connection or for Away
 // itself, its note, the expectations that name it, the figures of the screens that draw
-// it, and the rest of its area. the page
+// it, how it is built (the components that carry it, the work packages that deliver it,
+// the decisions that govern it), and the rest of its area. the page
 // /spec/capabilities/<part>/<key>/ is this; the map shows the same element beside its
 // tiles, fetched from that page, so there is one fact sheet, not two.
 import Figure from '../screens/Figure.astro';
@@ -30,6 +31,11 @@ const siblings = m.capabilities.filter((c: any) => c.area === cap.area);
 const figures: any[] = cap.figures ?? [];
 const toSee = ['person', 'admin'].includes(cap.who) && ['built', 'partial', 'v1'].includes(cap.state);
 const WIDTH: Record<string, number> = { computer: 300, phone: 104, 'phone-side': 230 };
+// how it is built: only a capability of the first release has components and packages
+const carriedBy: any[] = cap.carriedBy ?? [];
+const builtIn: any[] = [...(cap.builtIn ?? [])].sort((a, b) => a.pack.no - b.pack.no);
+const decidedBy: any[] = cap.decidedBy ?? [];
+const wayLabel = (k: string) => (k === 'away' ? 'Away itself' : (m.where.find((w: any) => w.key === k)?.label ?? k));
 ---
 
 <div class="capsheet" data-factsheet data-key={cap.key}>
@@ -89,6 +95,48 @@ const WIDTH: Record<string, number> = { computer: 300, phone: 104, 'phone-side':
 			</div>
 		) : (
 			toSee && <p>No figure of the screens shows it.</p>
+		)
+	}
+
+	{(carriedBy.length > 0 || builtIn.length > 0) && <h2 id="built">Built</h2>}
+	{
+		carriedBy.length > 0 && (
+			<p>
+				Carried by {listed(carriedBy.map((c: any) => c.name))} (<a href={`${BASE}/spec/architecture/carried/`}>where each capability is carried</a>).
+			</p>
+		)
+	}
+	{
+		builtIn.length > 0 && (
+			<ul class="capsheet-expected">
+				{builtIn.map((b: any) => (
+					<li>
+						<a href={b.pack.url}>
+							Work package {b.pack.no}: {b.pack.package}
+						</a>
+						{!b.all && (
+							<span class="capsheet-chip" data-tone="neutral">
+								{b.ways.map(wayLabel).join(', ')}
+							</span>
+						)}
+						{b.note && <span class="capsheet-quiet">{b.note}</span>}
+					</li>
+				))}
+			</ul>
+		)
+	}
+	{
+		decidedBy.length > 0 && (
+			<p class="capsheet-quiet">
+				Governed by{' '}
+				{decidedBy.map((d: any, i: number) => (
+					<>
+						{i > 0 && ', '}
+						<a href={d.url}>ADR-{d.adr}</a>
+					</>
+				))}
+				.
+			</p>
 		)
 	}
 

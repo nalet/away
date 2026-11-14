@@ -16,7 +16,13 @@ const m = load();
 const cap = m.capByKey.get(Astro.props.key);
 const area = m.areaByKey.get(cap.area);
 const drawn = (cap.figures ?? []).length > 0 || (['person', 'admin'].includes(cap.who) && ['built', 'partial', 'v1'].includes(cap.state));
-const headings = [['expected', 'Expected'], ...(drawn ? [['drawn', 'Drawn']] : []), ['area', area.area]].map(([slug, text]) => ({
+const built = (cap.carriedBy ?? []).length > 0 || (cap.builtIn ?? []).length > 0;
+const headings = [
+	['expected', 'Expected'],
+	...(drawn ? [['drawn', 'Drawn']] : []),
+	...(built ? [['built', 'Built']] : []),
+	['area', area.area],
+].map(([slug, text]) => ({
 	depth: 2,
 	slug,
 	text,

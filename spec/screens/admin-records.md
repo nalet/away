@@ -41,8 +41,11 @@ This chapter draws what the first release holds of
   ended is in the records (14.3).
 - **Last used** is what a rule's time counts from before it ends a session
   nobody uses ([chapter 13](./admin-rules.md)).
-- A session whose person lost the right to the machine, or the account, ends by
-  itself within a minute, and its record says so.
+- A session whose person lost the right to the machine ends by itself within a
+  minute, and its record says so.
+- A person whose account is gone can't renew their sign-in. Their sessions take
+  no key and no click from then on, and end when the time for signing in again
+  has passed ([chapter 3](./start.md)).
 
 ## 14.2 Ending a session
 

@@ -75,6 +75,8 @@ Who is connected right now, and ending what should not be. For the goal [Decide 
 | Watch a running session without taking part | admin | later | `watch-session` |
 | Send a message to the people in a session | admin | later | `message-session` |
 
+- *End a person's sessions as soon as their right or their account is gone*: an account that is gone shows as a sign-in that can't be renewed: its sessions stop at once and end after the time the operator set.
+
 ## What happened
 
 The records of every connection and change, and the recordings of sessions. For the goal [Know what happened](../goals/README.md#know-what-happened).

@@ -148,7 +148,7 @@ A person signs in once, where the organisation already signs in, and is then sig
 |---|---|---|---|---|
 | One sign-in is enough | interaction capability | times a name or a password is asked between opening Away and working on a machine | not set | none on a Windows machine in a domain and on a shell; none elsewhere once a secret is kept |
 | It works from a device the organisation does not manage | compatibility | what a device needs besides a browser | not set | nothing: no app, no certificate, no membership of the domain, no private network |
-| What opens a machine is worth little when stolen | security | how long a credential made for one sign-in is valid, and where it can be used | not set | five minutes or less, for one person on one machine, and never sent to the browser |
+| What opens a machine is worth little when stolen | security | how long a credential made for one sign-in is valid, and where it can be used | not set | five minutes or less, made for one person and one session, and never sent to the browser |
 | It cannot sign in as the directory's administrators | security | the accounts Away may sign in as by itself | not set | none of the directory's privileged groups, unless an administrator names one |
 | A kept secret is never shown again | security | who can read a kept password or key back | not set | nobody: not in a page, not through an interface, not in a log |
 
