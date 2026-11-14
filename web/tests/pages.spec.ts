@@ -777,6 +777,8 @@ test.describe('with a database', () => {
     await page.getByRole('button', { name: 'remove from favourites: Ledger' }).click();
     await expect(page.locator('section.grp h2')).toHaveText(['favourites 2']);
     await page.reload();
+    // the page that was loaded anew has to have drawn them before they are read
+    await expect(page.locator('section.grp h2')).toHaveText(['favourites 2']);
     expect(await tiles(page, 'favourites 2')).toEqual(home.slice(1));
     await page.goto(`${AWAY_THAT_KEEPS}/programs`);
     await expect(page.getByRole('button', { name: 'add to favourites: Ledger' })).toHaveAttribute('aria-pressed', 'false');
