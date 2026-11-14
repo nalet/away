@@ -11,6 +11,11 @@ publish.workspace = true
 [dependencies]
 away-part.workspace = true
 hyper.workspace = true
+ring.workspace = true
+
+[features]
+# a sign-in service that stands in for a real one, for tests
+stand-in = []
 
 [lints]
 workspace = true

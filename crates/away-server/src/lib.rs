@@ -3,6 +3,11 @@
 //! In this version it answers on the address Away is reached at, with one page that says
 //! Away is installed, and says whether it is well. It reaches nothing yet.
 
+pub mod token;
+
+#[cfg(any(test, feature = "stand-in"))]
+pub mod stand_in;
+
 use away_part::http::{answer, at_once, for_a_browser, plain, Answers, Listener};
 use away_part::part::Bound;
 use away_part::{Part, Settings};
