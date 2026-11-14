@@ -28,7 +28,8 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 | Open a machine straight into a given program or command | admin | later | — | later | — | `start-with-command` |
 | See the programs of several machines side by side, in one list of windows | person | later | — | — | — | `programs-of-several-machines` |
 | Use the small icons a program puts beside the machine's clock | person | later | — | — | — | `use-tray-icons` |
-| Reach a farm of Windows machines through its broker and land on the right one | system | later | — | — | — | `follow-broker` |
+| Reach a farm of Windows machines through its broker and land on the right one | system | v1 | — | — | — | `follow-broker` |
+| Take the licence that a machine for many people hands every client | system | v1 | — | — | — | `take-licence` |
 | Reach a shell that is only reachable through another machine | system | — | — | later | — | `jump-through` |
 | Open other kinds of target: Telnet, a serial console, a database, a web page | person | — | — | — | no | `open-other-kinds` |
 
@@ -42,6 +43,8 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 - *See that a desktop is in use by someone else, where opening it would take it from them or show their screen*: a desktop with one screen for everyone, or one account that several people are signed in with.
 - *See the programs of several machines side by side, in one list of windows*: in the first release each machine's programs are a session of their own.
 - *Use the small icons a program puts beside the machine's clock*: for a program that hides its window there.
+- *Reach a farm of Windows machines through its broker and land on the right one*: a machine's file names its collection and the machines that serve it; Away goes where the broker sends it, and to no machine the file doesn't name.
+- *Take the licence that a machine for many people hands every client*: a Windows machine that serves desktops or programs to many people asks every client to take one before it shows anything.
 - *Open other kinds of target: Telnet, a serial console, a database, a web page*: Away is for desktops and shells.
 
 ## The picture

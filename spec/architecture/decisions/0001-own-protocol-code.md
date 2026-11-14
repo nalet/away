@@ -1,6 +1,6 @@
 # ADR-0001: Away speaks RDP, VNC and SSH with code of its own
 
-**Status:** Accepted · 2026-11-14. Nothing of it is built. Its hardest part is judged by a proof before anything is built around it (see [Validation](#validation)).
+**Status:** Accepted · 2026-11-14. Its hardest part is judged by a proof before anything is built around it (see [Validation](#validation)); the proof is under way. On the owner's word of the same day the proof's machines are Windows 11, Windows Server 2025 and Linux, and the first release also takes the licence a machine for many people hands out and follows a broker to the machine that serves a collection.
 
 ## Context
 
@@ -23,7 +23,7 @@ RDP is the large one. It is a family of published specifications: the connection
 
    | Library | Speaks | What the first release needs of it |
    |---|---|---|
-   | the RDP code | RDP | a desktop and single programs: the connection over TLS, the graphics pipeline and its picture formats except video, keys and pointer, text on the clipboard, the display's size and density, the windows of programs |
+   | the RDP code | RDP | a desktop and single programs: the connection over TLS, the licence a machine for many people hands out, the broker's word on which machine serves a collection, the graphics pipeline and its picture formats except video, keys and pointer, text on the clipboard, the display's size and density, the windows of programs |
    | the Windows sign-in | Kerberos, the sign-in before the desktop, the smart card channel | signing in with a name and a password, and with a certificate presented as a smart card that exists only in memory ([ADR-0007](./0007-short-lived-certificates.md)) |
    | the VNC code | RFB | a desktop: signing in with a password, the common picture encodings, the pointer's shape, the desktop's size, text on the clipboard |
    | the SSH code | SSH | one shell: signing in with a password, a key or a certificate, checking the machine's key, the shell's size |
@@ -39,7 +39,7 @@ RDP is the large one. It is a family of published specifications: the connection
 
 Own RDP is judged early and apart from the rest, by two proofs that need no browser ([the work packages](../../plan/README.md)):
 
-- **Package 2** builds the RDP code far enough for a test program to sign in with a typed name and password and to save the desktop's picture, on Windows 11, on Windows Server 2019, 2022 and 2025, and on an RDP server on Linux. The picture has to be the machine's screen, pixel for pixel.
+- **Package 2** builds the RDP code far enough for a test program to sign in with a typed name and password and to save the desktop's picture, on Windows 11, on Windows Server 2025, and on an RDP server on Linux. The picture has to be the machine's screen, pixel for pixel.
 - **Package 3** does the same for the sign-in with a certificate, on a real domain.
 
 The design holds if both gates are met. If the first is not, the owner chooses between more time and the other way: an RDP library that exists, behind the seam the gateway already uses for its own code. The target of *It rests on little that others wrote* then changes, and nothing else of the architecture does.

@@ -29,7 +29,7 @@ What the chart runs from Away's one image.
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
 | `server` | the server: the pages, the requests, people's sign-ins, the rules, the records | service | there | 52 |
-| `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | there | 45 |
+| `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | there | 47 |
 | `issuer` | the issuer: makes the sign-ins on machines | service | there | 15 |
 | `relay` | a relay placed in a network Away is not in | relay | later | — |
 
@@ -44,7 +44,7 @@ The libraries the parts and the session view are built from.
 
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
-| `rdp` | the RDP code | library | first release | 9 |
+| `rdp` | the RDP code | library | first release | 11 |
 | `windows-sign-in` | the Windows sign-in: Kerberos, the sign-in before the desktop, the smart card in memory | library | first release | 3 |
 | `vnc` | the VNC code | library | first release | 2 |
 | `ssh` | the SSH code | library | first release | 3 |

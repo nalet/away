@@ -1,6 +1,8 @@
 capability,components,note
 open-desktop,web ; session-view ; gateway ; rdp ; vnc ; picture,
 open-program,web ; session-view ; gateway ; rdp,
+follow-broker,gateway ; rdp,
+take-licence,gateway ; rdp,
 switch-programs,session-view ; gateway ; rdp,
 list-open-windows,session-view ; gateway ; rdp,The machine reports each window; the list is drawn from that
 open-shell,web ; session-view ; gateway ; ssh ; shell-screen,

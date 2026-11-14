@@ -30,6 +30,8 @@ says which.
 | Choose between leaving a desktop running and signing out of the machine | `session-view` `gateway` `rdp` | [10](../plan/README.md#10-a-desktop-over-rdp) | `leave-or-sign-out` |
 | See why a session ended, and open it again from there | `web` `session-view` `server` `gateway` | [6](../plan/README.md#6-a-shell) (SSH), [9](../plan/README.md#9-a-desktop-over-vnc) (VNC), [10](../plan/README.md#10-a-desktop-over-rdp) (RDP) | `see-why-ended` |
 | See that a desktop is in use by someone else, where opening it would take it from them or show their screen | `web` `server` | [9](../plan/README.md#9-a-desktop-over-vnc) (VNC), [10](../plan/README.md#10-a-desktop-over-rdp) (RDP) | `see-in-use` |
+| Reach a farm of Windows machines through its broker and land on the right one | `gateway` `rdp` | [10](../plan/README.md#10-a-desktop-over-rdp) | `follow-broker` |
+| Take the licence that a machine for many people hands every client | `gateway` `rdp` | [10](../plan/README.md#10-a-desktop-over-rdp) | `take-licence` |
 
 - *See a machine's open windows in a list beside them, and bring one to the front, also one made small*: The machine reports each window; the list is drawn from that.
 - *Leave a session running while the browser is closed, and pick it up again*: The desktop goes on at its machine; opening the machine again picks it up.

@@ -105,7 +105,7 @@ and nothing built by then is lost.
 | 7 | [Sessions as they run](#7-sessions-as-they-run) | build | agreed | 6 | [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md) | 12 capabilities |
 | 8 | [A shell as oneself](#8-a-shell-as-oneself) | build | agreed | 6 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md) | 4 capabilities |
 | 9 | [A desktop over VNC](#9-a-desktop-over-vnc) | build | agreed | 7 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 24 capabilities |
-| 10 | [A desktop over RDP](#10-a-desktop-over-rdp) | build | agreed | 2, 9 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 26 capabilities |
+| 10 | [A desktop over RDP](#10-a-desktop-over-rdp) | build | agreed | 2, 9 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 28 capabilities |
 | 11 | [Windows as oneself](#11-windows-as-oneself) | build | agreed | 3, 8, 10 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 6 capabilities |
 | 12 | [The organisation's own authority](#12-the-organisations-own-authority) | build | agreed | 11 | [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 1 capability |
 | 13 | [Programs](#13-programs) | build | agreed | 10 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 5 capabilities |
@@ -113,7 +113,7 @@ and nothing built by then is lost.
 | 15 | [Status, and the check of the setup](#15-status-and-the-check-of-the-setup) | build | agreed | 11 | [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md) | 2 capabilities |
 | 16 | [Ready to release](#16-ready-to-release) | build | agreed | 12, 13, 14, 15 | [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 1 capability |
 
-16 packages: 2 proofs and 14 builds. Together the builds deliver 113 of the 113 capabilities of the first release.
+16 packages: 2 proofs and 14 builds. Together the builds deliver 115 of the 115 capabilities of the first release.
 <!-- end: packages -->
 
 ## What the build needs first
@@ -151,7 +151,7 @@ A build, with nothing before it. It rests on [ADR‑0002](../architecture/decisi
 
 A proof, after package 1. It rests on [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md). The gate of ADR-0001.
 
-**Its gate.** A test program built from Away's own RDP code signs in with a typed name and password on Windows 11, on Windows Server 2019, 2022 and 2025 and on an RDP server on Linux, and saves the desktop's picture. The picture is the machine's screen, pixel for pixel. The owner then says whether the RDP code stays Away's own.
+**Its gate.** A test program built from Away's own RDP code signs in with a typed name and password on Windows 11, on Windows Server 2025 and on an RDP server on Linux, and saves the desktop's picture. The picture is the machine's screen, pixel for pixel. The owner then says whether the RDP code stays Away's own.
 
 ### 3 The Windows sign-in, proven without a browser
 
@@ -259,7 +259,7 @@ A build, after package 2 and package 9. It rests on [ADR‑0001](../architecture
 
 | Area | What it delivers |
 |---|---|
-| [Opening a machine](../capabilities/session.md#opening-a-machine) | Open a machine's desktop (RDP); See how far a connection has come, and which step failed and why (RDP); Keep several machines open at once and move between them (RDP); Open a session in a browser tab or window of its own (RDP); Come back to a session by itself after the connection dropped (RDP); Leave a session running while the browser is closed, and pick it up again (RDP); Choose between leaving a desktop running and signing out of the machine; See why a session ended, and open it again from there (RDP); See that a desktop is in use by someone else, where opening it would take it from them or show their screen (RDP) |
+| [Opening a machine](../capabilities/session.md#opening-a-machine) | Open a machine's desktop (RDP); Reach a farm of Windows machines through its broker and land on the right one; Take the licence that a machine for many people hands every client; See how far a connection has come, and which step failed and why (RDP); Keep several machines open at once and move between them (RDP); Open a session in a browser tab or window of its own (RDP); Come back to a session by itself after the connection dropped (RDP); Leave a session running while the browser is closed, and pick it up again (RDP); Choose between leaving a desktop running and signing out of the machine; See why a session ended, and open it again from there (RDP); See that a desktop is in use by someone else, where opening it would take it from them or show their screen (RDP) |
 | [The picture](../capabilities/session.md#the-picture) | Fit the machine's screen to the window, and follow when its size changes (RDP); Fill the whole screen with a session (RDP); Show a sharp picture on a high-density screen (RDP); Show a screen at rest exactly, pixel for pixel (RDP); Give up detail while the picture moves or the line is slow, and restore it after (RDP); Show the desktop as it looks at the machine: its background, smooth fonts, its effects; Draw the pointer on one's own device, so that it moves without delay (RDP) |
 | [Keyboard and pointer](../capabilities/session.md#keyboard-and-pointer) | Type with one's own keyboard layout, whatever the machine's is (RDP); Send the key combinations a browser or a device keeps for itself, from a menu (RDP); Give every key to the machine while a session fills the screen (RDP); Use a Mac keyboard on a Windows machine and the reverse, with the keys where the hands expect them (RDP); Use every mouse button and the wheel, in both directions (RDP); Scroll with a trackpad as smoothly, as fast and in the direction one is used to (RDP) |
 | [Clipboard, files and printing](../capabilities/session.md#clipboard-files-and-printing) | Copy text on one side and paste it on the other (RDP) |

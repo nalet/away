@@ -15,7 +15,8 @@ see-in-use,open,"See that a desktop is in use by someone else, where opening it 
 start-with-command,open,Open a machine straight into a given program or command,admin,later,—,later,—,
 programs-of-several-machines,open,"See the programs of several machines side by side, in one list of windows",person,later,—,—,—,in the first release each machine's programs are a session of their own
 use-tray-icons,open,Use the small icons a program puts beside the machine's clock,person,later,—,—,—,for a program that hides its window there
-follow-broker,open,Reach a farm of Windows machines through its broker and land on the right one,system,later,—,—,—,
+follow-broker,open,Reach a farm of Windows machines through its broker and land on the right one,system,v1,—,—,—,"a machine's file names its collection and the machines that serve it; Away goes where the broker sends it, and to no machine the file doesn't name"
+take-licence,open,Take the licence that a machine for many people hands every client,system,v1,—,—,—,"a Windows machine that serves desktops or programs to many people asks every client to take one before it shows anything"
 jump-through,open,Reach a shell that is only reachable through another machine,system,—,—,later,—,
 open-other-kinds,open,"Open other kinds of target: Telnet, a serial console, a database, a web page",person,—,—,—,no,Away is for desktops and shells
 fit-to-window,picture,"Fit the machine's screen to the window, and follow when its size changes",person,v1,v1,v1,—,a Windows machine and a shell take the window's size; other desktops are scaled to it
