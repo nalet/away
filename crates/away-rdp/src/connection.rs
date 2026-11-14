@@ -5,15 +5,18 @@
 //! is signed in. It takes the frames the machine sends and gives bytes to send and what
 //! happened. It holds no connection itself.
 
+use crate::channel::{self, Pieces};
 use crate::gcc::{self, Client, Machine};
 use crate::input::{self, Input};
 use crate::licence::{self, Said, Taking};
 use crate::mcs::{self, Arrived};
 use crate::pdu::{self, FromMachine};
+use crate::rail::{self, Command};
 use crate::redirection::{self, Redirection};
 use crate::secret::Secret;
 use crate::tpkt::{self, Frame};
 use crate::update::{self, Rectangle, Updates};
+use crate::window::Change;
 use crate::Error;
 
 /// What happened, for whoever holds the connection to show or to act on.
@@ -53,6 +56,20 @@ pub enum Happened {
     /// The machine is a farm's broker, and sends the client on to the machine that
     /// serves it. This connection is at its end.
     SentOn(Redirection),
+    /// The machine is ready for programs, and was asked for the one this connection is for.
+    AskedForTheProgram,
+    /// The program started.
+    Started,
+    /// The program did not start.
+    NotStarted {
+        /// Why, as RDP numbers the reasons ([`rail::why`] says each in words).
+        result: u16,
+        /// Why, as the machine's own system numbers them.
+        raw: u32,
+    },
+    /// What the machine says of the windows of programs: new ones, changed ones, gone
+    /// ones, and which is in front.
+    Windows(Vec<Change>),
 }
 
 enum State {
@@ -79,6 +96,10 @@ pub struct Connection {
     share_id: u32,
     reason: u32,
     updates: Updates,
+    /// The pieces of a message about programs that is not whole yet.
+    pieces: Pieces,
+    /// The size of the desktop the machine offers.
+    size: (u16, u16),
 }
 
 impl Connection {
@@ -102,6 +123,8 @@ impl Connection {
             share_id: 0,
             reason: 0,
             updates: Updates::new(),
+            pieces: Pieces::default(),
+            size: (0, 0),
         };
         (connection, first)
     }
@@ -113,7 +136,16 @@ impl Connection {
                 return match self.state {
                     State::Finishes | State::Open => {
                         let drawn = self.updates.short_frame(&carried)?;
-                        Ok((Vec::new(), if drawn.is_empty() { Vec::new() } else { vec![Happened::Drawn(drawn)] }))
+                        let windows = self.updates.take_windows();
+                        let mut happened = Vec::new();
+                        // where the windows are comes before what is drawn in them
+                        if !windows.is_empty() {
+                            happened.push(Happened::Windows(windows));
+                        }
+                        if !drawn.is_empty() {
+                            happened.push(Happened::Drawn(drawn));
+                        }
+                        Ok((Vec::new(), happened))
                     }
                     _ => Err(Error::NotRdp("the machine draws before the connection is open")),
                 };
@@ -124,6 +156,10 @@ impl Connection {
         match &mut self.state {
             State::AwaitsMachine => {
                 self.machine = gcc::read_answer(mcs::read_connect_answer(message)?)?;
+                // a program is started over a channel of its own, which the machine has to give
+                if self.client.program.is_some() && self.machine.channels.is_empty() {
+                    return Err(Error::NoPrograms);
+                }
                 self.state = State::AwaitsUser;
                 Ok((mcs::erect_and_attach().iter().flat_map(|message| tpkt::data_frame(message)).collect(), Vec::new()))
             }
@@ -140,7 +176,7 @@ impl Connection {
                 if left.is_empty() {
                     self.state = State::AwaitsLicence;
                     // the password is used here and kept no longer
-                    let info = pdu::client_info(&self.domain, &self.name, self.password.take().as_ref());
+                    let info = pdu::client_info(&self.domain, &self.name, self.password.take().as_ref(), self.client.program.is_some());
                     let send = tpkt::data_frame(&mcs::send(self.user, self.machine.io_channel, &info));
                     return Ok((send, vec![Happened::Channels { user: self.user, desktop: self.machine.io_channel }]));
                 }
@@ -150,9 +186,43 @@ impl Connection {
             _ => match mcs::read_arrived(message)? {
                 Arrived::Ending => Err(Error::Ended(self.reason)),
                 Arrived::On(channel, arrived) if channel == self.machine.io_channel => self.on_the_desktops_channel(arrived),
+                Arrived::On(channel, arrived) if Some(channel) == self.programs_channel() => self.on_the_programs_channel(arrived),
                 Arrived::On(..) => Ok((Vec::new(), Vec::new())),
             },
         }
+    }
+
+    /// The channel programs are started over, where this connection is for a program.
+    fn programs_channel(&self) -> Option<u16> {
+        self.client.program.as_ref().and_then(|_| self.machine.channels.first().copied())
+    }
+
+    /// A message about programs, in the frames it travels in.
+    fn about_programs(&self, message: &[u8]) -> Vec<u8> {
+        let Some(on) = self.programs_channel() else { return Vec::new() };
+        channel::pieces(message).iter().flat_map(|piece| tpkt::data_frame(&mcs::send(self.user, on, piece))).collect()
+    }
+
+    fn on_the_programs_channel(&mut self, piece: &[u8]) -> Result<(Vec<u8>, Vec<Happened>), Error> {
+        let Some(message) = self.pieces.take(piece)? else { return Ok((Vec::new(), Vec::new())) };
+        Ok(match rail::read(&message)? {
+            // the machine is ready: the client is too, says what it is and how much room
+            // the windows have, and asks for the program
+            rail::Said::Ready => {
+                let (width, height) = match self.size {
+                    (0, _) | (_, 0) => (self.client.width, self.client.height),
+                    size => size,
+                };
+                let mut says = vec![rail::ready(), rail::client(), rail::work_area(width, height)];
+                if let Some(program) = &self.client.program {
+                    says.push(rail::start(program)?);
+                }
+                (says.iter().flat_map(|message| self.about_programs(message)).collect(), vec![Happened::AskedForTheProgram])
+            }
+            rail::Said::Started => (Vec::new(), vec![Happened::Started]),
+            rail::Said::NotStarted { result, raw } => (Vec::new(), vec![Happened::NotStarted { result, raw }]),
+            rail::Said::Other(_) => (Vec::new(), Vec::new()),
+        })
     }
 
     fn on_the_desktops_channel(&mut self, arrived: &[u8]) -> Result<(Vec<u8>, Vec<Happened>), Error> {
@@ -194,7 +264,9 @@ impl Connection {
                         return Err(Error::NotYet("offers its desktop at 8, 15 or 24 bits a pixel"));
                     }
                     self.share_id = share_id;
-                    let mut answers = vec![pdu::confirm(self.user, share_id, width, height, bits, self.client.layout)];
+                    self.size = (width, height);
+                    let for_a_program = self.client.program.is_some();
+                    let mut answers = vec![pdu::confirm(self.user, share_id, width, height, bits, self.client.layout, for_a_program)];
                     answers.extend(pdu::finish(self.user, share_id));
                     for answer in answers {
                         send.extend(tpkt::data_frame(&mcs::send(self.user, self.machine.io_channel, &answer)));
@@ -215,6 +287,12 @@ impl Connection {
                     // an update of the long kind: only rectangles are read
                     if drawn.starts_with(&[1, 0]) {
                         happened.push(Happened::Drawn(update::read_rectangles(drawn)?));
+                    } else if drawn.starts_with(&[0, 0]) {
+                        // instructions, of which Away takes the words on windows alone
+                        let windows = update::read_windows(drawn)?;
+                        if !windows.is_empty() {
+                            happened.push(Happened::Windows(windows));
+                        }
                     }
                 }
                 // why the machine is about to end the connection
@@ -238,6 +316,24 @@ impl Connection {
         }
     }
 
+    /// What to send to tell the machine that a window is the one the person works in
+    /// now, or no longer is. Nothing where the connection is for no program.
+    pub fn activate(&self, window: u32, active: bool) -> Vec<u8> {
+        match self.state {
+            State::Open => self.about_programs(&rail::activate(window, active)),
+            _ => Vec::new(),
+        }
+    }
+
+    /// What to send to tell the machine what the person does with a window as a whole:
+    /// make it small, make it large, bring it back, close it.
+    pub fn command(&self, window: u32, command: Command) -> Vec<u8> {
+        match self.state {
+            State::Open => self.about_programs(&rail::command(window, command)),
+            _ => Vec::new(),
+        }
+    }
+
     /// What to send to leave. The machine keeps what runs on the desktop, for the account
     /// to come back to.
     pub fn leave(&self) -> Vec<u8> {
@@ -247,5 +343,157 @@ impl Connection {
     /// What the client said of itself.
     pub fn client(&self) -> &Client {
         &self.client
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::picture::Picture;
+    use crate::rail::stand_in::Asked;
+    use crate::rail::Program;
+    use crate::stand_in::desktop::{Desktop, WINDOW, WINDOW_AT, WINDOW_SIZE};
+    use crate::tpkt::Frames;
+    use crate::window::{Part, Shown, Window};
+
+    /// A picture whose every pixel says where it is.
+    fn picture() -> Picture {
+        let mut picture = Picture::new(200, 120);
+        for row in 0..120 {
+            for column in 0..200 {
+                picture.pixels[(row * 200 + column) * 4..][..3].copy_from_slice(&[column as u8, row as u8, 0x7f]);
+            }
+        }
+        picture
+    }
+
+    /// Runs a connection against a stand-in for a machine until neither side has
+    /// anything to say, and gives what happened, the connection and the machine.
+    fn run(program: Option<&str>, machine: Desktop) -> (Result<Vec<Happened>, Error>, Connection, Desktop) {
+        let program = program.map(|run| Program { run: run.to_string(), arguments: String::new() });
+        let client =
+            Client { width: 1280, height: 800, security: 2, name: "away".to_string(), layout: gcc::LAYOUT_US, sent_on_to: None, program };
+        let for_a_licence = licence::New { random: [1; 32], secret: [2; 48], known_by: [3; 16] };
+        let (mut connection, first) = Connection::begin(client, "CORP", "alex.urban", None, for_a_licence);
+        let mut machine = machine;
+        let happened = talk(&mut connection, &mut machine, first);
+        (happened, connection, machine)
+    }
+
+    /// Passes what one side says to the other, and back, until both are silent.
+    fn talk(connection: &mut Connection, machine: &mut Desktop, mut to_machine: Vec<u8>) -> Result<Vec<Happened>, Error> {
+        let mut happened = Vec::new();
+        let (mut at_machine, mut at_client) = (Frames::new(), Frames::new());
+        while !to_machine.is_empty() {
+            at_machine.push(&to_machine);
+            to_machine.clear();
+            while let Some(frame) = at_machine.next_of_either_kind().expect("the client's frames") {
+                at_client.push(&match frame {
+                    Frame::Slow(carried) => machine.answer(&carried).expect("the machine takes what the client says"),
+                    Frame::Fast(head, carried) => machine.input(head, &carried).expect("the machine takes keys and the pointer"),
+                });
+            }
+            while let Some(frame) = at_client.next_of_either_kind().expect("the machine's frames") {
+                let (send, more) = connection.receive(frame)?;
+                to_machine.extend(send);
+                happened.extend(more);
+            }
+        }
+        Ok(happened)
+    }
+
+    #[test]
+    fn a_program_is_asked_for_starts_and_its_window_is_told_of_before_what_is_drawn_in_it() {
+        let (happened, connection, machine) = run(Some("||ledger"), Desktop::new(picture()).that_publishes(&["||ledger"]));
+        let happened = happened.expect("the connection opens");
+        // the machine gave a channel for programs beside the desktop's, and no desktop is shown
+        let kinds: Vec<&str> = happened
+            .iter()
+            .map(|happened| match happened {
+                Happened::Channels { .. } => "channels",
+                Happened::Licensed => "licensed",
+                Happened::Desktop { .. } => "desktop",
+                Happened::Open => "open",
+                Happened::AskedForTheProgram => "asked",
+                Happened::Started => "started",
+                Happened::Windows(_) => "windows",
+                Happened::Drawn(_) => "drawn",
+                _ => "other",
+            })
+            .collect();
+        assert_eq!(&kinds[..7], ["channels", "licensed", "desktop", "open", "asked", "started", "windows"]);
+        assert!(kinds[7..].iter().all(|kind| *kind == "drawn") && kinds.len() > 7);
+        let windows = happened.iter().find_map(|happened| if let Happened::Windows(windows) = happened { Some(windows) } else { None });
+        assert_eq!(
+            windows.unwrap(),
+            &[
+                Change::Window(Window {
+                    id: WINDOW,
+                    is_new: true,
+                    owner: None,
+                    style: Some((0x14cf_0000, 0x100)),
+                    shown: Some(Shown::AsItIs),
+                    title: Some("ledger".to_string()),
+                    at: Some((20, 10)),
+                    size: Some((160, 100)),
+                    seen_at: Some((20, 10)),
+                    seen: Some(vec![Part { left: 0, top: 0, right: 160, bottom: 100 }]),
+                }),
+                Change::InFront(WINDOW),
+                Change::Order(vec![WINDOW]),
+            ]
+        );
+        // what is drawn is the window and nothing beside it
+        let drawn: Vec<&Rectangle> = happened
+            .iter()
+            .filter_map(|happened| if let Happened::Drawn(drawn) = happened { Some(drawn) } else { None })
+            .flatten()
+            .collect();
+        let (left, top) = (WINDOW_AT.0 as u16, WINDOW_AT.1 as u16);
+        let (right, bottom) = (left + WINDOW_SIZE.0 as u16 - 1, top + WINDOW_SIZE.1 as u16 - 1);
+        assert!(drawn.iter().all(|drawn| drawn.left >= left && drawn.top >= top && drawn.right <= right && drawn.bottom <= bottom));
+        assert_eq!(
+            drawn.iter().map(|drawn| u32::from(drawn.right - drawn.left + 1) * u32::from(drawn.bottom - drawn.top + 1)).sum::<u32>(),
+            160 * 100
+        );
+
+        // the machine was told that the connection is for a program, and then, in this
+        // order: that the client is ready, what it is, how much room there is, the program
+        let seen = machine.seen();
+        assert!(seen.for_a_program);
+        assert_eq!(
+            seen.about_programs,
+            [
+                Asked::Ready,
+                Asked::Client(0x400),
+                Asked::WorkArea(200, 120),
+                Asked::Start(Program { run: "||ledger".to_string(), arguments: String::new() }),
+            ]
+        );
+
+        // the person works in the window, and then closes it: the machine says it is gone
+        let mut machine = machine;
+        let mut connection = connection;
+        let says = [connection.activate(WINDOW, true), connection.command(WINDOW, Command::Close)].concat();
+        let after = talk(&mut connection, &mut machine, says).unwrap();
+        assert_eq!(after, [Happened::Windows(vec![Change::Gone(WINDOW)])]);
+        assert_eq!(machine.seen().about_programs[4..], [Asked::Activate(WINDOW, true), Asked::Command(WINDOW, Command::Close)]);
+    }
+
+    #[test]
+    fn a_program_the_machine_does_not_publish_is_not_started_and_a_desktop_asks_for_no_program() {
+        let (happened, _, machine) = run(Some("||payroll"), Desktop::new(picture()).that_publishes(&["||ledger"]));
+        let happened = happened.unwrap();
+        assert_eq!(happened.last(), Some(&Happened::NotStarted { result: 3, raw: 2 }));
+        assert!(!happened.iter().any(|happened| matches!(happened, Happened::Windows(_) | Happened::Drawn(_))));
+        assert_eq!(machine.seen().about_programs.len(), 4);
+
+        // a connection for the desktop asks for no channel, says nothing of programs, and is shown the desktop
+        let (happened, connection, machine) = run(None, Desktop::new(picture()).that_publishes(&["||ledger"]));
+        let happened = happened.unwrap();
+        assert!(happened.iter().any(|happened| matches!(happened, Happened::Drawn(_))));
+        assert!(!happened.iter().any(|happened| matches!(happened, Happened::AskedForTheProgram | Happened::Windows(_))));
+        assert!(!machine.seen().for_a_program && machine.seen().about_programs.is_empty());
+        assert!(connection.activate(WINDOW, true).is_empty() && connection.command(WINDOW, Command::Close).is_empty());
     }
 }

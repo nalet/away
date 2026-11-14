@@ -4,6 +4,7 @@
 //! arrive in pieces. This cuts them apart, puts the pieces together, and gives the
 //! rectangles; turning a rectangle's bytes into pixels is the picture's part.
 
+use crate::window::{self, Change};
 use crate::Error;
 
 /// One rectangle of the machine's picture, as it arrived.
@@ -37,6 +38,7 @@ pub const LARGEST: usize = 8 * 1024 * 1024;
 #[derive(Default)]
 pub struct Updates {
     pieces: Vec<u8>,
+    windows: Vec<Change>,
 }
 
 impl Updates {
@@ -79,12 +81,32 @@ impl Updates {
                     Some(whole)
                 }
             };
-            if let (1, Some(whole)) = (kind, whole) {
-                rectangles.extend(read_rectangles(&whole)?);
+            match (kind, whole) {
+                (1, Some(whole)) => rectangles.extend(read_rectangles(&whole)?),
+                // instructions: how many, and then each. Away asks for none to draw from,
+                // so what arrives are the machine's words on the windows of programs
+                (0, Some(whole)) => {
+                    let [low, high, orders @ ..] = &whole[..] else { return Err(WRONG) };
+                    self.windows.extend(window::read(u16::from_le_bytes([*low, *high]), orders)?);
+                }
+                _ => {}
             }
         }
         Ok(rectangles)
     }
+
+    /// What the machine said of the windows of programs since this was last asked.
+    pub fn take_windows(&mut self) -> Vec<Change> {
+        std::mem::take(&mut self.windows)
+    }
+}
+
+/// Reads an update of the long kind that carries instructions, and gives the machine's
+/// words on the windows of programs in it.
+pub fn read_windows(update: &[u8]) -> Result<Vec<Change>, Error> {
+    const WRONG: Error = Error::NotRdp("an update of instructions is not built as one");
+    let count = update.get(4..6).map(|pair| u16::from_le_bytes([pair[0], pair[1]])).ok_or(WRONG)?;
+    window::read(count, update.get(8..).ok_or(WRONG)?)
 }
 
 /// Reads an update that carries rectangles: its kind, how many, then each.

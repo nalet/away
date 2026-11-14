@@ -47,6 +47,8 @@ pub enum Error {
     NotYet(&'static str),
     /// The machine ended the connection, with this reason of its own where it gave one.
     Ended(u32),
+    /// The machine opens no programs in windows of their own.
+    NoPrograms,
 }
 
 /// Why a machine refuses a sign-in, for the codes people meet.
@@ -103,6 +105,7 @@ impl fmt::Display for Error {
             Error::NotYet(what) => write!(out, "It {what}, which this version doesn't speak yet."),
             Error::Ended(0) => out.write_str("It ended the connection and gave no reason."),
             Error::Ended(code) => write!(out, "It ended the connection, with its own reason {code:#010x}."),
+            Error::NoPrograms => out.write_str("It opens no programs in windows of their own: it gave no channel to ask for one on."),
             Error::MayNotComeIn(5) => out.write_str("It took the sign-in, and says this account may not come in over RDP here."),
             Error::MayNotComeIn(code) => write!(out, "It took the sign-in, and then refused the account, with its own code {code:#010x}."),
         }

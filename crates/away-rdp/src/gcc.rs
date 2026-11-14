@@ -25,6 +25,9 @@ pub struct Client {
     /// The session a farm's broker sent the client on to, where this connection is to
     /// the machine it was sent to.
     pub sent_on_to: Option<u32>,
+    /// The program to start in windows of its own, where the connection is for a program
+    /// and not for the desktop.
+    pub program: Option<crate::rail::Program>,
 }
 
 /// The keyboard layout of the United States, which a client has where nothing says otherwise.
@@ -81,8 +84,11 @@ pub fn request(client: &Client) -> Vec<u8> {
     let mut blocks = block(0xc001, &core);
     // no encryption of RDP's own: TLS secures the connection
     blocks.extend(block(0xc002, &[0; 8]));
-    // no further channels yet
-    blocks.extend(block(0xc003, &0u32.to_le_bytes()));
+    // the further channels: the one programs are started over, where a program is asked for
+    let channels: Vec<[u8; 12]> = client.program.iter().map(|_| crate::channel::asked_for(crate::rail::CHANNEL)).collect();
+    let mut further = (channels.len() as u32).to_le_bytes().to_vec();
+    further.extend(channels.concat());
+    blocks.extend(block(0xc003, &further));
     // it follows a farm's word on where the connection belongs, in the current form; on the
     // machine it was sent to, it says which session the broker named
     let mut farm = vec![if client.sent_on_to.is_some() { 0x0f } else { 0x0d }, 0, 0, 0];
@@ -159,7 +165,7 @@ mod tests {
     use super::*;
 
     fn client() -> Client {
-        Client { width: 1280, height: 800, security: 8, name: "away".to_string(), layout: LAYOUT_US, sent_on_to: None }
+        Client { width: 1280, height: 800, security: 8, name: "away".to_string(), layout: LAYOUT_US, sent_on_to: None, program: None }
     }
 
     #[test]
@@ -178,6 +184,13 @@ mod tests {
         assert_eq!(&request[239..251], &[0x02, 0xc0, 0x0c, 0x00, 0, 0, 0, 0, 0, 0, 0, 0]);
         assert_eq!(&request[251..259], &[0x03, 0xc0, 0x08, 0x00, 0, 0, 0, 0]);
         assert_eq!(&request[259..], &[0x04, 0xc0, 0x0c, 0x00, 0x0d, 0, 0, 0, 0, 0, 0, 0]);
+
+        // for a program it asks for the channel programs are started over
+        let program = crate::rail::Program { run: "||ledger".to_string(), arguments: String::new() };
+        let request = super::request(&Client { program: Some(program), ..client() });
+        assert_eq!(&request[251..259], &[0x03, 0xc0, 0x14, 0x00, 1, 0, 0, 0]);
+        assert_eq!(&request[259..271], &[b'r', b'a', b'i', b'l', 0, 0, 0, 0, 0x00, 0x00, 0x20, 0xc0]);
+        assert_eq!(&request[271..275], &[0x04, 0xc0, 0x0c, 0x00]);
     }
 
     #[test]

@@ -28,6 +28,7 @@ use away_rdp::picture::Picture;
 use away_rdp::secret::Secret;
 use away_rdp::sign_in::{self, Message, New, Next, SignIn};
 use away_rdp::tpkt::Frames;
+use away_rdp::window::Change;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, CryptoProvider};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
@@ -35,7 +36,7 @@ use rustls::{ClientConfig, ClientConnection, DigitallySignedStruct, SignatureSch
 use sha2::{Digest, Sha256};
 
 const USAGE: &str = "\
-away-try rdp <address> [--as <account> --password-file <file> [--save <file>]] [--collection <name>]
+away-try rdp <address> [--as <account> --password-file <file> [--save <file>]] [--collection <name>] [--program <name>]
 
   Reaches a machine over RDP with Away's own code and says what it shows, step by step.
   The address is a name or a number, with a port after a colon where it is not 3389.
@@ -49,6 +50,10 @@ away-try rdp <address> [--as <account> --password-file <file> [--save <file>]] [
 
   With --collection the address is a farm's broker, which is asked for that collection
   and says which machine serves it.
+
+  With --program it opens no desktop: it asks the machine to start that program, and
+  says whether it started and which windows it opens. A program that a farm publishes
+  is asked for by the name it is published under, with || before it: '||ledger'.
 
   It says the SHA-256 of the picture's pixels: three bytes each (blue, green, red), row
   by row from the top. A screenshot taken on the machine at that moment has the same.
@@ -76,6 +81,7 @@ struct Asked {
     password_file: Option<String>,
     save: Option<String>,
     collection: Option<String>,
+    program: Option<String>,
 }
 
 /// Reads the words the program was started with. Gives nothing where they make no sense.
@@ -85,13 +91,14 @@ fn asked(words: &[String]) -> Option<Asked> {
     if kind != "rdp" || address.starts_with('-') {
         return None;
     }
-    let mut asked = Asked { address: address.clone(), account: None, password_file: None, save: None, collection: None };
+    let mut asked = Asked { address: address.clone(), account: None, password_file: None, save: None, collection: None, program: None };
     while let [option, value, after @ ..] = rest {
         let into = match option.as_str() {
             "--as" => &mut asked.account,
             "--password-file" => &mut asked.password_file,
             "--save" => &mut asked.save,
             "--collection" => &mut asked.collection,
+            "--program" => &mut asked.program,
             _ => return None,
         };
         if into.replace(value.clone()).is_some() {
@@ -99,9 +106,9 @@ fn asked(words: &[String]) -> Option<Asked> {
         }
         rest = after;
     }
-    // an account has a password, and a picture needs an account
+    // an account has a password, and a picture and a program need an account
     let whole = rest.is_empty() && asked.account.is_some() == asked.password_file.is_some();
-    (whole && (asked.save.is_none() || asked.account.is_some())).then_some(asked)
+    (whole && ((asked.save.is_none() && asked.program.is_none()) || asked.account.is_some())).then_some(asked)
 }
 
 fn main() -> ExitCode {
@@ -120,11 +127,11 @@ fn main() -> ExitCode {
         (Some(name), Some(file)) => match std::fs::read_to_string(file) {
             Ok(password) => {
                 let account = Account::named(name, Secret::new(password.trim_end_matches(['\r', '\n'])));
-                rdp(&asked.address, Some(account), asked.save.as_deref(), asked.collection.as_deref())
+                rdp(&asked.address, Some(account), asked.save.as_deref(), asked.collection.as_deref(), asked.program.as_deref())
             }
             Err(error) => Err(format!("The password's file can't be read: {error}.")),
         },
-        _ => rdp(&asked.address, None, None, asked.collection.as_deref()),
+        _ => rdp(&asked.address, None, None, asked.collection.as_deref(), None),
     };
     match tried {
         Ok(()) => ExitCode::SUCCESS,
@@ -136,7 +143,7 @@ fn main() -> ExitCode {
 }
 
 /// The steps of a connection over RDP, as far as Away's code goes.
-fn rdp(address: &str, account: Option<Account>, save: Option<&str>, collection: Option<&str>) -> Result<(), String> {
+fn rdp(address: &str, account: Option<Account>, save: Option<&str>, collection: Option<&str>, program: Option<&str>) -> Result<(), String> {
     let (host, port) = match address.rsplit_once(':') {
         Some((host, port)) if !host.contains(':') => (host, port.parse::<u16>().map_err(|_| format!("{port} is no port."))?),
         _ => (address, 3389),
@@ -309,6 +316,7 @@ fn rdp(address: &str, account: Option<Account>, save: Option<&str>, collection: 
         name: "away".to_string(),
         layout: away_rdp::gcc::LAYOUT_US,
         sent_on_to: None,
+        program: program.map(|run| away_rdp::rail::Program { run: run.to_string(), arguments: String::new() }),
     };
     let mut random = [0u8; 80];
     getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
@@ -376,6 +384,29 @@ fn rdp(address: &str, account: Option<Account>, save: Option<&str>, collection: 
                         }
                         println!("   This program goes no further: it reaches one machine.");
                         return Ok(());
+                    }
+                    Happened::AskedForTheProgram => {
+                        println!("   It is ready for programs, and was asked for {}.", program.unwrap_or("none"));
+                    }
+                    Happened::Started => println!("   The program started."),
+                    Happened::NotStarted { result, raw } => {
+                        return Err(format!("The program did not start: {} (its own code {raw:#010x}).", away_rdp::rail::why(result)));
+                    }
+                    Happened::Windows(changes) => {
+                        for change in changes {
+                            match change {
+                                Change::Window(window) => {
+                                    let what = if window.is_new { "A new window" } else { "A window changed" };
+                                    let title = window.title.map(|title| format!(", “{title}”")).unwrap_or_default();
+                                    let at = window.at.map(|(left, top)| format!(", at {left}, {top}")).unwrap_or_default();
+                                    let size = window.size.map(|(wide, high)| format!(", {wide} by {high}")).unwrap_or_default();
+                                    println!("   {what}: number {}{title}{at}{size}.", window.id);
+                                }
+                                Change::Gone(window) => println!("   A window is gone: number {window}."),
+                                Change::InFront(window) => println!("   In front is the window number {window}."),
+                                Change::Order(_) => {}
+                            }
+                        }
                     }
                     Happened::Drawn(rectangles) => {
                         for rectangle in &rectangles {

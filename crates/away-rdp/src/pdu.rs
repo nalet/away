@@ -21,7 +21,8 @@ fn number32(bytes: &[u8], at: usize) -> Option<u32> {
 /// the channels. With the sign-in before the desktop the machine already has the name and
 /// the password, so no password travels here. A machine that signs the account in itself
 /// is given the password, and asked to sign in with it without showing its own screen.
-pub fn client_info(domain: &str, name: &str, password: Option<&Secret>) -> Vec<u8> {
+/// A connection that is for a program says so here, and the machine shows no desktop.
+pub fn client_info(domain: &str, name: &str, password: Option<&Secret>, for_a_program: bool) -> Vec<u8> {
     let mut info = Vec::with_capacity(320);
     // this message is the client's information
     info.extend(0x0040u16.to_le_bytes());
@@ -30,7 +31,8 @@ pub fn client_info(domain: &str, name: &str, password: Option<&Secret>) -> Vec<u
     // a mouse with a wheel, the Windows key, names in Unicode, the shell as large as the
     // desktop, word of how signing in went, and no sound
     let signs_in = if password.is_some() { 0x0008 } else { 0 };
-    info.extend((0x000b_0173u32 | signs_in).to_le_bytes());
+    let programs = if for_a_program { 0x0000_8000 } else { 0 };
+    info.extend((0x000b_0173u32 | signs_in | programs).to_le_bytes());
     let texts = [wide(domain), wide(name), password.map(|password| wide(password.expose())).unwrap_or_default(), Vec::new(), Vec::new()];
     for text in &texts {
         info.extend((text.len() as u16).to_le_bytes());
@@ -90,7 +92,7 @@ pub(crate) fn words(numbers: &[u16]) -> Vec<u8> {
 /// The client's answer to what the machine can do: what the client can do. It takes
 /// pictures and nothing that has to be drawn from instructions, at the bits a pixel the
 /// machine offers, with every pixel as the machine has it.
-pub fn confirm(user: u16, share_id: u32, width: u16, height: u16, bits: u16, layout: u32) -> Vec<u8> {
+pub fn confirm(user: u16, share_id: u32, width: u16, height: u16, bits: u16, layout: u32, for_a_program: bool) -> Vec<u8> {
     let mut sets = Vec::new();
     // in general: the short frames for what is drawn, and pictures without a head of their own
     sets.push(capability(0x0001, &words(&[1, 3, 0x0200, 0, 0, 0x041d, 0, 0, 0, 0])));
@@ -139,6 +141,12 @@ pub fn confirm(user: u16, share_id: u32, width: u16, height: u16, bits: u16, lay
     sets.push(capability(0x0007, &words(&[0, 0, 0, 0])));
     // a picture may arrive in pieces, of up to this many bytes together
     sets.push(capability(0x001a, &(crate::update::LARGEST as u32).to_le_bytes()));
+    if for_a_program {
+        // programs in windows of their own, and the machine's words on those windows with
+        // everything they may carry; the icons it would keep are passed over
+        sets.push(capability(0x0017, &1u32.to_le_bytes()));
+        sets.push(capability(0x0018, &[2, 0, 0, 0, 3, 12, 0]));
+    }
 
     let named = b"AWAY\0";
     let all: Vec<u8> = sets.concat();
@@ -251,7 +259,7 @@ mod tests {
 
     #[test]
     fn the_clients_information_names_the_account_and_carries_no_password() {
-        let info = client_info("CORP", "alex.urban", None);
+        let info = client_info("CORP", "alex.urban", None, false);
         assert_eq!(&info[..4], &[0x40, 0, 0, 0]);
         assert_eq!(&info[8..12], &0x000b_0173u32.to_le_bytes());
         // the lengths of the domain, the name, and three empty texts
@@ -262,7 +270,7 @@ mod tests {
 
     #[test]
     fn a_machine_that_signs_in_itself_is_given_the_password_and_asked_to_use_it() {
-        let info = client_info("", "alex.urban", Some(&Secret::new("pw")));
+        let info = client_info("", "alex.urban", Some(&Secret::new("pw")), false);
         assert_eq!(&info[8..12], &0x000b_017bu32.to_le_bytes(), "sign in with what follows");
         assert_eq!(&info[12..22], &[0, 0, 20, 0, 4, 0, 0, 0, 0, 0]);
         // an empty domain, the name, then the password
@@ -273,7 +281,7 @@ mod tests {
 
     #[test]
     fn the_clients_answer_holds_its_sets_and_says_their_lengths() {
-        let answer = confirm(1007, 0x0001_03ea, 1280, 800, 32, 0x0409);
+        let answer = confirm(1007, 0x0001_03ea, 1280, 800, 32, 0x0409, false);
         assert_eq!(usize::from(u16::from_le_bytes([answer[0], answer[1]])), answer.len());
         assert_eq!(&answer[2..6], &[0x13, 0x00, 0xef, 0x03]);
         assert_eq!(&answer[6..12], &[0xea, 0x03, 0x01, 0x00, 0xea, 0x03]);
@@ -290,6 +298,13 @@ mod tests {
         }
         assert_eq!(kinds.len(), usize::from(count));
         assert_eq!(kinds, [1, 2, 3, 4, 8, 13, 15, 16, 17, 20, 12, 9, 14, 5, 7, 26]);
+        // for a program it says two more: programs in windows of their own, and words on those windows
+        let for_a_program = confirm(1007, 0x0001_03ea, 1280, 800, 32, 0x0409, true);
+        assert_eq!(for_a_program.len(), answer.len() + 8 + 11);
+        assert_eq!(&for_a_program[for_a_program.len() - 19..], &[0x17, 0, 8, 0, 1, 0, 0, 0, 0x18, 0, 11, 0, 2, 0, 0, 0, 3, 12, 0]);
+        assert_eq!(u16::from_le_bytes([for_a_program[21], for_a_program[22]]), count + 2);
+        // and its information says that the connection is for a program
+        assert_eq!(&client_info("CORP", "alex.urban", None, true)[8..12], &0x000b_8173u32.to_le_bytes());
     }
 
     #[test]

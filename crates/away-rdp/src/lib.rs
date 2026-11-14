@@ -24,6 +24,7 @@
 //! connection, and a hash, a cipher and the arithmetic of large numbers come from
 //! libraries.
 
+pub mod channel;
 pub mod connection;
 pub mod der;
 pub mod gcc;
@@ -37,6 +38,7 @@ pub mod ntlm;
 pub mod pdu;
 pub mod picture;
 pub mod planar;
+pub mod rail;
 pub mod redirection;
 /// A value that can be used and can't be printed.
 pub mod secret {
@@ -47,6 +49,7 @@ pub mod sign_in;
 pub mod stand_in;
 pub mod tpkt;
 pub mod update;
+pub mod window;
 
 mod error;
 

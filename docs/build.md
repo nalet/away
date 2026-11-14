@@ -107,6 +107,7 @@ cargo run --package away-try -- rdp fin-app-02.example.com
 cargo run --package away-try -- rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password
 cargo run --package away-try -- rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password --save desktop.bmp
 cargo run --package away-try -- rdp broker.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password --collection Desktops
+cargo run --package away-try -- rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password --program '||ledger'
 ```
 
 The password is read from a file, so that it is on no command line and in no
@@ -116,6 +117,13 @@ With `--collection` the address is a farm's broker. `away-try` tells it which
 collection is wanted, signs the account in, and says where the broker sends
 the client: the machine's name, its address, the session it names, and what
 the client is to say first there. It goes no further: it reaches one machine.
+
+With `--program` it opens no desktop. It asks the machine to start that
+program, says whether the program started, and names each window the program
+opens: its title, where it is, and how large it is. A program that a farm
+publishes is asked for by the name it is published under, with `||` before
+it. What the machine draws is the windows, each at its place on a desktop
+that is otherwise empty, and `--save` keeps that picture.
 
 Windows signs the account in before the desktop unless it is told otherwise:
 the password is proven and never sent in the clear, and the machine has to

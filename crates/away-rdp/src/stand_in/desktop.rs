@@ -1,13 +1,16 @@
 //! The machine's side of a connection once the person is signed in, for tests: it gives
 //! the channels, takes the client without a licence or hands it one, says what it can
 //! do, and draws one picture, in each of the ways a machine sends rectangles that Away
-//! reads.
+//! reads. A client that asks for a program is shown no desktop: the program it asks for
+//! opens in a window, of which the stand-in says where it is and draws what is in it.
 
+use crate::channel::{self, Pieces};
 use crate::input::{self, Button, Input};
 use crate::licence::stand_in::HandsOut;
 use crate::picture::Picture;
+use crate::rail::stand_in::Asked;
 use crate::redirection::{self, Redirection};
-use crate::{der, interleaved, mcs, ntlm, pdu, tpkt, Error};
+use crate::{der, interleaved, mcs, ntlm, pdu, rail, tpkt, window, Error};
 
 const WRONG: Error = Error::NotRdp("the client's message is not built as one");
 
@@ -16,6 +19,16 @@ const WRONG: Error = Error::NotRdp("the client's message is not built as one");
 const USER: u16 = 1004;
 const DESKTOP: u16 = 1003;
 const SHARING: u32 = 0x0001_03ea;
+/// The channel it gives for programs, to a client that asks for one.
+const PROGRAMS: u16 = 1005;
+
+/// The window a program opens in on the stand-in: what names it, where it is on the
+/// desktop, and how large it is.
+pub const WINDOW: u32 = 0x0001_0001;
+/// Where the window is.
+pub const WINDOW_AT: (usize, usize) = (20, 10);
+/// How wide and how high the window is.
+pub const WINDOW_SIZE: (usize, usize) = (160, 100);
 
 /// How wide and how high the rectangles are that the picture is cut into, at most.
 const TILE: usize = 64;
@@ -45,6 +58,10 @@ pub struct Seen {
     pub input: Vec<Input>,
     /// The session the client says a farm's broker sent it on to, where it says one.
     pub sent_on_to: Option<u32>,
+    /// Whether the client's information says that the connection is for a program.
+    pub for_a_program: bool,
+    /// What the client said about programs, in the order it said it.
+    pub about_programs: Vec<Asked>,
 }
 
 /// How wide and how high the mark is that the stand-in draws where a button went down,
@@ -85,13 +102,29 @@ pub struct Desktop {
     hands_out: Option<(HandsOut, Licences)>,
     /// Where it sends its clients on to, where it stands in for a farm's broker.
     sends_on: Option<Redirection>,
+    /// The programs it publishes, by what they are asked for as.
+    publishes: Vec<String>,
+    /// Whether the client asked for the channel programs are started over.
+    programs: bool,
+    /// The pieces of a message about programs that is not whole yet.
+    pieces: Pieces,
 }
 
 impl Desktop {
     /// A stand-in that offers a desktop of the picture's size, and draws the picture at
     /// 32 bits a pixel, as a workstation does.
     pub fn new(picture: Picture) -> Desktop {
-        Desktop { state: State::AwaitsClient, picture, bits: 32, seen: Seen::default(), hands_out: None, sends_on: None }
+        Desktop {
+            state: State::AwaitsClient,
+            picture,
+            bits: 32,
+            seen: Seen::default(),
+            hands_out: None,
+            sends_on: None,
+            publishes: Vec::new(),
+            programs: false,
+            pieces: Pieces::default(),
+        }
     }
 
     /// The same, drawing at 16 bits a pixel, as a Windows Server does unless it is set
@@ -117,6 +150,13 @@ impl Desktop {
     /// on already is shown the desktop, as a broker does that serves a collection itself.
     pub fn that_sends_on(self, to: Redirection) -> Desktop {
         Desktop { sends_on: Some(to), ..self }
+    }
+
+    /// The same, as a machine that publishes programs: each by what a client asks for it
+    /// as. A client that asks for one of them is shown its window, and one that asks for
+    /// another is told that the machine doesn't let it be started.
+    pub fn that_publishes(self, programs: &[&str]) -> Desktop {
+        Desktop { publishes: programs.iter().map(|program| program.to_string()).collect(), ..self }
     }
 
     /// What it saw of the client so far.
@@ -146,10 +186,14 @@ impl Desktop {
                     if kind == 0xc004 && block.len() >= 12 && block[4] & 0x02 != 0 {
                         self.seen.sent_on_to = Some(u32::from_le_bytes([block[8], block[9], block[10], block[11]]));
                     }
+                    // the further channels it asks for: the one programs are started over
+                    if kind == 0xc003 {
+                        self.programs = block.get(8..).ok_or(WRONG)?.as_chunks::<12>().0.iter().any(|asked| asked.starts_with(b"rail\0"));
+                    }
                     rest = &rest[block.len()..];
                 }
                 self.state = State::AwaitsUser;
-                Ok(tpkt::data_frame(&connect_answer()))
+                Ok(tpkt::data_frame(&connect_answer(self.programs)))
             }
             (State::AwaitsUser, [0x04, ..]) => Ok(Vec::new()),
             (State::AwaitsUser, [0x28]) => {
@@ -168,8 +212,10 @@ impl Desktop {
                     [first, arrived @ ..] => arrived.get(..usize::from(*first)).ok_or(WRONG)?,
                     _ => return Err(WRONG),
                 };
-                if u16::from_be_bytes([*high, *low]) != DESKTOP {
-                    return Ok(Vec::new());
+                match (u16::from_be_bytes([*high, *low]), &self.state) {
+                    (DESKTOP, _) => {}
+                    (PROGRAMS, State::Open) if self.programs => return self.about_programs(arrived),
+                    _ => return Ok(Vec::new()),
                 }
                 match self.state {
                     State::AwaitsAccount => self.account(arrived),
@@ -197,6 +243,7 @@ impl Desktop {
             (ntlm::utf16(texts.get(..domain).ok_or(WRONG)?), ntlm::utf16(texts.get(domain + 2..domain + 2 + name).ok_or(WRONG)?));
         let travelled = texts.get(domain + name + 4..domain + name + 4 + usize::from(password)).ok_or(WRONG)?;
         self.seen.password = (password != 0).then(|| ntlm::utf16(travelled));
+        self.seen.for_a_program = number16(arrived, 8)? & 0x8000 != 0;
         if let Some((machine, _)) = &self.hands_out {
             self.state = State::HandsOutALicence;
             return Ok(to_the_client(&machine.asks()));
@@ -284,7 +331,12 @@ impl Desktop {
                     (0x14, [1, 0, ..]) => send.extend(data(0x14, &pdu::words(&[2, USER, 0x03ea, 0]))),
                     (0x27, _) => {
                         send.extend(data(0x28, &pdu::words(&[0, 0, 3, 4])));
-                        send.extend(self.draw());
+                        // a client that came for a program is shown no desktop: the machine
+                        // says that it is ready for programs
+                        match self.programs {
+                            true => send.extend(on_the_programs_channel(&rail::stand_in::ready())),
+                            false => send.extend(self.draw()),
+                        }
                     }
                     _ => {}
                 },
@@ -292,6 +344,40 @@ impl Desktop {
             }
         }
         Ok(send)
+    }
+
+    /// What the client says about programs: the program it asks for opens in a window,
+    /// where the stand-in publishes it, and a window the person closes is gone.
+    fn about_programs(&mut self, piece: &[u8]) -> Result<Vec<u8>, Error> {
+        let Some(message) = self.pieces.take(piece)? else { return Ok(Vec::new()) };
+        let asked = rail::stand_in::read(&message)?;
+        self.seen.about_programs.push(asked.clone());
+        let words = |orders: &[Vec<u8>]| short_frame(0x00, &[&(orders.len() as u16).to_le_bytes()[..], &orders.concat()].concat());
+        Ok(match asked {
+            Asked::Start(program) if self.publishes.contains(&program.run) => {
+                let mut send = on_the_programs_channel(&rail::stand_in::result(&program, 0));
+                // where the window is and that it is in front, and then what is in it
+                let title = program.run.trim_start_matches('|');
+                let (at, size) = ((WINDOW_AT.0 as i32, WINDOW_AT.1 as i32), (WINDOW_SIZE.0 as u16, WINDOW_SIZE.1 as u16));
+                send.extend(words(&[
+                    window::stand_in::window(WINDOW, true, title, at, size),
+                    window::stand_in::in_front(WINDOW, &[WINDOW]),
+                ]));
+                for top in (WINDOW_AT.1..WINDOW_AT.1 + WINDOW_SIZE.1).step_by(TILE) {
+                    for left in (WINDOW_AT.0..WINDOW_AT.0 + WINDOW_SIZE.0).step_by(TILE) {
+                        let (wide, high) = (TILE.min(WINDOW_AT.0 + WINDOW_SIZE.0 - left), TILE.min(WINDOW_AT.1 + WINDOW_SIZE.1 - top));
+                        let mut update = vec![1, 0, 1, 0];
+                        update.extend(self.rectangle(left, top, wide, high, left / TILE + top / TILE));
+                        send.extend(short_frame(0x01, &update));
+                    }
+                }
+                send
+            }
+            // a program it doesn't publish is not among those it lets be started
+            Asked::Start(program) => on_the_programs_channel(&rail::stand_in::result(&program, 3)),
+            Asked::Command(WINDOW, rail::Command::Close) => words(&[window::stand_in::gone(WINDOW)]),
+            _ => Vec::new(),
+        })
     }
 
     /// Takes what a frame of the short kind tells of keys and of the pointer, and draws
@@ -448,7 +534,7 @@ fn length(of: usize) -> Vec<u8> {
 
 /// The machine's answer to what the client says of itself: the desktop's channel, and no
 /// encryption of RDP's own.
-fn connect_answer() -> Vec<u8> {
+fn connect_answer(programs: bool) -> Vec<u8> {
     let block = |kind: u16, holds: &[u8]| {
         let mut block = pdu::words(&[kind, (holds.len() + 4) as u16]);
         block.extend_from_slice(holds);
@@ -456,7 +542,11 @@ fn connect_answer() -> Vec<u8> {
     };
     let mut blocks = block(0x0c01, &[0x04, 0x00, 0x08, 0x00, 0x0b, 0, 0, 0, 0x01, 0, 0, 0]);
     blocks.extend(block(0x0c02, &[0; 8]));
-    blocks.extend(block(0x0c03, &pdu::words(&[DESKTOP, 0])));
+    // the channels: the desktop's, and the one for programs where the client asked for it
+    match programs {
+        true => blocks.extend(block(0x0c03, &pdu::words(&[DESKTOP, 1, PROGRAMS, 0]))),
+        false => blocks.extend(block(0x0c03, &pdu::words(&[DESKTOP, 0]))),
+    }
     let mut says = vec![0x00, 0x05, 0x00, 0x14, 0x7c, 0x00, 0x01, 0x2a, 0x14, 0x76, 0x0a, 0x01, 0x01, 0x00, 0x01, 0xc0, 0x00];
     says.extend(b"McDn");
     says.extend(length(blocks.len()));
@@ -476,6 +566,19 @@ fn to_the_client(carried: &[u8]) -> Vec<u8> {
     message.extend(length(carried.len()));
     message.extend_from_slice(carried);
     tpkt::data_frame(&message)
+}
+
+/// A message about programs for the client, in the pieces and the frames it travels in.
+fn on_the_programs_channel(message: &[u8]) -> Vec<u8> {
+    let [high, low] = PROGRAMS.to_be_bytes();
+    let mut send = Vec::new();
+    for piece in channel::pieces(message) {
+        let mut carried = vec![0x68, 0x00, 0x01, high, low, 0x70];
+        carried.extend(length(piece.len()));
+        carried.extend(piece);
+        send.extend(tpkt::data_frame(&carried));
+    }
+    send
 }
 
 /// A frame of the short kind around one update, or one piece of one.

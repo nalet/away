@@ -236,7 +236,8 @@ impl Secured {
             };
 
             // what Away is, the channels, the licence, and what each side can do
-            let client = Client { width, height, security: self.security.number(), name: "away".to_string(), layout, sent_on_to };
+            let client =
+                Client { width, height, security: self.security.number(), name: "away".to_string(), layout, sent_on_to, program: None };
             let mut fresh = [0u8; 80];
             getrandom::fill(&mut fresh).map_err(random(Step::SigningIn))?;
             let for_a_licence = licence::New {
@@ -374,6 +375,8 @@ impl Desktop {
                     }
                     Happened::SentOn(to) => self.sent_on = Some(to),
                     Happened::Channels { .. } | Happened::Licensed | Happened::AsksToTakeALicence { .. } | Happened::LicenceTaken(_) => {}
+                    // programs come with the next step: a desktop asks for none
+                    Happened::AskedForTheProgram | Happened::Started | Happened::NotStarted { .. } | Happened::Windows(_) => {}
                 }
             }
         }

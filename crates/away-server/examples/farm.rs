@@ -59,11 +59,12 @@ async fn main() -> std::process::ExitCode {
             println!("   It publishes {desktops} desktops and {} programs.", items.len() - desktops);
             for item in &items {
                 println!(
-                    "   {} | {} | at {} | collection {} | icon {}",
+                    "   {} | {} | at {} | collection {} | asked for as {} | icon {}",
                     if item.resource.desktop { "desktop" } else { "program" },
                     item.resource.title,
                     item.reached.address.as_deref().unwrap_or("-"),
                     item.reached.collection.as_deref().unwrap_or("-"),
+                    item.reached.program.as_deref().unwrap_or("-"),
                     item.icon.as_ref().map_or("none".to_string(), |icon| format!("{} bytes", icon.len())),
                 );
             }

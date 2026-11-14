@@ -80,6 +80,9 @@ enum Then {
     /// a Windows Server for many people does: it asks the client to take a licence,
     /// hands one over or doesn't, and draws its desktop at 16 bits a pixel.
     AsAServerForMany { hands_a_licence_over: bool },
+    /// It secures the connection, takes the sign-in before the desktop, and publishes
+    /// one program: a client that asks for it is shown the program's window.
+    PublishesAProgram,
 }
 
 /// A stand-in for a machine: it takes one connection, reads the first request, answers
@@ -103,6 +106,7 @@ fn machine_then(answer: &'static [u8], then: Then) -> (String, JoinHandle<Ended>
             Then::AsAServerForMany { hands_a_licence_over: true } => {
                 secure(&mut connection, Some(MAY_COME_IN), Desktop::new(desktop()).at_16_bits().that_hands_out_licences())
             }
+            Then::PublishesAProgram => secure(&mut connection, Some(MAY_COME_IN), Desktop::new(desktop()).that_publishes(&["||ledger"])),
             Then::AsAServerForMany { hands_a_licence_over: false } => secure(
                 &mut connection,
                 Some(MAY_COME_IN),
@@ -313,6 +317,8 @@ fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
             licence: None,
             input: Vec::new(),
             sent_on_to: None,
+            for_a_program: false,
+            about_programs: Vec::new(),
         }
     );
 }
@@ -391,6 +397,65 @@ fn a_server_that_counts_people_asks_for_a_licence_and_goes_on_without_one() {
     let licence = seen.licence.expect("the stand-in asked for a licence to be taken");
     assert_eq!(licence.names, ("alex.urban".to_string(), "away".to_string()));
     assert!(licence.known_by.is_empty());
+}
+
+fn try_a_program(address: &str, program: &str) -> Output {
+    let file = password_file(PASSWORD);
+    let tried = Command::new(env!("CARGO_BIN_EXE_away-try"))
+        .args(["rdp", address, "--as", KNOWN, "--program", program, "--password-file"])
+        .arg(&file)
+        .output()
+        .expect("the test program runs");
+    let _ = std::fs::remove_file(file);
+    tried
+}
+
+#[test]
+fn a_program_is_asked_for_and_its_window_is_said_and_drawn() {
+    let (address, running) = machine_then(&CHOSEN, Then::PublishesAProgram);
+    let tried = try_a_program(&address, "||ledger");
+    let said = String::from_utf8(tried.stdout).expect("text");
+    let ended = running.join().expect("the stand-in ends");
+    assert!(tried.status.success(), "{said}");
+    let lines: Vec<&str> = said.lines().collect();
+    let at = lines.iter().position(|line| *line == "   It is ready for programs, and was asked for ||ledger.").expect(&said);
+    assert_eq!(
+        lines[at + 1..at + 4],
+        [
+            "   The program started.",
+            "   A new window: number 65537, “ledger”, at 20, 10, 160 by 100.",
+            "   In front is the window number 65537."
+        ],
+        "{said}"
+    );
+    // what was drawn is the window, at its place on a desktop that is otherwise empty
+    assert_eq!(
+        lines[lines.len() - 5..lines.len() - 3],
+        [
+            "   2 rectangles at 32 bits a pixel, as they are, 17408 bytes in all.",
+            "   4 rectangles at 32 bits a pixel, compressed, 20585 bytes in all."
+        ],
+        "{said}"
+    );
+    assert!(lines[lines.len() - 2].starts_with("   200 by 120 pixels. Their SHA-256: "), "{said}");
+    let seen = ended.seen.expect("the client came as far as the desktop");
+    assert!(seen.for_a_program);
+    assert_eq!(seen.about_programs.len(), 4);
+}
+
+#[test]
+fn a_program_the_machine_does_not_publish_is_said_not_to_start() {
+    let (address, running) = machine_then(&CHOSEN, Then::PublishesAProgram);
+    let tried = try_a_program(&address, "||payroll");
+    let said = String::from_utf8(tried.stdout).expect("text");
+    running.join().expect("the stand-in ends");
+    assert_eq!(tried.status.code(), Some(1), "{said}");
+    assert!(
+        said.ends_with(
+            "   The program did not start: the machine does not let this program be started: it is not among those it publishes (its own code 0x00000002).\n"
+        ),
+        "{said}"
+    );
 }
 
 #[test]
@@ -510,9 +575,10 @@ fn it_says_what_it_takes() {
     assert!(
         String::from_utf8_lossy(&none.stderr).contains("away-try rdp <address> [--as <account> --password-file <file> [--save <file>]]")
     );
-    // a picture needs an account, an account its password, and nothing is said twice
+    // a picture and a program need an account, an account its password, and nothing is said twice
     for words in [
         &["rdp", "fin-app-02", "--save", "desktop.bmp"][..],
+        &["rdp", "fin-app-02", "--program", "||ledger"],
         &["rdp", "fin-app-02", "--as", KNOWN],
         &["rdp", "fin-app-02", "--as", KNOWN, "--as", KNOWN],
         &["rdp", "fin-app-02", "--anything", "else"],
