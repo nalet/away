@@ -6,10 +6,14 @@ the checksum of its source, and the compiler's own libraries.
 The image holds one file, the program, so what it holds is what the program was built
 from. That is read from cargo itself, for the processors the image is published for:
 only what is compiled for them is listed, not what a build for another system would take.
+The pages are part of the program, so the libraries they are built from are listed too,
+from web/package-lock.json.
 
 It needs Python 3 and cargo, and nothing else."""
+import base64
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import uuid
@@ -70,7 +74,23 @@ def main():
             out['hashes'] = [{'alg': 'SHA-256', 'content': checksum}]
         return out
 
-    components = [component(p) for p in own if p['name'] != 'away'] + [component(p) for p in others] + [
+    # the pages are part of the program, and so is every library they are built from
+    in_pages = []
+    lock = json.load(open(os.path.join('web', 'package-lock.json'), encoding='utf-8'))['packages']
+    for path, entry in sorted(lock.items()):
+        if not path or entry.get('dev'):
+            continue
+        name = path.split('node_modules/')[-1]
+        ref = f'pkg:npm/{name.replace("@", "%40")}@{entry["version"]}'
+        part = {'type': 'library', 'name': name, 'version': entry['version'], 'purl': ref, 'bom-ref': ref}
+        if entry.get('license'):
+            part['licenses'] = [{'expression': entry['license']}]
+        kind, _, letters = entry.get('integrity', '').partition('-')
+        if kind == 'sha512' and letters:
+            part['hashes'] = [{'alg': 'SHA-512', 'content': base64.b64decode(letters).hex()}]
+        in_pages.append(part)
+
+    components = [component(p) for p in own if p['name'] != 'away'] + [component(p) for p in others] + in_pages + [
         {'type': 'library', 'name': 'rust-std', 'version': compiler, 'bom-ref': f'pkg:generic/rust-std@{compiler}',
          'description': "The compiler's own libraries, which every Rust program holds.",
          'licenses': [{'expression': 'MIT OR Apache-2.0'}]},
@@ -94,7 +114,8 @@ def main():
     if output:
         with open(output, 'w', encoding='utf-8') as fh:
             fh.write(text)
-        print(f'{len(components)} parts beside the program: {len(own) - 1} of Away, {len(others)} libraries, the compiler\'s and the C library; written to {output}')
+        print(f'{len(components)} parts beside the program: {len(own) - 1} of Away, {len(others)} libraries, {len(in_pages)} of the pages, '
+              f'the compiler\'s and the C library; written to {output}')
     else:
         sys.stdout.write(text)
 

@@ -34,6 +34,9 @@ pub const SIGNING_IN: &str = "__Host-away-signing-in";
 /// The header a request that changes something has to carry, which only a page of
 /// Away's own can set.
 pub const FROM_AWAYS_PAGE: &str = "x-away";
+/// Where a browser goes that came back from the sign-in service without a sign-in: the
+/// page that says how one signs in.
+pub const NOT_SIGNED_IN: &str = "/?sign-in=none";
 
 struct Signing {
     told: SignIn,
@@ -87,6 +90,7 @@ impl GettingIn {
         let mut says = vec![
             ("version", version::VERSION.into()),
             ("commit", version::COMMIT.into()),
+            ("source", version::SOURCE.into()),
             ("contact", self.contact.as_deref().map_or(Json::Null, Json::from)),
             ("set_up", self.signing.is_some().into()),
         ];
@@ -142,14 +146,15 @@ impl GettingIn {
         let came_with = read_form(request.uri().query().unwrap_or_default()).unwrap_or_default();
         let came_with = |name: &str| came_with.iter().find(|(its, _)| its == name).map(|(_, value)| value.as_str());
         let browser = cookie(request, SIGNING_IN);
-        // a sign-in that this browser didn't begin, or began too long ago: from the start
+        // a sign-in that this browser didn't begin, or began too long ago: to the way in,
+        // which doesn't send the browser on by itself, so that it never goes in circles
         let Some(begun) = came_with("state").and_then(|state| signing.sign_ins.back(state, browser, now)) else {
-            return go_to("/");
+            return go_to(NOT_SIGNED_IN);
         };
         let mut answer = match (came_with("error"), came_with("code")) {
             // the person gave up on the sign-in page, or was refused there, and it said so itself
             (Some("access_denied" | "login_required" | "interaction_required" | "consent_required" | "account_selection_required"), _) => {
-                go_to("/")
+                go_to(NOT_SIGNED_IN)
             }
             (Some(error), _) => {
                 let more = came_with("error_description").map(|more| format!(": {more}")).unwrap_or_default();

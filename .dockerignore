@@ -1,5 +1,8 @@
-# the image is built from the program's source and nothing else
+# the image is built from the program's source and the pages', and nothing else
 *
 !Cargo.toml
 !Cargo.lock
 !crates/
+!web/
+web/node_modules/
+web/dist/

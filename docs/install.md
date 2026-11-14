@@ -4,9 +4,9 @@ Away is installed on Kubernetes or OpenShift with one chart, by someone who may
 act in one namespace. It asks for no rights over the cluster.
 
 > **What this version is.** Away's three parts run and say whether they are
-> well, and the server signs people in through the organisation's sign-in
-> service. There are no pages yet and no machine to open: someone who opens
-> `/sign-in` is signed in, and `/api/who` says who they are.
+> well. Someone who opens Away is signed in through the organisation's sign-in
+> service and sees the frame of Away's pages: home, the sessions, the settings,
+> and signing out. There is no machine to open yet.
 > [The work packages](../spec/plan/README.md) say what comes next.
 
 ## What it needs

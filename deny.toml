@@ -21,6 +21,8 @@ allow = [
     "MPL-2.0",
     # the licence of the list of public authorities, which is data and no code
     "CDLA-Permissive-2.0",
+    # the licence of the pages' fonts, which scripts/libraries.py checks with the pages' libraries
+    "OFL-1.1",
 ]
 confidence-threshold = 0.9
 

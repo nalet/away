@@ -4,25 +4,47 @@ Away is built from its source with one command, and every image the project
 publishes can be traced to the commit it was built from. This page says how to
 do both.
 
-What exists today: the program with its three parts, the chart that installs
-it, and the pipelines. The parts say whether they are well, and the server
-signs people in through a sign-in service. Away's own RDP code is proven by a
-test program. [The work packages](../spec/plan/README.md) say what comes next.
+What exists today: the program with its three parts, the pages, the chart
+that installs it, and the pipelines. The parts say whether they are well, and
+the server signs people in through a sign-in service and shows them the frame
+of Away's pages, which have no machine to open yet. Away's own RDP code is
+proven by a test program. [The work packages](../spec/plan/README.md) say what
+comes next.
 
 ## Building it
 
-It needs a Rust compiler, in the version that `rust-toolchain.toml` names, and
-`make`. [rustup](https://rustup.rs/) installs the right compiler by itself the
-first time it is asked.
+It needs a Rust compiler, in the version that `rust-toolchain.toml` names,
+Node 24 or newer with npm, and `make`. [rustup](https://rustup.rs/) installs
+the right compiler by itself the first time it is asked.
 
 ```sh
-make            # the program, in target/release/away
+make            # the pages, then the program with them inside, in target/release/away
 make test       # every test of the program
 make check      # what the pipeline checks on every change, short of a cluster
 make image      # the image, as away:dev (needs Docker)
 ```
 
 `make check` also needs Python 3.11 or newer and helm.
+
+The pages are built first, in `web/`, and become part of the program: the
+image holds one file, and the server reads nothing from a disk. A program
+built without them, with `cargo build` alone, runs and says on its one page
+that it holds none.
+
+## Working on the pages
+
+Two commands, in two terminals: the server beside a stand-in for a sign-in
+service, which signs in whoever opens it without asking anything, and the
+pages as they are written.
+
+```sh
+cargo run --package away-server --example pages --features stand-in
+npm --prefix web run dev
+```
+
+The pages are then at the address the second command names, and change as
+their files are saved. `ROLE=person` before the first command signs in
+somebody who administers nothing.
 
 The program is one file. Its first word chooses the part it runs as:
 
@@ -211,7 +233,9 @@ On every change, [the pipeline](../.github/workflows/build.yml):
 
 1. checks that every library is listed with what it is for
    ([the libraries](./libraries.md));
-2. checks the code's form and the compiler's warnings, which count as failures;
+2. checks the pages' code and builds them, to be part of the program, then
+   checks the program's form and the compiler's warnings, which count as
+   failures;
 3. runs the tests;
 4. renders the chart with each way in;
 5. checks the libraries' licences, known security holes and sources;

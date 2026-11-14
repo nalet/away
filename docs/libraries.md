@@ -26,6 +26,32 @@ library has no line that says what it is for.
 Away names 14 libraries. With what they bring with them, a build holds 71 in all, each in the version Cargo.lock names.
 <!-- end: libraries -->
 
+## The pages
+
+The pages are built from the design system and little else. `web/package.json`
+names their libraries, and what each is for. The design system comes from its
+own release, by that release's address; every other library from the public
+registry. `web/package-lock.json` holds each one's exact version and checksum,
+and the build fails on a licence that `deny.toml` doesn't allow.
+
+<!-- generated: pages -->
+| Library | What it is for | Version in this build | In the pages |
+|---|---|---|---|
+| [@fontsource/inter](https://www.npmjs.com/package/@fontsource/inter) | the font of the pages' text, as files of the build, so that none is fetched from a font service | 5.3.0 | yes |
+| [@fontsource/jetbrains-mono](https://www.npmjs.com/package/@fontsource/jetbrains-mono) | the font of names, labels and code, as files of the build | 5.3.0 | yes |
+| [@nalet/design-system](https://www.npmjs.com/package/@nalet/design-system) | the components and the tokens the pages are made of | 0.4.0 | yes |
+| [lucide-react](https://www.npmjs.com/package/lucide-react) | the icons, which the design system's components use as well | 1.73.0 | yes |
+| [react](https://www.npmjs.com/package/react) | draws the pages | 19.3.1 | yes |
+| [react-dom](https://www.npmjs.com/package/react-dom) | puts what React draws into the browser's page | 19.3.1 | yes |
+| [@types/react](https://www.npmjs.com/package/@types/react) | tells TypeScript what React offers | 19.3.0 | no, it only builds them |
+| [@types/react-dom](https://www.npmjs.com/package/@types/react-dom) | tells TypeScript what react-dom offers | 19.3.0 | no, it only builds them |
+| [@vitejs/plugin-react](https://www.npmjs.com/package/@vitejs/plugin-react) | lets vite build what is written for React | 6.3.0 | no, it only builds them |
+| [typescript](https://www.npmjs.com/package/typescript) | checks the pages' code before it is built | 7.0.2 | no, it only builds them |
+| [vite](https://www.npmjs.com/package/vite) | builds the pages into files whose names carry their content's hash | 8.3.8 | no, it only builds them |
+
+The pages name 11 libraries, 6 of which are in them. With what those bring with them, the pages hold 9 in all, each in the version web/package-lock.json names.
+<!-- end: pages -->
+
 ## What the build refuses
 
 On every change the pipeline runs `cargo deny check` with the rules of

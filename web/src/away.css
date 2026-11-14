@@ -1,0 +1,101 @@
+/* What is Away's own in the look of its pages. The tokens and the components are the
+   design system's, unchanged; here are the frame, which the design system doesn't have
+   yet, and the few places a page of Away's is laid out. */
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--ff-ui); }
+a { color: var(--cloud-blue); }
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* read by a screen reader, and not seen */
+.unseen { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* ── a page that has the whole window: the way in, and what is said when it fails ── */
+.whole { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 24px; text-align: center; }
+.whole .name { margin: 0; display: inline-flex; align-items: center; gap: 10px; font: 700 32px/1 var(--ff-mono); letter-spacing: .01em; color: var(--fg-2); }
+.whole .how { margin: 0; max-width: 300px; color: var(--fg-2); }
+.whole .said { margin: 0; color: var(--fg); font-weight: 500; }
+.details { max-width: 480px; color: var(--fg-muted); font-size: 13px; text-align: left; }
+.details summary { cursor: pointer; font-family: var(--ff-mono); min-height: 32px; display: flex; align-items: center; justify-content: center; }
+.details p { margin: 8px 0 0; padding: 12px; background: var(--surface); border: 1px solid var(--border); font-family: var(--ff-mono); overflow-wrap: anywhere; }
+.turn-to { margin: 0; color: var(--fg-muted); font-size: 13px; }
+
+/* ── the frame, on a computer: the bar across the top, the rail down the left ── */
+.frame { height: 100%; display: grid; grid-template-columns: 80px minmax(0, 1fr); grid-template-rows: 64px minmax(0, 1fr); }
+.skip { position: absolute; left: 8px; top: -64px; z-index: 200; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border-2); color: var(--fg); font-family: var(--ff-mono); }
+.skip:focus { top: 8px; }
+
+.bar { grid-column: 1 / -1; grid-row: 1; display: flex; align-items: center; gap: 24px; padding: 0 24px 0 0; background: var(--bg-2); border-bottom: 1px solid var(--border); position: relative; z-index: 10; }
+.bar .mark { width: 80px; align-self: stretch; flex: none; display: flex; align-items: center; justify-content: center; gap: 1px; border-right: 1px solid var(--border);
+             font: 700 20px/1 var(--ff-mono); color: var(--fg-2); text-decoration: none; }
+.bar .mark .word { display: none; }
+.bar .mark:focus-visible { outline-offset: -4px; }
+.bar .end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.rail { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 0; background: var(--bg-2); border-right: 1px solid var(--border); position: relative; z-index: 9; }
+.rail .gap { flex: 1; }
+.it { width: 48px; height: 48px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--fg-muted); position: relative; }
+.it:hover { color: var(--fg); }
+.it:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+/* the current view: blue on a lighter square, and a bar on its edge, so not by colour alone */
+.rail .it.on { color: var(--cloud-blue); background: var(--surface-2); box-shadow: inset 2px 0 0 var(--cloud-blue); }
+
+.page { grid-column: 2; grid-row: 2; min-width: 0; overflow: auto; position: relative; }
+.page:focus { outline: none; }
+.tabs { display: none; }
+
+.fill { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+.pg { max-width: 720px; padding: 32px 48px; }
+.pg h1 { margin: 0 0 24px; font: 600 24px/1.2 var(--ff-mono); text-transform: lowercase; }
+.pg h2 { margin: 0 0 12px; font: 600 14px/1.2 var(--ff-mono); color: var(--fg-2); text-transform: lowercase; }
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 24px; margin: 0 0 16px; }
+.facts dt { color: var(--fg-muted); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.mono { font-family: var(--ff-mono); }
+
+/* ── the avatar and its menu ── */
+.user { position: relative; display: flex; }
+.avatar { width: 48px; height: 48px; padding: 0; display: flex; align-items: center; justify-content: center; background: none; border: 0; cursor: pointer; }
+.av { width: 32px; height: 32px; flex: none; background: var(--signal-amber); color: var(--bg); font: 600 13px/32px var(--ff-mono); text-align: center; }
+.usermenu { position: absolute; z-index: 150; top: 52px; right: 8px; width: 248px; display: flex; flex-direction: column; padding: 0 0 4px; background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
+.usermenu .who { display: flex; flex-direction: column; gap: 2px; padding: 12px 12px 11px; margin-bottom: 4px; border-bottom: 1px solid var(--border-2); }
+.usermenu .who-name { color: var(--fg); font-weight: 500; overflow-wrap: anywhere; }
+.usermenu .who-address { color: var(--fg-muted); font-size: 13px; overflow-wrap: anywhere; }
+.usermenu .nc-actionmenu__item { display: flex; min-height: 40px; }
+
+/* ── the card that asks for a new sign-in, over the page ── */
+.over { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; padding: 16px; background: #05070CCC; }
+.over .card { width: 440px; max-width: 100%; display: flex; flex-direction: column; gap: 12px; padding: 24px; background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
+.over h2 { margin: 0; font: 600 18px/1.2 var(--ff-mono); }
+.over p { margin: 0; color: var(--fg-2); }
+.over .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+/* ── on a phone held upright: the bar, the page, and the views in a bar at the foot ── */
+@media (max-width: 640px) and (orientation: portrait), (max-width: 480px) {
+  .frame { display: flex; flex-direction: column; }
+  .bar { height: 56px; flex: none; gap: 2px; padding: 0 4px 0 16px; }
+  .bar .mark { width: auto; min-height: 48px; border-right: 0; gap: 6px; font-size: 18px; margin-right: auto; }
+  .bar .mark .letter { font-weight: 700; }
+  .bar .mark .word { display: inline; margin-left: -6px; }
+  .av { width: 28px; height: 28px; line-height: 28px; font-size: 12px; }
+  .usermenu { right: 8px; width: min(280px, calc(100vw - 16px)); }
+  .usermenu .nc-actionmenu__item { min-height: 48px; }
+  .rail { display: none; }
+  .page { flex: 1; }
+  .tabs { height: calc(56px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+          background: var(--bg-2); border-top: 1px solid var(--border); position: relative; z-index: 10; }
+  .tabs .it { width: auto; height: auto; color: var(--fg-dim); }
+  .tabs .it.on { color: var(--cloud-blue); box-shadow: inset 0 2px 0 var(--cloud-blue); }
+  .pg { padding: 24px 16px; }
+}
+
+/* ── on a phone held sideways: the views as a rail again, and the bar slimmer ── */
+@media (max-height: 480px) and (orientation: landscape) and (min-width: 481px) {
+  .frame { grid-template-rows: 48px minmax(0, 1fr); }
+  .bar .mark { font-size: 18px; }
+  .rail { justify-content: center; padding: 4px 0; }
+  .rail .gap { display: none; }
+  .rail .it-settings { display: none; }
+  .pg { padding: 16px 24px; }
+}

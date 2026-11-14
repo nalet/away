@@ -41,6 +41,15 @@ jobs:
       - name: The libraries are listed, each with what it is for
         run: python3 scripts/libraries.py --check
 
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+
+      - name: The pages, checked and built, to be part of the program
+        run: |
+          npm --prefix web ci --no-audit --no-fund
+          npm --prefix web run build
+
       - name: The code's form
         run: cargo fmt --all --check
 
@@ -208,8 +217,15 @@ jobs:
         run: |
           helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin <<< "$TOKEN"
           helm package chart --version "$VERSION" --app-version "$VERSION" --destination out
-          helm push "out/away-$VERSION.tgz" "oci://$CHARTS" 2>&1 | tee out/push.log
+          # the registry now and then doesn't find what was pushed a moment ago: once more, then
+          set -o pipefail
+          for attempt in 1 2 3; do
+            if helm push "out/away-$VERSION.tgz" "oci://$CHARTS" 2>&1 | tee out/push.log; then break; fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep 10
+          done
           digest=$(sed -n 's/^Digest: //p' out/push.log)
+          [ -n "$digest" ]
           cosign sign --yes "$CHARTS/away@$digest"
 
       - name: Say what was published

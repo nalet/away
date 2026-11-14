@@ -1,10 +1,11 @@
 //! The server: the pages, the requests, people's sign-ins, the rules, the records.
 //!
 //! In this version it signs people in through the organisation's sign-in service and
-//! holds their sign-ins, answers on the address Away is reached at with one page that
-//! says Away is installed, and says whether it is well. It reaches no machine.
+//! holds their sign-ins, serves the pages, and says whether it is well. It reaches no
+//! machine.
 
 pub mod getting_in;
+pub mod pages;
 pub mod service;
 pub mod sign_ins;
 pub mod token;
@@ -23,8 +24,8 @@ use hyper::{Method, StatusCode};
 use crate::getting_in::GettingIn;
 use crate::told::Told;
 
-/// The page at `/`, until Away has pages of its own.
-const INSTALLED: &str = "<!doctype html>\n\
+/// The page at `/` of a program that was built without its pages.
+const NO_PAGES: &str = "<!doctype html>\n\
 <html lang=\"en\">\n\
 <head>\n\
 <meta charset=\"utf-8\">\n\
@@ -35,7 +36,7 @@ const INSTALLED: &str = "<!doctype html>\n\
 <body>\n\
 <main>\n\
 <h1>away</h1>\n\
-<p>Away is installed and running. This version has no pages yet, so there is nothing to open here.</p>\n\
+<p>Away is installed and running. This build holds no pages: they are built in web/, before the program is.</p>\n\
 </main>\n\
 </body>\n\
 </html>\n";
@@ -91,10 +92,17 @@ fn public(getting_in: Arc<GettingIn>) -> Answers {
                 return for_a_browser(answer);
             }
             let reading = matches!(*request.method(), Method::GET | Method::HEAD);
-            for_a_browser(match request.uri().path() {
-                "/" if reading => answer(StatusCode::OK, "text/html; charset=utf-8", INSTALLED),
-                "/" => plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers GET.\n"),
-                _ => plain(StatusCode::NOT_FOUND, "Nothing is at this address.\n"),
+            let address = request.uri().path();
+            // an address that is none of the server's own is one of the pages' files, or the
+            // page. What a program asks is never answered with a page: a check of whether the
+            // part is well that reached this address by mistake would take one for a yes
+            let for_programs = address.starts_with("/api/") || matches!(address, "/livez" | "/readyz" | "/metrics");
+            let page = if for_programs { None } else { pages::at(address) };
+            for_a_browser(match (page, address) {
+                _ if !reading => plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers GET.\n"),
+                (Some(page), _) => page,
+                (None, "/") if !pages::are_built() => answer(StatusCode::OK, "text/html; charset=utf-8", NO_PAGES),
+                (None, _) => plain(StatusCode::NOT_FOUND, "Nothing is at this address.\n"),
             })
         })
     })

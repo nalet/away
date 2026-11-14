@@ -35,6 +35,14 @@ fn start(part: &str, listeners: usize) -> Running {
     running
 }
 
+/// A part never outlives its test: one whose test failed before it was ended is ended here.
+impl Drop for Running {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
 impl Running {
     fn next_line(&mut self) -> Option<String> {
         let mut line = String::new();
@@ -56,7 +64,7 @@ impl Running {
         assert!(ended.success(), "the signal was sent");
         while self.next_line().is_some() {}
         let code = self.child.wait().expect("it ends").code().expect("it ends by itself, with a code");
-        (code, self.lines)
+        (code, std::mem::take(&mut self.lines))
     }
 }
 
@@ -87,13 +95,21 @@ fn the_server_answers_on_its_address_and_says_it_is_well() {
     let (status, head, body) = ask(server.address("public"), "GET", "/");
     assert_eq!(status, 200);
     assert!(head.contains("content-type: text/html; charset=utf-8"));
-    assert!(body.contains("Away is installed and running."));
-    // a browser is told to load nothing from anywhere, and to keep no copy
-    assert!(head.contains("content-security-policy: default-src 'none'"));
+    // the page, or where the program was built without its pages, a page that says so
+    let built = away_server::pages::are_built();
+    assert!(if built { body.contains("<div id=\"root\"></div>") } else { body.contains("Away is installed and running.") });
+    // a browser is told to load nothing from anywhere but Away, and to keep no copy of the page
+    let rule = head.lines().find_map(|line| line.strip_prefix("content-security-policy: ")).expect("the rule for the browser");
+    assert!(rule.starts_with("default-src 'none'"));
+    assert_eq!(rule.contains("script-src 'self'"), built);
+    assert!(!rule.contains("unsafe") && !rule.contains("data:") && !rule.contains("http") && !rule.contains('*'));
     assert!(head.contains("x-content-type-options: nosniff"));
     assert!(head.contains("cache-control: no-store"));
 
-    assert_eq!(ask(server.address("public"), "GET", "/nothing-here").0, 404);
+    // every address is the page, which says itself when nothing is there; without pages, nothing is
+    assert_eq!(ask(server.address("public"), "GET", "/nothing-here").0, if built { 200 } else { 404 });
+    assert_eq!(ask(server.address("public"), "GET", "/api/nothing-here").0, 404);
+    assert_eq!(ask(server.address("public"), "GET", "/assets/nothing-here.js").0, 404);
     assert_eq!(ask(server.address("public"), "POST", "/").0, 405);
     // what says whether it is well is not on the address Away is reached at
     assert_eq!(ask(server.address("public"), "GET", "/livez").0, 404);
@@ -112,8 +128,10 @@ fn the_server_answers_on_its_address_and_says_it_is_well() {
     assert!(measures.contains("# TYPE away_build_info gauge"));
     assert!(measures.contains(&format!("away_build_info{{part=\"server\",version=\"{}\"", env!("CARGO_PKG_VERSION"))));
     assert!(measures.contains("away_ready{part=\"server\"} 1\n"));
-    assert!(measures.contains("away_requests_total{part=\"server\",listener=\"public\",answer=\"2xx\"} 1\n"));
-    assert!(measures.contains("away_requests_total{part=\"server\",listener=\"public\",answer=\"4xx\"} 4\n"));
+    // of the seven requests above, the page answered one more where it is built
+    let (answered, refused) = if built { (2, 5) } else { (1, 6) };
+    assert!(measures.contains(&format!("away_requests_total{{part=\"server\",listener=\"public\",answer=\"2xx\"}} {answered}\n")));
+    assert!(measures.contains(&format!("away_requests_total{{part=\"server\",listener=\"public\",answer=\"4xx\"}} {refused}\n")));
 
     let (code, lines) = server.end();
     assert_eq!(code, 0);

@@ -11,7 +11,7 @@ use away_part::address::Address;
 use away_part::json::Json;
 use away_part::{stop, Lines, Part, Settings, Stopper};
 use away_secret::Secret;
-use away_server::getting_in::{FROM_AWAYS_PAGE, SIGNED_IN, SIGNING_IN};
+use away_server::getting_in::{FROM_AWAYS_PAGE, NOT_SIGNED_IN, SIGNED_IN, SIGNING_IN};
 use away_server::service;
 use away_server::stand_in::SignInService;
 use away_server::told::{SignIn, Told};
@@ -245,15 +245,15 @@ fn a_sign_in_is_ended_only_by_the_browser_that_began_it() {
     let back = other.get(to_service.goes_to());
     let last_step = back.goes_to().to_string();
     let came_back = victim.get(&last_step);
-    assert_eq!(came_back.goes_to(), "/");
+    assert_eq!(came_back.goes_to(), NOT_SIGNED_IN);
     assert!(came_back.sets().iter().all(|cookie| !cookie.starts_with(&format!("{SIGNED_IN}="))));
     assert_eq!(victim.who(&world).get("signed_in"), Some(&Json::Flag(false)));
     // and the one who began it can't use it either any more
-    assert_eq!(other.get(&last_step).goes_to(), "/");
+    assert_eq!(other.get(&last_step).goes_to(), NOT_SIGNED_IN);
     assert_eq!(other.who(&world).get("signed_in"), Some(&Json::Flag(false)));
     // a way back that nobody began
-    assert_eq!(victim.get(&format!("{}/sign-in/back?code=x&state=y", world.away)).goes_to(), "/");
-    assert_eq!(victim.get(&format!("{}/sign-in/back", world.away)).goes_to(), "/");
+    assert_eq!(victim.get(&format!("{}/sign-in/back?code=x&state=y", world.away)).goes_to(), NOT_SIGNED_IN);
+    assert_eq!(victim.get(&format!("{}/sign-in/back", world.away)).goes_to(), NOT_SIGNED_IN);
 }
 
 #[test]
@@ -270,7 +270,7 @@ fn somebody_who_gives_up_on_the_sign_in_page_is_back_at_the_start() {
     let world = world();
     world.service.sends_back_with(Some("access_denied"));
     let mut browser = Browser::default();
-    assert_eq!(browser.sign_in(&world, "/").goes_to(), "/");
+    assert_eq!(browser.sign_in(&world, "/").goes_to(), NOT_SIGNED_IN);
     let who = browser.who(&world);
     assert_eq!(who.get("signed_in"), Some(&Json::Flag(false)));
     assert_eq!(who.get("failed"), Some(&Json::Null), "nothing failed: the sign-in page said what there was to say");
@@ -455,7 +455,13 @@ fn an_installation_that_is_told_of_no_sign_in_service_says_so() {
     assert_eq!(browser.get(&format!("{away}/sign-in")).goes_to(), "/");
     assert_eq!(browser.ask("POST", &format!("{away}/sign-out"), &[(FROM_AWAYS_PAGE, "1")]).status, 404);
     assert!(lines.kept().iter().any(|line| line.contains("no sign-in service is set")));
-    // the page that says Away is installed is still there
-    assert_eq!(browser.get(&away).status, 200);
+    // and its page is there
+    let page = browser.get(&away);
+    assert_eq!(page.status, 200);
+    assert_eq!(page.header("content-type"), Some("text/html; charset=utf-8"));
+    assert_eq!(page.header("cache-control"), Some("no-store"));
+    assert_eq!(page.header("x-content-type-options"), Some("nosniff"));
+    // what is asked of the server and is none of its addresses is no page
+    assert_eq!(browser.get(&format!("{away}/api/none")).status, 404);
     drop(runtime);
 }

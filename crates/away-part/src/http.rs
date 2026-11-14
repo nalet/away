@@ -64,7 +64,9 @@ pub fn plain(status: StatusCode, words: &'static str) -> Answer {
 
 /// An answer as it goes out to a browser on the address Away answers on: with the rules
 /// that keep a browser from loading anything from elsewhere, from guessing what a file
-/// is, from showing the page inside another, and from keeping a copy.
+/// is, from showing the page inside another, and from keeping a copy. An answer that
+/// brings a rule of its own keeps it: a page that may load Away's own files, and a file
+/// that may be kept.
 pub fn for_a_browser(mut answer: Answer) -> Answer {
     let headers = answer.headers_mut();
     for (name, value) in [
@@ -73,7 +75,7 @@ pub fn for_a_browser(mut answer: Answer) -> Answer {
         ("referrer-policy", "no-referrer"),
         ("cache-control", "no-store"),
     ] {
-        headers.insert(name, HeaderValue::from_static(value));
+        headers.entry(name).or_insert(HeaderValue::from_static(value));
     }
     answer
 }

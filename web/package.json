@@ -1,0 +1,44 @@
+{
+  "name": "away-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Away's pages around the sessions: the frame, signing in, the settings.",
+  "license": "MPL-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "check": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@nalet/design-system": "https://github.com/nalet/design-system/releases/download/v0.4.0/nalet-design-system-0.4.0.tgz",
+    "lucide-react": "^1.73.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  },
+  "whatFor": {
+    "react": "draws the pages",
+    "react-dom": "puts what React draws into the browser's page",
+    "@nalet/design-system": "the components and the tokens the pages are made of",
+    "lucide-react": "the icons, which the design system's components use as well",
+    "@fontsource/inter": "the font of the pages' text, as files of the build, so that none is fetched from a font service",
+    "@fontsource/jetbrains-mono": "the font of names, labels and code, as files of the build",
+    "typescript": "checks the pages' code before it is built",
+    "vite": "builds the pages into files whose names carry their content's hash",
+    "@vitejs/plugin-react": "lets vite build what is written for React",
+    "@types/react": "tells TypeScript what React offers",
+    "@types/react-dom": "tells TypeScript what react-dom offers"
+  }
+}

@@ -1,6 +1,7 @@
 # Away, built with one command: make
 #
-#   make          the program, in target/release/away
+#   make          the pages, then the program with them inside, in target/release/away
+#   make pages    the pages alone, in web/dist
 #   make test     every test of the program
 #   make check    what the pipeline checks on every change, short of a cluster
 #   make image    the image, as away:dev (needs Docker)
@@ -8,17 +9,21 @@
 
 COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 
-.PHONY: all build test check image clean
+.PHONY: all pages build test check image clean
 
 all: build
 
-build:
+pages:
+	npm --prefix web ci --no-audit --no-fund
+	npm --prefix web run build
+
+build: pages
 	AWAY_COMMIT=$(COMMIT) cargo build --release --locked
 
-test:
+test: pages
 	cargo test --locked
 
-check:
+check: pages
 	python3 scripts/model.py --check
 	python3 scripts/libraries.py --check
 	cargo fmt --all --check
@@ -30,3 +35,4 @@ image:
 
 clean:
 	cargo clean
+	rm -rf web/dist web/node_modules
