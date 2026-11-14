@@ -1,0 +1,18 @@
+[package]
+name = "away-part"
+description = "What every part of Away has alike: its lines, its measures, the addresses that say whether it is well, and the way it stops."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+tokio.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+http-body-util.workspace = true
+
+[lints]
+workspace = true

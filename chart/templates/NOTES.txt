@@ -1,0 +1,13 @@
+Away {{ .Chart.AppVersion }} is installed in the namespace {{ .Release.Namespace }}.
+
+{{- if or .Values.ingress.enabled .Values.route.enabled }}
+
+It answers at https://{{ .Values.address }}
+{{- else }}
+
+It has no way in from outside the cluster: neither ingress.enabled nor route.enabled is set.
+{{- end }}
+
+To see that its three parts run:
+
+  kubectl --namespace {{ .Release.Namespace }} get pods --selector app.kubernetes.io/instance={{ .Release.Name }}

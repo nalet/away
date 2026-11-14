@@ -1,0 +1,53 @@
+{{- /* For a cluster that runs the Prometheus operator: where the measures are, and rules for alerts that are ready to use. */ -}}
+{{- $name := include "away.name" . -}}
+{{- if .Values.monitoring.serviceMonitor }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+    {{- with .Values.monitoring.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "away.picks" (dict "root" .) | nindent 6 }}
+  endpoints:
+    - port: health
+      path: /metrics
+      interval: 30s
+{{- end }}
+{{- if .Values.monitoring.alerts }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+    {{- with .Values.monitoring.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: away
+      rules:
+        - alert: AwayPartGivesNoMeasures
+          expr: up{service="{{ $name }}-health"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: A part of Away gives no measures.
+            description: "The pod {{ "{{ $labels.pod }}" }} has given no measures for two minutes. It may not be running."
+        - alert: AwayPartNotReady
+          expr: away_ready{service="{{ $name }}-health"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: A part of Away is not ready.
+            description: "Away's {{ "{{ $labels.part }}" }} has not answered what it is there for in five minutes."
+{{- end }}

@@ -20,6 +20,9 @@ const SECTIONS = [
     label: 'overview',
     pages: [
       ['docs/README.md', 'documentation'],
+      ['docs/install.md', 'installing away'],
+      ['docs/build.md', 'building and checking'],
+      ['docs/libraries.md', 'the libraries'],
       ['docs/model.md', 'changing the model'],
     ],
   },

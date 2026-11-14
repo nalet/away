@@ -6,7 +6,9 @@ and then signed in on the machine too.
 
 **Specified, and being built. Nothing can be installed yet.** What Away is for,
 what it has to do, what it looks like, how it is built and in what order are
-written down, drawn and agreed. It is built one work package at a time:
+written down, drawn and agreed. It is built one work package at a time, and
+the first has begun: the program with its three parts, the chart that installs
+it and the pipelines.
 <https://nalet.github.io/away/>
 
 | | In this repository | On the site |
@@ -18,6 +20,19 @@ written down, drawn and agreed. It is built one work package at a time:
 | What it looks like | [spec/screens](spec/screens/README.md) | [all screens](https://nalet.github.io/away/spec/screens/all/) |
 | How it is built, and why | [spec/architecture](spec/architecture/README.md) | [the architecture](https://nalet.github.io/away/spec/architecture/) |
 | In what order it is built | [spec/plan](spec/plan/README.md) | [the work packages](https://nalet.github.io/away/spec/plan/) |
+
+## Building it
+
+```sh
+make          # the program, in target/release/away
+make test     # every test of the program
+make check    # what the pipeline checks on every change, short of a cluster
+```
+
+It needs a Rust compiler, which [rustup](https://rustup.rs/) installs in the
+version this repository names. [Building and checking](docs/build.md) says how
+to check an image the project published, and [installing](docs/install.md) how
+to install one. A security hole is reported [in private](SECURITY.md).
 
 ## The model
 

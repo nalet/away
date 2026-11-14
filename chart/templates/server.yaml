@@ -1,0 +1,16 @@
+{{- /* The server: the pages and the requests. The way in leads everything but a session's connection here. */ -}}
+{{ include "away.part" (dict "root" . "part" "server" "port" 8080 "named" "http") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "away.name" . }}-server
+  labels:
+    {{- include "away.labels" (dict "root" . "part" "server") | nindent 4 }}
+spec:
+  selector:
+    {{- include "away.picks" (dict "root" . "part" "server") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

@@ -1,0 +1,203 @@
+name: Build, test and publish Away
+
+# on every change: the libraries Away is built from are checked, then the program's form,
+# the compiler's warnings, its tests and the chart; and the image is installed on a fresh
+# Kubernetes cluster by someone with rights in one namespace alone, where
+# tests/install/kubernetes.sh tries it and the connections the cluster has to refuse.
+#
+# on the main branch and on a version's tag the image and the chart are then published:
+# built for two kinds of processor, signed with this pipeline's own identity, with a
+# record of how the image was built and a list of what it holds. docs/build.md says how
+# anyone checks each.
+#
+# every tool is fixed to one commit; the version it is, is beside it.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: check the program and the chart
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: The libraries are listed, each with what it is for
+        run: python3 scripts/libraries.py --check
+
+      - name: The code's form
+        run: cargo fmt --all --check
+
+      - name: The compiler's warnings, which count as failures
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: The tests
+        run: cargo test --locked
+
+      - name: The chart, with each way in
+        run: |
+          helm lint chart
+          helm template away chart --namespace away > /dev/null
+          helm template away chart --namespace away --set ingress.enabled=true --set address=away.example.com > /dev/null
+          helm template away chart --namespace away --set route.enabled=true --set address=away.example.com \
+            --set monitoring.serviceMonitor=true --set monitoring.alerts=true > /dev/null
+
+      - name: The libraries' licences, known holes and sources
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+
+  install:
+    name: install on a fresh Kubernetes cluster
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the image
+        run: docker build --build-arg AWAY_COMMIT=${{ github.sha }} --tag away:test .
+
+      - name: The image holds the program and nothing else
+        run: |
+          docker create --name held away:test > /dev/null
+          docker export held | tar --list | grep -v -E '^(dev|etc|proc|sys)(/|$)|^\.dockerenv$' > held.txt
+          cat held.txt
+          [ "$(cat held.txt)" = away ]
+          [ "$(docker inspect --format '{{.Config.User}}' away:test)" = 65532:65532 ]
+          docker run --rm away:test version
+
+      - name: Start a cluster
+        uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
+        with:
+          cluster_name: away
+
+      - name: Give the cluster the image
+        run: kind load docker-image away:test --name away
+
+      - name: Install Away and try it
+        run: tests/install/kubernetes.sh
+        env:
+          IMAGE_REPOSITORY: away
+          IMAGE_TAG: test
+          IMAGE_PULL_POLICY: Never
+
+  publish:
+    name: publish the image and the chart
+    needs: [check, install]
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Name what is published
+        id: name
+        run: |
+          # a tag publishes its version; the main branch publishes the version it is on
+          # its way to, with the commit: 0.1.0-main.34d0117
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tagged=${GITHUB_REF_NAME#v}
+            if [ "${tagged%%-*}" != "$version" ]; then
+              echo "The tag $GITHUB_REF_NAME is not the version $version that Cargo.toml names." >&2
+              exit 1
+            fi
+            version=$tagged
+            tags="$image:$version"
+          else
+            version="$version-main.${GITHUB_SHA::7}"
+            tags="$image:$version,$image:main"
+          fi
+          {
+            echo "version=$version"
+            echo "image=$image"
+            echo "charts=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"
+            echo "tags=$tags"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build the image for both kinds of processor, and publish it
+        id: image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.name.outputs.tags }}
+          build-args: AWAY_COMMIT=${{ github.sha }}
+          # the record of the build and the list of contents are made below, by the
+          # pipeline's own identity, and not by the builder
+          provenance: false
+          sbom: false
+
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - name: Sign the image
+        run: cosign sign --yes "${{ steps.name.outputs.image }}@${{ steps.image.outputs.digest }}"
+
+      - name: Record how the image was built
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.name.outputs.image }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+
+      - name: List what the image holds
+        run: python3 scripts/contents.py --output away.cdx.json
+
+      - name: Attach the list to the image
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ steps.name.outputs.image }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          sbom-path: away.cdx.json
+          push-to-registry: true
+
+      - name: Publish the chart, for this image, and sign it
+        env:
+          VERSION: ${{ steps.name.outputs.version }}
+          CHARTS: ${{ steps.name.outputs.charts }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin <<< "$TOKEN"
+          helm package chart --version "$VERSION" --app-version "$VERSION" --destination out
+          helm push "out/away-$VERSION.tgz" "oci://$CHARTS" 2>&1 | tee out/push.log
+          digest=$(sed -n 's/^Digest: //p' out/push.log)
+          cosign sign --yes "$CHARTS/away@$digest"
+
+      - name: Say what was published
+        env:
+          VERSION: ${{ steps.name.outputs.version }}
+          IMAGE: ${{ steps.name.outputs.image }}
+          CHARTS: ${{ steps.name.outputs.charts }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          {
+            echo "### Published"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Image | \`$IMAGE:$VERSION\` |"
+            echo "| Its digest | \`$DIGEST\` |"
+            echo "| Chart | \`oci://$CHARTS/away\`, version \`$VERSION\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

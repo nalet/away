@@ -1,0 +1,16 @@
+[package]
+name = "away-server"
+description = "The server: the pages, the requests, people's sign-ins, the rules, the records."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+away-part.workspace = true
+hyper.workspace = true
+
+[lints]
+workspace = true

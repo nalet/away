@@ -96,7 +96,7 @@ and nothing built by then is lost.
 <!-- generated: packages -->
 | No. | Package | Is | State | After | Rests on | Delivers |
 |---|---|---|---|---|---|---|
-| 1 | [The ground](#1-the-ground) | build | agreed | — | [ADR‑0002](../architecture/decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md), [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 11 capabilities |
+| 1 | [The ground](#1-the-ground) | build | begun | — | [ADR‑0002](../architecture/decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md), [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 11 capabilities |
 | 2 | [RDP, proven without a browser](#2-rdp-proven-without-a-browser) | proof | agreed | 1 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md) | — |
 | 3 | [The Windows sign-in, proven without a browser](#3-the-windows-sign-in-proven-without-a-browser) | proof | proposed | 2 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | — |
 | 4 | [Getting in, and the frame](#4-getting-in-and-the-frame) | build | agreed | 1 | [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 15 capabilities |

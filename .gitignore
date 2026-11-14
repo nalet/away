@@ -6,3 +6,4 @@ __pycache__/
 site/src/content/docs/docs/
 site/src/content/docs/spec/
 site/src/generated/
+target/

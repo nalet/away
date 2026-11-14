@@ -1,0 +1,5 @@
+# the image is built from the program's source and nothing else
+*
+!Cargo.toml
+!Cargo.lock
+!crates/

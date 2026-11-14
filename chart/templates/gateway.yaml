@@ -1,0 +1,16 @@
+{{- /* The gateway: the sessions. The way in leads a session's connection here. */ -}}
+{{ include "away.part" (dict "root" . "part" "gateway" "port" 8081 "named" "sessions") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "away.name" . }}-gateway
+  labels:
+    {{- include "away.labels" (dict "root" . "part" "gateway") | nindent 4 }}
+spec:
+  selector:
+    {{- include "away.picks" (dict "root" . "part" "gateway") | nindent 4 }}
+  ports:
+    - name: sessions
+      port: 8081
+      targetPort: sessions

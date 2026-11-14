@@ -1,0 +1,39 @@
+# Away, as one workspace: the program, its three parts, and the libraries they are built from.
+[workspace]
+resolver = "2"
+members = ["crates/away", "crates/away-part", "crates/away-server", "crates/away-gateway", "crates/away-issuer"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.99"
+license = "MPL-2.0"
+repository = "https://github.com/nalet/away"
+publish = false
+
+# every library Away is built from directly, each with what it is for. scripts/libraries.py
+# writes docs/libraries.md from these lines and fails when one says nothing.
+[workspace.dependencies]
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "net", "signal", "macros", "time", "sync"] } # runs many connections at once
+hyper = { version = "1", default-features = false, features = ["http1", "server"] } # speaks HTTP to browsers and to the cluster's checks
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"] } # lets hyper use tokio's connections and timers
+http-body-util = { version = "0.1", default-features = false } # holds the body of an HTTP answer
+
+away-part = { path = "crates/away-part" }
+away-server = { path = "crates/away-server" }
+away-gateway = { path = "crates/away-gateway" }
+away-issuer = { path = "crates/away-issuer" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

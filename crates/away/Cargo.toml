@@ -1,0 +1,19 @@
+[package]
+name = "away"
+description = "Away, the program: its first word chooses the part it runs as."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+away-part.workspace = true
+away-server.workspace = true
+away-gateway.workspace = true
+away-issuer.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

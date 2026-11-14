@@ -18,5 +18,14 @@ how far the build is.
 | see in what order it is built | [the work packages](../spec/plan/README.md) |
 | change any of it | [changing the model](./model.md) |
 
-How to install, set up and run Away is written here with each part that is
-built.
+What is built so far is the first work package: the program with its three
+parts, the chart and the pipelines.
+
+| To | Read |
+|---|---|
+| install what there is | [installing Away](./install.md) |
+| build it from its source, test it, and check a published image | [building and checking Away](./build.md) |
+| see what it is built from | [the libraries](./libraries.md) |
+| report a security hole | [in private](../SECURITY.md) |
+
+How to set up and run Away is written here with each part that is built.

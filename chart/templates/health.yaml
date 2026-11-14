@@ -1,0 +1,15 @@
+{{- /* Where each part says whether it is well and gives its measures: one name for all three, for the monitoring to find them by. */ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "away.name" . }}-health
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "away.picks" (dict "root" .) | nindent 4 }}
+  ports:
+    - name: health
+      port: 9090
+      targetPort: health

@@ -1,0 +1,84 @@
+{{- /*
+The cluster's network rules around Away: nothing reaches a part and a part reaches
+nothing, except the connections the architecture lists (spec/architecture/connections.csv).
+A rule is added here with the version that first makes its connection.
+*/ -}}
+{{- if .Values.networkRules.enabled }}
+{{- $name := include "away.name" . -}}
+{{- $wayIn := .Values.networkRules.wayInFrom -}}
+{{- if not $wayIn }}
+{{- if .Values.route.enabled }}
+{{- $wayIn = list (dict "namespaceSelector" (dict "matchLabels" (dict "policy-group.network.openshift.io/ingress" ""))) }}
+{{- else }}
+{{- $wayIn = list (dict "namespaceSelector" (dict)) }}
+{{- end }}
+{{- end }}
+# nothing in, nothing out: every other rule opens one connection
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-nothing-else
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "away.picks" (dict "root" .) | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+---
+# the way in passes the pages and the requests on to the server
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-way-in-to-server
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "away.picks" (dict "root" . "part" "server") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- toYaml $wayIn | nindent 8 }}
+      ports:
+        - port: http
+---
+# the way in passes a session's connection on to the gateway
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-way-in-to-gateway
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "away.picks" (dict "root" . "part" "gateway") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- toYaml $wayIn | nindent 8 }}
+      ports:
+        - port: sessions
+{{- with .Values.networkRules.measuresFrom }}
+---
+# the monitoring reads every part's measures
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-measures
+  labels:
+    {{- include "away.labels" (dict "root" $) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "away.picks" (dict "root" $) | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - port: health
+{{- end }}
+{{- end }}

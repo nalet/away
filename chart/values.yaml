@@ -1,0 +1,73 @@
+# The values of an installation. Everything Away is told at installation is here.
+# What each means is in the installation guide, docs/install.md.
+
+# The address Away answers on, such as away.example.com. A way in needs it.
+address: ""
+
+image:
+  repository: ghcr.io/nalet/away
+  # The image's tag. Empty takes the version of Away this chart was published with.
+  tag: ""
+  # The image's digest, sha256:... When set, the tag is not used.
+  digest: ""
+  pullPolicy: IfNotPresent
+  # Secrets to pull the image with, where the registry asks for one: [{name: ...}]
+  pullSecrets: []
+
+# How Away is reached from outside the cluster: an ingress, a route, or neither.
+ingress:
+  enabled: false
+  # The ingress controller's class. Empty takes the cluster's default.
+  className: ""
+  annotations: {}
+  # The secret that holds the certificate for the address. Empty takes the ingress
+  # controller's own.
+  tlsSecret: ""
+
+route:
+  # For OpenShift, in place of an ingress.
+  enabled: false
+  # One's own certificate in place of the cluster's. Give the three with --set-file,
+  # never in a file of values that is kept.
+  certificate: ""
+  key: ""
+  caCertificate: ""
+  # How long the router leaves a session's connection open while nothing passes.
+  timeout: 1h
+
+networkRules:
+  # Allow the connections Away is built to make, and refuse every other one.
+  enabled: true
+  # Who may reach Away's address, as the peers of a NetworkPolicy. Empty takes the
+  # cluster's router where a route is made, and every namespace otherwise.
+  wayInFrom: []
+  # Who may read the measures, as the peers of a NetworkPolicy. Empty lets nobody.
+  measuresFrom: []
+
+monitoring:
+  # Make a ServiceMonitor, so the Prometheus operator finds the measures by itself.
+  # The cluster has to have that kind.
+  serviceMonitor: false
+  # Make alert rules that are ready to use. The cluster has to have that kind.
+  alerts: false
+  # Labels for both, where the monitoring picks its objects by label.
+  labels: {}
+
+# What each part may use. A request is what it is given for certain, a limit what it
+# never gets more than.
+server:
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 256Mi }
+gateway:
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { memory: 1Gi }
+issuer:
+  resources:
+    requests: { cpu: 20m, memory: 32Mi }
+    limits: { memory: 128Mi }
+
+# Where the parts run.
+nodeSelector: {}
+tolerations: []

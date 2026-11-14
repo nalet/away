@@ -1,0 +1,94 @@
+{{- /*
+The way in: on Away's address, a session's connection goes to the gateway and everything
+else to the server. An ingress on Kubernetes, two routes on OpenShift.
+*/ -}}
+{{- if and .Values.ingress.enabled .Values.route.enabled }}
+{{- fail "ingress.enabled and route.enabled are both set: an installation has one way in" }}
+{{- end }}
+{{- if or .Values.ingress.enabled .Values.route.enabled }}
+{{- if not .Values.address }}
+{{- fail "address is empty: a way in needs the address Away answers on, such as away.example.com" }}
+{{- end }}
+{{- end }}
+{{- $name := include "away.name" . -}}
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  tls:
+    - hosts: [{{ .Values.address | quote }}]
+      {{- with .Values.ingress.tlsSecret }}
+      secretName: {{ . }}
+      {{- end }}
+  rules:
+    - host: {{ .Values.address | quote }}
+      http:
+        paths:
+          - path: /session
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $name }}-gateway
+                port:
+                  name: sessions
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $name }}-server
+                port:
+                  name: http
+{{- end }}
+{{- if .Values.route.enabled }}
+{{- range $route := list (dict "name" $name "path" "" "to" "server" "port" "http") (dict "name" (printf "%s-sessions" $name) "path" "/session" "to" "gateway" "port" "sessions") }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ $route.name }}
+  labels:
+    {{- include "away.labels" (dict "root" $) | nindent 4 }}
+  {{- if eq $route.to "gateway" }}
+  annotations:
+    haproxy.router.openshift.io/timeout: {{ $.Values.route.timeout | quote }}
+    haproxy.router.openshift.io/timeout-tunnel: {{ $.Values.route.timeout | quote }}
+  {{- end }}
+spec:
+  host: {{ $.Values.address | quote }}
+  {{- with $route.path }}
+  path: {{ . }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{ $name }}-{{ $route.to }}
+    weight: 100
+  port:
+    targetPort: {{ $route.port }}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+    {{- with $.Values.route.certificate }}
+    certificate: |
+      {{- . | nindent 6 }}
+    {{- end }}
+    {{- with $.Values.route.key }}
+    key: |
+      {{- . | nindent 6 }}
+    {{- end }}
+    {{- with $.Values.route.caCertificate }}
+    caCertificate: |
+      {{- . | nindent 6 }}
+    {{- end }}
+{{- end }}
+{{- end }}
