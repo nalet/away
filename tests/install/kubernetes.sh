@@ -150,30 +150,63 @@ say "The cluster refuses what the architecture doesn't list"
 server_ip=$(kubectl --namespace "$NAMESPACE" get pod "$server" --output jsonpath='{.status.podIP}')
 gateway_ip=$(kubectl --namespace "$NAMESPACE" get pod "$gateway" --output jsonpath='{.status.podIP}')
 issuer_ip=$(kubectl --namespace "$NAMESPACE" get pods --selector app.kubernetes.io/component=issuer --output jsonpath='{.items[0].status.podIP}')
-api_ip=$(kubectl --namespace default get service kubernetes --output jsonpath='{.spec.clusterIP}')
+
+# something to reach that no rule of Away's covers: the program itself, in another namespace
+kubectl --namespace "$OUTSIDE" apply -f - >/dev/null <<YAML
+apiVersion: v1
+kind: Pod
+metadata:
+  name: elsewhere
+spec:
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile: {type: RuntimeDefault}
+  containers:
+    - name: elsewhere
+      image: $IMAGE_REPOSITORY:$IMAGE_TAG
+      imagePullPolicy: $IMAGE_PULL_POLICY
+      args: [server]
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: {drop: [ALL]}
+YAML
+kubectl --namespace "$OUTSIDE" wait --for=condition=Ready pod/elsewhere --timeout=120s >/dev/null
+elsewhere_ip=$(kubectl --namespace "$OUTSIDE" get pod elsewhere --output jsonpath='{.status.podIP}')
+
 probe "$OUTSIDE" outsider
 probe "$NAMESPACE" stranger
-probe "$NAMESPACE" as-gateway "app.kubernetes.io/name: away, app.kubernetes.io/instance: away, app.kubernetes.io/component: gateway"
+for part in server gateway issuer; do
+  probe "$NAMESPACE" "as-$part" "app.kubernetes.io/name: away, app.kubernetes.io/instance: away, app.kubernetes.io/component: $part"
+done
 
-# first: does this cluster enforce network rules at all? a pod under the rules must not
-# reach the cluster's own interface, which every pod reaches where nothing is enforced.
-if reaches "$NAMESPACE" as-gateway "$api_ip:443"; then
-  fail "this cluster does not enforce network rules, so nothing here is refused"
-fi
-ok "the cluster enforces network rules"
+allowed() { if reaches "$1" "$2" "$3"; then ok "allowed: $4"; else fail "refused, and it has to be allowed: $4"; fi; }
+refused() {
+  if reaches "$1" "$2" "$3"; then
+    fail "allowed, and it has to be refused: $4. Either a rule is wrong, or this cluster does not enforce network rules."
+  else
+    ok "refused: $4"
+  fi
+}
 
-allowed() { reaches "$1" "$2" "$3" && ok "allowed: $4" || fail "refused, and the architecture lists it: $4"; }
-refused() { reaches "$1" "$2" "$3" && fail "allowed, and the architecture doesn't list it: $4" || ok "refused: $4"; }
-
-allowed "$OUTSIDE"   outsider   "$server_ip:8080"  "the way in to the server's address"
-allowed "$OUTSIDE"   outsider   "$gateway_ip:8081" "the way in to the gateway's address"
-refused "$OUTSIDE"   outsider   "$server_ip:9090"  "another namespace to the server's measures"
-refused "$OUTSIDE"   outsider   "$gateway_ip:9090" "another namespace to the gateway's measures"
-refused "$OUTSIDE"   outsider   "$issuer_ip:9090"  "another namespace to the issuer"
-refused "$NAMESPACE" stranger   "$issuer_ip:9090"  "another pod of Away's own namespace to the issuer"
-refused "$NAMESPACE" as-gateway "$issuer_ip:9090"  "the gateway to the issuer's measures"
-refused "$NAMESPACE" as-gateway "$server_ip:9090"  "the gateway to the server's measures"
-refused "$NAMESPACE" as-gateway "$server_ip:8080"  "the gateway to the server's public address"
-refused "$NAMESPACE" as-gateway "$api_ip:443"      "the gateway to the cluster's own interface"
+# what is allowed, so that a refusal below means a rule and not a broken network
+allowed "$OUTSIDE"   outsider    "$elsewhere_ip:8080" "a pod that no rule covers, to another one"
+allowed "$OUTSIDE"   outsider    "$server_ip:8080"    "the way in, to the server's address"
+allowed "$OUTSIDE"   outsider    "$gateway_ip:8081"   "the way in, to the gateway's address"
+# into Away: nothing but the way in
+refused "$OUTSIDE"   outsider    "$server_ip:9090"    "another namespace, to the server's measures"
+refused "$OUTSIDE"   outsider    "$gateway_ip:9090"   "another namespace, to the gateway's measures"
+refused "$OUTSIDE"   outsider    "$issuer_ip:9090"    "another namespace, to the issuer"
+refused "$NAMESPACE" stranger    "$issuer_ip:9090"    "another pod of Away's own namespace, to the issuer"
+# out of Away: nothing yet, for any part
+refused "$NAMESPACE" as-server   "$elsewhere_ip:8080" "the server, to something outside Away"
+refused "$NAMESPACE" as-gateway  "$elsewhere_ip:8080" "the gateway, to something outside Away"
+refused "$NAMESPACE" as-issuer   "$elsewhere_ip:8080" "the issuer, to something outside Away"
+# between the parts: nothing yet
+refused "$NAMESPACE" as-gateway  "$issuer_ip:9090"    "the gateway, to the issuer"
+refused "$NAMESPACE" as-gateway  "$server_ip:8080"    "the gateway, to the server"
+refused "$NAMESPACE" as-server   "$gateway_ip:8081"   "the server, to the gateway"
+refused "$NAMESPACE" as-issuer   "$server_ip:8080"    "the issuer, to the server"
 
 say "Everything this checks holds"
