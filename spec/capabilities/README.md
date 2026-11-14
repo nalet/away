@@ -117,18 +117,18 @@ has the steps.
 |---|---|---|---|---|---|---|---|
 | [in a session](./session.md) | 7 | 64 | 1 | 0 | 38 | 21 | 4 |
 | [around the sessions](./app.md) | 5 | 49 | 7 | 0 | 21 | 17 | 4 |
-| [administration](./admin.md) | 4 | 55 | 2 | 0 | 23 | 27 | 3 |
+| [administration](./admin.md) | 4 | 56 | 2 | 0 | 24 | 27 | 3 |
 | [the platform](./platform.md) | 3 | 33 | 15 | 1 | 8 | 7 | 2 |
-| all | 19 | 201 | 25 | 1 | 90 | 72 | 13 |
+| all | 19 | 202 | 25 | 1 | 91 | 72 | 13 |
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
-| a session over RDP | 0 | 0 | 37 | 23 | 4 | 137 |
-| a session over VNC | 0 | 0 | 26 | 11 | 13 | 151 |
-| a session over SSH | 0 | 0 | 27 | 12 | 2 | 160 |
-| Away itself | 25 | 1 | 46 | 46 | 9 | 74 |
+| a session over RDP | 0 | 0 | 37 | 23 | 4 | 138 |
+| a session over VNC | 0 | 0 | 26 | 11 | 13 | 152 |
+| a session over SSH | 0 | 0 | 27 | 12 | 2 | 161 |
+| Away itself | 25 | 1 | 47 | 46 | 9 | 74 |
 
-An expectation names 164 of the 201 capabilities; no expectation names the other 37.
+An expectation names 164 of the 202 capabilities; no expectation names the other 38.
 <!-- end: overview -->
 
 ## What is expected of it

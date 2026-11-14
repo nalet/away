@@ -20,7 +20,7 @@ use away_part::http::{answer, plain, Answer};
 use away_part::json::Json;
 use away_part::{time, version, Part};
 use hyper::body::Incoming;
-use hyper::header::{HeaderValue, COOKIE, LOCATION, ORIGIN, SET_COOKIE};
+use hyper::header::{HeaderValue, CACHE_CONTROL, COOKIE, LOCATION, ORIGIN, SET_COOKIE};
 use hyper::{Method, Request, StatusCode};
 
 use crate::register::files::Register;
@@ -85,6 +85,7 @@ impl GettingIn {
         let reading = matches!(*request.method(), Method::GET | Method::HEAD);
         Some(match (request.uri().path(), reading) {
             ("/api/who", true) => self.who(request),
+            (path, true) if path.starts_with("/api/icons/") => self.icon(request, path),
             ("/api/built-from", true) => self.built_from(request),
             ("/api/machines", true) => self.machines(request),
             ("/api/register", true) => self.in_force(request),
@@ -131,6 +132,24 @@ impl GettingIn {
         let (in_force, _) = self.register.in_force();
         let machines: Vec<Json> = in_force.reached_by(&person.groups).into_iter().map(|(machine, _)| machine.for_a_person()).collect();
         answer(StatusCode::OK, "application/json", Json::object([("machines", Json::List(machines))]).write())
+    }
+
+    /// The picture a program has as its icon, for whoever is signed in. A picture is
+    /// asked for by a name that is made from the picture itself, so a browser may keep it.
+    fn icon(&self, request: &Request<Incoming>, path: &str) -> Answer {
+        if self.signed_in(request).is_none() {
+            return plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n");
+        }
+        let name = path.trim_start_matches("/api/icons/").strip_suffix(".png").unwrap_or_default();
+        let (in_force, _) = self.register.in_force();
+        match in_force.pictures.get(name) {
+            Some(picture) => {
+                let mut answer = answer(StatusCode::OK, "image/png", picture.as_ref().clone());
+                answer.headers_mut().insert(CACHE_CONTROL, HeaderValue::from_static("private, max-age=31536000, immutable"));
+                answer
+            }
+            None => plain(StatusCode::NOT_FOUND, "No picture is at this address.\n"),
+        }
     }
 
     /// What is in force, for those who administer Away: every machine and every rule

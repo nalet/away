@@ -5,7 +5,12 @@ machines:
     address: fin-app-02.corp.example
     groups: [finance]
     desktop: true
-    programs: [Ledger, Payroll, Reports, Mail]
+    programs:
+      - name: Ledger
+        icon: icons/ledger.png
+      - Payroll
+      - Reports
+      - Mail
 
   - name: hr-app-01
     kind: windows

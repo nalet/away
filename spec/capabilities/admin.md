@@ -20,6 +20,7 @@ Which machines there are, how each is reached and how people are signed in on it
 | Keep a name and password or a key for a machine, never shown again | admin | v1 | `keep-secret` |
 | Change a kept password on the machine by itself from time to time | system | no | `change-kept-secret` |
 | Say which programs of a Windows machine people may open | admin | v1 | `offer-programs` |
+| Give a program an icon of its own, which people know it by | admin | v1 | `give-program-icons` |
 | Read the programs a Windows machine publishes from the machine itself | system | later | `read-programs-from-host` |
 | Set how a machine is reached: its port, its screen, what may pass | admin | v1 | `set-connection-options` |
 | Test a machine: is it reached, does signing in work, and if not, which step fails | admin | v1 | `test-machine` |
@@ -33,6 +34,7 @@ Which machines there are, how each is reached and how people are signed in on it
 - *Keep machines, groups and rules as files, applied as they change*: so they can live in a repository and be reviewed like code.
 - *Keep a name and password or a key for a machine, never shown again*: in the first release the machine's file names a secret that the cluster holds; typing one in the browser comes with adding machines there.
 - *Change a kept password on the machine by itself from time to time*: Away keeps the secrets it needs and manages no others.
+- *Give a program an icon of its own, which people know it by*: a picture among the files; Away serves it itself.
 - *Say how a machine proves who it is, and accept a changed identity on purpose*: by an authority Away trusts, or by what the machine showed when it was first tested.
 - *Make, copy or hand out fresh desktops as people ask for them*: Away reaches machines that exist.
 - *Reach a machine through a helper installed on it*: a machine is reached the way it already offers.

@@ -28,9 +28,9 @@
 {{- with .Values.contact }}
 {{- $told = append $told (dict "name" "AWAY_CONTACT" "value" .) -}}
 {{- end }}
-{{- /* the files of machines and rules: from the values, or from a ConfigMap of the operator's own */ -}}
-{{- if and .Values.files .Values.filesConfigMap }}
-{{- fail "files and filesConfigMap are both set: the files of machines and rules come from one place" }}
+{{- /* the files of machines and rules, and the pictures they name as icons: from the values, or from a ConfigMap of the operator's own */ -}}
+{{- if and (or .Values.files .Values.pictures) .Values.filesConfigMap }}
+{{- fail "files or pictures, and filesConfigMap, are both set: the files of machines and rules come from one place" }}
 {{- end }}
 {{- $files := list -}}
 {{- range $name := keys .Values.files | sortAlpha }}
@@ -38,6 +38,12 @@
 {{- fail (printf "files: \"%s\" is no name for a file of machines and rules: letters, digits, - _ . and folders, ending in .yaml" $name) }}
 {{- end }}
 {{- /* a ConfigMap's keys take no folders: the folders are in the path each key is mounted at */ -}}
+{{- $files = append $files (dict "key" (replace "/" "__" $name) "path" $name) -}}
+{{- end }}
+{{- range $name := keys .Values.pictures | sortAlpha }}
+{{- if not (regexMatch "^[-._a-zA-Z0-9]+(/[-._a-zA-Z0-9]+)*\\.png$" $name) }}
+{{- fail (printf "pictures: \"%s\" is no name for a picture: letters, digits, - _ . and folders, ending in .png" $name) }}
+{{- end }}
 {{- $files = append $files (dict "key" (replace "/" "__" $name) "path" $name) -}}
 {{- end }}
 {{- if $files }}
@@ -54,6 +60,12 @@ data:
   {{ replace "/" "__" $name }}: |
     {{- index $.Values.files $name | nindent 4 }}
   {{- end }}
+{{- with .Values.pictures }}
+binaryData:
+  {{- range $name := keys . | sortAlpha }}
+  {{ replace "/" "__" $name }}: {{ index $.Values.pictures $name | quote }}
+  {{- end }}
+{{- end }}
 ---
 {{- else if .Values.filesConfigMap }}
 {{- $told = append $told (dict "name" "AWAY_FILES" "value" "/etc/away/files") -}}

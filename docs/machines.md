@@ -20,7 +20,12 @@ machines:
     address: fin-app-02.corp.example
     groups: [finance]
     desktop: true
-    programs: [Ledger, Payroll, Reports, Mail]
+    programs:
+      - name: Ledger
+        icon: icons/ledger.png
+      - Payroll
+      - Reports
+      - Mail
 
   - name: build-01
     kind: linux
@@ -47,7 +52,7 @@ rules:
 | `address` | where it is reached: a name of the network, or a number | needed |
 | `groups` | the groups of machines it is in. A group is there as soon as a machine names it | none |
 | `desktop` | its desktop: `true`, or its port and what it is reached over | none |
-| `programs` | the programs of a Windows machine that open in windows of their own, by their names | none |
+| `programs` | the programs of a Windows machine that open in windows of their own: each its name, or its name and its icon | none |
 | `shell` | its shell: `true`, or its port | none |
 | `collection` | for a farm of Windows machines that people see as one: the collection this entry stands for | none |
 | `served-by` | the machines that serve the collection, by their addresses | none |
@@ -64,6 +69,18 @@ says so, and a way in that listens elsewhere names its port:
 ```
 
 A shell is reached over SSH, on port 22.
+
+A program is known by its name. With an icon it is known by its picture too:
+the icon names a PNG picture of the folder, by where it is in the folder. A
+picture is 256 KiB at most. Away serves the pictures itself, to people who are
+signed in.
+
+```yaml
+    programs:
+      - name: Ledger
+        icon: icons/ledger.png
+      - Payroll
+```
 
 ### A rule
 
@@ -100,8 +117,14 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
   --set-file 'files.rules/access\.yaml=rules/access.yaml'
 ```
 
-Or keep them in a ConfigMap of one's own, each file under its name, and name
-the ConfigMap:
+The pictures go the same way, each by its name and in Base64:
+
+```sh
+  --set "pictures.icons/ledger\.png=$(base64 < icons/ledger.png | tr -d '\n')"
+```
+
+Or keep them in a ConfigMap of one's own, each file and each picture under its
+name, and name the ConfigMap:
 
 ```sh
 kubectl --namespace away create configmap away-files --from-file=machines.yaml --from-file=rules.yaml
@@ -110,7 +133,8 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
 ```
 
 The server reads every `.yaml` and `.yml` file of the folder and of its
-folders, and leaves everything else.
+folders, takes every `.png` picture for a program to name as its icon, and
+leaves everything else.
 
 ## A change is applied whole or not at all
 

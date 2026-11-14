@@ -110,11 +110,11 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
                 // a program is an entry of its own; it leads to its machine's page
                 const Icon = program === null ? iconOf(machine) : AppWindow;
                 return (
-                  <li key={`${machine.name} ${program ?? ''}`}>
+                  <li key={`${machine.name} ${program?.name ?? ''}`}>
                     <a className="m" href={pageOf(machine.name)} onClick={inPlace(go, pageOf(machine.name))}>
-                      <Icon size={22} aria-hidden="true" />
+                      {program?.icon ? <img className="icon" src={program.icon} alt="" width={24} height={24} /> : <Icon size={22} aria-hidden="true" />}
                       <span className="main">
-                        <span className="name">{program ?? machine.name}</span>
+                        <span className="name">{program?.name ?? machine.name}</span>
                         <span className="sub">{program === null ? whatItIs(machine) : texts.programOn(machine.name)}</span>
                       </span>
                     </a>
@@ -196,10 +196,10 @@ export function MachinePage({ name, go }: { name: string; go: (to: string) => vo
               </h2>
               <ul className="mgrid">
                 {machine.programs.map((program) => (
-                  <li key={program} className="m prog still">
-                    <AppWindow size={22} aria-hidden="true" />
+                  <li key={program.name} className="m prog still">
+                    {program.icon ? <img className="icon" src={program.icon} alt="" width={24} height={24} /> : <AppWindow size={22} aria-hidden="true" />}
                     <span className="main">
-                      <span className="name">{program}</span>
+                      <span className="name">{program.name}</span>
                     </span>
                   </li>
                 ))}

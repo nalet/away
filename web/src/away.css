@@ -78,6 +78,8 @@ a { color: var(--cloud-blue); }
 .mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
 .m { min-height: 88px; padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; background: var(--surface); border: 1px solid var(--border); color: inherit; text-decoration: none; }
 .m > svg { flex: none; margin-top: 1px; color: var(--cloud-blue); stroke-width: 1.75; }
+/* a program's own icon, in the place of the drawn one */
+.m > img.icon { flex: none; width: 24px; height: 24px; object-fit: contain; }
 .m .main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .m .name { font-weight: 500; overflow-wrap: anywhere; }
 .m .sub { color: var(--fg-muted); font-size: 13px; line-height: 1.4; }

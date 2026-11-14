@@ -16,7 +16,7 @@ What a person's browser runs.
 
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
-| `web` | the web app: Away's pages around the sessions | web | first release | 42 |
+| `web` | the web app: Away's pages around the sessions | web | first release | 43 |
 | `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | first release | 38 |
 
 - `web`: Built from the design system's components; the frame is Away's own until the design system has it. Keeps: in the browser's own storage, which sessions this browser has open and how wide the list of windows was left. Code: `web/`. Runs: served by the server. Governed by [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](./decisions/0011-the-web-app.md).
@@ -28,7 +28,7 @@ What the chart runs from Away's one image.
 
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
-| `server` | the server: the pages, the requests, people's sign-ins, the rules, the records | service | there | 53 |
+| `server` | the server: the pages, the requests, people's sign-ins, the rules, the records | service | there | 54 |
 | `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | there | 47 |
 | `issuer` | the issuer: makes the sign-ins on machines | service | there | 15 |
 | `relay` | a relay placed in a network Away is not in | relay | later | — |

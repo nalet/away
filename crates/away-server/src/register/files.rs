@@ -7,23 +7,33 @@ use std::sync::{Arc, RwLock};
 use away_part::lines::Lines;
 use sha2::{Digest, Sha256};
 
-use super::{InForce, Refused};
+use super::{InForce, Refused, LARGEST_PICTURE};
 
 /// How many files a folder may hold, how large one may be, and how deep its folders go.
 const MOST_FILES: usize = 1000;
 const LARGEST: u64 = 1024 * 1024;
 const DEEPEST: usize = 4;
 
-/// Reads every file of machines and rules below a folder: each with its name inside
-/// the folder, in the order of the names.
-pub fn read_folder(folder: &Path) -> Result<Vec<(String, String)>, Refused> {
-    let mut files = Vec::new();
-    collect(folder, folder, 0, &mut files)?;
-    files.sort();
-    Ok(files)
+/// What a folder holds: the files of machines and rules, and the pictures they may
+/// name as icons, each with its name inside the folder, in the order of the names.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Folder {
+    /// The files of machines and rules: `.yaml` and `.yml`.
+    pub files: Vec<(String, String)>,
+    /// The pictures: `.png`.
+    pub pictures: Vec<(String, Vec<u8>)>,
 }
 
-fn collect(root: &Path, folder: &Path, depth: usize, files: &mut Vec<(String, String)>) -> Result<(), Refused> {
+/// Reads every file of machines and rules below a folder, and every picture.
+pub fn read_folder(folder: &Path) -> Result<Folder, Refused> {
+    let mut holds = Folder::default();
+    collect(folder, folder, 0, &mut holds)?;
+    holds.files.sort();
+    holds.pictures.sort();
+    Ok(holds)
+}
+
+fn collect(root: &Path, folder: &Path, depth: usize, holds: &mut Folder) -> Result<(), Refused> {
     let cant = |what: &str, path: &Path, error: std::io::Error| Refused {
         file: path.strip_prefix(root).unwrap_or(path).display().to_string(),
         line: 0,
@@ -44,20 +54,30 @@ fn collect(root: &Path, folder: &Path, depth: usize, files: &mut Vec<(String, St
         let is = std::fs::metadata(&path).map_err(|error| cant("the file", &path, error))?;
         if is.is_dir() {
             if depth < DEEPEST {
-                collect(root, &path, depth + 1, files)?;
+                collect(root, &path, depth + 1, holds)?;
             }
         } else if name.ends_with(".yaml") || name.ends_with(".yml") {
             let below = path.strip_prefix(root).unwrap_or(&path).display().to_string();
             if is.len() > LARGEST {
                 return Err(Refused { file: below, line: 0, why: "the file is larger than a file of the register may be".to_string() });
             }
-            if files.len() >= MOST_FILES {
+            if holds.files.len() + holds.pictures.len() >= MOST_FILES {
                 return Err(Refused { file: below, line: 0, why: format!("the folder holds more than {MOST_FILES} files") });
             }
             let text = std::fs::read(&path).map_err(|error| cant("the file", &path, error))?;
             let text =
                 String::from_utf8(text).map_err(|_| Refused { file: below.clone(), line: 0, why: "the file is not text".to_string() })?;
-            files.push((below, text));
+            holds.files.push((below, text));
+        } else if name.ends_with(".png") {
+            // a picture, which a program may name as its icon
+            let below = path.strip_prefix(root).unwrap_or(&path).display().to_string();
+            if is.len() > LARGEST_PICTURE as u64 {
+                return Err(Refused { file: below, line: 0, why: format!("the picture is larger than {} KiB", LARGEST_PICTURE / 1024) });
+            }
+            if holds.files.len() + holds.pictures.len() >= MOST_FILES {
+                return Err(Refused { file: below, line: 0, why: format!("the folder holds more than {MOST_FILES} files") });
+            }
+            holds.pictures.push((below, std::fs::read(&path).map_err(|error| cant("the picture", &path, error))?));
         }
     }
     Ok(())
@@ -120,13 +140,14 @@ impl Register {
         let Some(folder) = &self.folder else { return };
         let read = read_folder(folder);
         let seen: [u8; 32] = match &read {
-            Ok(files) => {
+            Ok(folder) => {
                 let mut sum = Sha256::new();
-                for (name, text) in files {
+                let texts = folder.files.iter().map(|(name, text)| (name, text.as_bytes()));
+                for (name, holds) in texts.chain(folder.pictures.iter().map(|(name, bytes)| (name, bytes.as_slice()))) {
                     sum.update((name.len() as u64).to_le_bytes());
                     sum.update(name);
-                    sum.update((text.len() as u64).to_le_bytes());
-                    sum.update(text);
+                    sum.update((holds.len() as u64).to_le_bytes());
+                    sum.update(holds);
                 }
                 sum.finalize().into()
             }
@@ -136,7 +157,8 @@ impl Register {
         if self.state.read().unwrap_or_else(|poisoned| poisoned.into_inner()).seen == Some(seen) {
             return;
         }
-        let applied = read.and_then(|files| InForce::read(&files).map(|in_force| (in_force, files.len())));
+        let applied = read
+            .and_then(|folder| InForce::read_with_pictures(&folder.files, &folder.pictures).map(|in_force| (in_force, folder.files.len())));
         let mut state = self.state.write().unwrap_or_else(|poisoned| poisoned.into_inner());
         state.seen = Some(seen);
         match applied {
@@ -205,10 +227,18 @@ mod tests {
         folder.write("README.md", "not a file of the register");
         folder.write("..data/machines/engineering.yaml", "what a cluster keeps for itself");
         folder.write(".hidden.yaml", "machines: wrong\n");
-        let files = read_folder(&folder.0).unwrap();
-        let names: Vec<&str> = files.iter().map(|(name, _)| name.as_str()).collect();
+        std::fs::write(folder.0.join("machines/build.png"), b"\x89PNG\r\n\x1a\nthe rest of a picture").expect("a picture");
+        let holds = read_folder(&folder.0).unwrap();
+        let names: Vec<&str> = holds.files.iter().map(|(name, _)| name.as_str()).collect();
         assert_eq!(names, ["machines/engineering.yaml", "machines/more.yml", "rules/access.yaml"]);
-        assert_eq!(files[0].1, MACHINE);
+        assert_eq!(holds.files[0].1, MACHINE);
+        // a picture is taken too, for a program to name as its icon
+        assert_eq!(holds.pictures.len(), 1);
+        assert_eq!((holds.pictures[0].0.as_str(), holds.pictures[0].1.len()), ("machines/build.png", 29));
+        // one that is larger than a picture of the files may be refuses the set
+        std::fs::write(folder.0.join("vast.png"), vec![0u8; LARGEST_PICTURE + 1]).expect("a picture");
+        assert_eq!(read_folder(&folder.0).unwrap_err().to_string(), "vast.png: the picture is larger than 256 KiB");
+        std::fs::remove_file(folder.0.join("vast.png")).expect("removed");
         // a folder that is not there
         let missing = read_folder(&folder.0.join("nothing-here")).unwrap_err();
         assert!(missing.why.starts_with("the folder of files can't be read: "), "{}", missing.why);

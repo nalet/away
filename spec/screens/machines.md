@@ -77,6 +77,8 @@ It draws what the first release holds of
 
 - Every program of every machine one may reach is here, whichever machine
   offers it, in the order of the administrator's files.
+- A program that the administrator's files give an icon shows that picture in
+  place of the drawn window, here and wherever its tile is.
 - The field at the top of the page finds a program by its name, and by its
   machine.
 
@@ -210,7 +212,7 @@ It draws what the first release holds of
 |---|---|
 | 4.1 Home, on a computer | [See the machines used last](../capabilities/app.md#finding-a-machine), [Mark machines and programs as favourites, and see them on home](../capabilities/app.md#finding-a-machine) |
 | 4.2 The machines, on a computer | [See the machines one may reach, on a page of their own](../capabilities/app.md#finding-a-machine), [See the machines in the groups an administrator made](../capabilities/app.md#finding-a-machine), [Mark machines and programs as favourites, and see them on home](../capabilities/app.md#finding-a-machine) |
-| 4.3 The programs, on a computer | [See every program one may open on a page of their own, each as an entry, and find it by its name](../capabilities/app.md#finding-a-machine), [Mark machines and programs as favourites, and see them on home](../capabilities/app.md#finding-a-machine) |
+| 4.3 The programs, on a computer | [See every program one may open on a page of their own, each as an entry, and find it by its name](../capabilities/app.md#finding-a-machine), [Mark machines and programs as favourites, and see them on home](../capabilities/app.md#finding-a-machine), [Give a program an icon of its own, which people know it by](../capabilities/admin.md#the-register-of-machines) |
 | 4.4 A machine's menu | [Choose how to open a machine that offers more than one way: its desktop, its programs, its shell](../capabilities/app.md#finding-a-machine), [Open a session in a browser tab or window of its own](../capabilities/session.md#opening-a-machine), [Open a machine from a link or a bookmark](../capabilities/app.md#finding-a-machine), [See what a machine is: its kind, its address, how one gets in](../capabilities/app.md#finding-a-machine) |
 | 4.5 The search, with what it found | [Find a machine by its name, its address or its group](../capabilities/app.md#finding-a-machine), [Find a machine by its name from any page](../capabilities/app.md#the-frame) |
 | 4.6 The search found nothing | [Find a machine by its name, its address or its group](../capabilities/app.md#finding-a-machine) |

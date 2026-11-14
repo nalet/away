@@ -7,13 +7,19 @@ export interface Way {
   over?: 'rdp' | 'vnc';
 }
 
+// A program of a Windows machine: its name, and where its icon is, where it has one.
+export interface Program {
+  name: string;
+  icon: string | null;
+}
+
 export interface Machine {
   name: string;
   kind: 'windows' | 'linux' | 'mac';
   address: string;
   groups: string[];
   desktop: Way | null;
-  programs: string[];
+  programs: Program[];
   shell: Way | null;
   collection: string | null;
 }
@@ -99,7 +105,7 @@ export function matches(machine: Machine, sought: string): boolean {
 // What people open: a machine, by its desktop or its shell, or one program of a machine.
 export interface Entry {
   machine: Machine;
-  program: string | null;
+  program: Program | null;
 }
 
 // Everything one may open on these machines, each as an entry of its own: the machines
@@ -116,5 +122,5 @@ export function entriesOf(machines: Machine[]): Entry[] {
 // machine's name, address or groups.
 export function found(entry: Entry, sought: string): boolean {
   const words = sought.trim().toLowerCase();
-  return (entry.program?.toLowerCase().includes(words) ?? false) || matches(entry.machine, sought);
+  return (entry.program?.name.toLowerCase().includes(words) ?? false) || matches(entry.machine, sought);
 }

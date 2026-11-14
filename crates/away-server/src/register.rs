@@ -10,7 +10,10 @@
 //!     address: fin-app-02.corp.example
 //!     groups: [finance]
 //!     desktop: true
-//!     programs: [Ledger, Payroll]
+//!     programs:
+//!       - Ledger
+//!       - name: Payroll
+//!         icon: icons/payroll.png
 //!   - name: build-01
 //!     kind: linux
 //!     address: build-01.corp.example
@@ -29,8 +32,10 @@ pub mod files;
 pub mod yaml;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use away_part::json::Json;
+use sha2::{Digest, Sha256};
 
 use crate::register::yaml::{Node, Value};
 
@@ -73,6 +78,22 @@ impl Over {
     }
 }
 
+/// A program of a Windows machine that opens in windows of its own.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Program {
+    /// The name people know it by.
+    pub name: String,
+    /// Its icon, where the files give it one: the name the picture is asked for by,
+    /// which is made from the picture itself.
+    pub icon: Option<String>,
+}
+
+/// The largest a picture of the files may be, in bytes.
+pub const LARGEST_PICTURE: usize = 256 * 1024;
+
+/// What a PNG picture begins with.
+const PNG: &[u8] = b"\x89PNG\r\n\x1a\n";
+
 /// One machine.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Machine {
@@ -87,7 +108,7 @@ pub struct Machine {
     /// Its desktop, where it offers one: what it is reached over, and on which port.
     pub desktop: Option<(Over, u16)>,
     /// The programs of a Windows machine that open in windows of their own.
-    pub programs: Vec<String>,
+    pub programs: Vec<Program>,
     /// Its shell, where it offers one: the port.
     pub shell: Option<u16>,
     /// The collection of a farm of Windows machines that this entry stands for.
@@ -141,6 +162,9 @@ pub struct InForce {
     pub machines: Vec<Machine>,
     /// The rules.
     pub rules: Vec<Rule>,
+    /// The pictures the machines' programs name as their icons, each by the name it is
+    /// asked for by.
+    pub pictures: BTreeMap<String, Arc<Vec<u8>>>,
 }
 
 /// The longest a name, an address or a group may be.
@@ -271,8 +295,15 @@ impl InForce {
     /// Reads a set of files: each with its name inside the folder, and what it holds.
     /// Gives what they say, or the first thing that is wrong with them.
     pub fn read(files: &[(String, String)]) -> Result<InForce, Refused> {
+        InForce::read_with_pictures(files, &[])
+    }
+
+    /// Reads a set of files, and the pictures of the folder that the files may name as
+    /// icons: each picture with its name inside the folder, and its bytes.
+    pub fn read_with_pictures(files: &[(String, String)], pictures: &[(String, Vec<u8>)]) -> Result<InForce, Refused> {
         let mut machines: Vec<Machine> = Vec::new();
         let mut rules: Vec<Rule> = Vec::new();
+        let mut named: BTreeMap<String, Arc<Vec<u8>>> = BTreeMap::new();
         for (file, text) in files {
             let Some(whole) = yaml::read(text).map_err(|(line, why)| refused(file, line, why))? else { continue };
             let holds = Parts::of(
@@ -292,7 +323,7 @@ impl InForce {
                 };
                 for node in listed {
                     if read == 0 {
-                        let machine = machine(file, node)?;
+                        let machine = machine(file, node, pictures, &mut named)?;
                         if let Some(other) = machines.iter().find(|other| same(&other.name, &machine.name)) {
                             let (in_file, line) = &other.written_in;
                             return Err(refused(
@@ -345,7 +376,7 @@ impl InForce {
                 }
             }
         }
-        Ok(InForce { machines, rules })
+        Ok(InForce { machines, rules, pictures: named })
     }
 
     /// The machines that someone of these groups reaches, each with the rules that give
@@ -363,8 +394,68 @@ impl InForce {
     }
 }
 
+/// Reads the programs of a machine: each a name alone, or a name and an icon. An icon is
+/// a PNG picture of the folder, named by where it is in the folder.
+fn programs(
+    file: &str,
+    node: Option<&Node>,
+    of: &str,
+    pictures: &[(String, Vec<u8>)],
+    named: &mut BTreeMap<String, Arc<Vec<u8>>>,
+) -> Result<Vec<Program>, Refused> {
+    let Some(node) = node else { return Ok(Vec::new()) };
+    let listed = match &node.value {
+        Value::List(listed) => listed.as_slice(),
+        Value::Text(nothing) if nothing.is_empty() => &[],
+        _ => return Err(refused(file, node.line, format!("the programs of {of} are a list: of names, or of names with their icons"))),
+    };
+    let mut programs: Vec<Program> = Vec::new();
+    for node in listed {
+        let (name, icon) = match &node.value {
+            Value::Thing(_) => {
+                let parts = Parts::of(file, node, &["name", "icon"], "a program", "")?;
+                let Some((name, _)) = parts.text("name", &format!("a program of {of}"))? else {
+                    return Err(refused(file, node.line, format!("a program of {of} has no name")));
+                };
+                let icon = parts.text("icon", &format!("the program {name}"))?;
+                (name, icon)
+            }
+            Value::Text(text) if !text.trim().is_empty() && text.chars().count() <= LONGEST && !text.chars().any(char::is_control) => {
+                (text.trim().to_string(), None)
+            }
+            _ => return Err(refused(file, node.line, format!("a program of {of} is a name, or a name with its icon"))),
+        };
+        if programs.iter().any(|other| same(&other.name, &name)) {
+            return Err(refused(file, node.line, format!("“{name}” is twice among the programs of {of}")));
+        }
+        let icon = match icon {
+            None => None,
+            Some((path, line)) => {
+                let Some((_, picture)) = pictures.iter().find(|(its, _)| *its == path) else {
+                    return Err(refused(file, line, format!("the icon of {name} is “{path}”, and the folder holds no picture of that name: a PNG picture, named by where it is in the folder")));
+                };
+                if !picture.starts_with(PNG) {
+                    return Err(refused(file, line, format!("the icon of {name}, “{path}”, is no PNG picture")));
+                }
+                // a picture is asked for by a name made from the picture itself, so that a
+                // browser may keep it for as long as it likes
+                let sum: String = Sha256::digest(picture).iter().take(16).map(|byte| format!("{byte:02x}")).collect();
+                named.entry(sum.clone()).or_insert_with(|| Arc::new(picture.clone()));
+                Some(sum)
+            }
+        };
+        programs.push(Program { name, icon });
+    }
+    Ok(programs)
+}
+
 /// Reads one machine.
-fn machine(file: &str, node: &Node) -> Result<Machine, Refused> {
+fn machine(
+    file: &str,
+    node: &Node,
+    pictures: &[(String, Vec<u8>)],
+    named: &mut BTreeMap<String, Arc<Vec<u8>>>,
+) -> Result<Machine, Refused> {
     let may_hold = ["name", "kind", "address", "groups", "desktop", "programs", "shell", "collection", "served-by"];
     let shape = "a machine is written as its name, its kind, its address and its ways in, beginning with “- name:”";
     let parts = Parts::of(file, node, &may_hold, "a machine", shape)?;
@@ -412,7 +503,7 @@ fn machine(file: &str, node: &Node) -> Result<Machine, Refused> {
         return Err(refused(file, line, format!("the desktop of {name} is reached over what a {} machine doesn't speak", kind.written())));
     }
     let shell = parts.way("shell", of, 22, false)?.map(|(_, port)| port);
-    let programs: Vec<String> = parts.texts("programs", of)?.into_iter().map(|(program, _)| program).collect();
+    let programs = programs(file, parts.get("programs"), of, pictures, named)?;
     if !programs.is_empty() && kind != Kind::Windows {
         let line = parts.get("programs").map_or(node.line, |node| node.line);
         return Err(refused(file, line, format!("{name} names programs, which only a Windows machine has")));
@@ -502,7 +593,18 @@ impl Machine {
             ("address", self.address.as_str().into()),
             ("groups", Json::List(self.groups.iter().map(|group| group.as_str().into()).collect())),
             ("desktop", self.desktop.map_or(Json::Null, |(over, port)| way(Some(over), port))),
-            ("programs", Json::List(self.programs.iter().map(|program| program.as_str().into()).collect())),
+            (
+                "programs",
+                Json::List(
+                    self.programs
+                        .iter()
+                        .map(|program| {
+                            let icon = program.icon.as_ref().map_or(Json::Null, |sum| format!("/api/icons/{sum}.png").into());
+                            Json::object([("name", program.name.as_str().into()), ("icon", icon)])
+                        })
+                        .collect(),
+                ),
+            ),
             ("shell", self.shell.map_or(Json::Null, |port| way(None, port))),
             ("collection", self.collection.as_deref().map_or(Json::Null, Json::from)),
         ])
@@ -594,7 +696,8 @@ rules:
         let named = |name: &str| in_force.machines.iter().find(|machine| machine.name == name).unwrap();
         let fin = named("fin-app-02");
         assert_eq!((fin.kind, fin.address.as_str(), fin.desktop), (Kind::Windows, "fin-app-02.corp.example", Some((Over::Rdp, 3389))));
-        assert_eq!(fin.programs, ["Ledger", "Payroll", "Reports", "Mail"]);
+        assert_eq!(fin.programs.iter().map(|program| program.name.as_str()).collect::<Vec<_>>(), ["Ledger", "Payroll", "Reports", "Mail"]);
+        assert!(fin.programs.iter().all(|program| program.icon.is_none()) && in_force.pictures.is_empty());
         assert_eq!(fin.written_in, ("machines/finance.yaml".to_string(), 3));
         assert_eq!(named("hr-app-01").desktop, Some((Over::Rdp, 3390)));
         assert_eq!((named("build-01").desktop, named("build-01").shell), (None, Some(22)));
@@ -755,6 +858,58 @@ rules:
         assert_eq!((twice.file.as_str(), twice.why.as_str()), ("b.yaml", "the rule design-mac is also written in a.yaml, line 8"));
         // and a file that is not YAML at all
         assert!(why("machines:\n  - name: a\n   kind: linux\n").why.starts_with("it is not YAML: "));
+    }
+
+    #[test]
+    fn a_program_names_its_icon_and_the_picture_is_held_under_a_name_made_from_itself() {
+        let machine = "machines:\n  - name: fin-app-03\n    kind: windows\n    address: a.example\n    programs:\n      - name: Ledger\n        icon: icons/ledger.png\n      - Payroll\n      - name: Reports\n        icon: icons/ledger.png\n";
+        let picture = [PNG, b"the rest of a picture"].concat();
+        let pictures = vec![("icons/ledger.png".to_string(), picture.clone()), ("icons/unused.png".to_string(), PNG.to_vec())];
+        let in_force = InForce::read_with_pictures(&files(&[("a.yaml", machine)]), &pictures).unwrap();
+        let programs = &in_force.machines[0].programs;
+        let sum = programs[0].icon.clone().expect("an icon");
+        assert_eq!((sum.len(), sum.chars().all(|c| c.is_ascii_hexdigit())), (32, true));
+        assert_eq!((programs[1].icon.as_ref(), programs[2].icon.as_ref()), (None, Some(&sum)));
+        // one picture, held once, and none that no program names
+        assert_eq!(in_force.pictures.len(), 1);
+        assert_eq!(in_force.pictures[&sum].as_ref(), &picture);
+        let told = in_force.machines[0].for_a_person().write();
+        assert!(
+            told.contains(&format!(r#""programs":[{{"name":"Ledger","icon":"/api/icons/{sum}.png"}},{{"name":"Payroll","icon":null}},"#)),
+            "{told}"
+        );
+
+        let wrong =
+            |file: &str, pictures: &[(String, Vec<u8>)]| InForce::read_with_pictures(&files(&[("a.yaml", file)]), pictures).unwrap_err();
+        let reasons: [(&str, usize, &str); 6] = [
+            (
+                "icons/ledgr.png",
+                7,
+                "the icon of Ledger is “icons/ledgr.png”, and the folder holds no picture of that name: a PNG picture, named by where it is in the folder",
+            ),
+            ("icons/text.png", 7, "the icon of Ledger, “icons/text.png”, is no PNG picture"),
+            ("", 7, "the icon of the program Ledger is empty"),
+            ("ICN", 7, "“icn” is not something a program has"),
+            ("TWICE", 8, "“ledger” is twice among the programs of fin-app-03"),
+            ("NONAME", 6, "a program of fin-app-03 has no name"),
+        ];
+        let text = vec![("icons/text.png".to_string(), b"not a picture".to_vec())];
+        for (case, line, reason) in reasons {
+            let file = match case {
+                "ICN" => {
+                    machine.replace("        icon: icons/ledger.png\n      - Payroll", "        icn: icons/ledger.png\n      - Payroll")
+                }
+                "TWICE" => machine.replace("      - Payroll", "      - ledger"),
+                "NONAME" => machine.replace("      - name: Ledger\n        icon: icons/ledger.png", "      - icon: icons/ledger.png"),
+                path => machine.replacen("icon: icons/ledger.png", &format!("icon: {path}"), 1),
+            };
+            let refused = wrong(&file, if case == "icons/text.png" { &text } else { &pictures });
+            assert_eq!((refused.line, refused.why.as_str()), (line, reason), "{case}");
+        }
+        assert_eq!(
+            wrong("machines:\n  - name: a\n    kind: windows\n    address: a.example\n    programs: Ledger\n", &[]).why,
+            "the programs of a are a list: of names, or of names with their icons"
+        );
     }
 
     #[test]

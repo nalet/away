@@ -182,6 +182,12 @@ test('home shows the machines a rule gives, in their groups, and a person sees n
     ['Reports', 'program on fin-app-02'],
     ['Mail', 'program on fin-app-02'],
   ]);
+  // a program that the files give an icon shows it, as a picture that Away itself serves
+  const icon = page.getByRole('link', { name: /^Ledger/ }).locator('img.icon');
+  await expect(icon).toHaveAttribute('src', /^\/api\/icons\/[0-9a-f]{32}\.png$/);
+  expect(await icon.evaluate((picture: HTMLImageElement) => picture.complete && picture.naturalWidth)).toBe(32);
+  await expect(page.getByRole('link', { name: /^Payroll/ }).locator('img')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /^Payroll/ }).locator('svg')).toHaveCount(1);
   // a program leads to the page of its machine
   await page.getByRole('link', { name: /^Ledger/ }).click();
   await expect(page).toHaveURL(`${AWAY}/machines/fin-app-02`);
@@ -243,6 +249,7 @@ test('a machine has a page of its own, which says what it offers and what it is'
   await expect(page.getByRole('region', { name: 'desktop' })).toContainText('Windows desktop');
   const programs = page.getByRole('region', { name: 'programs 4' });
   await expect(programs.getByRole('listitem')).toHaveText(['Ledger', 'Payroll', 'Reports', 'Mail']);
+  await expect(programs.getByRole('listitem').nth(0).locator('img.icon')).toHaveAttribute('src', /^\/api\/icons\/[0-9a-f]{32}\.png$/);
   await expect(page.getByRole('region', { name: 'shell' })).toHaveCount(0);
   const about = page.getByRole('region', { name: 'about this machine' });
   await expect(about).toContainText('What it isWindows machine');
@@ -356,7 +363,7 @@ test('a changed file with a mistake in it is refused with its line and its reaso
       await page.reload();
       await expect(refused).toBeVisible({ timeout: 1000 });
     }).toPass({ timeout: 20_000 });
-    await expect(refused).toContainText('In line 19, “prot” is not something a machine has. What was in force before stays.');
+    await expect(refused).toContainText('In line 24, “prot” is not something a machine has. What was in force before stays.');
     await expect(page.getByRole('table', { name: 'machines' }).getByRole('row')).toHaveCount(8);
     await accessible(page);
     // and people go on seeing what they saw

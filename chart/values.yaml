@@ -35,7 +35,10 @@ contact: ""
 # with --set-file, or in a file of values. Away applies a change as it arrives, whole or
 # not at all.
 files: {}
-# Or a ConfigMap of one's own that holds the files, each under its name.
+# The pictures the files name as icons: each entry is a picture's name, such as
+# icons/ledger.png, and the picture itself in Base64. PNG, 256 KiB at most each.
+pictures: {}
+# Or a ConfigMap of one's own that holds the files and the pictures, each under its name.
 filesConfigMap: ""
 
 image:

@@ -149,7 +149,8 @@ Everything an installation is told is one of these. The chart's
 | `recordReaders` | the groups whose people read its records | none |
 | `contact` | whom people turn to when something fails | none |
 | `files` | the machines, their groups and the rules, as files: each entry a file's name and what it holds ([the machines and the rules](./machines.md)) | none: Away knows no machines |
-| `filesConfigMap` | a ConfigMap of one's own that holds those files, in place of `files` | none |
+| `pictures` | the pictures the files name as icons: each entry a picture's name and the picture in Base64 | none |
+| `filesConfigMap` | a ConfigMap of one's own that holds those files and pictures, in place of `files` and `pictures` | none |
 | `image.repository`, `image.tag`, `image.digest` | the image; a digest goes before a tag | the project's image, in the chart's version |
 | `image.pullSecrets` | secrets to pull the image with | none |
 | `ingress.enabled` | make an ingress | no |

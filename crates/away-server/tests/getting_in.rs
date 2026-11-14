@@ -189,10 +189,27 @@ fn every_person_is_told_the_machines_a_rule_gives_them_and_no_others() {
     assert_eq!(names(&told, "machines"), ["build-01", "build-02", "dev-linux-03", "mac-design-01", "Desktops", "fin-app-02", "hr-app-01"]);
     let Some(Json::List(listed)) = told.get("machines") else { panic!() };
     let fin = listed.iter().find(|machine| machine.text_of("name") == Some("fin-app-02")).expect("fin-app-02");
+    // a program with an icon names where the picture is: an address made from the picture itself
+    let picture = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/files/icons/ledger.png")).expect("the tests' icon");
+    let icon = {
+        use sha2::{Digest, Sha256};
+        let sum: String = Sha256::digest(&picture).iter().take(16).map(|byte| format!("{byte:02x}")).collect();
+        format!("/api/icons/{sum}.png")
+    };
     assert_eq!(
         fin.write(),
-        r#"{"name":"fin-app-02","kind":"windows","address":"fin-app-02.corp.example","groups":["finance"],"desktop":{"port":3389,"over":"rdp"},"programs":["Ledger","Payroll","Reports","Mail"],"shell":null,"collection":null}"#
+        format!(
+            r#"{{"name":"fin-app-02","kind":"windows","address":"fin-app-02.corp.example","groups":["finance"],"desktop":{{"port":3389,"over":"rdp"}},"programs":[{{"name":"Ledger","icon":"{icon}"}},{{"name":"Payroll","icon":null}},{{"name":"Reports","icon":null}},{{"name":"Mail","icon":null}}],"shell":null,"collection":null}}"#
+        )
     );
+    // the picture itself: for those who are signed in, as the picture it is, to be kept
+    let head = browser.ask("HEAD", &format!("{}{icon}", world.away), &[]);
+    assert_eq!(head.status, 200);
+    assert_eq!(head.header("content-type"), Some("image/png"));
+    assert_eq!(head.header("content-length"), Some(picture.len().to_string().as_str()));
+    assert_eq!(head.header("cache-control"), Some("private, max-age=31536000, immutable"));
+    assert_eq!(browser.get(&format!("{}/api/icons/0000.png", world.away)).status, 404);
+    assert_eq!(Browser::default().get(&format!("{}{icon}", world.away)).status, 401);
     assert!(
         !told.write().contains("yaml") && !told.write().contains("rdsh-01"),
         "a person is not told of files, nor of the machines behind a collection"
