@@ -10,7 +10,8 @@
 //! `GOOD_FOR` how many seconds a sign-in is good for before it is renewed, and
 //! `ROLE=person` signs in somebody who administers nothing. `SIGN_IN_PORT` puts the
 //! stand-in at a port that is known, so that a test can tell it how to behave, and
-//! `SIGN_IN=absent` tells the server of a sign-in service that isn't there.
+//! `SIGN_IN=absent` tells the server of a sign-in service that isn't there. `FILES`
+//! names a folder of machines and rules; without it the server takes the tests' own.
 
 use std::time::Duration;
 
@@ -61,6 +62,7 @@ async fn main() -> std::io::Result<()> {
             looks_every: Duration::from_secs(5),
         }),
         contact: Some("it-help@example.com".to_string()),
+        files: Some(said("FILES").unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/files").to_string()).into()),
     };
 
     let lines = Lines::to_output("server");

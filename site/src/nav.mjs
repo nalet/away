@@ -21,6 +21,7 @@ const SECTIONS = [
     pages: [
       ['docs/README.md', 'documentation'],
       ['docs/install.md', 'installing away'],
+      ['docs/machines.md', 'machines and rules'],
       ['docs/build.md', 'building and checking'],
       ['docs/libraries.md', 'the libraries'],
       ['docs/model.md', 'changing the model'],

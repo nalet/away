@@ -46,8 +46,8 @@ The rules: which people reach which machines, and what they may do there. For th
 | Allow a group of people to reach a machine or a group of machines | admin | v1 | `allow-by-group` |
 | Show a person only the machines a rule gives them | system | v1 | `show-only-allowed` |
 | See what a person reaches, and by which rule | admin | v1 | `see-who-reaches` |
-| Take people and their groups from the identity provider, and keep none of its own | system | v1 | `take-people-from-provider` |
-| Say who administers Away, who reads its records, and who only connects | admin | v1 | `name-roles` |
+| Take people and their groups from the identity provider, and keep none of its own | system | built | `take-people-from-provider` |
+| Say who administers Away, who reads its records, and who only connects | admin | built | `name-roles` |
 | Allow or forbid the clipboard, in each direction | admin | v1 | `limit-clipboard` |
 | Allow or forbid moving files, in each direction | admin | later | `limit-files` |
 | Allow or forbid printing, sound and the microphone | admin | later | `limit-other-channels` |

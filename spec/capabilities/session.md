@@ -151,7 +151,7 @@ Working without a keyboard and a mouse: touch, the keys a phone lacks, a small s
 
 | Capability | Who | RDP | VNC | SSH | Away | Key |
 |---|---|---|---|---|---|---|
-| Find a machine and open it on a phone, with every page fitted to it | person | — | — | — | v1 | `use-on-phone` |
+| Find a machine and open it on a phone, with every page fitted to it | person | — | — | — | built | `use-on-phone` |
 | Work by touch: tap to click, hold for the other button, two fingers to scroll | person | v1 | v1 | v1 | — | `work-by-touch` |
 | Zoom into the picture with two fingers and move around it | person | v1 | v1 | v1 | — | `zoom-by-touch` |
 | Use the keys a phone's keyboard lacks: Ctrl, Alt, Esc, Tab, the arrows, the function keys | person | v1 | v1 | v1 | — | `use-extra-keys` |

@@ -1,5 +1,5 @@
-// The pages inside the frame. This version signs people in and knows no machines, so
-// home, the sessions and the administration say that there is nothing yet.
+// The pages inside the frame that are neither home nor the administration: the sessions,
+// of which this version opens none, the settings, and what Away says of itself.
 import { Button, Card, Code, Divider, EmptyState, Input, Table } from '@nalet/design-system';
 import { ArrowLeft, ChevronRight, Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -9,29 +9,11 @@ import { texts } from './texts';
 import { askBuiltFrom } from './who';
 import type { Part, Who } from './who';
 
-export function Home() {
-  return (
-    <div className="fill">
-      <h1 className="unseen">{texts.views.home}</h1>
-      <EmptyState illustration="empty" size="lg" title={texts.home.title} description={texts.home.why} />
-    </div>
-  );
-}
-
 export function Sessions() {
   return (
     <div className="fill">
       <h1 className="unseen">{texts.views.sessions}</h1>
       <EmptyState illustration="empty" size="lg" title={texts.sessions.title} />
-    </div>
-  );
-}
-
-export function Administration() {
-  return (
-    <div className="fill">
-      <h1 className="unseen">{texts.views.administration}</h1>
-      <EmptyState illustration="empty" size="lg" title={texts.administration.title} description={texts.administration.why} />
     </div>
   );
 }

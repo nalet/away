@@ -24,8 +24,9 @@ library has no line that says what it is for.
 | [sha1](https://crates.io/crates/sha1) | the second hash that the taking of a licence makes its keys and its checks with | 0.11.0 | — |
 | [num-bigint](https://crates.io/crates/num-bigint) | does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is | 0.5.1 | — |
 | [getrandom](https://crates.io/crates/getrandom) | takes random bytes from the system, for keys and for numbers used once | 0.2.17, 0.4.3 | — |
+| [saphyr-parser](https://crates.io/crates/saphyr-parser) | reads the files of machines and rules, which are YAML, and knows the line each thing is written in | 0.3.4 | — |
 
-Away names 16 libraries. With what they bring with them, a build holds 76 in all, each in the version Cargo.lock names.
+Away names 17 libraries. With what they bring with them, a build holds 80 in all, each in the version Cargo.lock names.
 <!-- end: libraries -->
 
 ## The pages

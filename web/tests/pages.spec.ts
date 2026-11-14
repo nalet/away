@@ -3,7 +3,9 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page, Request } from '@playwright/test';
 
-import { AWAY, AWAY_WITHOUT_SERVICE, SIGN_IN_SERVICE } from '../playwright.config';
+import { readFileSync, writeFileSync } from 'node:fs';
+
+import { AWAY, AWAY_WITHOUT_SERVICE, FILES, SIGN_IN_SERVICE } from '../playwright.config';
 
 // Tells the stand-in for the sign-in service how to behave from now on.
 async function service(told: Record<string, string>) {
@@ -52,7 +54,7 @@ test('someone who opens Away is signed in and sees the frame, and the pages load
   await expect(rail.getByRole('link')).toHaveCount(4);
   await expect(rail.getByRole('link', { name: 'home' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { level: 1, name: 'home' })).toBeAttached();
-  await expect(page.getByRole('heading', { level: 2, name: 'nothing to open yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'engineering 3' })).toBeVisible();
 
   // the page comes with the rule that lets a browser load Away's own files, and nothing else
   expect(first?.headers()['content-security-policy']).toBe(
@@ -155,6 +157,174 @@ test('what Away is built from is said only to those who are signed in', async ({
   expect((await request.get(`${AWAY}/licence.txt`)).status()).toBe(200);
 });
 
+// The tiles of a group on home: each machine's name and what it is.
+async function tiles(page: Page, group: string) {
+  const section = page.locator('section.grp').filter({ has: page.getByRole('heading', { level: 2, name: group }) });
+  return section.getByRole('link').evaluateAll((links) => links.map((link) => [link.querySelector('.name')?.textContent, link.querySelector('.sub')?.textContent]));
+}
+
+test('home shows the machines a rule gives, in their groups, and a person sees no others', async ({ page }) => {
+  const { complaints } = watch(page);
+  await page.goto('/');
+  // an administrator of the tests is in staff and in away-admins: both rules give
+  await expect(page.locator('section.grp h2')).toHaveText(['design 1', 'engineering 3', 'finance 2', 'other machines 1']);
+  expect(await tiles(page, 'engineering 3')).toEqual([
+    ['build-01', 'shell'],
+    ['build-02', 'shell'],
+    ['dev-linux-03', 'Linux desktop, shell'],
+  ]);
+  expect(await tiles(page, 'finance 2')).toEqual([
+    ['fin-app-02', 'Windows desktop, 4 programs'],
+    ['hr-app-01', 'Windows desktop'],
+  ]);
+  expect(await tiles(page, 'design 1')).toEqual([['mac-design-01', 'Mac desktop']]);
+  expect(await tiles(page, 'other machines 1')).toEqual([['Desktops', 'Windows desktop']]);
+  expect(complaints).toEqual([]);
+  await accessible(page);
+
+  // someone who is in staff alone: what the one rule gives
+  await service({ person: 'person' });
+  await page.goto('/sign-in?to=/');
+  await expect(page.getByRole('button', { name: 'Robin Meyer, your account' })).toBeVisible();
+  await expect(page.locator('section.grp h2')).toHaveText(['finance 2', 'other machines 1']);
+  await expect(page.getByRole('link', { name: /build-01/ })).toHaveCount(0);
+  // and a machine that no rule gives them is not there for them, by its address either
+  await page.goto('/machines/build-01');
+  await expect(page.getByRole('heading', { name: 'no machine of that name for you' })).toBeVisible();
+  await expect(page.getByText("It doesn't exist, or no rule gives it to you.")).toBeVisible();
+  await accessible(page);
+  await page.getByRole('link', { name: 'go home' }).click();
+  await expect(page).toHaveTitle('home · away');
+});
+
+test('a machine is found by its name, its address or its group', async ({ page }) => {
+  await page.goto('/');
+  const find = page.getByRole('searchbox', { name: 'find a machine…' });
+  const shown = () => page.locator('a.m .name').allTextContents();
+  await find.focus();
+  await page.keyboard.type('BUILD');
+  expect(await shown()).toEqual(['build-01', 'build-02']);
+  // a group's name finds its machines
+  await find.fill('finance');
+  expect(await shown()).toEqual(['fin-app-02', 'hr-app-01']);
+  await expect(page.locator('section.grp h2')).toHaveText(['finance 2']);
+  // and an address its machine
+  await find.fill('farm.corp');
+  expect(await shown()).toEqual(['Desktops']);
+  await find.fill('xyz');
+  await expect(page.getByRole('status')).toContainText('No machine matches “xyz”.');
+  await expect(page.getByRole('status')).toContainText('The search looks at the names, the addresses and the groups of the machines you can reach.');
+  await accessible(page);
+  await find.fill('');
+  expect((await shown()).length).toBe(7);
+});
+
+test('a machine has a page of its own, which says what it offers and what it is', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: /^fin-app-02/ }).click();
+  await expect(page).toHaveURL(`${AWAY}/machines/fin-app-02`);
+  await expect(page).toHaveTitle('fin-app-02 · away');
+  await expect(page.getByRole('heading', { level: 1, name: 'fin-app-02' })).toBeVisible();
+  // it is a page of home
+  await expect(page.getByRole('navigation', { name: 'views' }).getByRole('link', { name: 'home' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByText('This version of Away shows the machines you may reach. It opens none yet.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'desktop' })).toContainText('Windows desktop');
+  const programs = page.getByRole('region', { name: 'programs 4' });
+  await expect(programs.getByRole('listitem')).toHaveText(['Ledger', 'Payroll', 'Reports', 'Mail']);
+  await expect(page.getByRole('region', { name: 'shell' })).toHaveCount(0);
+  const about = page.getByRole('region', { name: 'about this machine' });
+  await expect(about).toContainText('What it isWindows machine');
+  await expect(about).toContainText('Addressfin-app-02.corp.example');
+  await expect(about).toContainText('Groupsfinance');
+  await accessible(page);
+
+  // a link to a machine leads to it, and a farm says its collection
+  await page.goto('/machines/Desktops');
+  await expect(page).toHaveTitle('Desktops · away');
+  await expect(page.getByRole('region', { name: 'about this machine' })).toContainText('CollectionDesktops');
+  await expect(page.getByRole('region', { name: 'about this machine' })).toContainText('Groupsnone');
+  await page.goto('/machines/dev-linux-03');
+  await expect(page.getByRole('region', { name: 'shell' })).toContainText('A shell on the machine');
+  await expect(page.getByRole('region', { name: 'desktop' })).toContainText('Linux desktop');
+
+  // on a phone nothing is wider than the screen
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0);
+  await accessible(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  // and back to the machines, with the keyboard
+  await page.getByRole('main').getByRole('link', { name: 'machines' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(`${AWAY}/`);
+});
+
+test('those who administer see what is in force and the file each thing comes from', async ({ page }) => {
+  await page.goto('/administration');
+  await expect(page.getByRole('tab', { name: 'machines' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText(/^In force since .+, when the files were last applied\. To change a machine, change its file\.$/)).toBeVisible();
+  const machines = page.getByRole('table', { name: 'machines' });
+  await expect(machines.getByRole('row')).toHaveCount(8);
+  await expect(machines.getByRole('row').nth(0)).toHaveText(/machine\s*what it is\s*groups\s*who reaches it\s*file/);
+  const farm = machines.getByRole('row', { name: /^Desktops/ });
+  await expect(farm).toContainText('Windows desktop');
+  await expect(farm).toContainText('staff-finance gives it to staff');
+  await expect(farm).toContainText('machines/engineering.yaml:30');
+  await expect(machines.getByRole('row', { name: /^mac-design-01/ })).toContainText('admins-engineering gives it to away-admins');
+  // filtered by a name, a group or a file
+  await page.getByRole('searchbox', { name: 'filter machines…' }).fill('finance.yaml');
+  await expect(machines.getByRole('row')).toHaveCount(3);
+  await accessible(page);
+
+  // the rules, on a page of their own
+  await page.getByRole('tab', { name: 'rules' }).click();
+  await expect(page).toHaveURL(`${AWAY}/administration/rules`);
+  await expect(page.getByRole('navigation', { name: 'views' }).getByRole('link', { name: 'administration' })).toHaveAttribute('aria-current', 'page');
+  const rules = page.getByRole('table', { name: 'rules' });
+  await expect(rules.getByRole('row')).toHaveText([/rule\s*who\s*reaches\s*file/, /admins-engineering\s*away-admins\s*engineering, mac-design-01\s*rules\/access\.yaml:8/, /staff-finance\s*staff\s*finance, Desktops\s*rules\/access\.yaml:4/]);
+  await expect(page.getByText('To change a rule, change its file.')).toBeVisible();
+  await accessible(page);
+  await page.reload();
+  await expect(page.getByRole('tab', { name: 'rules' })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('a changed file with a mistake in it is refused with its line and its reason, and what was in force stays', async ({ page }) => {
+  const file = `${FILES}/machines/finance.yaml`;
+  const before = readFileSync(file, 'utf8');
+  try {
+    // a machine more, with a part that no machine has
+    writeFileSync(file, `${before}\n  - name: fin-app-03\n    kind: windows\n    address: fin-app-03.corp.example\n    prot: 3389\n    desktop: true\n`);
+    await page.goto('/administration');
+    const refused = page.getByRole('status').filter({ hasText: 'A change to machines/finance.yaml was not applied on ' });
+    await expect(async () => {
+      await page.reload();
+      await expect(refused).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 20_000 });
+    await expect(refused).toContainText('In line 19, “prot” is not something a machine has. What was in force before stays.');
+    await expect(page.getByRole('table', { name: 'machines' }).getByRole('row')).toHaveCount(8);
+    await accessible(page);
+    // and people go on seeing what they saw
+    await page.goto('/');
+    await expect(page.locator('section.grp h2')).toHaveText(['design 1', 'engineering 3', 'finance 2', 'other machines 1']);
+
+    // the mistake put right: the machine is there, and nothing is refused any more
+    writeFileSync(file, `${before}\n  - name: fin-app-03\n    kind: windows\n    address: fin-app-03.corp.example\n    groups: [finance]\n    desktop: true\n`);
+    await expect(async () => {
+      await page.reload();
+      await expect(page.locator('section.grp h2')).toHaveText(['design 1', 'engineering 3', 'finance 3', 'other machines 1'], { timeout: 1000 });
+    }).toPass({ timeout: 20_000 });
+    await page.goto('/administration');
+    await expect(page.getByRole('table', { name: 'machines' }).getByRole('row')).toHaveCount(9);
+    await expect(refused).toHaveCount(0);
+  } finally {
+    writeFileSync(file, before);
+  }
+  // as it was before, for the tests that follow
+  await expect(async () => {
+    await page.goto('/');
+    await expect(page.locator('section.grp h2')).toHaveText(['design 1', 'engineering 3', 'finance 2', 'other machines 1'], { timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+});
+
 test('nothing of the sign-in is in the page: one cookie that no script can read', async ({ page, context }) => {
   await page.goto('/');
   await expect(page).toHaveTitle('home · away');
@@ -177,7 +347,7 @@ test('every view has an address, and back and forward lead through them', async 
   await accessible(page);
   await rail.getByRole('link', { name: 'administration' }).click();
   await expect(page).toHaveURL(`${AWAY}/administration`);
-  await expect(page.getByRole('heading', { name: 'nothing to administer yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'administration' })).toBeVisible();
   await accessible(page);
   await page.goBack();
   await expect(page).toHaveTitle('sessions · away');
@@ -191,7 +361,7 @@ test('every view has an address, and back and forward lead through them', async 
   await page.getByRole('link', { name: 'away, home' }).click();
   await expect(page).toHaveURL(`${AWAY}/`);
   // an address that is nothing says so, inside the frame
-  await page.goto('/machines/no-such-machine');
+  await page.goto('/no-such-page');
   await expect(page.getByRole('heading', { name: 'nothing is at this address' })).toBeVisible();
   await accessible(page);
   await page.getByRole('link', { name: 'go home' }).click();

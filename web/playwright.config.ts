@@ -8,6 +8,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 const inThePipeline = Boolean((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.CI);
 const server = '../target/debug/examples/pages';
+// the machines and the rules of the tests, as a copy that a test may change
+export const FILES = '../target/pages-test-files';
+const withFiles = `rm -rf ${FILES} && cp -R ../crates/away-server/tests/fixtures/files ${FILES} && exec ${server}`;
 
 export const AWAY = 'http://127.0.0.1:18080';
 export const SIGN_IN_SERVICE = 'http://127.0.0.1:18081';
@@ -23,7 +26,7 @@ export default defineConfig({
   use: { baseURL: AWAY, trace: 'retain-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } }],
   webServer: [
-    { command: server, env: { PORT: '18080', SIGN_IN_PORT: '18081' }, url: `${AWAY}/api/who`, reuseExistingServer: !inThePipeline },
+    { command: withFiles, env: { PORT: '18080', SIGN_IN_PORT: '18081', FILES }, url: `${AWAY}/api/who`, reuseExistingServer: !inThePipeline },
     { command: server, env: { PORT: '18082', SIGN_IN: 'absent' }, url: `${AWAY_WITHOUT_SERVICE}/api/who`, reuseExistingServer: !inThePipeline },
   ],
 });

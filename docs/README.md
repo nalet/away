@@ -18,12 +18,15 @@ how far the build is.
 | see in what order it is built | [the work packages](../spec/plan/README.md) |
 | change any of it | [changing the model](./model.md) |
 
-What is built so far is the first work package: the program with its three
-parts, the chart and the pipelines. The second has begun: Away's own RDP code.
+What is built so far: the program with its three parts, the chart and the
+pipelines; Away's own RDP code, proven against real machines; signing in, and
+the frame of the pages; and the machines and the rules as files, with home
+showing each person the machines a rule gives them. No machine is opened yet.
 
 | To | Read |
 |---|---|
 | install what there is | [installing Away](./install.md) |
+| write the machines and the rules | [the machines and the rules](./machines.md) |
 | build it from its source, test it, and check a published image | [building and checking Away](./build.md) |
 | see what it is built from | [the libraries](./libraries.md) |
 | report a security hole | [in private](../SECURITY.md) |

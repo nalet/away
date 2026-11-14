@@ -1,0 +1,14 @@
+# The machines of the finance department, for the tests.
+machines:
+  - name: fin-app-02
+    kind: windows
+    address: fin-app-02.corp.example
+    groups: [finance]
+    desktop: true
+    programs: [Ledger, Payroll, Reports, Mail]
+
+  - name: hr-app-01
+    kind: windows
+    address: hr-app-01.corp.example
+    groups: [finance]
+    desktop: true

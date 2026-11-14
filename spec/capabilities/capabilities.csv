@@ -56,18 +56,18 @@ set-shell-look,shell,"Set the shell's text size, its font and its colours",perso
 open-shell-link,shell,Open a web address the shell shows,person,—,—,later,—,
 split-shell,shell,"Open a further shell on the same machine, beside the first",person,—,—,later,—,
 forward-port,shell,Forward a port through the shell's connection,person,—,—,no,—,Away carries sessions and no other traffic
-use-on-phone,touch,"Find a machine and open it on a phone, with every page fitted to it",person,—,—,—,v1,
+use-on-phone,touch,"Find a machine and open it on a phone, with every page fitted to it",person,—,—,—,built,
 work-by-touch,touch,"Work by touch: tap to click, hold for the other button, two fingers to scroll",person,v1,v1,v1,—,
 zoom-by-touch,touch,Zoom into the picture with two fingers and move around it,person,v1,v1,v1,—,
 use-extra-keys,touch,"Use the keys a phone's keyboard lacks: Ctrl, Alt, Esc, Tab, the arrows, the function keys",person,v1,v1,v1,—,
 touch-as-trackpad,touch,"Move the pointer as on a trackpad, for small targets",person,later,later,—,—,
 send-real-touch,touch,Send touches to the machine as touches,person,later,—,—,—,for a Windows machine's own touch gestures
 add-to-home-screen,touch,Add Away to a phone's home screen and open it like an app,person,—,—,—,later,
-sign-in,signin,Sign in through the organisation's identity provider,person,—,—,—,v1,over OpenID Connect
+sign-in,signin,Sign in through the organisation's identity provider,person,—,—,—,built,over OpenID Connect
 sign-in-with-saml,signin,Sign in through an identity provider that speaks SAML only,person,—,—,—,no,OpenID Connect is the one way in
-stay-signed-in,signin,Stay signed in while the sign-in renews itself,system,—,—,—,v1,
-sign-in-again,signin,"Sign in again when the sign-in has run out, with the open sessions kept",person,—,—,—,v1,
-sign-out,signin,"Sign out, and end the sessions Away opened",person,—,—,—,v1,
+stay-signed-in,signin,Stay signed in while the sign-in renews itself,system,—,—,—,built,
+sign-in-again,signin,"Sign in again when the sign-in has run out, with the open sessions kept",person,—,—,—,built,
+sign-out,signin,"Sign out, and end the sessions Away opened",person,—,—,—,built,
 be-oneself-on-machine,signin,"Be signed in on the machine as oneself, with nothing asked",system,v1,no,v1,—,"a Windows machine in a domain, and a shell that trusts Away; an ordinary account is enough; VNC knows no identity"
 use-kept-secret,signin,Be signed in with a name and password or a key that Away keeps for the machine,system,v1,v1,v1,—,for a machine that knows no directory; the secret never reaches the browser
 type-credentials,signin,Type a name and a password when the machine asks for them,person,v1,v1,v1,—,
@@ -78,13 +78,13 @@ go-on-without-password,signin,Go on from the machine to a further one with nothi
 unlock-without-password,signin,Open a locked desktop again with nothing asked,person,v1,later,—,—,
 be-oneself-cloud-joined,signin,Be signed in as oneself on a Windows machine that is joined to a cloud directory only,system,later,—,—,—,
 check-machine-identity,signin,"Check that a machine is the one it claims to be, and refuse one that changed",system,v1,later,v1,—,
-move-between-views,frame,"Move between the machines, the open sessions and the settings",person,—,—,—,v1,"a rail of icons on a wide screen, a bar of icons on a phone"
+move-between-views,frame,"Move between the machines, the open sessions and the settings",person,—,—,—,built,"a rail of icons on a wide screen, a bar of icons on a phone"
 see-open-sessions,frame,"See the sessions that are open, and go to one",person,—,—,—,v1,
 find-from-anywhere,frame,Find a machine by its name from any page,person,—,—,—,v1,
-see-who-is-signed-in,frame,See which account is signed in,person,—,—,—,v1,
+see-who-is-signed-in,frame,See which account is signed in,person,—,—,—,built,
 use-session-bar,frame,"Reach a session's own controls without leaving it: keys, clipboard, files, size, ending it",person,—,—,—,v1,
 give-session-the-window,frame,Give the machine the whole window while a session is open,system,—,—,—,v1,a session with programs keeps the list of their windows beside them
-use-without-mouse,frame,"Use every page around a session with the keyboard alone, and with a screen reader",person,—,—,—,v1,
+use-without-mouse,frame,"Use every page around a session with the keyboard alone, and with a screen reader",person,—,—,—,built,
 choose-language,frame,Use Away in one's own language,person,—,—,—,later,English first
 see-notices,frame,"Be told what happened meanwhile: a session ended, a request was answered",person,—,—,—,later,
 use-installed-app,frame,"Use an installed app instead of the browser, on a computer or a phone",person,—,—,—,no,the browser is the one way in
@@ -132,8 +132,8 @@ install-helper-on-machine,register,Reach a machine through a helper installed on
 allow-by-group,rules,Allow a group of people to reach a machine or a group of machines,admin,—,—,—,v1,
 show-only-allowed,rules,Show a person only the machines a rule gives them,system,—,—,—,v1,
 see-who-reaches,rules,"See what a person reaches, and by which rule",admin,—,—,—,v1,
-take-people-from-provider,rules,"Take people and their groups from the identity provider, and keep none of its own",system,—,—,—,v1,
-name-roles,rules,"Say who administers Away, who reads its records, and who only connects",admin,—,—,—,v1,
+take-people-from-provider,rules,"Take people and their groups from the identity provider, and keep none of its own",system,—,—,—,built,
+name-roles,rules,"Say who administers Away, who reads its records, and who only connects",admin,—,—,—,built,
 limit-clipboard,rules,"Allow or forbid the clipboard, in each direction",admin,—,—,—,v1,
 limit-files,rules,"Allow or forbid moving files, in each direction",admin,—,—,—,later,
 limit-other-channels,rules,"Allow or forbid printing, sound and the microphone",admin,—,—,—,later,
@@ -169,18 +169,18 @@ see-use-over-time,records,"See how Away is used over time: by whom, which machin
 install-with-chart,install,Install it on Kubernetes or OpenShift with one chart,operator,—,—,—,built,
 run-without-special-rights,install,Run with no special rights on the cluster,system,—,—,—,built,
 install-as-one-container,install,Run it as one container on one machine,operator,—,—,—,later,
-use-own-provider,install,"Use the identity provider that is there, over OpenID Connect",operator,—,—,—,v1,
+use-own-provider,install,"Use the identity provider that is there, over OpenID Connect",operator,—,—,—,built,
 name-account-claim,install,Say which part of a person's sign-in names their account on the machines,operator,—,—,—,v1,"a Windows domain knows a person by a name and an identifier of its own, a shell by another name"
 bring-provider-along,install,Bring an identity provider along for those who have none,operator,—,—,—,no,Away asks an identity provider and is none
-set-address,install,"Set the address it answers on, behind the reverse proxy that is there",operator,—,—,—,partial,"shown behind OpenShift's router, with routes; behind an ingress controller on Kubernetes it is still to be shown"
-use-own-certificates,install,"Use the cluster's certificates, or one's own",operator,—,—,—,partial,shown with the cluster's own certificate; one's own is still to be shown
+set-address,install,"Set the address it answers on, behind the reverse proxy that is there",operator,—,—,—,built,"shown behind OpenShift's router with routes, and behind an ingress controller on Kubernetes"
+use-own-certificates,install,"Use the cluster's certificates, or one's own",operator,—,—,—,built,"shown with the cluster's own certificate behind a router, and with one's own behind an ingress controller"
 connect-domain-authority,install,Choose who issues the sign-ins on a Windows domain's machines: Away's own authority or the organisation's,operator,—,—,—,v1,Away's own is made known to the domain once; the organisation's issues on Away's request; an installation without a domain sets neither
 certify-domain-controllers,install,"Give a domain's controllers the certificates they need, where the domain has no authority of its own",operator,—,—,—,v1,"signing in with a certificate needs them, and Away's own authority issues them on the operator's request"
 make-shells-trust,install,"Have the shells trust Away's sign-in, with one line on each machine",operator,—,—,—,v1,
 sign-apart,install,"Run the part that signs people in on machines apart from the rest, with rights of its own",operator,—,—,—,built,
-protect-secrets,install,"Keep what has to stay secret encrypted, with the key kept elsewhere",system,—,—,—,v1,
+protect-secrets,install,"Keep what has to stay secret encrypted, with the key kept elsewhere",system,—,—,—,built,
 check-setup,install,"Check the whole setup and say what is wrong: the provider, the authority, each kind of machine",operator,—,—,—,v1,
-name-support-contact,install,"Say whom people turn to, and show it wherever something fails",operator,—,—,—,v1,
+name-support-contact,install,"Say whom people turn to, and show it wherever something fails",operator,—,—,—,built,
 reach-other-networks,install,"Reach machines in a network Away is not in, through a relay placed there",operator,—,—,—,later,
 carry-other-traffic,install,"Carry other traffic to the machines' network, as a private network would",operator,—,—,—,no,Away carries sessions and no other traffic
 update-in-one-step,operate,"Update to a new version in one step, with people told and their desktops back by themselves",operator,—,—,—,v1,
@@ -196,6 +196,6 @@ verify-image,check,Check that an image is the one the project built,anyone,—,�
 see-image-contents,check,"See what an image holds: every part, its version, its licence",anyone,—,—,—,built,
 build-from-source,check,Build it from its source with one command,anyone,—,—,—,built,
 run-its-tests,check,"Run its tests on one's own machine, against a real server of each protocol",anyone,—,—,—,v1,
-call-nobody-else,check,"Run it with no call to anyone outside: no fonts, scripts, statistics or update checks",system,—,—,—,v1,
-see-version-and-licences,check,"See in Away itself which version runs, where its source is and the licences of what it is built from",anyone,—,—,—,v1,
+call-nobody-else,check,"Run it with no call to anyone outside: no fonts, scripts, statistics or update checks",system,—,—,—,built,
+see-version-and-licences,check,"See in Away itself which version runs, where its source is and the licences of what it is built from",anyone,—,—,—,built,
 report-in-private,check,"Report a security hole in private, and learn what happens next",anyone,—,—,—,built,

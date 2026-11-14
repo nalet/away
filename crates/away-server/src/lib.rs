@@ -1,11 +1,13 @@
 //! The server: the pages, the requests, people's sign-ins, the rules, the records.
 //!
 //! In this version it signs people in through the organisation's sign-in service and
-//! holds their sign-ins, serves the pages, and says whether it is well. It reaches no
-//! machine.
+//! holds their sign-ins, reads the machines and the rules from the operator's files and
+//! tells each person the machines a rule gives them, serves the pages, and says whether
+//! it is well. It reaches no machine.
 
 pub mod getting_in;
 pub mod pages;
+pub mod register;
 pub mod service;
 pub mod sign_ins;
 pub mod token;
@@ -44,6 +46,9 @@ const NO_PAGES: &str = "<!doctype html>\n\
 /// Where the server listens when nothing says otherwise.
 pub const ADDRESS: &str = "0.0.0.0:8080";
 
+/// How often the server looks whether the files of machines and rules changed.
+const LOOKS_AT_THE_FILES_EVERY: std::time::Duration = std::time::Duration::from_secs(5);
+
 /// The server, bound and not yet answering.
 pub struct Server {
     part: Part,
@@ -78,8 +83,18 @@ impl Server {
     /// Answers until the part is told to stop.
     pub async fn run(self) {
         let renewing = tokio::spawn(self.getting_in.clone().keep_renewing());
+        // the files are looked at as time passes, and applied where they changed
+        let register = self.getting_in.register();
+        let looking = tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(LOOKS_AT_THE_FILES_EVERY).await;
+                let register = register.clone();
+                let _ = tokio::task::spawn_blocking(move || register.look(away_part::time::now().as_secs())).await;
+            }
+        });
         self.part.run(self.health, vec![(self.public, public(self.getting_in))]).await;
         renewing.abort();
+        looking.abort();
     }
 }
 

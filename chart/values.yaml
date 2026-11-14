@@ -30,6 +30,14 @@ recordReaders: []
 # Whom people turn to when something fails, as the pages show it: it-help@example.com
 contact: ""
 
+# The machines, their groups and the rules, as files: each entry is a file's name and
+# what the file holds. A name may have folders, such as machines/finance.yaml. Give them
+# with --set-file, or in a file of values. Away applies a change as it arrives, whole or
+# not at all.
+files: {}
+# Or a ConfigMap of one's own that holds the files, each under its name.
+filesConfigMap: ""
+
 image:
   repository: ghcr.io/nalet/away
   # The image's tag. Empty takes the version of Away this chart was published with.

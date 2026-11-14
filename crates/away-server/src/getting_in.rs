@@ -23,6 +23,7 @@ use hyper::body::Incoming;
 use hyper::header::{HeaderValue, COOKIE, LOCATION, ORIGIN, SET_COOKIE};
 use hyper::{Method, Request, StatusCode};
 
+use crate::register::files::Register;
 use crate::service::{Failed, Service};
 use crate::sign_ins::{Failure, Person, SignIns, KEPT_FOR};
 use crate::told::{SignIn, Told};
@@ -55,6 +56,7 @@ struct Signing {
 pub struct GettingIn {
     contact: Option<String>,
     signing: Option<Signing>,
+    register: Arc<Register>,
     part: Part,
 }
 
@@ -69,7 +71,8 @@ impl GettingIn {
             }
             None => None,
         };
-        Ok(GettingIn { contact: told.contact, signing, part })
+        let register = Arc::new(Register::new(told.files, part.lines.clone(), time::now().as_secs()));
+        Ok(GettingIn { contact: told.contact, signing, register, part })
     }
 
     /// Whether the installation is told about a sign-in service.
@@ -83,11 +86,13 @@ impl GettingIn {
         Some(match (request.uri().path(), reading) {
             ("/api/who", true) => self.who(request),
             ("/api/built-from", true) => self.built_from(request),
+            ("/api/machines", true) => self.machines(request),
+            ("/api/register", true) => self.in_force(request),
             ("/licence.txt", true) => answer(StatusCode::OK, "text/plain; charset=utf-8", LICENCE_TEXT),
             ("/sign-in", true) => self.begin(request).await,
             ("/sign-in/back", true) => self.back(request).await,
             ("/sign-out", _) if request.method() == Method::POST => self.sign_out(request).await,
-            ("/api/who" | "/api/built-from" | "/licence.txt" | "/sign-in" | "/sign-in/back", _) => {
+            ("/api/who" | "/api/built-from" | "/api/machines" | "/api/register" | "/licence.txt" | "/sign-in" | "/sign-in/back", _) => {
                 plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers GET.\n")
             }
             ("/sign-out", _) => plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers POST.\n"),
@@ -95,14 +100,86 @@ impl GettingIn {
         })
     }
 
+    /// Who asks, where they are signed in and their sign-in has not run out.
+    fn signed_in(&self, request: &Request<Incoming>) -> Option<(&Signing, Person)> {
+        let signing = self.signing.as_ref()?;
+        match signing.sign_ins.who(cookie(request, SIGNED_IN)?, time::now().as_secs())? {
+            (person, false) => Some((signing, person)),
+            _ => None,
+        }
+    }
+
+    /// The register, for whatever looks at its files as time passes.
+    pub fn register(&self) -> Arc<Register> {
+        self.register.clone()
+    }
+
     /// What Away is built from, for whoever is signed in.
     fn built_from(&self, request: &Request<Incoming>) -> Answer {
-        let now = time::now().as_secs();
-        let signed_in = self.signing.as_ref().and_then(|signing| signing.sign_ins.who(cookie(request, SIGNED_IN)?, now));
-        match signed_in {
-            Some((_, false)) => answer(StatusCode::OK, "application/json", BUILT_FROM),
-            _ => plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n"),
+        match self.signed_in(request) {
+            Some(_) => answer(StatusCode::OK, "application/json", BUILT_FROM),
+            None => plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n"),
         }
+    }
+
+    /// The machines that whoever asks may reach: those a rule gives to one of their
+    /// groups, and no others.
+    fn machines(&self, request: &Request<Incoming>) -> Answer {
+        let Some((_, person)) = self.signed_in(request) else {
+            return plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n");
+        };
+        let (in_force, _) = self.register.in_force();
+        let machines: Vec<Json> = in_force.reached_by(&person.groups).into_iter().map(|(machine, _)| machine.for_a_person()).collect();
+        answer(StatusCode::OK, "application/json", Json::object([("machines", Json::List(machines))]).write())
+    }
+
+    /// What is in force, for those who administer Away: every machine and every rule
+    /// with the file it comes from, since when, and the change that was refused, where
+    /// one was.
+    fn in_force(&self, request: &Request<Incoming>) -> Answer {
+        let Some((signing, person)) = self.signed_in(request) else {
+            return plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n");
+        };
+        if !person.groups.iter().any(|group| signing.told.administrators.contains(group)) {
+            return plain(StatusCode::FORBIDDEN, "This is for those who administer Away.\n");
+        }
+        let (in_force, since) = self.register.in_force();
+        let texts = |texts: &[String]| Json::List(texts.iter().map(|text| text.as_str().into()).collect());
+        let written_in = |(file, line): &(String, usize)| [("file", Json::from(file.as_str())), ("line", Json::from(*line as u64))];
+        let machines = in_force.machines.iter().map(|machine| {
+            let Json::Object(mut says) = machine.for_a_person() else { unreachable!("a machine is an object") };
+            says.extend(written_in(&machine.written_in).map(|(name, value)| (name.to_string(), value)));
+            // who reaches it: each rule that gives it, and to whom
+            let given: Vec<Json> = in_force
+                .rules
+                .iter()
+                .filter(|rule| rule.reaches.iter().any(|reached| *reached == machine.name || machine.groups.contains(reached)))
+                .map(|rule| Json::object([("rule", rule.name.as_str().into()), ("who", texts(&rule.who))]))
+                .collect();
+            says.push(("given_by".to_string(), Json::List(given)));
+            says.push(("served_by".to_string(), texts(&machine.served_by)));
+            Json::Object(says)
+        });
+        let rules = in_force.rules.iter().map(|rule| {
+            let [file, line] = written_in(&rule.written_in);
+            Json::object([("name", rule.name.as_str().into()), ("who", texts(&rule.who)), ("reaches", texts(&rule.reaches)), file, line])
+        });
+        let refused = self.register.refused().map_or(Json::Null, |refusal| {
+            Json::object([
+                ("at", refusal.at.into()),
+                ("file", refusal.why.file.as_str().into()),
+                ("line", (refusal.why.line as u64).into()),
+                ("why", refusal.why.why.as_str().into()),
+            ])
+        });
+        let says = Json::object([
+            ("has_files", self.register.has_files().into()),
+            ("since", since.into()),
+            ("machines", Json::List(machines.collect())),
+            ("rules", Json::List(rules.collect())),
+            ("refused", refused),
+        ]);
+        answer(StatusCode::OK, "application/json", says.write())
     }
 
     /// Who is signed in, for the page.

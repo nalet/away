@@ -1,0 +1,10 @@
+# Who reaches what, for the tests. The groups of people are those the stand-in for a
+# sign-in service gives: everyone is in staff, an administrator in away-admins too.
+rules:
+  - name: staff-finance
+    who: [staff]
+    reaches: [finance, Desktops]
+
+  - name: admins-engineering
+    who: [away-admins]
+    reaches: [engineering, mac-design-01]

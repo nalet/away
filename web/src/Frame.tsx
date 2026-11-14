@@ -12,7 +12,10 @@ import { ABOUT, addressOf, inPlace, viewAt } from './place';
 import type { View } from './place';
 import { texts } from './texts';
 import { UserMenu } from './UserMenu';
-import { About, Administration, Home, Nowhere, Sessions, SettingsPage } from './views';
+import { Administration } from './Administration';
+import { Home, MachinePage } from './Home';
+import { namedBy } from './machines';
+import { About, Nowhere, Sessions, SettingsPage } from './views';
 import type { Who } from './who';
 
 const ICONS: Record<View, LucideIcon> = { home: House, sessions: Layers, administration: Shield, settings: Settings };
@@ -27,13 +30,15 @@ interface FrameProps {
 
 export function Frame({ who, path, go, signOut, signInAgain }: FrameProps) {
   const view = viewAt(path);
+  const machine = namedBy(path);
   const page = useRef<HTMLElement>(null);
-  const administers = Boolean(who.administers || who.reads_records);
+  // the administration holds what administrators see; the records come with a later version
+  const administers = Boolean(who.administers);
   // the views, in their order; administration only for those who have a role there
   const views: View[] = administers ? ['home', 'sessions', 'administration'] : ['home', 'sessions'];
 
   useEffect(() => {
-    const title = path === ABOUT ? texts.about.title : view ? texts.views[view] : texts.nowhere.title;
+    const title = path === ABOUT ? texts.about.title : (namedBy(path) ?? (view ? texts.views[view] : texts.nowhere.title));
     document.title = `${title} · ${texts.name}`;
   }, [view, path]);
 
@@ -94,9 +99,9 @@ export function Frame({ who, path, go, signOut, signInAgain }: FrameProps) {
         {link('settings', 'rail')}
       </nav>
       <main className="page" id="page" tabIndex={-1} ref={page}>
-        {view === 'home' && <Home />}
+        {view === 'home' && (machine ? <MachinePage name={machine} go={go} key={machine} /> : <Home go={go} contact={who.contact} />)}
         {view === 'sessions' && <Sessions />}
-        {view === 'administration' && (administers ? <Administration /> : <Nowhere go={go} />)}
+        {view === 'administration' && (administers ? <Administration path={path} go={go} /> : <Nowhere go={go} />)}
         {view === 'settings' && (path === ABOUT ? <About who={who} go={go} /> : <SettingsPage who={who} go={go} />)}
         {view === null && <Nowhere go={go} />}
       </main>

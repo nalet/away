@@ -1,6 +1,6 @@
 # ADR-0001: Away speaks RDP, VNC and SSH with code of its own
 
-**Status:** Accepted · 2026-11-14. Its hardest part is judged by a proof before anything is built around it (see [Validation](#validation)); the first proof's pictures matched on all three kinds of machine on 2026-11-14 ([what it found](#what-the-first-proof-found)), and the owner's word on it is open. On the owner's word of the same day the proof's machines are Windows 11, Windows Server 2025 and Linux, and the first release also takes the licence a machine for many people hands out and follows a broker to the machine that serves a collection.
+**Status:** Accepted · 2026-11-14. Its hardest part is judged by a proof before anything is built around it (see [Validation](#validation)); the first proof's pictures matched on all three kinds of machine on 2026-11-14 ([what it found](#what-the-first-proof-found)), and the owner said the same day that the RDP code stays Away's own. On the owner's word of the same day the proof's machines are Windows 11, Windows Server 2025 and Linux, and the first release also takes the licence a machine for many people hands out and follows a broker to the machine that serves a collection.
 
 ## Context
 
@@ -50,7 +50,7 @@ The test program's picture was the machine's screen, pixel for pixel, on Windows
 
 - **A Windows Server draws at 16 bits a pixel** for a client that takes its picture as rectangles, unless the server is set otherwise; a workstation draws at 32. The picture of a server is therefore the server's screen with each colour cut to 16 bits, and it is that pixel for pixel. A server's full colours come with the graphics pipeline, which package 10 builds.
 - **A machine for many people asks every client to take a licence.** One that counts the people who use it takes the client's answer and goes on: that is proven on Windows Server 2025. One that counts devices hands a licence over: that is tested against a stand-in, and not yet against a real machine. Keeping a licence and showing it again belongs to package 10.
-- **Taking a licence has one step that no cryptography library offers.** The protocol seals a secret to the machine's key with RSA as it is, without the padding every library insists on. A library for large numbers does that arithmetic; the cipher and the hashes of the exchange are libraries'. Nothing rests on the step, because the whole exchange travels inside the secured connection. It is the one place where *No cryptography of Away's own* is read by its purpose and not by its letter.
+- **Taking a licence has one step that no cryptography library offers.** The protocol seals a secret to the machine's key with RSA as it is, without the padding every library insists on. A library for large numbers does that arithmetic; the cipher and the hashes of the exchange are libraries'. Nothing rests on the step, because the whole exchange travels inside the secured connection. It is the one place where *No cryptography of Away's own* is read by its purpose and not by its letter, and the owner accepted it as that on 2026-11-14.
 
 ## Consequences
 

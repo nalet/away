@@ -28,6 +28,37 @@
 {{- with .Values.contact }}
 {{- $told = append $told (dict "name" "AWAY_CONTACT" "value" .) -}}
 {{- end }}
+{{- /* the files of machines and rules: from the values, or from a ConfigMap of the operator's own */ -}}
+{{- if and .Values.files .Values.filesConfigMap }}
+{{- fail "files and filesConfigMap are both set: the files of machines and rules come from one place" }}
+{{- end }}
+{{- $files := list -}}
+{{- range $name := keys .Values.files | sortAlpha }}
+{{- if not (regexMatch "^[-._a-zA-Z0-9]+(/[-._a-zA-Z0-9]+)*\\.ya?ml$" $name) }}
+{{- fail (printf "files: \"%s\" is no name for a file of machines and rules: letters, digits, - _ . and folders, ending in .yaml" $name) }}
+{{- end }}
+{{- /* a ConfigMap's keys take no folders: the folders are in the path each key is mounted at */ -}}
+{{- $files = append $files (dict "key" (replace "/" "__" $name) "path" $name) -}}
+{{- end }}
+{{- if $files }}
+{{- $told = append $told (dict "name" "AWAY_FILES" "value" "/etc/away/files") -}}
+{{- $mounts = append $mounts (dict "at" "/etc/away/files" "volume" (dict "name" "files" "configMap" (dict "name" (printf "%s-files" (include "away.name" .)) "items" $files))) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "away.name" . }}-files
+  labels:
+    {{- include "away.labels" (dict "root" . "part" "server") | nindent 4 }}
+data:
+  {{- range $name := keys .Values.files | sortAlpha }}
+  {{ replace "/" "__" $name }}: |
+    {{- index $.Values.files $name | nindent 4 }}
+  {{- end }}
+---
+{{- else if .Values.filesConfigMap }}
+{{- $told = append $told (dict "name" "AWAY_FILES" "value" "/etc/away/files") -}}
+{{- $mounts = append $mounts (dict "at" "/etc/away/files" "volume" (dict "name" "files" "configMap" (dict "name" .Values.filesConfigMap))) -}}
+{{- end }}
 {{ include "away.part" (dict "root" . "part" "server" "port" 8080 "named" "http" "told" $told "mounts" $mounts) }}
 ---
 apiVersion: v1

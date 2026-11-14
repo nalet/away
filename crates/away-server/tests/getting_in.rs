@@ -58,7 +58,8 @@ fn world_told(change: impl FnOnce(&mut SignIn)) -> World {
         looks_every: Duration::from_millis(100),
     };
     change(&mut sign_in);
-    let told = Told { sign_in: Some(sign_in), contact: Some("it-help@example.com".to_string()) };
+    let files = Some(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/files").into());
+    let told = Told { sign_in: Some(sign_in), contact: Some("it-help@example.com".to_string()), files };
     let (away, lines, stopper) = serve(&runtime, port, told);
     World { _runtime: runtime, service, away, lines, _stopper: stopper }
 }
@@ -164,6 +165,82 @@ impl Browser {
     fn who(&mut self, world: &World) -> Json {
         self.get(&format!("{}/api/who", world.away)).says()
     }
+}
+
+/// The names of the machines an answer lists.
+fn names(says: &Json, list: &str) -> Vec<String> {
+    let Some(Json::List(listed)) = says.get(list) else { panic!("no {list} in {}", says.write()) };
+    listed.iter().map(|one| one.text_of("name").expect("a name").to_string()).collect()
+}
+
+#[test]
+fn every_person_is_told_the_machines_a_rule_gives_them_and_no_others() {
+    let world = world();
+    let machines = format!("{}/api/machines", world.away);
+    // nobody who is not signed in is told of a machine
+    let mut browser = Browser::default();
+    assert_eq!(browser.get(&machines).status, 401);
+    assert_eq!(browser.ask("POST", &machines, &[]).status, 405);
+
+    // an administrator, who is in staff and in away-admins: what both rules give
+    browser.sign_in(&world, "/");
+    let told = browser.get(&machines).says();
+    assert_eq!(names(&told, "machines"), ["build-01", "build-02", "Desktops", "dev-linux-03", "fin-app-02", "hr-app-01", "mac-design-01"]);
+    let Some(Json::List(listed)) = told.get("machines") else { panic!() };
+    let fin = listed.iter().find(|machine| machine.text_of("name") == Some("fin-app-02")).expect("fin-app-02");
+    assert_eq!(
+        fin.write(),
+        r#"{"name":"fin-app-02","kind":"windows","address":"fin-app-02.corp.example","groups":["finance"],"desktop":{"port":3389,"over":"rdp"},"programs":["Ledger","Payroll","Reports","Mail"],"shell":null,"collection":null}"#
+    );
+    assert!(
+        !told.write().contains("yaml") && !told.write().contains("rdsh-01"),
+        "a person is not told of files, nor of the machines behind a collection"
+    );
+
+    // someone who is in staff alone: what the one rule gives, and nothing of engineering
+    world.service.signs_in(away_server::stand_in::person());
+    let mut other = Browser::default();
+    other.sign_in(&world, "/");
+    assert_eq!(names(&other.get(&machines).says(), "machines"), ["Desktops", "fin-app-02", "hr-app-01"]);
+
+    // someone the sign-in service says no group of: nothing
+    world.service.signs_in(Json::object([("sub", "another".into()), ("name", "Sam Okoro".into())]));
+    let mut third = Browser::default();
+    third.sign_in(&world, "/");
+    assert_eq!(names(&third.get(&machines).says(), "machines"), Vec::<String>::new());
+}
+
+#[test]
+fn those_who_administer_see_what_is_in_force_and_where_it_is_written() {
+    let world = world();
+    let register = format!("{}/api/register", world.away);
+    let mut browser = Browser::default();
+    assert_eq!(browser.get(&register).status, 401);
+    browser.sign_in(&world, "/");
+    let says = browser.get(&register).says();
+    assert_eq!(says.get("has_files"), Some(&Json::Flag(true)));
+    assert_eq!(says.get("refused"), Some(&Json::Null));
+    assert!(says.get("since").and_then(Json::count).is_some_and(|since| since > 1_700_000_000));
+    assert_eq!(names(&says, "machines").len(), 7);
+    assert_eq!(names(&says, "rules"), ["admins-engineering", "staff-finance"]);
+    let Some(Json::List(machines)) = says.get("machines") else { panic!() };
+    let farm = machines.iter().find(|machine| machine.text_of("name") == Some("Desktops")).expect("the farm");
+    assert_eq!(farm.text_of("file"), Some("machines/engineering.yaml"));
+    assert_eq!(farm.get("line").and_then(Json::count), Some(30));
+    assert_eq!(farm.get("given_by").map(Json::write).as_deref(), Some(r#"[{"rule":"staff-finance","who":["staff"]}]"#));
+    assert_eq!(farm.get("served_by").map(Json::write).as_deref(), Some(r#"["rdsh-01.corp.example","rdsh-02.corp.example"]"#));
+    let Some(Json::List(rules)) = says.get("rules") else { panic!() };
+    assert_eq!(
+        rules[1].write(),
+        r#"{"name":"staff-finance","who":["staff"],"reaches":["finance","Desktops"],"file":"rules/access.yaml","line":4}"#
+    );
+
+    // someone who administers nothing is told nothing of it
+    world.service.signs_in(away_server::stand_in::person());
+    let mut other = Browser::default();
+    other.sign_in(&world, "/");
+    let refused = other.get(&register);
+    assert_eq!((refused.status, refused.body.as_str()), (403, "This is for those who administer Away.\n"));
 }
 
 #[test]

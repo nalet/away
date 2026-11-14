@@ -39,6 +39,7 @@ rc4 = { version = "0.2", default-features = false } # the cipher that signing in
 sha1 = { version = "0.11", default-features = false } # the second hash that the taking of a licence makes its keys and its checks with
 num-bigint = { version = "0.5", default-features = false } # does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is
 getrandom = { version = "0.4", default-features = false } # takes random bytes from the system, for keys and for numbers used once
+saphyr-parser = { version = "0.3", default-features = false } # reads the files of machines and rules, which are YAML, and knows the line each thing is written in
 
 away-secret = { path = "crates/away-secret" }
 away-part = { path = "crates/away-part" }

@@ -1,0 +1,35 @@
+# The machines of the engineers and of the designers, for the tests.
+machines:
+  - name: build-01
+    kind: linux
+    address: build-01.corp.example
+    groups: [engineering]
+    shell: true
+
+  - name: build-02
+    kind: linux
+    address: build-02.corp.example
+    groups: [engineering]
+    shell:
+      port: 2222
+
+  - name: dev-linux-03
+    kind: linux
+    address: dev-linux-03.corp.example
+    groups: [engineering]
+    desktop: true
+    shell: true
+
+  - name: mac-design-01
+    kind: mac
+    address: mac-design-01.corp.example
+    groups: [design]
+    desktop: true
+
+  # a farm of Windows machines, which people see as one desktop
+  - name: Desktops
+    kind: windows
+    address: farm.corp.example
+    desktop: true
+    collection: Desktops
+    served-by: [rdsh-01.corp.example, rdsh-02.corp.example]

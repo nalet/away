@@ -111,6 +111,13 @@ contact: it-help@example.com
   cluster's name service. `networkRules.signInServiceAt` narrows that to the
   addresses it names.
 
+## The machines and the rules
+
+Away knows machines, their groups and the rules from files, which the chart
+takes as values or from a ConfigMap of one's own.
+[The machines and the rules](./machines.md) says how they are written and how a
+change is applied.
+
 ## What it makes
 
 | What | For |
@@ -141,6 +148,8 @@ Everything an installation is told is one of these. The chart's
 | `administrators` | the groups whose people administer Away | none |
 | `recordReaders` | the groups whose people read its records | none |
 | `contact` | whom people turn to when something fails | none |
+| `files` | the machines, their groups and the rules, as files: each entry a file's name and what it holds ([the machines and the rules](./machines.md)) | none: Away knows no machines |
+| `filesConfigMap` | a ConfigMap of one's own that holds those files, in place of `files` | none |
 | `image.repository`, `image.tag`, `image.digest` | the image; a digest goes before a tag | the project's image, in the chart's version |
 | `image.pullSecrets` | secrets to pull the image with | none |
 | `ingress.enabled` | make an ingress | no |

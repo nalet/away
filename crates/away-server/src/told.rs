@@ -48,16 +48,20 @@ pub struct Told {
     pub sign_in: Option<SignIn>,
     /// Whom people turn to when something fails.
     pub contact: Option<String>,
+    /// The folder that holds the files of machines and rules. Without it Away knows no
+    /// machines.
+    pub files: Option<std::path::PathBuf>,
 }
 
 impl Told {
     /// Reads what the environment says. A file is read with the function given.
     pub fn read(variable: impl Fn(&str) -> Option<String>, file: impl Fn(&str) -> std::io::Result<Vec<u8>>) -> Result<Told, String> {
         let contact = variable("AWAY_CONTACT");
+        let files = variable("AWAY_FILES").filter(|folder| !folder.is_empty()).map(std::path::PathBuf::from);
         let needed = ["AWAY_PUBLIC_ADDRESS", "AWAY_SIGN_IN_SERVICE", "AWAY_SIGN_IN_CLIENT", "AWAY_SIGN_IN_SECRET_FILE"];
         let said: Vec<Option<String>> = needed.iter().map(|name| variable(name)).collect();
         if said.iter().all(Option::is_none) {
-            return Ok(Told { sign_in: None, contact });
+            return Ok(Told { sign_in: None, contact, files });
         }
         if let Some(missing) = needed.iter().zip(&said).find(|(_, said)| said.is_none()).map(|(name, _)| name) {
             return Err(format!("{missing} is not set, and signing in needs it."));
@@ -97,6 +101,7 @@ impl Told {
                 looks_every: Duration::from_secs(15),
             }),
             contact,
+            files,
         })
     }
 }

@@ -11,11 +11,11 @@ Signing in to Away once, and from there on each machine. For the goal [Get in wi
 
 | Capability | Who | RDP | VNC | SSH | Away | Key |
 |---|---|---|---|---|---|---|
-| Sign in through the organisation's identity provider | person | — | — | — | v1 | `sign-in` |
+| Sign in through the organisation's identity provider | person | — | — | — | built | `sign-in` |
 | Sign in through an identity provider that speaks SAML only | person | — | — | — | no | `sign-in-with-saml` |
-| Stay signed in while the sign-in renews itself | system | — | — | — | v1 | `stay-signed-in` |
-| Sign in again when the sign-in has run out, with the open sessions kept | person | — | — | — | v1 | `sign-in-again` |
-| Sign out, and end the sessions Away opened | person | — | — | — | v1 | `sign-out` |
+| Stay signed in while the sign-in renews itself | system | — | — | — | built | `stay-signed-in` |
+| Sign in again when the sign-in has run out, with the open sessions kept | person | — | — | — | built | `sign-in-again` |
+| Sign out, and end the sessions Away opened | person | — | — | — | built | `sign-out` |
 | Be signed in on the machine as oneself, with nothing asked | system | v1 | no | v1 | — | `be-oneself-on-machine` |
 | Be signed in with a name and password or a key that Away keeps for the machine | system | v1 | v1 | v1 | — | `use-kept-secret` |
 | Type a name and a password when the machine asks for them | person | v1 | v1 | v1 | — | `type-credentials` |
@@ -39,13 +39,13 @@ What is around every page: the rail, the top bar, the search, and the bar of a s
 
 | Capability | Who | Away | Key |
 |---|---|---|---|
-| Move between the machines, the open sessions and the settings | person | v1 | `move-between-views` |
+| Move between the machines, the open sessions and the settings | person | built | `move-between-views` |
 | See the sessions that are open, and go to one | person | v1 | `see-open-sessions` |
 | Find a machine by its name from any page | person | v1 | `find-from-anywhere` |
-| See which account is signed in | person | v1 | `see-who-is-signed-in` |
+| See which account is signed in | person | built | `see-who-is-signed-in` |
 | Reach a session's own controls without leaving it: keys, clipboard, files, size, ending it | person | v1 | `use-session-bar` |
 | Give the machine the whole window while a session is open | system | v1 | `give-session-the-window` |
-| Use every page around a session with the keyboard alone, and with a screen reader | person | v1 | `use-without-mouse` |
+| Use every page around a session with the keyboard alone, and with a screen reader | person | built | `use-without-mouse` |
 | Use Away in one's own language | person | later | `choose-language` |
 | Be told what happened meanwhile: a session ended, a request was answered | person | later | `see-notices` |
 | Use an installed app instead of the browser, on a computer or a phone | person | no | `use-installed-app` |
