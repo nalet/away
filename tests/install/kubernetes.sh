@@ -92,9 +92,16 @@ forward() {
   fail "no way to port $2 of $1: $(cat "$log")"
 }
 
-# pod <namespace> <name> <labels> <image> <what it runs>: a pod of this test, under the
-# strictest profile
+# pod <namespace> <name> <labels> <image> <what it runs> [pull policy] [apart]: a pod of
+# this test, under the strictest profile. One that is "apart" never says it is ready, so
+# that no service sends it a request: it is for pods that carry a part's labels, which a
+# part's service would otherwise take for the part.
 pod() {
+  local ready='' waits_for='condition=Ready'
+  if [ "${7:-}" = apart ]; then
+    ready='readinessProbe: {exec: {command: ["false"]}, periodSeconds: 3600}'
+    waits_for="jsonpath={.status.phase}=Running"
+  fi
   kubectl --namespace "$1" apply -f - >/dev/null <<YAML
 apiVersion: v1
 kind: Pod
@@ -112,17 +119,18 @@ spec:
       image: $4
       imagePullPolicy: ${6:-IfNotPresent}
       $5
+      $ready
       securityContext:
         allowPrivilegeEscalation: false
         readOnlyRootFilesystem: true
         capabilities: {drop: [ALL]}
 YAML
-  kubectl --namespace "$1" wait --for=condition=Ready "pod/$2" --timeout=180s >/dev/null \
+  kubectl --namespace "$1" wait --for="$waits_for" "pod/$2" --timeout=180s >/dev/null \
     || { kubectl --namespace "$1" describe "pod/$2" | tail -15 >&2; fail "the test's pod $2 did not start"; }
 }
 
-# probe <namespace> <name> [labels]: a pod that waits, to try connections from
-probe() { pod "$1" "$2" "${3:-}" "$PROBE_IMAGE" 'command: [sleep, "3600"]'; }
+# probe <namespace> <name> [labels] [apart]: a pod that waits, to try connections from
+probe() { pod "$1" "$2" "${3:-}" "$PROBE_IMAGE" 'command: [sleep, "3600"]' IfNotPresent "${4:-}"; }
 
 # reaches <namespace> <pod> <address>: whether a connection from the pod is taken
 reaches() {
@@ -225,6 +233,10 @@ if [ -n "$ADDRESS" ]; then
   ok "a session's address leads to the gateway"
   [ "$(curl --silent --max-time 20 --output /dev/null --write-out '%{http_code}' "https://$ADDRESS/metrics")" = 404 ] || fail "the measures are on the address Away is reached at"
   ok "no measures on Away's address"
+  if curl --silent --max-time 20 --head "https://$ADDRESS/" | grep -qi '^set-cookie:'; then
+    fail "the way in gives the browser a cookie of its own"
+  fi
+  ok "the way in gives the browser no cookie of its own"
   case "$(curl --silent --max-time 20 --output /dev/null --write-out '%{http_code} %{redirect_url}' "http://$ADDRESS/")" in
     30[1278]\ https://*) ok "what arrives without TLS is sent on to https" ;;
     *) fail "http://$ADDRESS/ is answered without TLS" ;;
@@ -246,7 +258,8 @@ elsewhere_ip=$(kubectl --namespace "$other" get pod elsewhere --output jsonpath=
 probe "$other" outsider
 [ -n "$INSTALLED" ] || probe "$NAMESPACE" stranger
 for part in server gateway issuer; do
-  probe "$NAMESPACE" "as-$part" "app.kubernetes.io/name: away, app.kubernetes.io/instance: $RELEASE, app.kubernetes.io/component: $part"
+  # in a part's place, as the rules see it, and apart from the part's service
+  probe "$NAMESPACE" "as-$part" "app.kubernetes.io/name: away, app.kubernetes.io/instance: $RELEASE, app.kubernetes.io/component: $part" apart
 done
 
 allowed() { if reaches "$1" "$2" "$3"; then ok "allowed: $4"; else fail "refused, and it has to be allowed: $4"; fi; }

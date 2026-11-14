@@ -59,11 +59,14 @@ metadata:
   name: {{ $route.name }}
   labels:
     {{- include "away.labels" (dict "root" $) | nindent 4 }}
-  {{- if eq $route.to "gateway" }}
   annotations:
+    # the router would give every browser a cookie of its own, to send it to the same pod
+    # each time: Away needs none, and a browser gets Away's cookies alone
+    haproxy.router.openshift.io/disable_cookies: "true"
+    {{- if eq $route.to "gateway" }}
     haproxy.router.openshift.io/timeout: {{ $.Values.route.timeout | quote }}
     haproxy.router.openshift.io/timeout-tunnel: {{ $.Values.route.timeout | quote }}
-  {{- end }}
+    {{- end }}
 spec:
   host: {{ $.Values.address | quote }}
   {{- with $route.path }}
