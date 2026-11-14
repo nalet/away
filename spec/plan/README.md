@@ -6,8 +6,9 @@ review one at a time. It is the fifth part of the specification: the
 the [architecture](../architecture/README.md) which piece of Away carries each
 capability, and this part when each is built and what shows that it is done.
 
-> **A proposal. No package has begun.** A package begins when the owner says
-> so, by its number, and not before the decisions it rests on are accepted.
+> **A package begins when the owner names it**, by its number, and not before
+> the decisions it rests on are accepted. The table of packages says how far
+> each is.
 
 ## How a package runs
 
@@ -95,24 +96,24 @@ and nothing built by then is lost.
 <!-- generated: packages -->
 | No. | Package | Is | State | After | Rests on | Delivers |
 |---|---|---|---|---|---|---|
-| 1 | [The ground](#1-the-ground) | build | proposed | — | [ADR‑0002](../architecture/decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md), [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 11 capabilities |
-| 2 | [RDP, proven without a browser](#2-rdp-proven-without-a-browser) | proof | proposed | 1 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md) | — |
+| 1 | [The ground](#1-the-ground) | build | agreed | — | [ADR‑0002](../architecture/decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md), [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 11 capabilities |
+| 2 | [RDP, proven without a browser](#2-rdp-proven-without-a-browser) | proof | agreed | 1 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md) | — |
 | 3 | [The Windows sign-in, proven without a browser](#3-the-windows-sign-in-proven-without-a-browser) | proof | proposed | 2 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | — |
-| 4 | [Getting in, and the frame](#4-getting-in-and-the-frame) | build | proposed | 1 | [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 15 capabilities |
+| 4 | [Getting in, and the frame](#4-getting-in-and-the-frame) | build | agreed | 1 | [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 15 capabilities |
 | 5 | [The register, the rules, and home](#5-the-register-the-rules-and-home) | build | proposed | 4 | [ADR‑0009](../architecture/decisions/0009-one-database-and-files.md) | 18 capabilities |
 | 6 | [A shell](#6-a-shell) | build | proposed | 5 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0005](../architecture/decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0010](../architecture/decisions/0010-secrets-live-in-the-cluster.md) | 29 capabilities |
 | 7 | [Sessions as they run](#7-sessions-as-they-run) | build | proposed | 6 | [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md) | 11 capabilities |
 | 8 | [A shell as oneself](#8-a-shell-as-oneself) | build | proposed | 6 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md) | 3 capabilities |
 | 9 | [A desktop over VNC](#9-a-desktop-over-vnc) | build | proposed | 7 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 24 capabilities |
 | 10 | [A desktop over RDP](#10-a-desktop-over-rdp) | build | proposed | 2, 9 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 26 capabilities |
-| 11 | [Windows as oneself](#11-windows-as-oneself) | build | proposed | 3, 8, 10 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 5 capabilities |
+| 11 | [Windows as oneself](#11-windows-as-oneself) | build | proposed | 3, 8, 10 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 6 capabilities |
 | 12 | [The organisation's own authority](#12-the-organisations-own-authority) | build | proposed | 11 | [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 1 capability |
 | 13 | [Programs](#13-programs) | build | proposed | 10 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 5 capabilities |
 | 14 | [By touch](#14-by-touch) | build | proposed | 10 | [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 3 capabilities |
 | 15 | [Status, and the check of the setup](#15-status-and-the-check-of-the-setup) | build | proposed | 11 | [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md) | 2 capabilities |
 | 16 | [Ready to release](#16-ready-to-release) | build | proposed | 12, 13, 14, 15 | [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 1 capability |
 
-16 packages: 2 proofs and 14 builds. Together the builds deliver 112 of the 112 capabilities of the first release.
+16 packages: 2 proofs and 14 builds. Together the builds deliver 113 of the 113 capabilities of the first release.
 <!-- end: packages -->
 
 ## What the build needs first
@@ -122,8 +123,7 @@ needs them.
 
 | Needed | By |
 |---|---|
-| The decisions accepted, each by its number | every package: the table above says which |
-| A target for each quality that a gate measures against | packages 7, 9, 10 and 16 |
+| The decisions a package rests on, accepted | every package: the table above says which, and [the decisions](../architecture/decisions/README.md) which are |
 | A Kubernetes cluster and an OpenShift cluster to install on | package 1 |
 | A sign-in service to sign in through | package 4 |
 | A Windows machine of each version on the list | package 2 |
@@ -157,7 +157,7 @@ A proof, after package 1. It rests on [ADR‑0001](../architecture/decisions/000
 
 A proof, after package 2. It rests on [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md). The proof the first release rests on.
 
-**Its gate.** On a domain that exists for testing, the test program signs an ordinary account in on a Windows machine with a certificate of five minutes and nothing typed, from outside the domain. It reads a file share as that account. An account of the directory's administrators is refused.
+**Its gate.** On a domain that exists for testing and has no certificate authority of its own, the test program signs an ordinary account in on a Windows machine with a certificate of five minutes and nothing typed, from outside the domain. The domain controllers have their certificates from the same test authority. It reads a file share as that account. An account of the directory's administrators is refused.
 
 ### 4 Getting in, and the frame
 
@@ -265,24 +265,24 @@ A build, after package 2 and package 9. It rests on [ADR‑0001](../architecture
 
 ### 11 Windows as oneself
 
-A build, after package 3 and package 8 and package 10. It rests on [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md). With Away's own authority.
+A build, after package 3 and package 8 and package 10. It rests on [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md). With Away's own authority, which also certifies the domain controllers of a domain that has none.
 
-**Its gate.** On a real domain, from a device that is not in it, a person with an ordinary account opens a Windows desktop with nothing typed, reaches a file share as themselves, and opens the desktop again after it locked. The certificate lasts five minutes. An account of the directory's administrators is refused.
+**Its gate.** On a real domain, from a device that is not in it, a person with an ordinary account opens a Windows desktop with nothing typed, reaches a file share as themselves, and opens the desktop again after it locked. The certificate lasts five minutes. An account of the directory's administrators is refused. With no domain named in the configuration, Away runs as before and shows no authority.
 
 | Area | What it delivers |
 |---|---|
 | [Signing in](../capabilities/app.md#signing-in) | Be signed in on the machine as oneself, with nothing asked (RDP); Reach file shares and printers from the machine as oneself; Open a locked desktop again with nothing asked |
-| [Installing and configuring](../capabilities/platform.md#installing-and-configuring) | Connect a certificate authority the Windows domain trusts, for signing in on its machines: with Away's own authority; Say which part of a person's sign-in names their account on the machines: the name and the identifier a Windows domain knows a person's account by |
+| [Installing and configuring](../capabilities/platform.md#installing-and-configuring) | Choose who issues the sign-ins on a Windows domain's machines: Away's own authority or the organisation's: with Away's own authority; Give a domain's controllers the certificates they need, where the domain has no authority of its own; Say which part of a person's sign-in names their account on the machines: the name and the identifier a Windows domain knows a person's account by |
 
 ### 12 The organisation's own authority
 
-A build, after package 11. It rests on [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md). It begins with a proof of how the authority is asked; if none holds, the first release ships without it.
+A build, after package 11. It rests on [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md). It begins with a proof of how the authority is asked; if no way holds, the owner chooses what follows.
 
-**Its gate.** With the organisation's own authority issuing, a person is signed in on a Windows machine as in package 11, and the directory itself refuses a certificate for an account outside the group it allows. Nothing of Away's is installed on a Windows machine.
+**Its gate.** With the configuration changed to the organisation's own authority and nothing else, a person is signed in on a Windows machine as in package 11, and the directory itself refuses a certificate for an account outside the group it allows. Nothing of Away's is installed on a Windows machine.
 
 | Area | What it delivers |
 |---|---|
-| [Installing and configuring](../capabilities/platform.md#installing-and-configuring) | Connect a certificate authority the Windows domain trusts, for signing in on its machines: with the organisation's own authority |
+| [Installing and configuring](../capabilities/platform.md#installing-and-configuring) | Choose who issues the sign-ins on a Windows domain's machines: Away's own authority or the organisation's: with the organisation's own authority |
 
 ### 13 Programs
 

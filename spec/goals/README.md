@@ -107,14 +107,14 @@ flowchart TD
 <!-- generated: goals -->
 | Goal | Is | Needs | Expected of it | Capabilities | Qualities |
 |---|---|---|---|---|---|
-| [Work on a machine that is somewhere else](#work-on-a-machine-that-is-somewhere-else) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself) | 24: 14 first release, 3 first release in part, 5 later, 2 not planned | 78 in 9 areas: 45 first release, 28 later, 5 not planned | 9, 0 with a target |
-| [Get in without another password](#get-in-without-another-password) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself), [Know what happened](#know-what-happened) | 16: 10 first release, 3 first release in part, 2 later, 1 not planned | 15 in 1 area: 10 first release, 3 later, 2 not planned | 5, 0 with a target |
-| [Look at a machine together](#look-at-a-machine-together) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself) | 4: 3 later, 1 not planned | 6 in 1 area: 5 later, 1 not planned | 1, 0 with a target |
-| [Know the machines](#know-the-machines) | what that takes | [Run it oneself](#run-it-oneself) | 13: 5 first release, 7 later, 1 not planned | 30 in 2 areas: 19 first release, 8 later, 3 not planned | 2, 0 with a target |
-| [Decide who reaches what](#decide-who-reaches-what) | what that takes | [Run it oneself](#run-it-oneself) | 13: 7 first release, 2 first release in part, 4 later | 24 in 2 areas: 10 first release, 14 later | 2, 0 with a target |
-| [Know what happened](#know-what-happened) | what that takes | [Run it oneself](#run-it-oneself) | 9: 3 first release, 1 first release in part, 5 later | 13 in 1 area: 5 first release, 8 later | 3, 0 with a target |
-| [Run it oneself](#run-it-oneself) | what that takes | [Trust it](#trust-it) | 15: 7 first release, 3 first release in part, 2 later, 3 not planned | 25 in 2 areas: 16 first release, 7 later, 2 not planned | 6, 0 with a target |
-| [Trust it](#trust-it) | what being open adds | — | 4: 4 first release | 7 in 1 area: 7 first release | 6, 0 with a target |
+| [Work on a machine that is somewhere else](#work-on-a-machine-that-is-somewhere-else) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself) | 24: 14 first release, 3 first release in part, 5 later, 2 not planned | 78 in 9 areas: 45 first release, 28 later, 5 not planned | 9, 9 with a target |
+| [Get in without another password](#get-in-without-another-password) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself), [Know what happened](#know-what-happened) | 16: 10 first release, 3 first release in part, 2 later, 1 not planned | 15 in 1 area: 10 first release, 3 later, 2 not planned | 5, 5 with a target |
+| [Look at a machine together](#look-at-a-machine-together) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself) | 4: 3 later, 1 not planned | 6 in 1 area: 5 later, 1 not planned | 1, 1 with a target |
+| [Know the machines](#know-the-machines) | what that takes | [Run it oneself](#run-it-oneself) | 13: 5 first release, 7 later, 1 not planned | 30 in 2 areas: 19 first release, 8 later, 3 not planned | 2, 2 with a target |
+| [Decide who reaches what](#decide-who-reaches-what) | what that takes | [Run it oneself](#run-it-oneself) | 13: 7 first release, 2 first release in part, 4 later | 24 in 2 areas: 10 first release, 14 later | 2, 2 with a target |
+| [Know what happened](#know-what-happened) | what that takes | [Run it oneself](#run-it-oneself) | 9: 3 first release, 1 first release in part, 5 later | 13 in 1 area: 5 first release, 8 later | 3, 3 with a target |
+| [Run it oneself](#run-it-oneself) | what that takes | [Trust it](#trust-it) | 16: 8 first release, 3 first release in part, 2 later, 3 not planned | 26 in 2 areas: 17 first release, 7 later, 2 not planned | 7, 7 with a target |
+| [Trust it](#trust-it) | what being open adds | — | 4: 4 first release | 7 in 1 area: 7 first release | 6, 6 with a target |
 <!-- end: goals -->
 
 <!-- generated: by-goal -->
@@ -127,15 +127,15 @@ A person opens a desktop, a single program or a shell of a machine that is somew
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
-| Typing and pointing feel as they do at the machine | performance efficiency | the delay Away adds between a key or a pointer move and its effect on the screen | not set | under 50 ms, 95 times of 100, with Away and the machine on one network |
-| Text on the machine reads as sharp as on one's own screen | functional suitability | whether a screen at rest is shown exactly, pixel for pixel | not set | exact within a second of coming to rest, on a high-density screen too |
-| A moving picture stays smooth | performance efficiency | pictures a second while a window is dragged, at 1920 by 1080 | not set | 30 or more on a local network; 15 or more on a line of 10 Mbit/s |
-| It stays usable on a slow line | performance efficiency | the slowest line on which office work is still possible | not set | 2 Mbit/s for a desktop; 50 kbit/s for a shell |
-| A machine is on the screen soon after it is chosen | performance efficiency | seconds from choosing a machine to its first picture | not set | under 5 s for a desktop that is running; under 2 s for a shell |
-| A dropped connection costs no work | reliability | what a change of network or a closed lid costs | not set | the session is back by itself within 10 s of the network returning, as it was left |
-| It works in the browser a person has | compatibility | the browsers and devices every release is tested on | not set | the current and the previous version of Chrome, Edge, Firefox and Safari, on a computer, a tablet and a phone |
-| Every key and shortcut reaches the machine | interaction capability | the key combinations with no way to send them, by browser and keyboard layout | not set | none: what a browser keeps for itself can be sent from a menu |
-| People who see or hear less can use it | interaction capability | the accessibility level the pages around a session meet | not set | WCAG 2.2 level AA around the session; a shell a screen reader can read |
+| Typing and pointing feel as they do at the machine | performance efficiency | the delay Away adds between a key or a pointer move and its effect on the screen | under 50 ms, 95 times of 100, with Away and the machine on one network | under 50 ms, 95 times of 100, with Away and the machine on one network |
+| Text on the machine reads as sharp as on one's own screen | functional suitability | whether a screen at rest is shown exactly, pixel for pixel | exact within a second of coming to rest, on a high-density screen too | exact within a second of coming to rest, on a high-density screen too |
+| A moving picture stays smooth | performance efficiency | pictures a second while a window is dragged, at 1920 by 1080 | 30 or more on a local network; 15 or more on a line of 10 Mbit/s | 30 or more on a local network; 15 or more on a line of 10 Mbit/s |
+| It stays usable on a slow line | performance efficiency | the slowest line on which office work is still possible | 2 Mbit/s for a desktop; 50 kbit/s for a shell | 2 Mbit/s for a desktop; 50 kbit/s for a shell |
+| A machine is on the screen soon after it is chosen | performance efficiency | seconds from choosing a machine to its first picture | under 5 s for a desktop that is running; under 2 s for a shell | under 5 s for a desktop that is running; under 2 s for a shell |
+| A dropped connection costs no work | reliability | what a change of network or a closed lid costs | the session is back by itself within 10 s of the network returning, as it was left | the session is back by itself within 10 s of the network returning, as it was left |
+| It works in the browser a person has | compatibility | the browsers and devices every release is tested on | the current and the previous version of Chrome, Edge, Firefox and Safari, on a computer, a tablet and a phone | the current and the previous version of Chrome, Edge, Firefox and Safari, on a computer, a tablet and a phone |
+| Every key and shortcut reaches the machine | interaction capability | the key combinations with no way to send them, by browser and keyboard layout | none: what a browser keeps for itself can be sent from a menu | none: what a browser keeps for itself can be sent from a menu |
+| People who see or hear less can use it | interaction capability | the accessibility level the pages around a session meet | WCAG 2.2 level AA around the session; a shell a screen reader can read | WCAG 2.2 level AA around the session; a shell a screen reader can read |
 
 ## Get in without another password
 
@@ -146,11 +146,11 @@ A person signs in once, where the organisation already signs in, and is then sig
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
-| One sign-in is enough | interaction capability | times a name or a password is asked between opening Away and working on a machine | not set | none on a Windows machine in a domain and on a shell; none elsewhere once a secret is kept |
-| It works from a device the organisation does not manage | compatibility | what a device needs besides a browser | not set | nothing: no app, no certificate, no membership of the domain, no private network |
-| What opens a machine is worth little when stolen | security | how long a credential made for one sign-in is valid, and where it can be used | not set | five minutes or less, made for one person and one session, and never sent to the browser |
-| It cannot sign in as the directory's administrators | security | the accounts Away may sign in as by itself | not set | none of the directory's privileged groups, unless an administrator names one |
-| A kept secret is never shown again | security | who can read a kept password or key back | not set | nobody: not in a page, not through an interface, not in a log |
+| One sign-in is enough | interaction capability | times a name or a password is asked between opening Away and working on a machine | none on a Windows machine in a domain and on a shell; none elsewhere once a secret is kept | none on a Windows machine in a domain and on a shell; none elsewhere once a secret is kept |
+| It works from a device the organisation does not manage | compatibility | what a device needs besides a browser | nothing: no app, no certificate, no membership of the domain, no private network | nothing: no app, no certificate, no membership of the domain, no private network |
+| What opens a machine is worth little when stolen | security | how long a credential made for one sign-in is valid, and where it can be used | five minutes or less, made for one person and one session, and never sent to the browser | five minutes or less, made for one person and one session, and never sent to the browser |
+| It cannot sign in as the directory's administrators | security | the accounts Away may sign in as by itself | none of the directory's privileged groups, unless an administrator names one | none of the directory's privileged groups, unless an administrator names one |
+| A kept secret is never shown again | security | who can read a kept password or key back | nobody: not in a page, not through an interface, not in a log | nobody: not in a page, not through an interface, not in a log |
 
 ## Look at a machine together
 
@@ -161,7 +161,7 @@ Two people look at the same session from wherever each is: one shows, helps or t
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
-| Nobody is watched without knowing | security | what a person sees while someone else is in their session | not set | who is there, for as long as they are; joining asks first |
+| Nobody is watched without knowing | security | what a person sees while someone else is in their session | who is there, for as long as they are; joining asks first | who is there, for as long as they are; joining asks first |
 
 ## Know the machines
 
@@ -172,8 +172,8 @@ To open a machine, Away has to know it: what it is, where it is, how it is reach
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
-| The list shows the machines that are really there | functional suitability | the time until a machine added, renamed or removed at its source shows in Away | not set | 15 minutes for machines taken from a directory; at once for those kept as files |
-| A machine is found in a moment, among hundreds | interaction capability | steps from opening Away to a session on a machine used before | not set | two: choose it among the last used, and it opens |
+| The list shows the machines that are really there | functional suitability | the time until a machine added, renamed or removed at its source shows in Away | 15 minutes for machines taken from a directory; at once for those kept as files | 15 minutes for machines taken from a directory; at once for those kept as files |
+| A machine is found in a moment, among hundreds | interaction capability | steps from opening Away to a session on a machine used before | two: choose it among the last used, and it opens | two: choose it among the last used, and it opens |
 
 ## Decide who reaches what
 
@@ -184,8 +184,8 @@ An organisation is many people and many machines: each person sees and reaches o
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
-| A person reaches only what a rule gives them | security | ways to a machine that no rule allows | not set | none: without a rule a machine is neither shown nor reached, and a test proves it on every change |
-| A right that is taken away is gone at once | security | the time from removing a right to the end of the sessions that rested on it | not set | under a minute |
+| A person reaches only what a rule gives them | security | ways to a machine that no rule allows | none: without a rule a machine is neither shown nor reached, and a test proves it on every change | none: without a rule a machine is neither shown nor reached, and a test proves it on every change |
+| A right that is taken away is gone at once | security | the time from removing a right to the end of the sessions that rested on it | under a minute | under a minute |
 
 ## Know what happened
 
@@ -196,25 +196,26 @@ Whoever answers for the machines can say afterwards who was on which one, when, 
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
-| No connection is made without a record | security | connections with no entry in the records | not set | none: when the record cannot be written, the connection is not made |
-| A record cannot be changed afterwards | security | who can change or remove an entry, and whether it would show | not set | nobody inside Away; every entry also leaves Away as it is written |
-| A recording takes little room | performance efficiency | the size of an hour of office work, recorded | not set | under 100 MB for a desktop; under 1 MB for a shell |
+| No connection is made without a record | security | connections with no entry in the records | none: when the record cannot be written, the connection is not made | none: when the record cannot be written, the connection is not made |
+| A record cannot be changed afterwards | security | who can change or remove an entry, and whether it would show | nobody inside Away; every entry also leaves Away as it is written | nobody inside Away; every entry also leaves Away as it is written |
+| A recording takes little room | performance efficiency | the size of an hour of office work, recorded | under 100 MB for a desktop; under 1 MB for a shell | under 100 MB for a desktop; under 1 MB for a shell |
 
 ## Run it oneself
 
 Somebody runs it: installs it, makes it reachable, keeps it up to date, and learns when it fails. It needs: [Trust it](#trust-it). Needed by: [Work on a machine that is somewhere else](#work-on-a-machine-that-is-somewhere-else), [Get in without another password](#get-in-without-another-password), [Look at a machine together](#look-at-a-machine-together), [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Know what happened](#know-what-happened).
 
-- **Expected of it:** [15 expectations](../capabilities/expectations.md#run-it-oneself): 7 first release, 3 first release in part, 2 later, 3 not planned.
-- **Capabilities:** [Installing and configuring](../capabilities/platform.md#installing-and-configuring) (16), [Running it](../capabilities/platform.md#running-it) (9). Of the 25: 16 first release, 7 later, 2 not planned.
+- **Expected of it:** [16 expectations](../capabilities/expectations.md#run-it-oneself): 8 first release, 3 first release in part, 2 later, 3 not planned.
+- **Capabilities:** [Installing and configuring](../capabilities/platform.md#installing-and-configuring) (17), [Running it](../capabilities/platform.md#running-it) (9). Of the 26: 17 first release, 7 later, 2 not planned.
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
-| Someone who has not seen it installs it in an hour | flexibility | time from nothing to a first session, with a cluster and an identity provider at hand | not set | one hour |
-| It runs on little | performance efficiency | the processor and the memory that 20 desktops of office work take | not set | 2 processor cores and 2 GiB |
-| A connection that fails says why | interaction capability | the share of failed connections whose message names the step that failed and what to do | not set | all of them |
-| An update ends nobody's work unannounced | reliability | what an update does to the sessions that are open | not set | people are told before; desktops are back by themselves within 30 s |
-| Whoever runs it learns of a failure before the people do | reliability | how a failure reaches them | not set | a health address and measures for the monitoring that is there, with alert rules ready to use |
-| One failing part does not end everyone's work | reliability | what the loss of one instance costs | not set | its desktops are back on another instance within 30 s |
+| It runs where there is no Windows domain | flexibility | what an installation needs besides a cluster and a sign-in service | nothing: no Windows domain, no certificate authority and no directory of its own | nothing: no Windows domain, no certificate authority and no directory of its own |
+| Someone who has not seen it installs it in an hour | flexibility | time from nothing to a first session, with a cluster and an identity provider at hand | one hour | one hour |
+| It runs on little | performance efficiency | the processor and the memory that 20 desktops of office work take | 2 processor cores and 2 GiB | 2 processor cores and 2 GiB |
+| A connection that fails says why | interaction capability | the share of failed connections whose message names the step that failed and what to do | all of them | all of them |
+| An update ends nobody's work unannounced | reliability | what an update does to the sessions that are open | people are told before; desktops are back by themselves within 30 s | people are told before; desktops are back by themselves within 30 s |
+| Whoever runs it learns of a failure before the people do | reliability | how a failure reaches them | a health address and measures for the monitoring that is there, with alert rules ready to use | a health address and measures for the monitoring that is there, with alert rules ready to use |
+| One failing part does not end everyone's work | reliability | what the loss of one instance costs | its desktops are back on another instance within 30 s | its desktops are back on another instance within 30 s |
 
 ## Trust it
 
@@ -225,12 +226,12 @@ It opens the door to every machine it knows, so anyone can see what it does, che
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
-| A security hole can be reported in private | security | a policy that says where and how, and how soon an answer comes | not set | a policy in the repository, private reports turned on, a first answer within three working days |
-| Every image can be traced to the source it was built from | security | signatures, a record of each build, a list of what an image holds | not set | all three, for every release |
-| It rests on little that others wrote | maintainability | the libraries a release is built from, and which of them speak a remote protocol | not set | none that speaks RDP, VNC or SSH; every other one listed, licensed and checked on each build |
-| A hostile machine cannot harm Away or the person's browser | security | how the code that reads what a machine sends is tested | not set | fuzzed on every change and without pause; reviewed by someone outside before the first release |
-| What is done in a session stays with whoever runs Away | security | what the pages and the server send to anyone else | not set | nothing: no fonts, scripts, statistics or update checks from outside |
-| A stranger can change it and have the change taken in | maintainability | a guide to contributing, and tests that run on every change | not set | both, with tests against a real server of each protocol |
+| A security hole can be reported in private | security | a policy that says where and how, and how soon an answer comes | a policy in the repository, private reports turned on, a first answer within three working days | a policy in the repository, private reports turned on, a first answer within three working days |
+| Every image can be traced to the source it was built from | security | signatures, a record of each build, a list of what an image holds | all three, for every release | all three, for every release |
+| It rests on little that others wrote | maintainability | the libraries a release is built from, and which of them speak a remote protocol | none that speaks RDP, VNC or SSH; every other one listed, licensed and checked on each build | none that speaks RDP, VNC or SSH; every other one listed, licensed and checked on each build |
+| A hostile machine cannot harm Away or the person's browser | security | how the code that reads what a machine sends is tested | fuzzed on every change and without pause; reviewed by someone outside before the first release | fuzzed on every change and without pause; reviewed by someone outside before the first release |
+| What is done in a session stays with whoever runs Away | security | what the pages and the server send to anyone else | nothing: no fonts, scripts, statistics or update checks from outside | nothing: no fonts, scripts, statistics or update checks from outside |
+| A stranger can change it and have the change taken in | maintainability | a guide to contributing, and tests that run on every change | both, with tests against a real server of each protocol | both, with tests against a real server of each protocol |
 <!-- end: by-goal -->
 
 ## The files

@@ -1,6 +1,6 @@
 # ADR-0002: Written in Rust, as one program in one repository
 
-**Status:** Proposed · 2026-11-14. Nothing of it is built.
+**Status:** Accepted · 2026-11-14. Nothing of it is built.
 
 ## Context
 

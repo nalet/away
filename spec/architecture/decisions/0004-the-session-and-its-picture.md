@@ -1,6 +1,6 @@
 # ADR-0004: One connection a session, and the gateway keeps the picture
 
-**Status:** Proposed · 2026-11-14. Nothing of it is built. The targets for the picture are measured before the design is taken as settled (see [Validation](#validation)).
+**Status:** Accepted · 2026-11-14. Nothing of it is built. The targets for the picture are measured before the design is taken as settled (see [Validation](#validation)).
 
 ## Context
 

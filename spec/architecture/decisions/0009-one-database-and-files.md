@@ -1,6 +1,6 @@
 # ADR-0009: Machines and rules are files; everything else Away keeps is in one database
 
-**Status:** Proposed · 2026-11-14. Nothing of it is built.
+**Status:** Accepted · 2026-11-14. Nothing of it is built.
 
 ## Context
 

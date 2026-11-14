@@ -1,6 +1,6 @@
 # ADR-0013: Built, tested, signed and listed by the project's own pipelines
 
-**Status:** Proposed · 2026-11-14. One pipeline is there, the one that checks the model and publishes this site. The rest is not built.
+**Status:** Accepted · 2026-11-14. One pipeline is there, the one that checks the model and publishes this site. The rest is not built.
 
 ## Context
 

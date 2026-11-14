@@ -1,6 +1,6 @@
 # ADR-0003: Three parts, each with its own rights
 
-**Status:** Proposed · 2026-11-14. Nothing of it is built.
+**Status:** Accepted · 2026-11-14. Nothing of it is built.
 
 ## Context
 

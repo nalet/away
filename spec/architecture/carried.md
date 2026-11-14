@@ -192,7 +192,8 @@ says which.
 | Say which part of a person's sign-in names their account on the machines | `server` `issuer` | [8](../plan/README.md#8-a-shell-as-oneself), [11](../plan/README.md#11-windows-as-oneself) | `name-account-claim` |
 | Set the address it answers on, behind the reverse proxy that is there | `server` `chart` | [1](../plan/README.md#1-the-ground) | `set-address` |
 | Use the cluster's certificates, or one's own | `chart` | [1](../plan/README.md#1-the-ground) | `use-own-certificates` |
-| Connect a certificate authority the Windows domain trusts, for signing in on its machines | `issuer` `chart` | [11](../plan/README.md#11-windows-as-oneself), [12](../plan/README.md#12-the-organisations-own-authority) | `connect-domain-authority` |
+| Choose who issues the sign-ins on a Windows domain's machines: Away's own authority or the organisation's | `issuer` `chart` | [11](../plan/README.md#11-windows-as-oneself), [12](../plan/README.md#12-the-organisations-own-authority) | `connect-domain-authority` |
+| Give a domain's controllers the certificates they need, where the domain has no authority of its own | `issuer` `docs` | [11](../plan/README.md#11-windows-as-oneself) | `certify-domain-controllers` |
 | Have the shells trust Away's sign-in, with one line on each machine | `issuer` `docs` | [8](../plan/README.md#8-a-shell-as-oneself) | `make-shells-trust` |
 | Run the part that signs people in on machines apart from the rest, with rights of its own | `issuer` `chart` | [1](../plan/README.md#1-the-ground) | `sign-apart` |
 | Keep what has to stay secret encrypted, with the key kept elsewhere | `server` `issuer` `chart` | [4](../plan/README.md#4-getting-in-and-the-frame) | `protect-secrets` |

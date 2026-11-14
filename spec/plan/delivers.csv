@@ -140,6 +140,7 @@ p11,be-oneself-on-machine,rdp,
 p11,reach-network-as-oneself,,
 p11,unlock-without-password,,
 p11,connect-domain-authority,,With Away's own authority
+p11,certify-domain-controllers,,
 p11,name-account-claim,,The name and the identifier a Windows domain knows a person's account by
 p12,connect-domain-authority,,With the organisation's own authority
 p13,open-program,,

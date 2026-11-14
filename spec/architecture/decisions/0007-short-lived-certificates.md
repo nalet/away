@@ -1,6 +1,6 @@
 # ADR-0007: On a machine as oneself, by a certificate that lasts minutes
 
-**Status:** Proposed · 2026-11-14. Nothing of it is built. The Windows half is proven on a real domain before anything is built around it (see [Validation](#validation)).
+**Status:** Accepted · 2026-11-14. Nothing of it is built. The Windows half is proven on a real domain before anything is built around it (see [Validation](#validation)).
 
 ## Context
 

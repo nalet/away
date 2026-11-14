@@ -1,6 +1,6 @@
 # ADR-0012: Installed by one chart, with no rights beyond its own namespace
 
-**Status:** Proposed · 2026-11-14. Nothing of it is built.
+**Status:** Accepted · 2026-11-14. Nothing of it is built.
 
 ## Context
 

@@ -36,7 +36,7 @@ first release unless its note begins with *There* or *Later*.
 | `gateway` | opens | `machines` | RDP | Port 3389 unless the machine's file says otherwise. |
 | `gateway` | opens | `machines` | VNC | Port 5900 unless the machine's file says otherwise. |
 | `gateway` | opens | `machines` | SSH | Port 22 unless the machine's file says otherwise. |
-| `gateway` | calls | `domain` | Kerberos | It proves the person with their certificate and gets the ticket for the machine. |
+| `gateway` | calls | `domain` | Kerberos | Only where the configuration names a domain: it proves the person with their certificate and gets the ticket for the machine. |
 | `gateway` | reads | `cluster-secrets` | its own signing key | Mounted. |
 | `gateway` | uses | `rdp` | — | — |
 | `gateway` | uses | `vnc` | — | — |
@@ -45,7 +45,7 @@ first release unless its note begins with *There* or *Later*.
 | `gateway` | uses | `wire` | — | — |
 | `issuer` | fetches | `sign-in-service` | the provider's public keys | To check a person's sign-in itself. |
 | `issuer` | reads | `cluster-secrets` | its authority's keys and the kept accounts | The one part that may read the kept accounts. |
-| `issuer` | asks | `authority` | one of the authority's published interfaces | Only where the organisation's own authority issues the Windows sign-ins; a proof settles which interface. |
+| `issuer` | asks | `authority` | one of the authority's published interfaces | Only where the configuration says that the organisation's own authority issues; a proof settles which interface. |
 | `issuer` | calls | `server` | internal | What is public of it: its state, the names of the kept accounts that exist, its authority's certificate and the list of those it withdrew. |
 | `server` | puts out | `log-system` | lines on its output | What happens, and every record as it is written. |
 | `gateway` | puts out | `log-system` | lines on its output | — |
@@ -69,7 +69,7 @@ first release unless its note begins with *There* or *Later*.
 
 | From |  | To | On | Note |
 |---|---|---|---|---|
-| `domain` | fetches | `server` | /authority | Only where Away's own authority issues them: the list of certificates it withdrew, which a domain asks for before it accepts one. |
+| `domain` | fetches | `server` | /authority | Only where the configuration says that Away's own authority issues: the list of certificates it withdrew, which a domain asks for before it accepts one. |
 | `monitoring` | measures | `server` | /metrics | — |
 | `monitoring` | measures | `gateway` | /metrics | — |
 | `monitoring` | measures | `issuer` | /metrics | — |

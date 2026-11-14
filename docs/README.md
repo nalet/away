@@ -1,9 +1,10 @@
 # Documentation
 
-Away is not built yet, so there is nothing to install and nothing to run. What
+Away is being built, and there is nothing to install or to run yet. What
 exists is its [specification](../spec/README.md): what Away is for, what it has
-to do, what it looks like, how it is built and in what order. It is a first
-cut, under review.
+to do, what it looks like, how it is built and in what order. The owner agreed
+to it on 14 November 2026, and [the work packages](../spec/plan/README.md) say
+how far the build is.
 
 | To | Read |
 |---|---|

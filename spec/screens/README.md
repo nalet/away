@@ -5,10 +5,10 @@ what it says in each state, on a computer and on a phone. They are the third
 part of the specification, after [what Away is for](../goals/README.md) and
 [what it does](../capabilities/README.md).
 
-> **Drawings of something not built yet.** Nothing of Away exists. Every
-> drawing here is a proposal for the first release, under review like the rest
-> of the specification: a screen can change, and so can the capability behind
-> it. What is built follows the reviewed drawings.
+> **Drawings, and no screenshots.** The screens are built from these drawings,
+> which the owner agreed to on 14 November 2026. Until a screen exists, its
+> figure says what it will be. Where building shows a drawing wrong, the
+> drawing is changed first, and so is the capability behind it.
 
 ## 1.1 Scope
 

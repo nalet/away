@@ -30,7 +30,7 @@ What the chart runs from Away's one image.
 |---|---|---|---|---|
 | `server` | the server: the pages, the requests, people's sign-ins, the rules, the records | service | first release | 52 |
 | `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | first release | 45 |
-| `issuer` | the issuer: makes the sign-ins on machines | service | first release | 14 |
+| `issuer` | the issuer: makes the sign-ins on machines | service | first release | 15 |
 | `relay` | a relay placed in a network Away is not in | relay | later | — |
 
 - `server`: The only part that reaches the database and the sign-in service; it reaches no machine. Keeps: nothing itself; what it holds is in the database. Code: `crates/away-server/`. Runs: run by the chart, as server. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0009](./decisions/0009-one-database-and-files.md).
@@ -91,8 +91,8 @@ What Away reaches and does not run.
 
 - `sign-in-service`: Any provider that speaks OpenID Connect. Keeps: the people and their groups. Governed by [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md).
 - `machines`: Reached the way each already offers: RDP, VNC or SSH; nothing of Away's runs on them.
-- `domain`: For signing in on its machines as oneself. Keeps: the accounts. Governed by [ADR‑0008](./decisions/0008-the-authority-for-windows-sign-ins.md).
-- `authority`: Where the organisation's own authority issues the Windows sign-ins, in place of Away's. Governed by [ADR‑0008](./decisions/0008-the-authority-for-windows-sign-ins.md).
+- `domain`: For signing in on its machines as oneself; an installation without one leaves it out and lacks nothing else. Keeps: the accounts. Governed by [ADR‑0008](./decisions/0008-the-authority-for-windows-sign-ins.md).
+- `authority`: Where the configuration says that the organisation's own authority issues the Windows sign-ins. Governed by [ADR‑0008](./decisions/0008-the-authority-for-windows-sign-ins.md).
 - `log-system`: It collects the lines every part puts out.
 - `monitoring`: It reads every part's measures.
 
@@ -107,7 +107,7 @@ What builds, tests, installs and describes Away.
 | `site-pipeline` | the pipeline that checks the model and publishes the site | pipeline | there | — |
 | `test-servers` | the servers the tests run against: a shell, a desktop over VNC, a desktop over RDP | tests | first release | 1 |
 | `registry` | the registry the project publishes to | registry | first release | — |
-| `docs` | the documentation, the specification and the site | docs | there | 4 |
+| `docs` | the documentation, the specification and the site | docs | there | 5 |
 
 - `chart`: No kinds of its own and no rights beyond its namespace. Code: `chart/`. Governed by [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](./decisions/0012-one-chart-no-special-rights.md).
 - `pipelines`: Beside the one that is there. Code: `.github/workflows/`. Runs: on GitHub. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).

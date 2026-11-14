@@ -6,10 +6,11 @@ fourth part of the specification. The [capabilities](../capabilities/README.md)
 say what Away does and for whom, and the [screens](../screens/README.md) what
 that looks like; this part says which piece of Away does it.
 
-> **A proposal, for something not built yet.** No component here exists but the
-> documentation. Every decision is a record with the status Proposed, and
-> becomes Accepted when the owner says so, by its number. Two of them rest on a
-> proof that comes before anything is built around it.
+> **A model of something that is being built.** A component exists when
+> [components](./components.md) says *there* of it, and no sooner. A decision
+> is a record: Proposed until the owner accepts it by its number, Accepted from
+> then on. Two of them rest on a proof that comes before anything is built
+> around it.
 
 ## The parts that run
 
@@ -177,9 +178,9 @@ decided, why, what follows from it, and what it rules out.
 
 | Decision records | Proposed | Accepted | Superseded | Rejected |
 |---|---|---|---|---|
-| 13 | 13 |  |  |  |
+| 13 | 1 | 12 |  |  |
 
-The first release holds 112 capabilities, and a component of Away's own carries each: 28 are carried by one component, the others by up to 6.
+The first release holds 113 capabilities, and a component of Away's own carries each: 28 are carried by one component, the others by up to 6.
 <!-- end: state -->
 
 ## What follows for the first release

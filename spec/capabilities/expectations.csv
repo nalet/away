@@ -78,6 +78,7 @@ watch-live,record,Watch a running session,watch-session,
 kept-for-a-time,record,"Records kept for a set time, then removed",keep-for-set-time,
 what-was-moved,record,A record of the files moved and of what was copied across,record-moved-content,
 cannot-be-changed,record,Records nobody can change unnoticed,show-tampering ; send-records-on,
+without-a-domain,run,It runs where there is no Windows domain,use-own-provider ; make-shells-trust ; use-kept-secret ; type-credentials,people come from the sign-in service; a Windows domain is a part one turns on
 one-step-install,run,Install it in one step,install-with-chart ; install-as-one-container,
 on-a-cluster,run,"Runs on Kubernetes and OpenShift, without special rights",install-with-chart ; run-without-special-rights,
 provider-that-is-there,run,Works with the identity provider that is there,use-own-provider ; name-account-claim,

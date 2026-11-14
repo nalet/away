@@ -4,11 +4,11 @@ The specification says what Away is for and what it has to do, before any of it
 is built. It is written for the people who decide what Away becomes and for the
 people who build it, and every release is checked against it.
 
-> **A first cut, under review.** Nothing of Away is built yet. Every row of this
-> specification is a proposal until the owner has reviewed it: a goal can be
-> struck, a capability moved between the first release and later, a target set,
-> a decision accepted or turned down. What is built follows from the reviewed
-> model, and not before.
+> **Agreed on 14 November 2026.** The owner reviewed this specification and
+> agreed to it: the goals, the cut between the first release and later, the
+> screens, a target for every quality, and every decision but one, which was
+> revised and waits. It stays a model: where building shows a row wrong, the
+> row is changed here first, and what is built follows it.
 
 It has five parts:
 
@@ -34,14 +34,14 @@ every product shares. The specification doesn't repeat them.
 |  | Rows | Of them |
 |---|---|---|
 | Goals | 8 | 3 what people want, 4 what that takes, 1 what being open adds |
-| Qualities | 34 | 0 with a target, 34 with a proposal |
-| Expectations | 98 | 50 first release, 12 first release in part, 28 later, 8 not planned |
-| Capabilities | 198 | in 19 areas: 112 first release, 73 later, 13 not planned |
+| Qualities | 35 | 35 with a target, 35 with a proposal |
+| Expectations | 99 | 51 first release, 12 first release in part, 28 later, 8 not planned |
+| Capabilities | 199 | in 19 areas: 113 first release, 73 later, 13 not planned |
 | Figures | 83 | in 15 chapters; they show 60 of the 66 capabilities the first release holds for a person or an administrator |
 | Components | 29 | in 6 layers: 2 there, 26 first release, 1 later |
 | Connections | 43 | of 16 kinds |
-| Decision records | 13 | 13 proposed |
-| Work packages | 16 | 2 proofs and 14 builds: 16 proposed |
+| Decision records | 13 | 1 proposed, 12 accepted |
+| Work packages | 16 | 2 proofs and 14 builds: 13 proposed, 3 agreed |
 <!-- end: state -->
 
 A capability counts once, by the soonest it is planned for any kind of
@@ -52,16 +52,14 @@ connection. How the words are meant is in
 ## Before the first release is built
 
 The five parts say what the first release is, how it is built and in what
-order. Building it waits for these:
+order. What still stands between them and a release:
 
 | Open | What it takes |
 |---|---|
-| The review | The owner's word on the goals, on the cut between the first release and later, and on the screens. |
-| Targets | Every quality has a proposal and no target. A target is what a release is tested against, and a work package whose gate measures against one can't end without it. |
-| The decisions | The [decision records](./architecture/decisions/README.md) are proposed. Each waits for the owner's word, by its number, and a work package begins only once the records it rests on are accepted. |
+| One decision | [ADR-0008](./architecture/decisions/0008-the-authority-for-windows-sign-ins.md), on who issues the sign-ins for Windows machines, was revised on the owner's word and waits to be accepted. Work packages 3, 11 and 12 rest on it. The others are accepted. |
 | Two proofs | Whether Away's own code reaches a Windows desktop, and whether it signs an ordinary account in there with a short-lived certificate that a domain accepts. The first release rests on both, so [work packages](./plan/README.md) 2 and 3 prove them with no browser, before anything is built around them. |
 | Machines to test against | The tests run against a real server of each protocol. A build can start some of them by itself: a shell, a desktop over VNC, a desktop over RDP on Linux. Windows machines it cannot, and the sign-in needs a domain that exists for testing. [What the build needs first](./plan/README.md#what-the-build-needs-first) lists them. |
-| The work packages | [Proposed](./plan/README.md), and none has begun. A package begins when the owner names it. |
+| The work packages | [Sixteen](./plan/README.md), each ending at a gate. A package begins when the owner names it, and the table there says how far each is. |
 
 The frame's components, the top bar, the rail and a phone's tab bar, are
 drafts in the design system. Away builds its own from those drafts and offers

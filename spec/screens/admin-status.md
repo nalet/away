@@ -40,6 +40,8 @@ and the version to [Checking it](../capabilities/platform.md#checking-it).
 - A part that this installation doesn't have is not listed: without a Windows
   domain there is no certificate authority, and without a log system the
   records say nothing of putting out.
+- Which authority issues is the configuration's choice: Away's own, or the
+  organisation's. The row is the same for either.
 - A state is never shown by colour alone: it has a mark and a word, “well” or
   “not answering”.
 - The same facts are at an address for health checks and as measures, for the

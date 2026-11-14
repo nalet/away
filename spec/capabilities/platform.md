@@ -18,7 +18,8 @@ Away as an operator installs it: where it runs, the identity provider, addresses
 | Bring an identity provider along for those who have none | operator | no | `bring-provider-along` |
 | Set the address it answers on, behind the reverse proxy that is there | operator | v1 | `set-address` |
 | Use the cluster's certificates, or one's own | operator | v1 | `use-own-certificates` |
-| Connect a certificate authority the Windows domain trusts, for signing in on its machines | operator | v1 | `connect-domain-authority` |
+| Choose who issues the sign-ins on a Windows domain's machines: Away's own authority or the organisation's | operator | v1 | `connect-domain-authority` |
+| Give a domain's controllers the certificates they need, where the domain has no authority of its own | operator | v1 | `certify-domain-controllers` |
 | Have the shells trust Away's sign-in, with one line on each machine | operator | v1 | `make-shells-trust` |
 | Run the part that signs people in on machines apart from the rest, with rights of its own | operator | v1 | `sign-apart` |
 | Keep what has to stay secret encrypted, with the key kept elsewhere | system | v1 | `protect-secrets` |
@@ -29,7 +30,8 @@ Away as an operator installs it: where it runs, the identity provider, addresses
 
 - *Say which part of a person's sign-in names their account on the machines*: a Windows domain knows a person by a name and an identifier of its own, a shell by another name.
 - *Bring an identity provider along for those who have none*: Away asks an identity provider and is none.
-- *Connect a certificate authority the Windows domain trusts, for signing in on its machines*: the organisation's own, issuing on Away's request; or Away's own, made known to the domain once.
+- *Choose who issues the sign-ins on a Windows domain's machines: Away's own authority or the organisation's*: Away's own is made known to the domain once; the organisation's issues on Away's request; an installation without a domain sets neither.
+- *Give a domain's controllers the certificates they need, where the domain has no authority of its own*: signing in with a certificate needs them, and Away's own authority issues them on the operator's request.
 - *Carry other traffic to the machines' network, as a private network would*: Away carries sessions and no other traffic.
 
 ## Running it

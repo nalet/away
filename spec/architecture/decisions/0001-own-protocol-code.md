@@ -1,6 +1,6 @@
 # ADR-0001: Away speaks RDP, VNC and SSH with code of its own
 
-**Status:** Proposed · 2026-11-14. Nothing of it is built. Its hardest part is judged by a proof before anything is built around it (see [Validation](#validation)).
+**Status:** Accepted · 2026-11-14. Nothing of it is built. Its hardest part is judged by a proof before anything is built around it (see [Validation](#validation)).
 
 ## Context
 

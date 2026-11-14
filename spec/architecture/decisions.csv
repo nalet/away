@@ -6,7 +6,7 @@ adr,components,capabilities,note
 0005,shell-screen ; session-view ; gateway,run-full-screen-programs ; scroll-back ; select-shell-text,
 0006,web ; server ; sign-in-service,sign-in ; stay-signed-in ; sign-in-again ; sign-out ; take-people-from-provider ; use-own-provider ; end-on-lost-right,
 0007,gateway ; issuer ; windows-sign-in ; ssh,be-oneself-on-machine ; reach-network-as-oneself ; unlock-without-password ; make-shells-trust ; name-account-claim ; record-sign-ins-made,
-0008,issuer ; domain ; authority,connect-domain-authority,
+0008,issuer ; domain ; authority,connect-domain-authority ; certify-domain-controllers,
 0009,server ; database ; files,keep-as-files ; see-what-is-in-force ; see-refused-change ; record-connections ; record-changes ; read-records ; send-records-on,
 0010,issuer ; cluster-secrets,keep-secret ; use-kept-secret ; protect-secrets,
 0011,web ; session-view,move-between-views ; use-on-phone ; use-without-mouse ; call-nobody-else,

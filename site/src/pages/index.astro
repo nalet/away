@@ -28,6 +28,14 @@ const shown = ['machines-computer', 'desktop-bar-computer', 'shell-computer'].ma
 const chapters = new Set(m.screens.map((f: any) => f.chapter)).size;
 // how it is built: the decision records by their status, the work packages by their state
 const tally = (xs: any[], by: string) => [...new Set(xs.map((x) => x[by]))].map((k) => `${xs.filter((x) => x[by] === k).length} ${String(k).toLowerCase()}`).join(', ');
+// how far the build is, from the work packages' states
+const done = m.packages.filter((p: any) => p.state === 'done').length;
+const underway = m.packages.filter((p: any) => p.state === 'begun').length;
+const building = done + underway > 0;
+const stage = building ? 'being built' : 'being specified';
+const progress = building
+	? `${done} of its ${m.packages.length} work packages ${done === 1 ? 'is' : 'are'} done and ${underway} ${underway === 1 ? 'is' : 'are'} being built`
+	: `none of its ${m.packages.length} work packages has begun`;
 const built = [
 	{ n: m.components.length, name: 'components' },
 	{ n: m.decisions.length, name: `decision records: ${tally(m.decisions, 'status')}` },
@@ -43,13 +51,13 @@ const built = [
 		<title>Away</title>
 		<meta
 			name="description"
-			content="Away: remote access in a browser, signed in once. It is being specified in the open; nothing is built yet."
+			content="Away: remote access in a browser, signed in once. Specified and built in the open; nothing can be installed yet."
 		/>
 		<meta name="color-scheme" content="dark" />
 		<meta name="theme-color" content="#0B0F19" />
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content="Away" />
-		<meta property="og:description" content="Remote access in a browser, signed in once. Being specified in the open." />
+		<meta property="og:description" content="Remote access in a browser, signed in once. Specified and built in the open." />
 		<meta property="og:url" content={`${ORIGIN}${BASE}/`} />
 		<link rel="icon" href={`${BASE}/favicon.svg`} type="image/svg+xml" />
 	</head>
@@ -81,13 +89,13 @@ const built = [
 			<section class="hero">
 				<div class="wrap hero-inner">
 					<p class="eyebrow">
-						<span class="chev">&gt;</span> remote access in a browser <span class="nc-badge nc-badge--blue">being specified</span>
+						<span class="chev">&gt;</span> remote access in a browser <span class="nc-badge nc-badge--blue">{stage}</span>
 					</p>
 					<h1 class="hero-title">your machines.<br />one sign-in.</h1>
 					<p class="lede">
-						Away is being specified. A browser on one side; a Windows desktop or one of its programs, a Mac or a Linux
-						desktop, or a shell on the other; and no second password in between. Nothing is built yet: what it is for and
-						what it has to do are written down, its screens are drawn, and all of it is open to review.
+						Away is {stage}. A browser on one side; a Windows desktop or one of its programs, a Mac or a Linux
+						desktop, or a shell on the other; and no second password in between. Nothing can be installed yet: what it is
+						for and what it has to do are written down, its screens are drawn, and {progress}.
 					</p>
 					<div class="cta-row">
 						<a class="nc-btn nc-btn--primary nc-btn--lg" href={`${spec}/goals/map/`}>the goal map</a>
@@ -118,7 +126,8 @@ const built = [
 							</h2>
 							<p class="sec-lede">
 								Drawings of the first release, from the specification: {m.screens.length} figures in {chapters} chapters.
-								Nothing is built yet, so none of them is a screenshot. The pink numbers are notes that a chapter explains.
+								None of them is a screenshot: the screens are built from these drawings. The pink numbers are notes that a
+								chapter explains.
 							</p>
 							<div class="figs">
 								{shown.map((f: any) => (
@@ -165,8 +174,8 @@ const built = [
 				<div class="wrap">
 					<h2 class="sec-title"><span class="chev">&gt;</span> where it stands</h2>
 					<p class="sec-lede">
-						Nothing is built, so the model says what is planned: for the first release, for later, or not at all. Each
-						number is counted from the model as this page is built.
+						Until a capability is built, the model says when it is planned: for the first release, for later, or not at
+						all. Each number is counted from the model as this page is built.
 					</p>
 					<p class="stat-of">{m.capabilities.length} capabilities</p>
 					<div class="stats">
@@ -251,7 +260,7 @@ const built = [
 					<a href={`${spec}/`}>spec</a>
 					<a href={`${BASE}/docs/`}>docs</a>
 				</nav>
-				<p class="foot-fine">mpl-2.0 · being specified · nothing is built yet</p>
+				<p class="foot-fine">mpl-2.0 · {stage} · nothing to install yet</p>
 			</div>
 		</footer>
 	</body>

@@ -1,6 +1,6 @@
 # ADR-0005: A shell's screen is worked out in the browser
 
-**Status:** Proposed · 2026-11-14. Nothing of it is built.
+**Status:** Accepted · 2026-11-14. Nothing of it is built.
 
 ## Context
 

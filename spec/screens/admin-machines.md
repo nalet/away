@@ -190,6 +190,7 @@ knows. **Cancel** changes nothing.
 | In the files | Defined in · line 3 · Groups |
 | The test | test · Reaching fin-app-02 · It answered in 12 ms. · Checking that it is fin-app-02 · Its certificate comes from Example Corp Issuing CA. · Signing in as CORP\alex.urban, as a test · today, 09:13 · by Alex Urban |
 | The test, the domain refuses Away's authority | The domain doesn't accept certificates from Away's authority for signing in. Make the authority known to the domain; the installation guide says how. |
+| The test, the organisation's authority gives no certificate | The organisation's authority gave no certificate for CORP\alex.urban. Its answer is in the details; the installation guide says what it has to allow. |
 | A changed identity | hr-app-01 shows another identity than on 2 November 2026. Away opens it for nobody until you accept the change. · compare |
 | The dialog | accept hr-app-01's new identity? · The identity Away knows, since 2 November 2026 · The identity hr-app-01 shows now, first seen today at 08:47 · A machine shows another identity after it was set up again or its certificate was renewed. If neither happened, another machine may be answering in its place: don't accept, and ask whoever looks after hr-app-01. · cancel · accept |
 

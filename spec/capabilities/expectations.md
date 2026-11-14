@@ -160,6 +160,7 @@ For the goal [Run it oneself](../goals/README.md#run-it-oneself).
 
 | Expected | State | Met by | Note |
 |---|---|---|---|
+| It runs where there is no Windows domain | first release | [`use-own-provider`](./platform.md#installing-and-configuring) first release, [`make-shells-trust`](./platform.md#installing-and-configuring) first release, [`use-kept-secret`](./app.md#signing-in) first release, [`type-credentials`](./app.md#signing-in) first release | people come from the sign-in service; a Windows domain is a part one turns on |
 | Install it in one step | first release in part | [`install-with-chart`](./platform.md#installing-and-configuring) first release, [`install-as-one-container`](./platform.md#installing-and-configuring) later | — |
 | Runs on Kubernetes and OpenShift, without special rights | first release | [`install-with-chart`](./platform.md#installing-and-configuring) first release, [`run-without-special-rights`](./platform.md#installing-and-configuring) first release | — |
 | Works with the identity provider that is there | first release | [`use-own-provider`](./platform.md#installing-and-configuring) first release, [`name-account-claim`](./platform.md#installing-and-configuring) first release | — |

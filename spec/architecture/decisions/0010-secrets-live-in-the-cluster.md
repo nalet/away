@@ -1,6 +1,6 @@
 # ADR-0010: Secrets and keys live in the cluster, and only the issuer reads a kept account
 
-**Status:** Proposed · 2026-11-14. Nothing of it is built.
+**Status:** Accepted · 2026-11-14. Nothing of it is built.
 
 ## Context
 

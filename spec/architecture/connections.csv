@@ -18,7 +18,7 @@ gateway,issuer,asks,internal,v1,"For one session: a certificate for its key, a k
 gateway,machines,opens,RDP,v1,Port 3389 unless the machine's file says otherwise
 gateway,machines,opens,VNC,v1,Port 5900 unless the machine's file says otherwise
 gateway,machines,opens,SSH,v1,Port 22 unless the machine's file says otherwise
-gateway,domain,calls,Kerberos,v1,It proves the person with their certificate and gets the ticket for the machine
+gateway,domain,calls,Kerberos,v1,Only where the configuration names a domain: it proves the person with their certificate and gets the ticket for the machine
 gateway,cluster-secrets,reads,its own signing key,v1,Mounted
 gateway,rdp,uses,,v1,
 gateway,vnc,uses,,v1,
@@ -28,9 +28,9 @@ gateway,wire,uses,,v1,
 rdp,windows-sign-in,uses,,v1,
 issuer,sign-in-service,fetches,the provider's public keys,v1,To check a person's sign-in itself
 issuer,cluster-secrets,reads,its authority's keys and the kept accounts,v1,The one part that may read the kept accounts
-issuer,authority,asks,one of the authority's published interfaces,v1,Only where the organisation's own authority issues the Windows sign-ins; a proof settles which interface
+issuer,authority,asks,one of the authority's published interfaces,v1,Only where the configuration says that the organisation's own authority issues; a proof settles which interface
 issuer,server,calls,internal,v1,"What is public of it: its state, the names of the kept accounts that exist, its authority's certificate and the list of those it withdrew"
-domain,server,fetches,/authority,v1,"Only where Away's own authority issues them: the list of certificates it withdrew, which a domain asks for before it accepts one"
+domain,server,fetches,/authority,v1,"Only where the configuration says that Away's own authority issues: the list of certificates it withdrew, which a domain asks for before it accepts one"
 server,log-system,puts out,lines on its output,v1,"What happens, and every record as it is written"
 gateway,log-system,puts out,lines on its output,v1,
 issuer,log-system,puts out,lines on its output,v1,A line of its own for every sign-in it makes

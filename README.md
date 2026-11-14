@@ -4,9 +4,9 @@ Remote access in a browser: a Windows desktop or one of its programs, a Mac or
 a Linux desktop, a shell. Signed in once, with the organisation's own sign-in,
 and then signed in on the machine too.
 
-**Being specified. Nothing is built yet.** What Away is for, what it has to do,
-what it looks like, how it is built and in what order are written down and
-drawn as a first cut, and under review:
+**Specified, and being built. Nothing can be installed yet.** What Away is for,
+what it has to do, what it looks like, how it is built and in what order are
+written down, drawn and agreed. It is built one work package at a time:
 <https://nalet.github.io/away/>
 
 | | In this repository | On the site |

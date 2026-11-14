@@ -118,17 +118,17 @@ has the steps.
 | [in a session](./session.md) | 7 | 63 | 0 | 0 | 37 | 22 | 4 |
 | [around the sessions](./app.md) | 5 | 48 | 0 | 0 | 27 | 17 | 4 |
 | [administration](./admin.md) | 4 | 55 | 0 | 0 | 25 | 27 | 3 |
-| [the platform](./platform.md) | 3 | 32 | 0 | 0 | 23 | 7 | 2 |
-| all | 19 | 198 | 0 | 0 | 112 | 73 | 13 |
+| [the platform](./platform.md) | 3 | 33 | 0 | 0 | 24 | 7 | 2 |
+| all | 19 | 199 | 0 | 0 | 113 | 73 | 13 |
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
-| a session over RDP | 0 | 0 | 35 | 24 | 4 | 135 |
-| a session over VNC | 0 | 0 | 26 | 11 | 13 | 148 |
-| a session over SSH | 0 | 0 | 27 | 12 | 2 | 157 |
-| Away itself | 0 | 0 | 70 | 46 | 9 | 73 |
+| a session over RDP | 0 | 0 | 35 | 24 | 4 | 136 |
+| a session over VNC | 0 | 0 | 26 | 11 | 13 | 149 |
+| a session over SSH | 0 | 0 | 27 | 12 | 2 | 158 |
+| Away itself | 0 | 0 | 71 | 46 | 9 | 73 |
 
-An expectation names 163 of the 198 capabilities; no expectation names the other 35.
+An expectation names 163 of the 199 capabilities; no expectation names the other 36.
 <!-- end: overview -->
 
 ## What is expected of it
@@ -146,9 +146,9 @@ the capabilities that meet it, and says how the states are worked out.
 | [Know the machines](./expectations.md#know-the-machines) | 13 | 0 | 0 | 5 | 0 | 7 | 1 |
 | [Decide who reaches what](./expectations.md#decide-who-reaches-what) | 13 | 0 | 0 | 7 | 2 | 4 | 0 |
 | [Know what happened](./expectations.md#know-what-happened) | 9 | 0 | 0 | 3 | 1 | 5 | 0 |
-| [Run it oneself](./expectations.md#run-it-oneself) | 15 | 0 | 0 | 7 | 3 | 2 | 3 |
+| [Run it oneself](./expectations.md#run-it-oneself) | 16 | 0 | 0 | 8 | 3 | 2 | 3 |
 | [Trust it](./expectations.md#trust-it) | 4 | 0 | 0 | 4 | 0 | 0 | 0 |
-| all | 98 | 0 | 0 | 50 | 12 | 28 | 8 |
+| all | 99 | 0 | 0 | 51 | 12 | 28 | 8 |
 <!-- end: expected -->
 
 ## Pages
