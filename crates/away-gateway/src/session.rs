@@ -315,12 +315,17 @@ where
         return Err(Failure { step: Step::SigningIn, why: Why::SignInRefused, details });
     };
 
-    // then its first picture
+    // then its first picture. A program is open once the machine says that it started:
+    // its windows come when the program has them, and a first sign-in takes its time
     tell(browser, ToBrowser::Step("first-picture")).await.map_err(|()| gone(Step::FirstPicture))?;
-    let first = tokio::time::timeout(machine::FIRST_PICTURE_WITHIN, async {
+    let within = match taken.program {
+        Some(_) => machine::PROGRAM_STARTS_WITHIN,
+        None => machine::FIRST_PICTURE_WITHIN,
+    };
+    let first = tokio::time::timeout(within, async {
         loop {
             let drawn = desktop.take().await?;
-            if !drawn.is_empty() {
+            if !drawn.is_empty() || desktop.started() {
                 // what was drawn is for whoever shows the desktop: said again there
                 break Ok::<(), Failure>(());
             }
@@ -332,7 +337,8 @@ where
         Ok(Ok(())) => Ok(Some(Open { desktop, served_by })),
         Ok(Err(failed)) => Err(Failure { step: Step::FirstPicture, ..failed }),
         Err(_) => {
-            Err(Failure { step: Step::FirstPicture, why: Why::NoPicture, details: "it showed nothing within 30 seconds".to_string() })
+            let details = format!("it showed nothing within {} seconds", within.as_secs());
+            Err(Failure { step: Step::FirstPicture, why: Why::NoPicture, details })
         }
     }
 }

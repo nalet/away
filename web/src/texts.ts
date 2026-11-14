@@ -130,7 +130,7 @@ export const texts = {
         'checking another-identity': { says: "It showed another identity than the one Away knows, so Away doesn't connect to it.", again: false },
         'signing-in sign-in-refused': { says: `${machine} didn't accept that name and password.`, again: true },
         'signing-in sent-elsewhere': { says: "Its farm sent Away on to a machine that isn't among those named for it, so Away doesn't connect there.", again: false },
-        'first-picture no-picture': { says: 'It took the sign-in and showed nothing within 30 seconds.', again: true },
+        'first-picture no-picture': { says: 'It took the sign-in and then showed nothing in time.', again: true },
         'first-picture program-not-started': { says: "It took the sign-in and didn't start the program.", again: true },
       };
       return known[`${step} ${why}`] ?? { says: 'Something went wrong on the way to it.', again: true };

@@ -32,6 +32,9 @@ use crate::windows::Windows;
 pub const WITHIN: Duration = Duration::from_secs(10);
 /// How long a machine gets to show its first picture, once it took the sign-in.
 pub const FIRST_PICTURE_WITHIN: Duration = Duration::from_secs(30);
+/// How long a machine gets to say that a program started, once it took the sign-in: a
+/// person's first sign-in on a machine that serves programs takes its time.
+pub const PROGRAM_STARTS_WITHIN: Duration = Duration::from_secs(120);
 
 /// The steps of a connection, as a person sees them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -266,6 +269,7 @@ impl Secured {
                 drawn: Vec::new(),
                 windows: Windows::default(),
                 windows_changed: false,
+                started: false,
                 scratch: vec![0u8; 32 * 1024],
             };
             while !desktop.is_open {
@@ -326,6 +330,8 @@ pub struct Desktop {
     windows: Windows,
     /// Whether the machine said something of the windows since they were last asked for.
     windows_changed: bool,
+    /// Whether the machine said that the program started.
+    started: bool,
     scratch: Vec<u8>,
 }
 
@@ -395,8 +401,9 @@ impl Desktop {
                         let details = format!("{} (its own code {raw:#010x})", away_rdp::rail::why(result));
                         return Err(failure(Step::FirstPicture, Why::ProgramNotStarted, details));
                     }
+                    Happened::Started => self.started = true,
                     Happened::Channels { .. } | Happened::Licensed | Happened::AsksToTakeALicence { .. } | Happened::LicenceTaken(_) => {}
-                    Happened::AskedForTheProgram | Happened::Started => {}
+                    Happened::AskedForTheProgram => {}
                 }
             }
         }
@@ -407,6 +414,11 @@ impl Desktop {
     /// the machine said something of them since this was last asked.
     pub fn windows(&mut self) -> Option<(Vec<away_wire::Window>, Option<u32>)> {
         std::mem::take(&mut self.windows_changed).then(|| self.windows.told())
+    }
+
+    /// Whether the machine said that the program started, where the session is for one.
+    pub fn started(&self) -> bool {
+        self.started
     }
 
     /// How many windows of their own are open.
