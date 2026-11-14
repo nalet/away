@@ -10,8 +10,15 @@ publish.workspace = true
 
 [dependencies]
 away-part.workspace = true
+away-secret.workspace = true
 hyper.workspace = true
+tokio.workspace = true
 ring.workspace = true
+getrandom.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+away-server = { workspace = true, features = ["stand-in"] }
 
 [features]
 # a sign-in service that stands in for a real one, for tests

@@ -4,10 +4,10 @@ Away is built from its source with one command, and every image the project
 publishes can be traced to the commit it was built from. This page says how to
 do both.
 
-What exists today is the first work package: the program with its three parts,
-the chart that installs it, and the pipelines. The parts say whether they are
-well and do nothing else yet. [The work packages](../spec/plan/README.md) say
-what comes next.
+What exists today: the program with its three parts, the chart that installs
+it, and the pipelines. The parts say whether they are well, and the server
+signs people in through a sign-in service. Away's own RDP code is proven by a
+test program. [The work packages](../spec/plan/README.md) say what comes next.
 
 ## Building it
 

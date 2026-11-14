@@ -39,8 +39,10 @@ part runs the one image as an ordinary user, with files it can't write and no
 capabilities, so it fits the strictest profile a cluster has.
   root   the chart's context
   part   server, gateway or issuer
-  port   where it answers what it is there for, if it has such an address
-  named  that port's name
+  port     where it answers what it is there for, if it has such an address
+  named    that port's name
+  told     what it is told through its environment: a list of names and values
+  mounts   the files it is given: a list of volumes, each with where it is mounted
 */}}
 {{- define "away.part" -}}
 {{- $name := printf "%s-%s" (include "away.name" .root) .part -}}
@@ -91,6 +93,18 @@ spec:
             {{- end }}
             - name: health
               containerPort: 9090
+          {{- with .told }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .mounts }}
+          volumeMounts:
+            {{- range .mounts }}
+            - name: {{ .volume.name }}
+              mountPath: {{ .at }}
+              readOnly: true
+            {{- end }}
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /livez
@@ -109,6 +123,12 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+      {{- if .mounts }}
+      volumes:
+        {{- range .mounts }}
+        - {{ toYaml .volume | indent 10 | trim }}
+        {{- end }}
+      {{- end }}
       {{- with .root.Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

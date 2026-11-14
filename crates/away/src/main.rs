@@ -13,6 +13,7 @@ use std::process::ExitCode;
 use away_gateway::Gateway;
 use away_issuer::Issuer;
 use away_part::{stop, version, Lines, Part, Settings};
+use away_server::told::Told;
 use away_server::Server;
 
 const USAGE: &str = "\
@@ -30,6 +31,10 @@ A part reads where to listen from its environment:
                          (server 0.0.0.0:8080, gateway 0.0.0.0:8081; the issuer has none)
   AWAY_HEALTH_ADDRESS    where it says whether it is well and gives its measures
                          (0.0.0.0:9090)
+
+The server also reads what an installation tells it, which the chart sets from its
+values: the address people reach Away at, the sign-in service, who administers, and
+whom people turn to. docs/install.md has each.
 ";
 
 fn main() -> ExitCode {
@@ -84,7 +89,14 @@ async fn run(name: &'static str, lines: Lines) -> ExitCode {
     let ran = match name {
         "server" => {
             let settings = Settings::with_address(away_server::ADDRESS).from_environment(from_environment);
-            match Server::bind(&settings, part).await {
+            let told = match Told::read(from_environment, |path| std::fs::read(path)) {
+                Ok(told) => told,
+                Err(why) => {
+                    part.lines.error("could not start", &[("why", (&why).into())]);
+                    return ExitCode::FAILURE;
+                }
+            };
+            match Server::bind(&settings, told, part).await {
                 Ok(server) => {
                     server.run().await;
                     true

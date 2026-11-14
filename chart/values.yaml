@@ -4,6 +4,32 @@
 # The address Away answers on, such as away.example.com. A way in needs it.
 address: ""
 
+# The organisation's sign-in service, which speaks OpenID Connect. Without it Away
+# runs, and nobody can sign in.
+signIn:
+  # The service, as it names itself, such as https://sign-in.example.com/realms/staff
+  service: ""
+  # The name the service knows Away by.
+  client: ""
+  # The secret that holds what Away proves itself to the service with, under the key
+  # "secret". It is made beside the chart, so that it is in no file of values.
+  secretName: ""
+  # A ConfigMap with the certificates of authorities to trust besides the public ones,
+  # as PEM under the key "authorities.pem": for a service whose certificate is of the
+  # organisation's own authority.
+  authoritiesConfigMap: ""
+  # What the service is asked to say of a person.
+  asksFor: openid profile email
+  # The entry of a sign-in that names the person's groups.
+  groupsEntry: groups
+
+# The groups whose people administer Away, and the groups whose people read its records.
+administrators: []
+recordReaders: []
+
+# Whom people turn to when something fails, as the pages show it: it-help@example.com
+contact: ""
+
 image:
   repository: ghcr.io/nalet/away
   # The image's tag. Empty takes the version of Away this chart was published with.
@@ -43,6 +69,10 @@ networkRules:
   wayInFrom: []
   # Who may read the measures, as the peers of a NetworkPolicy. Empty lets nobody.
   measuresFrom: []
+  # Where the sign-in service is, as the peers of a NetworkPolicy, and its port. Empty
+  # takes any address: the server reaches that port and nothing else.
+  signInServiceAt: []
+  signInServicePort: 443
 
 monitoring:
   # Make a ServiceMonitor, so the Prometheus operator finds the measures by itself.

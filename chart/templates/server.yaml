@@ -1,5 +1,34 @@
 {{- /* The server: the pages and the requests. The way in leads everything but a session's connection here. */ -}}
-{{ include "away.part" (dict "root" . "part" "server" "port" 8080 "named" "http") }}
+{{- $told := list -}}
+{{- $mounts := list -}}
+{{- with .Values.signIn }}
+{{- if or .service .client .secretName }}
+{{- /* the sign-in service is named whole or not at all */ -}}
+{{- $address := required "signIn needs the address people reach Away at: set address" $.Values.address -}}
+{{- $told = append $told (dict "name" "AWAY_PUBLIC_ADDRESS" "value" (printf "https://%s" $address)) -}}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_SERVICE" "value" (required "signIn.service is not set" .service)) -}}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_CLIENT" "value" (required "signIn.client is not set" .client)) -}}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_SECRET_FILE" "value" "/run/away/sign-in/secret") -}}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_ASKS_FOR" "value" .asksFor) -}}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_GROUPS" "value" .groupsEntry) -}}
+{{- $secret := dict "secretName" (required "signIn.secretName is not set" .secretName) "items" (list (dict "key" "secret" "path" "secret")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/sign-in" "volume" (dict "name" "sign-in" "secret" $secret)) -}}
+{{- if .authoritiesConfigMap }}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_AUTHORITIES_FILE" "value" "/run/away/authorities/authorities.pem") -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/authorities" "volume" (dict "name" "authorities" "configMap" (dict "name" .authoritiesConfigMap))) -}}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- with .Values.administrators }}
+{{- $told = append $told (dict "name" "AWAY_ADMINISTRATORS" "value" (join "," .)) -}}
+{{- end }}
+{{- with .Values.recordReaders }}
+{{- $told = append $told (dict "name" "AWAY_RECORD_READERS" "value" (join "," .)) -}}
+{{- end }}
+{{- with .Values.contact }}
+{{- $told = append $told (dict "name" "AWAY_CONTACT" "value" .) -}}
+{{- end }}
+{{ include "away.part" (dict "root" . "part" "server" "port" 8080 "named" "http" "told" $told "mounts" $mounts) }}
 ---
 apiVersion: v1
 kind: Service

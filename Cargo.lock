@@ -69,8 +69,13 @@ name = "away-server"
 version = "0.1.0"
 dependencies = [
  "away-part",
+ "away-secret",
+ "away-server",
+ "getrandom 0.4.3",
  "hyper",
  "ring",
+ "sha2",
+ "tokio",
 ]
 
 [[package]]
