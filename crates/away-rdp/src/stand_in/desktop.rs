@@ -3,6 +3,7 @@
 //! do, and draws one picture, in each of the ways a machine sends rectangles that Away
 //! reads.
 
+use crate::input::{self, Button, Input};
 use crate::licence::stand_in::HandsOut;
 use crate::picture::Picture;
 use crate::{der, interleaved, mcs, ntlm, pdu, tpkt, Error};
@@ -39,6 +40,20 @@ pub struct Seen {
     pub left: bool,
     /// What the client took a licence as, where the stand-in handed one out.
     pub licence: Option<crate::licence::stand_in::Seen>,
+    /// The keys and the pointer, as the client told of them.
+    pub input: Vec<Input>,
+}
+
+/// How wide and how high the mark is that the stand-in draws where a button went down,
+/// and in its corner for a key.
+pub const MARK: usize = 12;
+
+/// The colour of the mark for the left button: blue, green, red.
+pub const CLICKED: [u8; 3] = [0x20, 0x40, 0xe0];
+
+/// The colour of the mark for a key that went down: it says which key it was.
+pub fn typed(code: u8) -> [u8; 3] {
+    [code, 0xff - code, 0x55]
 }
 
 enum State {
@@ -249,6 +264,42 @@ impl Desktop {
             }
         }
         Ok(send)
+    }
+
+    /// Takes what a frame of the short kind tells of keys and of the pointer, and draws
+    /// as a desktop would: a mark where the left button went down, and a mark in the
+    /// corner for a key, whose colour says which key it was. The answer is what it drew.
+    pub fn input(&mut self, head: u8, carried: &[u8]) -> Result<Vec<u8>, Error> {
+        if !matches!(self.state, State::Open) {
+            return Err(WRONG);
+        }
+        let mut send = Vec::new();
+        for event in input::read(head, carried)? {
+            self.seen.input.push(event);
+            let (left, top, colour) = match event {
+                Input::Button { button: Button::Left, down: true, x, y } => (usize::from(x), usize::from(y), CLICKED),
+                Input::Key { code, down: true, .. } => (0, 0, typed(code)),
+                _ => continue,
+            };
+            let (left, top) = (left.min(self.picture.width - 1), top.min(self.picture.height - 1));
+            let (wide, high) = (MARK.min(self.picture.width - left), MARK.min(self.picture.height - top));
+            for row in top..top + high {
+                for column in left..left + wide {
+                    self.picture.pixels[(row * self.picture.width + column) * 4..][..3].copy_from_slice(&colour);
+                }
+            }
+            // one rectangle, as it is, in a frame of the short kind
+            let rectangle = self.rectangle(left, top, wide, high, if self.bits == 16 { 1 } else { 2 });
+            let mut update = vec![1, 0, 1, 0];
+            update.extend(rectangle);
+            send.extend(short_frame(0x01, &update));
+        }
+        Ok(send)
+    }
+
+    /// The picture as the stand-in has it now, with what it drew for keys and the pointer.
+    pub fn picture(&self) -> &Picture {
+        &self.picture
     }
 
     /// The picture, cut into rectangles and sent in each way a machine sends them.

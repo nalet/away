@@ -34,7 +34,7 @@ A part reads where to listen from its environment:
 
 The server also reads what an installation tells it, which the chart sets from its
 values: the address people reach Away at, the sign-in service, who administers, and
-whom people turn to. docs/install.md has each.
+whom people turn to. The gateway reads where the server is. docs/install.md has each.
 ";
 
 fn main() -> ExitCode {
@@ -106,7 +106,14 @@ async fn run(name: &'static str, lines: Lines) -> ExitCode {
         }
         "gateway" => {
             let settings = Settings::with_address(away_gateway::ADDRESS).from_environment(from_environment);
-            match Gateway::bind(&settings, part).await {
+            let told = match away_gateway::Told::read(from_environment, |path| std::fs::read(path)) {
+                Ok(told) => told,
+                Err(why) => {
+                    part.lines.error("could not start", &[("why", (&why).into())]);
+                    return ExitCode::FAILURE;
+                }
+            };
+            match Gateway::bind(&settings, told, part).await {
                 Ok(gateway) => {
                     gateway.run().await;
                     true

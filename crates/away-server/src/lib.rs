@@ -11,6 +11,7 @@ pub mod pages;
 pub mod records;
 pub mod register;
 pub mod service;
+pub mod sessions;
 pub mod sign_ins;
 pub mod store;
 pub mod token;
@@ -68,6 +69,8 @@ pub struct Server {
     public: Listener,
     health: Listener,
     getting_in: Arc<GettingIn>,
+    /// Where the gateway asks the server, where the installation names such an address.
+    internal: Option<Listener>,
     /// What reads the feeds of farms, and how often, where Away is given an account for it.
     farms: Option<(Arc<Reader>, std::time::Duration)>,
 }
@@ -86,6 +89,7 @@ impl Server {
                 }
             },
         };
+        let internal = told.internal.take();
         let getting_in = match GettingIn::new(told, part.clone()) {
             Ok(getting_in) => Arc::new(getting_in),
             Err(why) => {
@@ -98,12 +102,34 @@ impl Server {
         }
         let public = part.listen("public", &settings.address).await?;
         let health = part.listen("health", &settings.health_address).await?;
-        Ok(Server { part, public, health, getting_in, farms })
+        let internal = match internal {
+            None => None,
+            Some(internal) => {
+                let listener = part.listen("internal", &internal.address).await?;
+                Some(match internal.certificate {
+                    Some((certificate, key)) => listener.secured_with(&certificate, &key).map_err(|why| {
+                        let why = format!("The certificate for what the gateway asks the server can't be used: {why}.");
+                        part.lines.error("could not start", &[("why", (&why).into())]);
+                        std::io::Error::other(why)
+                    })?,
+                    None => {
+                        part.lines.warn("what the gateway asks the server is not secured: that is for the two on one machine", &[]);
+                        listener
+                    }
+                })
+            }
+        };
+        Ok(Server { part, public, health, getting_in, internal, farms })
     }
 
     /// The addresses it is bound to.
     pub fn bound(&self) -> Bound {
         Bound { address: Some(self.public.address()), health_address: self.health.address() }
+    }
+
+    /// The address the gateway asks it at, where it has one.
+    pub fn internal_address(&self) -> Option<std::net::SocketAddr> {
+        self.internal.as_ref().map(Listener::address)
     }
 
     /// Answers until the part is told to stop.
@@ -212,7 +238,17 @@ impl Server {
                 tokio::time::sleep(every.min(std::time::Duration::from_secs(5))).await;
             }
         });
-        self.part.run(self.health, vec![(self.public, public(self.getting_in))]).await;
+        let mut others = Vec::new();
+        if let Some(internal) = self.internal {
+            let getting_in = self.getting_in.clone();
+            let answers: Answers = Arc::new(move |request| {
+                let getting_in = getting_in.clone();
+                Box::pin(async move { getting_in.answer_internal(request).await })
+            });
+            others.push((internal, answers));
+        }
+        others.push((self.public, public(self.getting_in)));
+        self.part.run(self.health, others).await;
         renewing.abort();
         looking.abort();
         reading.abort();

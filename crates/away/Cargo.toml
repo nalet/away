@@ -15,5 +15,18 @@ away-gateway.workspace = true
 away-issuer.workspace = true
 tokio.workspace = true
 
+[dev-dependencies]
+away-server = { workspace = true, features = ["stand-in"] }
+away-gateway = { workspace = true, features = ["stand-in"] }
+away-rdp = { workspace = true, features = ["stand-in"] }
+away-secret.workspace = true
+away-wire.workspace = true
+tokio = { workspace = true, features = ["io-util"] }
+tokio-tungstenite.workspace = true
+tokio-postgres.workspace = true
+futures-util.workspace = true
+png.workspace = true
+getrandom.workspace = true
+
 [lints]
 workspace = true

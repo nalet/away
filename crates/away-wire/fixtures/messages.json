@@ -1,0 +1,21 @@
+{
+  "to_browser": [
+    {"says": "the first step has begun", "text": "{\"step\":\"reaching\"}"},
+    {"says": "the last step has begun", "text": "{\"step\":\"first-picture\"}"},
+    {"says": "the machine asks for a name and a password", "text": "{\"asks\":{\"again\":false}}"},
+    {"says": "it didn't accept them and asks again", "text": "{\"asks\":{\"again\":true}}"},
+    {"says": "the desktop is open, 1280 by 800", "text": "{\"desktop\":{\"width\":1280,\"height\":800}}"},
+    {"says": "a rectangle at 64, 128, 200 wide and 120 high, as a PNG picture that begins 89 50 4e 47", "bytes": "010040008000c800780189504e47"},
+    {"says": "the rectangles up to here are number 7", "text": "{\"drawn\":7}"},
+    {"says": "reaching failed: no answer", "text": "{\"failed\":{\"step\":\"reaching\",\"why\":\"no-answer\",\"details\":\"no answer within 10 seconds\"}}"},
+    {"says": "the session ended because the person left", "text": "{\"ended\":\"left\"}"}
+  ],
+  "from_browser": [
+    {"says": "the session begins: its ticket, and a desktop of 1280 by 800", "text": "{\"ticket\":\"7f3a\",\"width\":1280,\"height\":800}"},
+    {"says": "a name and a password", "text": "{\"name\":\"CORP\\\\alex.urban\",\"password\":\"a \\\"password\\\"\"}"},
+    {"says": "the rectangles up to number 7 are drawn", "text": "{\"seen\":7}"},
+    {"says": "the person leaves", "text": "{\"leaves\":true}"},
+    {"says": "the pointer moved to 640, 400", "bytes": "0102800190"},
+    {"says": "the main button down at 640, 400; the second button up at 1, 2; the wheel one notch towards the person, and one to the right, at 3, 4; the key A down; the arrow to the right up; the character for the euro; the number lock and the capitals lock on", "bytes": "020001028001900202000001000203ff8800000300040300780100030004041e0001044d01000520ac010606"}
+  ]
+}

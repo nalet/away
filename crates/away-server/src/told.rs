@@ -25,6 +25,8 @@
 //! | `AWAY_DATABASE_PASSWORD_FILE` | the file that holds that account's password |
 //! | `AWAY_DATABASE_CONNECTION` | how the connection to the database is secured: `verified` (as it is unless said otherwise), `encrypted` without checking the database's certificate, or `plain` |
 //! | `AWAY_DATABASE_AUTHORITIES_FILE` | certificates of authorities to trust for the database besides the public ones, as PEM |
+//! | `AWAY_INTERNAL_ADDRESS` | where the gateway asks the server, such as `0.0.0.0:8082`; without it no session is opened |
+//! | `AWAY_INTERNAL_CERTIFICATE_FILE`, `AWAY_INTERNAL_KEY_FILE` | the certificate that secures that address and its key, as PEM |
 
 use std::time::Duration;
 
@@ -66,6 +68,19 @@ pub struct Told {
     pub farms: Option<Farms>,
     /// The database. Without it Away keeps nothing: no favourites, and no records.
     pub database: Option<Database>,
+    /// Where the gateway asks the server: to take a session over, and to say what
+    /// became of it. Without it no session is opened.
+    pub internal: Option<Internal>,
+}
+
+/// Where Away's other parts ask the server, and what secures that.
+#[derive(Clone, Debug)]
+pub struct Internal {
+    /// The address, such as `0.0.0.0:8082`.
+    pub address: String,
+    /// The certificate that secures it and the certificate's key, both as PEM. Without
+    /// them it is not secured, which is for a server and a gateway on one machine.
+    pub certificate: Option<(Vec<u8>, Vec<u8>)>,
 }
 
 /// How the connection to the database is secured.
@@ -188,10 +203,30 @@ impl Told {
             }
             _ => return Err("AWAY_DATABASE_HOST and AWAY_DATABASE_PASSWORD_FILE go together: one of them is not set.".to_string()),
         };
+        let internal =
+            match variable("AWAY_INTERNAL_ADDRESS").map(|address| address.trim().to_string()).filter(|address| !address.is_empty()) {
+                None => None,
+                Some(address) => {
+                    let read = |name: &str| {
+                        variable(name)
+                            .map(|path| file(&path).map_err(|error| format!("{name} names {path}, which can't be read: {error}.")))
+                            .transpose()
+                    };
+                    let certificate = match (read("AWAY_INTERNAL_CERTIFICATE_FILE")?, read("AWAY_INTERNAL_KEY_FILE")?) {
+                        (Some(certificate), Some(key)) => Some((certificate, key)),
+                        (None, None) => None,
+                        _ => {
+                            return Err("AWAY_INTERNAL_CERTIFICATE_FILE and AWAY_INTERNAL_KEY_FILE go together: one of them is not set."
+                                .to_string())
+                        }
+                    };
+                    Some(Internal { address, certificate })
+                }
+            };
         let needed = ["AWAY_PUBLIC_ADDRESS", "AWAY_SIGN_IN_SERVICE", "AWAY_SIGN_IN_CLIENT", "AWAY_SIGN_IN_SECRET_FILE"];
         let said: Vec<Option<String>> = needed.iter().map(|name| variable(name)).collect();
         if said.iter().all(Option::is_none) {
-            return Ok(Told { sign_in: None, contact, files, farms, database });
+            return Ok(Told { sign_in: None, contact, files, farms, database, internal });
         }
         if let Some(missing) = needed.iter().zip(&said).find(|(_, said)| said.is_none()).map(|(name, _)| name) {
             return Err(format!("{missing} is not set, and signing in needs it."));
@@ -234,6 +269,7 @@ impl Told {
             files,
             farms,
             database,
+            internal,
         })
     }
 }

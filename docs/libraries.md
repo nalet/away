@@ -25,10 +25,13 @@ library has no line that says what it is for.
 | [num-bigint](https://crates.io/crates/num-bigint) | does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is | 0.5.1 | — |
 | [getrandom](https://crates.io/crates/getrandom) | takes random bytes from the system, for keys and for numbers used once | 0.2.17, 0.4.3 | — |
 | [saphyr-parser](https://crates.io/crates/saphyr-parser) | reads the files of machines and rules, which are YAML, and knows the line each thing is written in | 0.3.4 | — |
+| [tokio-tungstenite](https://crates.io/crates/tokio-tungstenite) | carries a session between a browser and the gateway: the WebSocket | 0.30.0 | `handshake` |
+| [png](https://crates.io/crates/png) | packs what a machine draws into pictures a browser reads by itself | 0.18.1 | — |
+| [futures-util](https://crates.io/crates/futures-util) | lets the gateway take and send a session's messages one by one | 0.3.34 | `sink` |
 | [tokio-postgres](https://crates.io/crates/tokio-postgres) | speaks to the database: the client that most programs in this language use | 0.7.18 | `runtime` |
 | [tokio-postgres-rustls](https://crates.io/crates/tokio-postgres-rustls) | lets rustls secure the connection to the database | 0.14.0 | `ring` |
 
-Away names 19 libraries. With what they bring with them, a build holds 145 in all, each in the version Cargo.lock names.
+Away names 22 libraries. With what they bring with them, a build holds 157 in all, each in the version Cargo.lock names.
 <!-- end: libraries -->
 
 ## The pages

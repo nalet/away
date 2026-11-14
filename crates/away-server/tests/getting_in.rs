@@ -64,7 +64,14 @@ fn world_with(change: impl FnOnce(&mut Told)) -> World {
         looks_every: Duration::from_millis(100),
     };
     let files = Some(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/files").into());
-    let mut told = Told { sign_in: Some(sign_in), contact: Some("it-help@example.com".to_string()), files, farms: None, database: None };
+    let mut told = Told {
+        sign_in: Some(sign_in),
+        contact: Some("it-help@example.com".to_string()),
+        files,
+        farms: None,
+        database: None,
+        internal: None,
+    };
     change(&mut told);
     let (away, lines, stopper) = serve(&runtime, port, told);
     World { _runtime: runtime, service, away, lines, _stopper: stopper }

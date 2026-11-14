@@ -311,6 +311,7 @@ fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
             takes_instructions: false,
             left: true,
             licence: None,
+            input: Vec::new(),
         }
     );
 }

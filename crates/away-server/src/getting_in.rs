@@ -9,6 +9,14 @@
 //! | `POST /sign-out` | ends the sign-in |
 //! | `GET /api/favourites` | what the person starred, of what they reach |
 //! | `PUT /api/favourites?machine=…&program=…` | stars a machine, or a program of it; `DELETE` takes the star away |
+//! | `POST /api/sessions?machine=…` | asks to open a machine's desktop: writes the record, and gives the ticket the page's connection to the gateway begins with |
+//!
+//! The gateway asks the server on an address of its own, which no browser reaches:
+//!
+//! | Address | Does |
+//! |---|---|
+//! | `POST /internal/take` | takes a session over with its ticket, once: who it is for, and where the machine is |
+//! | `POST /internal/told` | says what became of a session: what the machine showed of itself, that it is open, that it failed, that it ended |
 //!
 //! The browser holds two cookies and nothing else: one that names its sign-in, and for
 //! the minutes a sign-in is under way one that ties it to the browser that began it.
@@ -18,17 +26,21 @@ use std::sync::Arc;
 
 use away_part::address::read_form;
 use away_part::client::{self, Client};
-use away_part::http::{answer, plain, Answer};
+use away_part::http::{answer, carried, plain, Answer};
 use away_part::json::Json;
 use away_part::{time, version, Part};
 use hyper::body::Incoming;
 use hyper::header::{HeaderValue, CACHE_CONTROL, COOKIE, LOCATION, ORIGIN, SET_COOKIE};
 use hyper::{Method, Request, StatusCode};
 
+use crate::records::Records;
 use crate::register::files::Register;
+use crate::register::Over;
 use crate::service::{Failed, Service};
+use crate::sessions::{Asked, Sessions};
 use crate::sign_ins::{Failure, Person, SignIns, KEPT_FOR};
 use crate::store::favourites::Favourite;
+use crate::store::records::Record;
 use crate::store::{self, Store};
 use crate::told::{DatabaseConnection, SignIn, Told};
 
@@ -65,6 +77,10 @@ pub struct GettingIn {
     store: Option<Arc<Store>>,
     /// Why the database last gave nothing, so that it is written once and not with every request.
     said_of_the_store: std::sync::Mutex<Option<String>>,
+    /// What adds records.
+    records: Records,
+    /// The sessions that were asked for, and those that run.
+    sessions: Sessions,
     part: Part,
 }
 
@@ -105,7 +121,17 @@ impl GettingIn {
                 Some(Arc::new(Store::new(settings, part.lines.clone())))
             }
         };
-        Ok(GettingIn { contact: told.contact, signing, register, store, said_of_the_store: std::sync::Mutex::new(None), part })
+        let records = Records::new(store.clone(), part.lines.clone());
+        Ok(GettingIn {
+            contact: told.contact,
+            signing,
+            register,
+            store,
+            said_of_the_store: std::sync::Mutex::new(None),
+            records,
+            sessions: Sessions::default(),
+            part,
+        })
     }
 
     /// What Away keeps, where it is given a database.
@@ -130,6 +156,8 @@ impl GettingIn {
             ("/api/favourites", true) => self.favourites(request).await,
             ("/api/favourites", _) if matches!(*request.method(), Method::PUT | Method::DELETE) => self.star(request).await,
             ("/api/favourites", _) => plain(StatusCode::METHOD_NOT_ALLOWED, "This address answers GET, PUT and DELETE.\n"),
+            ("/api/sessions", _) if request.method() == Method::POST => self.open(request).await,
+            ("/api/sessions", _) => plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers POST.\n"),
             ("/licence.txt", true) => answer(StatusCode::OK, "text/plain; charset=utf-8", LICENCE_TEXT),
             ("/sign-in", true) => self.begin(request).await,
             ("/sign-in/back", true) => self.back(request).await,
@@ -442,6 +470,200 @@ impl GettingIn {
             }
             Err(unusable) => self.kept_nothing(&unusable),
         }
+    }
+
+    /// Asks to open a machine's desktop for whoever asks. The record is written before
+    /// anything is opened, and nothing is opened where it can't be written. The answer
+    /// is the ticket that the page's connection to the gateway begins with.
+    async fn open(&self, request: &Request<Incoming>) -> Answer {
+        let Some((signing, person)) = self.signed_in(request) else {
+            return plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n");
+        };
+        if !from_aways_page(request, signing) {
+            return plain(StatusCode::FORBIDDEN, "Only Away's own pages open a machine.\n");
+        }
+        let Some(sign_in) = cookie(request, SIGNED_IN) else {
+            return plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n");
+        };
+        let named = read_form(request.uri().query().unwrap_or_default()).unwrap_or_default();
+        let Some(name) = named.iter().find(|(its, value)| its == "machine" && !value.is_empty()).map(|(_, value)| value.as_str()) else {
+            return plain(StatusCode::BAD_REQUEST, "A machine is opened by its name, as machine=.\n");
+        };
+        let (in_force, _) = self.register.in_force();
+        let reached = in_force.reached_by(&person.groups);
+        let Some((machine, _)) = reached.iter().find(|(machine, _)| machine.name == name) else {
+            return plain(StatusCode::NOT_FOUND, "Nothing of that name is there for you.\n");
+        };
+        // what Away opens so far: the desktop of one Windows machine, reached at its own address
+        let Some((Over::Rdp, port)) = machine.desktop else {
+            return plain(StatusCode::NOT_IMPLEMENTED, "Away opens Windows desktops so far, and this machine offers none.\n");
+        };
+        if machine.collection.is_some() {
+            return plain(
+                StatusCode::NOT_IMPLEMENTED,
+                "Away doesn't open the desktop of a farm yet: it can't follow a farm's broker so far.\n",
+            );
+        }
+        if !self.records.are_kept() {
+            return plain(StatusCode::SERVICE_UNAVAILABLE, "Away opens no machine here: it is given no database to keep its records in.\n");
+        }
+        let session = match Records::key() {
+            Ok(session) => session,
+            Err(why) => {
+                self.part.lines.error("a session could not be begun", &[("why", why.as_str().into())]);
+                return plain(StatusCode::INTERNAL_SERVER_ERROR, "The session could not be begun.\n");
+            }
+        };
+        let record = Record {
+            key: session.clone(),
+            kind: "session-asked".to_string(),
+            person: Some((person.subject.clone(), person.name.clone())),
+            machine: Some(machine.name.clone()),
+            details: Json::object([
+                ("way", "desktop".into()),
+                ("address", machine.address.as_str().into()),
+                ("port", u64::from(port).into()),
+            ]),
+        };
+        // no connection is made without its record
+        if let Err(unusable) = self.records.add(&record).await {
+            let _ = self.kept_nothing(&unusable);
+            return plain(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "No machine is opened without a record, and the record can't be written right now.\n",
+            );
+        }
+        self.store_answers();
+        let asked = Asked {
+            session: session.clone(),
+            person,
+            sign_in: sign_in.to_string(),
+            machine: machine.name.clone(),
+            address: machine.address.clone(),
+            port,
+            at: time::now().as_secs(),
+        };
+        match self.sessions.ask(asked) {
+            Ok(ticket) => answer(
+                StatusCode::OK,
+                "application/json",
+                Json::object([("session", session.as_str().into()), ("ticket", ticket.as_str().into())]).write(),
+            ),
+            Err(why) => {
+                self.part.lines.error("a session could not be begun", &[("why", why.as_str().into())]);
+                plain(StatusCode::INTERNAL_SERVER_ERROR, "The session could not be begun.\n")
+            }
+        }
+    }
+
+    /// Answers the gateway, on the address no browser reaches.
+    pub async fn answer_internal(&self, request: Request<Incoming>) -> Answer {
+        if request.method() != Method::POST {
+            return plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers POST.\n");
+        }
+        let path = request.uri().path().to_string();
+        let said = match carried(request, 16 * 1024).await.and_then(|sent| read_form(std::str::from_utf8(&sent).ok()?)) {
+            Some(said) => said,
+            None => return plain(StatusCode::BAD_REQUEST, "What is said here is said as a form.\n"),
+        };
+        let said = |name: &str| said.iter().find(|(its, _)| its == name).map(|(_, value)| value.as_str());
+        match path.as_str() {
+            "/internal/take" => {
+                let taken = said("ticket")
+                    .zip(said("sign_in"))
+                    .and_then(|(ticket, sign_in)| self.sessions.take(ticket, sign_in, time::now().as_secs()));
+                let Some(asked) = taken else { return plain(StatusCode::NOT_FOUND, "No session is asked for with this ticket.\n") };
+                self.count_sessions();
+                let says = Json::object([
+                    ("session", asked.session.as_str().into()),
+                    (
+                        "person",
+                        Json::object([("subject", asked.person.subject.as_str().into()), ("name", asked.person.name.as_str().into())]),
+                    ),
+                    (
+                        "machine",
+                        Json::object([
+                            ("name", asked.machine.as_str().into()),
+                            ("address", asked.address.as_str().into()),
+                            ("port", u64::from(asked.port).into()),
+                        ]),
+                    ),
+                ]);
+                answer(StatusCode::OK, "application/json", says.write())
+            }
+            "/internal/told" => self.told(&said).await,
+            _ => plain(StatusCode::NOT_FOUND, "Nothing is at this address.\n"),
+        }
+    }
+
+    /// Takes what the gateway says became of a session.
+    async fn told<'said>(&self, said: &impl Fn(&str) -> Option<&'said str>) -> Answer {
+        let Some(session) = said("session") else { return plain(StatusCode::BAD_REQUEST, "A session is named, as session=.\n") };
+        let Some(running) = self.sessions.running(session) else { return plain(StatusCode::NOT_FOUND, "No session of that name runs.\n") };
+        let record = |kind: &str, details: Json| Record {
+            key: format!("{session}-{kind}"),
+            kind: format!("session-{kind}"),
+            person: Some((running.person.subject.clone(), running.person.name.clone())),
+            machine: Some(running.machine.clone()),
+            details,
+        };
+        let text = |name: &str| Json::from(said(name).unwrap_or_default());
+        let count = |name: &str| Json::from(said(name).and_then(|count| count.parse::<u64>().ok()).unwrap_or(0));
+        match said("what") {
+            // what the machine showed of itself: kept the first time, and compared ever after
+            Some("identity") => {
+                let (Some(at), Some(shows)) = (said("at"), said("shows")) else {
+                    return plain(
+                        StatusCode::BAD_REQUEST,
+                        "A machine's identity is said with where it was reached, as at=, and what it shows, as shows=.\n",
+                    );
+                };
+                let Some(store) = &self.store else {
+                    return plain(StatusCode::SERVICE_UNAVAILABLE, "Away keeps nothing here: it is given no database.\n");
+                };
+                match store.identity(at, shows).await {
+                    Ok(known) if known == shows => answer(StatusCode::OK, "application/json", "{}"),
+                    Ok(_) => plain(StatusCode::CONFLICT, "The machine shows another identity than the one Away knows.\n"),
+                    Err(unusable) => self.kept_nothing(&unusable),
+                }
+            }
+            Some("opened") => {
+                let details = Json::object([("session", session.into()), ("width", count("width")), ("height", count("height"))]);
+                match self.records.add(&record("opened", details)).await {
+                    Ok(()) => answer(StatusCode::OK, "application/json", "{}"),
+                    Err(unusable) => self.kept_nothing(&unusable),
+                }
+            }
+            Some(what @ ("failed" | "ended")) => {
+                self.sessions.end(session);
+                self.count_sessions();
+                let seconds = time::now().as_secs().saturating_sub(running.since);
+                let details = match what {
+                    "failed" => Json::object([
+                        ("session", session.into()),
+                        ("step", text("step")),
+                        ("why", text("why")),
+                        ("details", text("details")),
+                    ]),
+                    _ => Json::object([("session", session.into()), ("why", text("why")), ("seconds", seconds.into())]),
+                };
+                let record = record(what, details);
+                // the session is over whether its end can be written or not: where it can't, it is on the output at least
+                if let Err(unusable) = self.records.add(&record).await {
+                    let (why, details) = (unusable.to_string(), record.details.write());
+                    self.part.lines.warn(
+                        "the end of a session could not be kept as a record",
+                        &[("why", why.as_str().into()), ("kind", record.kind.as_str().into()), ("details", details.as_str().into())],
+                    );
+                }
+                answer(StatusCode::OK, "application/json", "{}")
+            }
+            _ => plain(StatusCode::BAD_REQUEST, "What became of a session is one of: identity, opened, failed, ended.\n"),
+        }
+    }
+
+    fn count_sessions(&self) {
+        self.part.measures.gauge("away_sessions", "The sessions that run.", &[]).set(self.sessions.count() as u64);
     }
 
     /// The answer where the database gave nothing. Why is written once, and again only

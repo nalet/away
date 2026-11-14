@@ -130,6 +130,7 @@ async fn main() -> std::io::Result<()> {
         files: Some(files.into()),
         farms,
         database,
+        internal: None,
     };
 
     let lines = Lines::to_output("server");

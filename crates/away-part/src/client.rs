@@ -96,10 +96,11 @@ pub fn securing(also_trusted: Option<&[u8]>, speaks: &[u8]) -> Result<ClientConf
     Ok(config)
 }
 
-/// How connections are encrypted to a service whose certificate is not checked: for a
-/// service that shows a certificate no authority signed, where the installation says
-/// so. What travels can't be read on the way. Whoever can put themselves between the
-/// two is not noticed, so it is for a network nobody else is on.
+/// How connections are encrypted to something whose certificate is not checked against
+/// an authority: a service that shows a certificate no authority signed, where the
+/// installation says so, or a machine, which is known by the certificate itself. What
+/// travels can't be read on the way. Whoever can put themselves between the two is not
+/// noticed by this alone.
 pub fn encrypting_unchecked(speaks: &[u8]) -> Result<ClientConfig, String> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let mut config = ClientConfig::builder_with_provider(provider.clone())
@@ -108,7 +109,10 @@ pub fn encrypting_unchecked(speaks: &[u8]) -> Result<ClientConfig, String> {
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(Unchecked(provider)))
         .with_no_client_auth();
-    config.alpn_protocols = vec![speaks.to_vec()];
+    // a protocol that has no name of this kind is not named
+    if !speaks.is_empty() {
+        config.alpn_protocols = vec![speaks.to_vec()];
+    }
     Ok(config)
 }
 

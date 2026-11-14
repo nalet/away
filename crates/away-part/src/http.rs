@@ -15,8 +15,12 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::{TokioIo, TokioTimer};
+use rustls::pki_types::pem::PemObject;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
+use tokio_rustls::TlsAcceptor;
 
 use crate::lines::Lines;
 use crate::measures::Measures;
@@ -85,6 +89,8 @@ pub struct Listener {
     name: &'static str,
     socket: TcpListener,
     address: SocketAddr,
+    /// What secures each connection, where the listener's connections are secured.
+    secures: Option<TlsAcceptor>,
 }
 
 impl Listener {
@@ -92,7 +98,26 @@ impl Listener {
     pub async fn bind(name: &'static str, address: &str) -> std::io::Result<Listener> {
         let socket = TcpListener::bind(address).await?;
         let address = socket.local_addr()?;
-        Ok(Listener { name, socket, address })
+        Ok(Listener { name, socket, address, secures: None })
+    }
+
+    /// The same listener, with every connection secured by this certificate and its
+    /// key, both written as PEM: for what Away's parts ask of each other.
+    pub fn secured_with(self, certificate: &[u8], key: &[u8]) -> Result<Listener, String> {
+        let certificates: Vec<CertificateDer<'static>> = CertificateDer::pem_slice_iter(certificate)
+            .collect::<Result<_, _>>()
+            .map_err(|error| format!("the certificate can't be read: {error}"))?;
+        if certificates.is_empty() {
+            return Err("the certificate's file holds no certificate".to_string());
+        }
+        let key = PrivateKeyDer::from_pem_slice(key).map_err(|error| format!("the certificate's key can't be read: {error}"))?;
+        let config = rustls::ServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+            .with_safe_default_protocol_versions()
+            .map_err(|error| error.to_string())?
+            .with_no_client_auth()
+            .with_single_cert(certificates, key)
+            .map_err(|error| format!("the certificate and its key can't be used: {error}"))?;
+        Ok(Listener { secures: Some(TlsAcceptor::from(Arc::new(config))), ..self })
     }
 
     /// The address it is bound to.
@@ -121,28 +146,16 @@ impl Listener {
             };
             let answers = answers.clone();
             let counted = counted.clone();
-            let mut stop = stop.clone();
+            let stop = stop.clone();
+            let secures = self.secures.clone();
             connections.spawn(async move {
-                let service = service_fn(move |request: Request<Incoming>| {
-                    let answering = answers(request);
-                    let counted = counted.clone();
-                    async move {
-                        let answer = answering.await;
-                        counted.count(answer.status());
-                        Ok::<_, Infallible>(answer)
-                    }
-                });
-                let connection = http1::Builder::new()
-                    .timer(TokioTimer::new())
-                    .header_read_timeout(HEAD_WITHIN)
-                    .serve_connection(TokioIo::new(stream), service);
-                tokio::pin!(connection);
-                tokio::select! {
-                    _ = connection.as_mut() => {}
-                    _ = stop.wait() => {
-                        // answer what is being asked, then close
-                        connection.as_mut().graceful_shutdown();
-                        let _ = connection.await;
+                match secures {
+                    None => serve(stream, answers, counted, stop).await,
+                    // a connection that is not secured in time, or not at all, is let go
+                    Some(secures) => {
+                        if let Ok(Ok(secured)) = tokio::time::timeout(HEAD_WITHIN, secures.accept(stream)).await {
+                            serve(secured, answers, counted, stop).await;
+                        }
                     }
                 }
             });
@@ -157,6 +170,37 @@ impl Listener {
                 &[("listener", self.name.into()), ("open", (connections.len() as u64).into())],
             );
             connections.abort_all();
+        }
+    }
+}
+
+/// Answers the requests of one connection, until it ends or the part stops.
+async fn serve<Connection>(connection: Connection, answers: Answers, counted: Counted, mut stop: Stop)
+where
+    Connection: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    let service = service_fn(move |request: Request<Incoming>| {
+        let answering = answers(request);
+        let counted = counted.clone();
+        async move {
+            let answer = answering.await;
+            counted.count(answer.status());
+            Ok::<_, Infallible>(answer)
+        }
+    });
+    let connection = http1::Builder::new()
+        .timer(TokioTimer::new())
+        .header_read_timeout(HEAD_WITHIN)
+        .serve_connection(TokioIo::new(connection), service)
+        // a session's connection begins as a request and is handed over as it is
+        .with_upgrades();
+    tokio::pin!(connection);
+    tokio::select! {
+        _ = connection.as_mut() => {}
+        _ = stop.wait() => {
+            // answer what is being asked, then close
+            connection.as_mut().graceful_shutdown();
+            let _ = connection.await;
         }
     }
 }

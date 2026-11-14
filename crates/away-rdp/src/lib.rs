@@ -28,6 +28,7 @@ pub mod connection;
 pub mod der;
 pub mod gcc;
 pub mod identity;
+pub mod input;
 pub mod interleaved;
 pub mod licence;
 pub mod mcs;

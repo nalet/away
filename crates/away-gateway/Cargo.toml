@@ -10,7 +10,25 @@ publish.workspace = true
 
 [dependencies]
 away-part.workspace = true
+away-rdp.workspace = true
+away-secret.workspace = true
 hyper.workspace = true
+tokio = { workspace = true, features = ["io-util"] }
+tokio-rustls.workspace = true
+rustls.workspace = true
+getrandom.workspace = true
+away-wire.workspace = true
+hyper-util.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+png.workspace = true
+
+[dev-dependencies]
+away-gateway = { workspace = true, features = ["stand-in"] }
+
+[features]
+# a machine that stands in for a real one, for tests
+stand-in = ["away-rdp/stand-in"]
 
 [lints]
 workspace = true

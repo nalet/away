@@ -6,6 +6,7 @@
 //! happened. It holds no connection itself.
 
 use crate::gcc::{self, Client, Machine};
+use crate::input::{self, Input};
 use crate::licence::{self, Said, Taking};
 use crate::mcs::{self, Arrived};
 use crate::pdu::{self, FromMachine};
@@ -221,6 +222,15 @@ impl Connection {
             }
         }
         Ok((send, happened))
+    }
+
+    /// What to send to tell the machine of keys and of the pointer. Nothing before the
+    /// connection is open: a machine takes none until it draws.
+    pub fn input(&self, events: &[Input]) -> Vec<u8> {
+        match self.state {
+            State::Open => input::write(events),
+            _ => Vec::new(),
+        }
     }
 
     /// What to send to leave. The machine keeps what runs on the desktop, for the account

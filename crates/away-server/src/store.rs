@@ -10,6 +10,7 @@
 //! [`SHAPE`] is taken once, in its order, and the database remembers which were taken.
 
 pub mod favourites;
+pub mod identities;
 pub mod records;
 
 use std::time::Duration;
@@ -54,6 +55,14 @@ pub const SHAPE: &[(&str, &str)] = &[
         create trigger record_is_not_changed before update or delete on record for each row execute function record_stays();
         create trigger record_is_not_emptied before truncate on record for each statement execute function record_stays();
         create index record_by_kind on record (kind, machine, number)",
+    ),
+    (
+        "what each machine showed of itself the first time",
+        "create table machine_identity (
+            machine text primary key,
+            fingerprint text not null,
+            since timestamptz not null default now()
+        )",
     ),
 ];
 

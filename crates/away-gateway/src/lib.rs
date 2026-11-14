@@ -1,30 +1,100 @@
 //! The gateway: the sessions, each with one connection to the browser and one to the
 //! machine.
 //!
-//! In this version it holds no session. It listens where a session's connection will
-//! arrive, answers that nothing is there, and says whether it is well.
+//! A session's connection arrives at `/session`, as a request that is handed over to
+//! become a WebSocket. Its first message is the ticket the server gave for it; the
+//! gateway takes the session over at the server with that ticket, opens the machine,
+//! and tells the server what became of it.
+//!
+//! | Variable | Says |
+//! |---|---|
+//! | `AWAY_SERVER` | where the gateway asks the server: `https://away-server:8082`. Without it no session opens |
+//! | `AWAY_SERVER_AUTHORITIES_FILE` | the certificate of the authority that secures that address, as PEM |
 
-use away_part::http::{at_once, for_a_browser, plain, Answers, Listener};
+pub mod machine;
+pub mod session;
+#[cfg(feature = "stand-in")]
+pub mod stand_in;
+
+use std::sync::Arc;
+
+use away_part::address::Address;
+use away_part::client::Client;
+use away_part::http::{for_a_browser, plain, Answer, Answers, Listener};
 use away_part::part::Bound;
 use away_part::{Part, Settings};
-use hyper::StatusCode;
+use hyper::body::Incoming;
+use hyper::header::{HeaderValue, CONNECTION, COOKIE, HOST, ORIGIN, UPGRADE};
+use hyper::{Method, Request, StatusCode};
+use hyper_util::rt::TokioIo;
+use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
+use tokio_tungstenite::tungstenite::protocol::{Role, WebSocketConfig};
+use tokio_tungstenite::WebSocketStream;
+
+use session::{Around, Server};
 
 /// Where the gateway listens when nothing says otherwise.
 pub const ADDRESS: &str = "0.0.0.0:8081";
+
+/// The cookie that names a browser's sign-in, which the server gave it.
+const SIGNED_IN: &str = "__Host-away";
+
+/// The longest message a browser may send: a name and a password, or what a person did
+/// with the keys and the pointer in a moment.
+const LONGEST_FROM_A_BROWSER: usize = 64 * 1024;
+
+/// What an installation tells the gateway.
+#[derive(Clone, Debug, Default)]
+pub struct Told {
+    /// Where the gateway asks the server. Without it no session opens.
+    pub server: Option<Address>,
+    /// The certificate of the authority that secures that address, as PEM.
+    pub authorities: Option<Vec<u8>>,
+}
+
+impl Told {
+    /// Reads what the environment says. A file is read with the function given.
+    pub fn read(variable: impl Fn(&str) -> Option<String>, file: impl Fn(&str) -> std::io::Result<Vec<u8>>) -> Result<Told, String> {
+        let server = match variable("AWAY_SERVER") {
+            None => None,
+            Some(written) => Some(Address::read(written.trim()).map_err(|why| format!("AWAY_SERVER is no address: {why}."))?),
+        };
+        let authorities = variable("AWAY_SERVER_AUTHORITIES_FILE")
+            .map(|path| file(&path).map_err(|error| format!("AWAY_SERVER_AUTHORITIES_FILE names {path}, which can't be read: {error}.")))
+            .transpose()?;
+        Ok(Told { server, authorities })
+    }
+}
 
 /// The gateway, bound and not yet answering.
 pub struct Gateway {
     part: Part,
     sessions: Listener,
     health: Listener,
+    around: Arc<Around>,
 }
 
 impl Gateway {
-    /// Binds the gateway's addresses.
-    pub async fn bind(settings: &Settings, part: Part) -> std::io::Result<Gateway> {
+    /// Binds the gateway's addresses, and takes what the installation tells it.
+    pub async fn bind(settings: &Settings, told: Told, part: Part) -> std::io::Result<Gateway> {
+        let server = match told.server {
+            None => {
+                part.lines.warn("the gateway is told of no server, so no session opens", &[]);
+                None
+            }
+            Some(at) => match Client::new(told.authorities.as_deref()) {
+                Ok(client) => Some(Server::new(client, at)),
+                Err(why) => {
+                    let why = format!("The authority that secures the server's address can't be used: {why}.");
+                    part.lines.error("could not start", &[("why", (&why).into())]);
+                    return Err(std::io::Error::other(why));
+                }
+            },
+        };
         let sessions = part.listen("sessions", &settings.address).await?;
         let health = part.listen("health", &settings.health_address).await?;
-        Ok(Gateway { part, sessions, health })
+        let around = Arc::new(Around { server, lines: part.lines.clone() });
+        Ok(Gateway { part, sessions, health, around })
     }
 
     /// The addresses it is bound to.
@@ -34,11 +104,61 @@ impl Gateway {
 
     /// Answers until the part is told to stop.
     pub async fn run(self) {
-        self.part.run(self.health, vec![(self.sessions, sessions())]).await;
+        self.part.run(self.health, vec![(self.sessions, sessions(self.around))]).await;
     }
 }
 
 /// What answers where a session's connection arrives.
-fn sessions() -> Answers {
-    at_once(|_| for_a_browser(plain(StatusCode::NOT_FOUND, "No session is at this address.\n")))
+fn sessions(around: Arc<Around>) -> Answers {
+    Arc::new(move |request| {
+        let around = around.clone();
+        Box::pin(async move { for_a_browser(begin(request, around)) })
+    })
+}
+
+/// Takes a request that wants to become a session's connection, and hands it over.
+fn begin(mut request: Request<Incoming>, around: Arc<Around>) -> Answer {
+    if request.uri().path() != "/session" {
+        return plain(StatusCode::NOT_FOUND, "No session is at this address.\n");
+    }
+    let header = |name| request.headers().get(name).and_then(|value: &HeaderValue| value.to_str().ok());
+    let wants_a_socket = request.method() == Method::GET
+        && header(UPGRADE).is_some_and(|upgrade| upgrade.eq_ignore_ascii_case("websocket"))
+        && header(CONNECTION).is_some_and(|connection| connection.split(',').any(|part| part.trim().eq_ignore_ascii_case("upgrade")))
+        && request.headers().get("sec-websocket-version").is_some_and(|version| version.as_bytes() == b"13");
+    let Some(key) = request.headers().get("sec-websocket-key").filter(|_| wants_a_socket) else {
+        return plain(StatusCode::BAD_REQUEST, "A session's connection is a WebSocket.\n");
+    };
+    // a page of another site may not open a session's connection: a browser says where a
+    // request is from, and that has to be the address this one came to
+    let from = header(ORIGIN).and_then(|origin| origin.split_once("://")).map(|(_, host)| host);
+    if from.is_some_and(|from| Some(from) != header(HOST)) {
+        return plain(StatusCode::FORBIDDEN, "Only Away's own pages open a session.\n");
+    }
+    let accept = derive_accept_key(key.as_bytes());
+    let sign_in = request
+        .headers()
+        .get_all(COOKIE)
+        .iter()
+        .filter_map(|sent| sent.to_str().ok())
+        .flat_map(|sent| sent.split(';'))
+        .filter_map(|pair| pair.trim().split_once('='))
+        .find(|(name, value)| *name == SIGNED_IN && !value.is_empty())
+        .map(|(_, value)| value.to_string());
+
+    let handed_over = hyper::upgrade::on(&mut request);
+    tokio::spawn(async move {
+        let Ok(connection) = handed_over.await else { return };
+        let limits = WebSocketConfig::default().max_message_size(Some(LONGEST_FROM_A_BROWSER)).max_frame_size(Some(LONGEST_FROM_A_BROWSER));
+        let browser = WebSocketStream::from_raw_socket(TokioIo::new(connection), Role::Server, Some(limits)).await;
+        session::run(browser, sign_in, around).await;
+    });
+    let mut answer = plain(StatusCode::SWITCHING_PROTOCOLS, "");
+    answer.headers_mut().remove(hyper::header::CONTENT_TYPE);
+    answer.headers_mut().insert(UPGRADE, HeaderValue::from_static("websocket"));
+    answer.headers_mut().insert(CONNECTION, HeaderValue::from_static("Upgrade"));
+    if let Ok(accept) = HeaderValue::from_str(&accept) {
+        answer.headers_mut().insert("sec-websocket-accept", accept);
+    }
+    answer
 }
