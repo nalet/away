@@ -11,8 +11,11 @@ use std::thread::JoinHandle;
 
 use away_rdp::identity::Identity;
 use away_rdp::ntlm::Account;
+use away_rdp::picture::Picture;
 use away_rdp::secret::Secret;
+use away_rdp::stand_in::desktop::{Desktop, Seen};
 use away_rdp::stand_in::StandIn;
+use away_rdp::tpkt::Frames;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::{ServerConfig, ServerConnection};
 
@@ -33,14 +36,41 @@ const PASSWORD: &str = "a password that exists for these tests alone";
 const MAY_COME_IN: [u8; 4] = [0, 0, 0, 0];
 const MAY_NOT: [u8; 4] = [5, 0, 0, 0];
 
+/// The desktop the stand-in draws: flat parts, slopes, noise and stripes, so that its
+/// rectangles hold everything a machine's do. Its size is no multiple of a rectangle's.
+fn desktop() -> Picture {
+    let mut picture = Picture::new(200, 120);
+    let mut noise = 1u32;
+    for row in 0..picture.height {
+        for column in 0..picture.width {
+            noise = noise.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            let pixel = match column / 50 {
+                0 => [0xf3, 0xf2, 0xf1],
+                1 => [(row * 2) as u8, column as u8, (row + column) as u8],
+                2 => [(noise >> 8) as u8, (noise >> 16) as u8, (noise >> 24) as u8],
+                _ => [if row % 2 == 0 { 0 } else { 255 }; 3],
+            };
+            picture.pixels[(row * picture.width + column) * 4..][..3].copy_from_slice(&pixel);
+        }
+    }
+    picture
+}
+
+/// What a stand-in gives when it ends: the first request it read and, where the
+/// connection went that far, what it saw of the client on the way to the desktop.
+struct Ended {
+    request: Vec<u8>,
+    seen: Option<Seen>,
+}
+
 /// A stand-in for a machine: it takes one connection, reads the first request, answers
-/// with these bytes and, when asked to, secures the connection and takes the sign-in
-/// before the desktop, ending with this verdict. It gives the request it read.
-fn machine(answer: &'static [u8], secures: bool) -> (String, JoinHandle<Vec<u8>>) {
+/// with these bytes and, when asked to, secures the connection, takes the sign-in before
+/// the desktop, says this verdict, and draws its desktop.
+fn machine(answer: &'static [u8], secures: bool) -> (String, JoinHandle<Ended>) {
     machine_with_verdict(answer, secures, MAY_COME_IN)
 }
 
-fn machine_with_verdict(answer: &'static [u8], secures: bool, verdict: [u8; 4]) -> (String, JoinHandle<Vec<u8>>) {
+fn machine_with_verdict(answer: &'static [u8], secures: bool, verdict: [u8; 4]) -> (String, JoinHandle<Ended>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("an address");
     let address = listener.local_addr().expect("its address").to_string();
     let running = std::thread::spawn(move || {
@@ -48,15 +78,13 @@ fn machine_with_verdict(answer: &'static [u8], secures: bool, verdict: [u8; 4]) 
         let mut request = [0u8; 19];
         connection.read_exact(&mut request).expect("the first request");
         connection.write_all(answer).expect("the answer goes out");
-        if secures {
-            secure(&mut connection, verdict);
-        }
-        request.to_vec()
+        let seen = if secures { secure(&mut connection, verdict) } else { None };
+        Ended { request: request.to_vec(), seen }
     });
     (address, running)
 }
 
-fn secure(connection: &mut TcpStream, verdict: [u8; 4]) {
+fn secure(connection: &mut TcpStream, verdict: [u8; 4]) -> Option<Seen> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let config = ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
@@ -67,7 +95,7 @@ fn secure(connection: &mut TcpStream, verdict: [u8; 4]) {
     let mut secured = ServerConnection::new(Arc::new(config)).expect("a connection to secure");
     while secured.is_handshaking() {
         if secured.complete_io(connection).is_err() {
-            return;
+            return None;
         }
     }
     // the sign-in before the desktop, answered as a Windows machine of a domain answers:
@@ -81,29 +109,43 @@ fn secure(connection: &mut TcpStream, verdict: [u8; 4]) {
             match away_rdp::der::whole(&message) {
                 Ok(Some(length)) if message.len() >= length => break,
                 Ok(_) => {}
-                Err(_) => return,
+                Err(_) => return None,
             }
             let mut bytes = [0u8; 4096];
             match secured.read(&mut bytes) {
                 Ok(count) if count > 0 => message.extend_from_slice(&bytes[..count]),
                 // the client left: it had no account, or it was refused
-                _ => return,
+                _ => return None,
             }
         }
         match stand_in.answer(&message) {
             Ok(answer) if answer.is_empty() => break,
             Ok(answer) => {
                 if secured.write_all(&answer).is_err() {
-                    return;
+                    return None;
                 }
             }
-            Err(_) => return,
+            Err(_) => return None,
         }
     }
     // the name and the password have arrived: say whether the account may come in
     let _ = secured.write_all(&verdict);
-    let mut rest = Vec::new();
-    let _ = secured.read_to_end(&mut rest);
+    // then the desktop, for as long as the client stays
+    let mut desktop = Desktop::new(desktop());
+    let mut frames = Frames::new();
+    loop {
+        while let Ok(Some(carried)) = frames.next_frame() {
+            let answer = desktop.answer(&carried).expect("the client's messages are built as they are");
+            if secured.write_all(&answer).is_err() {
+                return Some(desktop.seen().clone());
+            }
+        }
+        let mut bytes = [0u8; 4096];
+        match secured.read(&mut bytes) {
+            Ok(count) if count > 0 => frames.push(&bytes[..count]),
+            _ => return Some(desktop.seen().clone()),
+        }
+    }
 }
 
 /// A file that holds a password, as the test program takes one.
@@ -135,7 +177,7 @@ fn it_reaches_a_machine_secures_the_connection_and_says_what_the_machine_shows()
     let (address, running) = machine(&CHOSEN, true);
     let tried = try_rdp(&address);
     let said = String::from_utf8(tried.stdout).expect("text");
-    assert_eq!(running.join().expect("the stand-in ends"), away_rdp::negotiation::request(), "what it asked for");
+    assert_eq!(running.join().expect("the stand-in ends").request, away_rdp::negotiation::request(), "what it asked for");
     assert!(tried.status.success(), "{said}");
     let lines: Vec<&str> = said.lines().collect();
     assert!(lines[0].starts_with("Reaching 127.0.0.1, on port "), "{said}");
@@ -161,15 +203,32 @@ fn it_reaches_a_machine_secures_the_connection_and_says_what_the_machine_shows()
 }
 
 #[test]
-fn it_signs_an_account_in_before_the_desktop() {
+fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
     let (address, running) = machine(&CHOSEN, true);
-    let tried = try_rdp_as(&address, KNOWN, PASSWORD);
+    let picture = std::env::temp_dir().join(format!("away-try-{}-desktop.bmp", std::process::id()));
+    let file = password_file(PASSWORD);
+    let tried = Command::new(env!("CARGO_BIN_EXE_away-try"))
+        .args(["rdp", &address, "--save"])
+        .arg(&picture)
+        .args(["--as", KNOWN, "--password-file"])
+        .arg(&file)
+        .output()
+        .expect("the test program runs");
+    let _ = std::fs::remove_file(file);
     let said = String::from_utf8(tried.stdout).expect("text");
-    running.join().expect("the stand-in ends");
+    let seen = running.join().expect("the stand-in ends").seen.expect("the connection went on to the desktop");
     assert!(tried.status.success(), "{said}");
+
+    let drew = desktop();
+    let sum: String = {
+        use sha2::{Digest, Sha256};
+        let mut sum = Sha256::new();
+        drew.pixels.as_chunks::<4>().0.iter().for_each(|pixel| sum.update(&pixel[..3]));
+        sum.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+    };
     let lines: Vec<&str> = said.lines().skip(11).collect();
     assert_eq!(
-        lines,
+        lines[..13],
         [
             "Signing in, before the desktop, as CORP\\alex.urban",
             "   It answers as FIN-APP-02 of the domain CORP, in full FIN-APP-02.corp.example.com.",
@@ -177,11 +236,61 @@ fn it_signs_an_account_in_before_the_desktop() {
             "   It took the proof of the password, and proved that it holds the certificate it showed.",
             "   The name and the password were handed over, sealed.",
             "   It says the account may come in.",
-            "The next step is what a client says of itself, which this version doesn't speak yet.",
+            "Saying what Away is, and taking the channels",
+            "   It gave the channel 1004 to this client, and 1003 is the desktop's.",
+            "   It takes the client as it is, without a licence.",
+            "Agreeing on what each side can do",
+            "   It offers a desktop of 200 by 120, at 32 bits a pixel.",
+            "   Both sides have said what they can do, and it draws from now on.",
+            "Taking what it draws, until it has drawn nothing for 3 seconds",
         ],
         "{said}"
     );
+    // eight rectangles: two as they are, of 64 by 64 and of 64 by 56 pixels, and six compressed
+    assert_eq!(lines[13], "   2 rectangles at 32 bits a pixel, as they are, 30720 bytes in all.", "{said}");
+    assert!(lines[14].starts_with("   6 rectangles at 32 bits a pixel, compressed, "), "{said}");
+    assert_eq!(lines[15], "The desktop's picture");
+    assert_eq!(lines[16], format!("   200 by 120 pixels. Their SHA-256: {sum}"));
+    assert_eq!(lines[17], format!("   It is in {}.", picture.display()));
+    assert_eq!(lines.len(), 18, "{said}");
     assert!(!said.contains(PASSWORD), "the password is never said");
+
+    // the file holds the desktop the stand-in drew, pixel for pixel
+    let kept = std::fs::read(&picture).expect("the picture's file");
+    let _ = std::fs::remove_file(&picture);
+    assert_eq!(&kept[..2], b"BM");
+    assert_eq!(kept.len(), 54 + 200 * 120 * 3);
+    assert_eq!(kept[18..26], [200, 0, 0, 0, 120, 0, 0, 0]);
+    let rows: Vec<u8> = kept[54..].as_chunks::<600>().0.iter().rev().flatten().copied().collect();
+    let drawn: Vec<u8> = drew.pixels.as_chunks::<4>().0.iter().flat_map(|pixel| &pixel[..3]).copied().collect();
+    assert!(rows == drawn, "the picture in the file is not the one the stand-in drew");
+
+    // what the stand-in saw of the client
+    assert_eq!(
+        seen,
+        Seen {
+            asked: (1280, 800),
+            name: "away".to_string(),
+            security: 8,
+            account: ("CORP".to_string(), "alex.urban".to_string()),
+            password_travelled: false,
+            bits: 32,
+            takes_instructions: false,
+            left: true,
+        }
+    );
+}
+
+#[test]
+fn without_a_file_the_picture_is_not_kept_and_its_sum_is_still_said() {
+    let (address, running) = machine(&CHOSEN, true);
+    let tried = try_rdp_as(&address, KNOWN, PASSWORD);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    running.join().expect("the stand-in ends");
+    assert!(tried.status.success(), "{said}");
+    let lines: Vec<&str> = said.lines().collect();
+    assert!(lines[lines.len() - 2].starts_with("   200 by 120 pixels. Their SHA-256: "), "{said}");
+    assert_eq!(lines[lines.len() - 1], "   To keep it, name a file: --save <file>.");
 }
 
 #[test]
@@ -200,7 +309,7 @@ fn an_account_that_may_not_come_in_is_told_so() {
     let (address, running) = machine_with_verdict(&CHOSEN, true, MAY_NOT);
     let tried = try_rdp_as(&address, KNOWN, PASSWORD);
     let said = String::from_utf8(tried.stdout).expect("text");
-    running.join().expect("the stand-in ends");
+    assert!(running.join().expect("the stand-in ends").seen.is_some_and(|seen| seen == Seen::default()), "it went no further");
     assert_eq!(tried.status.code(), Some(1));
     assert!(said.ends_with("   The name and the password were handed over, sealed.\n   It took the sign-in, and says this account may not come in over RDP here.\n"), "{said}");
 }
@@ -248,7 +357,20 @@ fn a_port_nothing_listens_on_is_said_to_take_no_connection() {
 fn it_says_what_it_takes() {
     let none = Command::new(env!("CARGO_BIN_EXE_away-try")).output().expect("the test program runs");
     assert_eq!(none.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&none.stderr).contains("away-try rdp <address> [--as <account> --password-file <file>]"));
+    assert!(
+        String::from_utf8_lossy(&none.stderr).contains("away-try rdp <address> [--as <account> --password-file <file> [--save <file>]]")
+    );
+    // a picture needs an account, an account its password, and nothing is said twice
+    for words in [
+        &["rdp", "fin-app-02", "--save", "desktop.bmp"][..],
+        &["rdp", "fin-app-02", "--as", KNOWN],
+        &["rdp", "fin-app-02", "--as", KNOWN, "--as", KNOWN],
+        &["rdp", "fin-app-02", "--anything", "else"],
+        &["vnc", "fin-app-02"],
+    ] {
+        let refused = Command::new(env!("CARGO_BIN_EXE_away-try")).args(words).output().expect("the test program runs");
+        assert_eq!(refused.status.code(), Some(2), "{words:?}");
+    }
     let wrong = Command::new(env!("CARGO_BIN_EXE_away-try")).args(["rdp", "fin-app-02:port"]).output().expect("the test program runs");
     assert_eq!(wrong.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&wrong.stdout).contains("port is no port."));

@@ -19,15 +19,22 @@
 //! The cryptography is never this crate's own: TLS is done by whoever holds the
 //! connection, and a hash comes from a library.
 
+pub mod connection;
 pub mod der;
+pub mod gcc;
 pub mod identity;
+pub mod mcs;
 pub mod negotiation;
 pub mod ntlm;
+pub mod pdu;
+pub mod picture;
+pub mod planar;
 pub mod secret;
 pub mod sign_in;
 #[cfg(any(test, feature = "stand-in"))]
 pub mod stand_in;
 pub mod tpkt;
+pub mod update;
 
 mod error;
 

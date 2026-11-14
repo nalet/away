@@ -4,6 +4,7 @@
 //! ```text
 //! away-try rdp fin-app-02.example.com
 //! away-try rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password
+//! away-try rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password --save desktop.bmp
 //! ```
 //!
 //! It is for the people who build Away: the proof that the protocol code works against
@@ -16,10 +17,13 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use away_rdp::connection::{Connection, Happened};
 use away_rdp::der;
+use away_rdp::gcc::Client;
 use away_rdp::identity::Identity;
 use away_rdp::negotiation::{self, Security};
 use away_rdp::ntlm::{self, Account, Challenge, Fresh};
+use away_rdp::picture::Picture;
 use away_rdp::secret::Secret;
 use away_rdp::sign_in::{self, Message, New, Next, SignIn};
 use away_rdp::tpkt::Frames;
@@ -27,39 +31,86 @@ use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, Server
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, CryptoProvider};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, ClientConnection, DigitallySignedStruct, SignatureScheme};
+use sha2::{Digest, Sha256};
 
 const USAGE: &str = "\
-away-try rdp <address> [--as <account> --password-file <file>]
+away-try rdp <address> [--as <account> --password-file <file> [--save <file>]]
 
   Reaches a machine over RDP with Away's own code and says what it shows, step by step.
   The address is a name or a number, with a port after a colon where it is not 3389.
 
-  With an account it signs in before the desktop. The account is written as people
+  With an account it signs in and opens the desktop. The account is written as people
   write it: CORP\\alex.urban, alex.urban@corp.example.com, or a name alone. Its
   password is read from a file, so that it is on no command line.
+
+  With --save it writes the desktop's picture to a file, as a BMP, once the machine
+  has stopped drawing.
+
+  It says the SHA-256 of the picture's pixels: three bytes each (blue, green, red), row
+  by row from the top. A screenshot taken on the machine at that moment has the same.
 ";
 
 /// How long a machine gets to answer, at each step.
 const WITHIN: Duration = Duration::from_secs(10);
+/// How long a machine has to draw nothing for its picture to count as finished.
+const QUIET_FOR: Duration = Duration::from_secs(3);
+/// How long what a machine draws is taken at most.
+const DRAWS_AT_MOST: Duration = Duration::from_secs(45);
+
+/// What the program was asked to do.
+struct Asked {
+    address: String,
+    account: Option<String>,
+    password_file: Option<String>,
+    save: Option<String>,
+}
+
+/// Reads the words the program was started with. Gives nothing where they make no sense.
+fn asked(words: &[String]) -> Option<Asked> {
+    let [kind, address, rest @ ..] = words else { return None };
+    let mut rest = rest;
+    if kind != "rdp" || address.starts_with('-') {
+        return None;
+    }
+    let mut asked = Asked { address: address.clone(), account: None, password_file: None, save: None };
+    while let [option, value, after @ ..] = rest {
+        let into = match option.as_str() {
+            "--as" => &mut asked.account,
+            "--password-file" => &mut asked.password_file,
+            "--save" => &mut asked.save,
+            _ => return None,
+        };
+        if into.replace(value.clone()).is_some() {
+            return None;
+        }
+        rest = after;
+    }
+    // an account has a password, and a picture needs an account
+    let whole = rest.is_empty() && asked.account.is_some() == asked.password_file.is_some();
+    (whole && (asked.save.is_none() || asked.account.is_some())).then_some(asked)
+}
 
 fn main() -> ExitCode {
     let words: Vec<String> = std::env::args().skip(1).collect();
-    let tried = match words.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
-        ["rdp", address] => rdp(address, None),
-        ["rdp", address, "--as", name, "--password-file", file] | ["rdp", address, "--password-file", file, "--as", name] => {
-            match std::fs::read_to_string(file) {
-                Ok(password) => rdp(address, Some(Account::named(name, Secret::new(password.trim_end_matches(['\r', '\n']))))),
-                Err(error) => Err(format!("The password's file can't be read: {error}.")),
-            }
-        }
-        ["help" | "--help" | "-h"] => {
+    if let [word] = words.as_slice() {
+        if matches!(word.as_str(), "help" | "--help" | "-h") {
             print!("{USAGE}");
             return ExitCode::SUCCESS;
         }
-        _ => {
-            eprint!("{USAGE}");
-            return ExitCode::from(2);
-        }
+    }
+    let Some(asked) = asked(&words) else {
+        eprint!("{USAGE}");
+        return ExitCode::from(2);
+    };
+    let tried = match (&asked.account, &asked.password_file) {
+        (Some(name), Some(file)) => match std::fs::read_to_string(file) {
+            Ok(password) => {
+                let account = Account::named(name, Secret::new(password.trim_end_matches(['\r', '\n'])));
+                rdp(&asked.address, Some(account), asked.save.as_deref())
+            }
+            Err(error) => Err(format!("The password's file can't be read: {error}.")),
+        },
+        _ => rdp(&asked.address, None, None),
     };
     match tried {
         Ok(()) => ExitCode::SUCCESS,
@@ -71,7 +122,7 @@ fn main() -> ExitCode {
 }
 
 /// The steps of a connection over RDP, as far as Away's code goes.
-fn rdp(address: &str, account: Option<Account>) -> Result<(), String> {
+fn rdp(address: &str, account: Option<Account>, save: Option<&str>) -> Result<(), String> {
     let (host, port) = match address.rsplit_once(':') {
         Some((host, port)) if !host.contains(':') => (host, port.parse::<u16>().map_err(|_| format!("{port} is no port."))?),
         _ => (address, 3389),
@@ -96,6 +147,8 @@ fn rdp(address: &str, account: Option<Account>) -> Result<(), String> {
         .and_then(|()| connection.set_write_timeout(Some(WITHIN)))
         .map_err(|error| error.to_string())?;
     println!("   It answered in {} ms.", began.elapsed().as_millis());
+    // the same connection once more, to change how long it waits while it is in use
+    let waits = connection.try_clone().map_err(|error| error.to_string())?;
 
     println!("Asking which security it takes");
     connection.write_all(&negotiation::request()).map_err(|error| format!("The request couldn't be sent: {error}."))?;
@@ -164,7 +217,7 @@ fn rdp(address: &str, account: Option<Account>) -> Result<(), String> {
     println!("   Its fingerprint (SHA-256): {}", identity.fingerprint_text());
 
     if answer.security == Security::Tls {
-        println!("The next step is what a client says of itself, which this version doesn't speak yet.");
+        println!("It wants the sign-in on its own screen, which this version doesn't do yet.");
         return Ok(());
     }
 
@@ -182,6 +235,7 @@ fn rdp(address: &str, account: Option<Account>) -> Result<(), String> {
         return Ok(());
     };
 
+    let (domain, name) = (account.domain.clone(), account.name.clone());
     let written = if account.domain.is_empty() { account.name.clone() } else { format!("{}\\{}", account.domain, account.name) };
     println!("Signing in, before the desktop, as {written}");
     let mut random = [0u8; 56];
@@ -219,8 +273,125 @@ fn rdp(address: &str, account: Option<Account>) -> Result<(), String> {
         sign_in::read_verdict(verdict).map_err(|error| error.to_string())?;
         println!("   It says the account may come in.");
     }
-    println!("The next step is what a client says of itself, which this version doesn't speak yet.");
+
+    println!("Saying what Away is, and taking the channels");
+    let client = Client { width: 1280, height: 800, security: answer.security.number(), name: "away".to_string() };
+    let (mut open, first) = Connection::begin(client, &domain, &name);
+    secured.write_all(&first).map_err(|error| format!("It couldn't be sent: {error}."))?;
+    let mut frames = Frames::new();
+    let mut picture: Option<Picture> = None;
+    let mut opened: Option<Instant> = None;
+    let mut last_drawn: Option<Instant> = None;
+    let mut drawn: std::collections::BTreeMap<(u16, bool), (usize, usize)> = std::collections::BTreeMap::new();
+    loop {
+        while let Some(frame) = frames.next_of_either_kind().map_err(|error| error.to_string())? {
+            let (send, happened) = open.receive(frame).map_err(|error| error.to_string())?;
+            if !send.is_empty() {
+                secured.write_all(&send).map_err(|error| format!("It couldn't be sent: {error}."))?;
+            }
+            for happened in happened {
+                match happened {
+                    Happened::Channels { user, desktop } => {
+                        println!("   It gave the channel {user} to this client, and {desktop} is the desktop's.")
+                    }
+                    Happened::Licensed => {
+                        println!("   It takes the client as it is, without a licence.");
+                        println!("Agreeing on what each side can do");
+                    }
+                    Happened::Desktop { width, height, bits } => {
+                        println!("   It offers a desktop of {width} by {height}, at {bits} bits a pixel.");
+                        picture = Some(Picture::new(usize::from(width), usize::from(height)));
+                    }
+                    Happened::Open => {
+                        println!("   Both sides have said what they can do, and it draws from now on.");
+                        println!("Taking what it draws, until it has drawn nothing for {} seconds", QUIET_FOR.as_secs());
+                        opened = Some(Instant::now());
+                        waits.set_read_timeout(Some(Duration::from_millis(250))).map_err(|error| error.to_string())?;
+                    }
+                    Happened::Drawn(rectangles) => {
+                        for rectangle in &rectangles {
+                            let of_a_kind = drawn.entry((rectangle.bits, rectangle.compressed)).or_default();
+                            of_a_kind.0 += 1;
+                            of_a_kind.1 += rectangle.carries.len();
+                            if let Some(picture) = &mut picture {
+                                picture.draw(rectangle).map_err(|error| error.to_string())?;
+                            }
+                        }
+                        last_drawn = Some(Instant::now());
+                    }
+                }
+            }
+        }
+        let now = Instant::now();
+        let quiet = last_drawn.is_some_and(|last| now.duration_since(last) >= QUIET_FOR);
+        if opened.is_some_and(|opened| quiet || now.duration_since(opened) >= DRAWS_AT_MOST) {
+            if !quiet {
+                println!("   It still drew after {} seconds, which is where this stops.", DRAWS_AT_MOST.as_secs());
+            }
+            break;
+        }
+        let mut bytes = [0u8; 16_384];
+        match secured.read(&mut bytes) {
+            Ok(0) => return Err("It closed the connection.".to_string()),
+            Ok(count) => frames.push(&bytes[..count]),
+            Err(error) if matches!(error.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {
+                if opened.is_none() {
+                    return Err(format!("It gave no answer within {} seconds.", WITHIN.as_secs()));
+                }
+            }
+            Err(error) => return Err(format!("The connection broke: {error}.")),
+        }
+    }
+    for ((bits, compressed), (count, bytes)) in &drawn {
+        println!(
+            "   {count} rectangles at {bits} bits a pixel, {}, {bytes} bytes in all.",
+            if *compressed { "compressed" } else { "as they are" }
+        );
+    }
+    if drawn.is_empty() {
+        println!("   It drew nothing in that time.");
+    }
+    // leaving is a courtesy: the machine notices a closed connection as well
+    let _ = secured.write_all(&open.leave());
+    let Some(picture) = picture else { return Ok(()) };
+    println!("The desktop's picture");
+    let mut sum = Sha256::new();
+    picture.pixels.as_chunks::<4>().0.iter().for_each(|pixel| sum.update(&pixel[..3]));
+    let sum: String = sum.finalize().iter().map(|byte| format!("{byte:02x}")).collect();
+    println!("   {} by {} pixels. Their SHA-256: {sum}", picture.width, picture.height);
+    match save {
+        Some(file) => {
+            std::fs::write(file, bmp(&picture)).map_err(|error| format!("The picture couldn't be written to {file}: {error}."))?;
+            println!("   It is in {file}.");
+        }
+        None => println!("   To keep it, name a file: --save <file>."),
+    }
     Ok(())
+}
+
+/// A picture as a BMP file: 24 bits a pixel, and rows from the bottom up, as that format
+/// has them.
+fn bmp(picture: &Picture) -> Vec<u8> {
+    let row = (picture.width * 3).next_multiple_of(4);
+    let size = 54 + row * picture.height;
+    let mut file = Vec::with_capacity(size);
+    file.extend_from_slice(b"BM");
+    file.extend_from_slice(&(size as u32).to_le_bytes());
+    file.extend_from_slice(&[0; 4]);
+    file.extend_from_slice(&54u32.to_le_bytes());
+    file.extend_from_slice(&40u32.to_le_bytes());
+    file.extend_from_slice(&(picture.width as u32).to_le_bytes());
+    file.extend_from_slice(&(picture.height as u32).to_le_bytes());
+    file.extend_from_slice(&1u16.to_le_bytes());
+    file.extend_from_slice(&24u16.to_le_bytes());
+    file.extend_from_slice(&[0; 24]);
+    for line in picture.pixels.chunks_exact(picture.width * 4).rev() {
+        for pixel in line.as_chunks::<4>().0 {
+            file.extend_from_slice(&pixel[..3]);
+        }
+        file.resize(file.len() + row - picture.width * 3, 0);
+    }
+    file
 }
 
 /// One whole message of the sign-in, read from the secured connection.

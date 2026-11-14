@@ -40,20 +40,64 @@ stops when it is sent the signal a cluster sends.
 and nothing else of Away around it, and says what happened at each step. It
 goes as far as that code goes. Today, over RDP, it asks a machine which
 security it takes, secures the connection, reads the certificate the machine
-shows, and signs an account in before the desktop: it proves the password,
-checks that the machine holds the certificate it showed, hands over the name
-and the password sealed, and reads the machine's word on whether the account
-may come in.
+shows, signs an account in before the desktop, opens the desktop, and takes
+what the machine draws until the machine has drawn nothing for three seconds.
+Then it says the size of the desktop's picture and the SHA-256 of its pixels
+and, given a file, saves the picture there as a BMP.
 
 ```sh
 cargo run --package away-try -- rdp fin-app-02.example.com
 cargo run --package away-try -- rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password
+cargo run --package away-try -- rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password --save desktop.bmp
 ```
 
 The password is read from a file, so that it is on no command line and in no
 history.
 
+It opens the desktop of a machine that signs the account in before the
+desktop, as Windows does unless it is told otherwise. A machine that wants the
+sign-in on its own screen is reached as far as its certificate.
+
+Leaving doesn't sign the account out: what runs on the desktop stays on the
+machine for the account to come back to, until the account is signed out
+there.
+
 It is for the people who build Away, and it is not in the image.
+
+### Checking the picture against the machine's screen
+
+The picture is right when it is the machine's screen, pixel for pixel.
+[`tests/machines/windows-screen.ps1`](../tests/machines/windows-screen.ps1)
+runs on a Windows machine and writes, twice a second, the SHA-256 of what the
+screen shows. It is computed the way `away-try` computes it: over the pixels,
+three bytes each (blue, green, red), row by row from the top.
+
+As an administrator of the machine, start it for the account:
+
+```powershell
+.\windows-screen.ps1 -ForAccount 'CORP\alex.urban' -Seconds 40
+```
+
+While it runs, take the picture:
+
+```sh
+cargo run --package away-try -- rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password
+```
+
+The script then writes its lines, one for each screen it took:
+
+```
+time,width,height,sha256
+15:54:36.312,1280,800,4caeecc4fc2b4d1c030dcbf218ffc83602f00ebd0c2ca810c92ace46f55d4c3e
+```
+
+The picture is the machine's screen when the sum `away-try` says is the sum
+of the machine's lines in the seconds before it left. With `-Pictures <folder>`
+the script keeps each screen as a PNG file as well, to look at where a picture
+differs.
+
+The script runs in the account's own session, so the account has to have
+signed in on the machine once before. It leaves nothing on the machine.
 
 ## What a part answers
 

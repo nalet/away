@@ -41,6 +41,10 @@ pub enum Error {
     /// The machine took the sign-in and says this account may not come in over RDP, with
     /// this code of its own.
     MayNotComeIn(u32),
+    /// The machine did something this version of Away's code doesn't speak yet.
+    NotYet(&'static str),
+    /// The machine ended the connection, with this reason of its own where it gave one.
+    Ended(u32),
 }
 
 /// Why a machine refuses a sign-in, for the codes people meet.
@@ -84,6 +88,9 @@ impl fmt::Display for Error {
                 Some(why) => write!(out, "It refused the sign-in: {why} (its own code {code:#010x})."),
                 None => write!(out, "It refused the sign-in, with its own code {code:#010x}."),
             },
+            Error::NotYet(what) => write!(out, "It {what}, which this version doesn't speak yet."),
+            Error::Ended(0) => out.write_str("It ended the connection and gave no reason."),
+            Error::Ended(code) => write!(out, "It ended the connection, with its own reason {code:#010x}."),
             Error::MayNotComeIn(5) => out.write_str("It took the sign-in, and says this account may not come in over RDP here."),
             Error::MayNotComeIn(code) => write!(out, "It took the sign-in, and then refused the account, with its own code {code:#010x}."),
         }

@@ -1,7 +1,34 @@
-//! The frames RDP travels in at the start of a connection: four bytes that say how long
-//! a frame is, then the frame (TPKT, RFC 1006).
+//! The frames RDP travels in. At the start of a connection every frame is four bytes that
+//! say how long it is, then what it carries (TPKT, RFC 1006). Once a desktop is drawn, the
+//! machine also sends a shorter kind, made for what it draws (the fast path).
 
 use crate::Error;
+
+/// One frame from the machine.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Frame {
+    /// A frame of the ordinary kind, and what it carries.
+    Slow(Vec<u8>),
+    /// A frame of the shorter kind: its first byte, and what follows its length.
+    Fast(u8, Vec<u8>),
+}
+
+/// What an ordinary frame carries once the connection is open: a data unit, of which the
+/// first three bytes say only that it is one.
+pub fn data(carried: &[u8]) -> Result<&[u8], Error> {
+    match carried {
+        [2, 0xf0, 0x80, rest @ ..] => Ok(rest),
+        _ => Err(Error::NotRdp("a frame carries no data unit")),
+    }
+}
+
+/// A frame around a data unit.
+pub fn data_frame(carried: &[u8]) -> Vec<u8> {
+    let mut unit = Vec::with_capacity(carried.len() + 3);
+    unit.extend_from_slice(&[2, 0xf0, 0x80]);
+    unit.extend_from_slice(carried);
+    frame(&unit)
+}
 
 /// A frame around what it carries.
 ///
@@ -55,6 +82,35 @@ impl Frames {
         Ok(Some(carried))
     }
 
+    /// The next whole frame of either kind, if one has arrived.
+    pub fn next_of_either_kind(&mut self) -> Result<Option<Frame>, Error> {
+        let [first, second, ..] = self.held[..] else {
+            return Ok(None);
+        };
+        if first == 3 {
+            return Ok(self.next_frame()?.map(Frame::Slow));
+        }
+        if first & 0x3 != 0 {
+            return Err(Error::NotRdp("a frame doesn't begin as one"));
+        }
+        // the shorter kind: its length is one byte, or two when the first has its top bit set
+        let (length, begins) = if second & 0x80 == 0 {
+            (usize::from(second), 2)
+        } else {
+            let Some(third) = self.held.get(2) else { return Ok(None) };
+            ((usize::from(second & 0x7f) << 8) | usize::from(*third), 3)
+        };
+        if length < begins {
+            return Err(Error::NotRdp("a frame says it is shorter than its own beginning"));
+        }
+        if self.held.len() < length {
+            return Ok(None);
+        }
+        let carried = self.held[begins..length].to_vec();
+        self.held.drain(..length);
+        Ok(Some(Frame::Fast(first, carried)))
+    }
+
     /// The bytes that arrived after the last whole frame.
     pub fn left(&self) -> &[u8] {
         &self.held
@@ -83,6 +139,30 @@ mod tests {
         assert_eq!(frames.next_frame().unwrap().unwrap(), b"second");
         assert_eq!(frames.next_frame().unwrap(), None);
         assert!(frames.left().is_empty());
+    }
+
+    #[test]
+    fn both_kinds_of_frame_come_out_of_one_stream() {
+        let mut frames = Frames::new();
+        frames.push(&data_frame(b"slow"));
+        frames.push(&[0x00, 0x05, 1, 2, 3]);
+        let mut long = vec![0x00, 0x81, 0x00];
+        long.extend(std::iter::repeat_n(7, 253));
+        frames.push(&long[..100]);
+        assert_eq!(frames.next_of_either_kind().unwrap(), Some(Frame::Slow([&[2, 0xf0, 0x80][..], b"slow"].concat())));
+        assert_eq!(frames.next_of_either_kind().unwrap(), Some(Frame::Fast(0, vec![1, 2, 3])));
+        assert_eq!(frames.next_of_either_kind().unwrap(), None, "the long one has not all arrived");
+        frames.push(&long[100..]);
+        assert_eq!(frames.next_of_either_kind().unwrap(), Some(Frame::Fast(0, vec![7; 253])));
+        assert_eq!(frames.next_of_either_kind().unwrap(), None);
+        assert_eq!(data(&[2, 0xf0, 0x80, 9]).unwrap(), [9]);
+        assert!(data(&[2, 0xf0]).is_err());
+        let mut wrong = Frames::new();
+        wrong.push(&[0x01, 0x05, 0, 0, 0]);
+        assert!(wrong.next_of_either_kind().is_err());
+        let mut short = Frames::new();
+        short.push(&[0x00, 0x01]);
+        assert!(short.next_of_either_kind().is_err());
     }
 
     #[test]

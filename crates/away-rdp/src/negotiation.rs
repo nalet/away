@@ -27,6 +27,17 @@ pub enum Security {
     },
 }
 
+impl Security {
+    /// The number the machine gave for it, which the client says back later.
+    pub fn number(self) -> u32 {
+        match self {
+            Security::Tls => TLS,
+            Security::SignInFirst { tells_result: false } => SIGN_IN_FIRST,
+            Security::SignInFirst { tells_result: true } => SIGN_IN_FIRST_WITH_RESULT,
+        }
+    }
+}
+
 /// A machine's answer to the first request.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Answer {

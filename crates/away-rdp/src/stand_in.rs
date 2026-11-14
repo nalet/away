@@ -1,8 +1,10 @@
 //! The machine's side of the sign-in before the desktop, for tests and for whatever
 //! stands in for a machine. It knows one account and its password, and answers as a
-//! Windows machine of a domain does.
+//! Windows machine of a domain does. What follows the sign-in is the [`desktop`]'s.
 //!
 //! It is built only for tests: nothing of it is in a release.
+
+pub mod desktop;
 
 use sha2::{Digest, Sha256};
 
