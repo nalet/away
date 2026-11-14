@@ -60,7 +60,6 @@ export function UserMenu({ who, go, signOut }: { who: Who; go: (to: string) => v
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        aria-label={texts.menu.account(name)}
         onClick={() => setOpen(!open)}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown' && !open) {
@@ -69,9 +68,10 @@ export function UserMenu({ who, go, signOut }: { who: Who; go: (to: string) => v
           }
         }}
       >
-        <span className="av" aria-hidden="true">
-          {who.initials}
-        </span>
+        {/* the letters that show are part of the button's name, so that whoever speaks to
+            the browser can say what they see; the name follows for a screen reader */}
+        <span className="av">{who.initials}</span>
+        <span className="unseen">, {texts.menu.account(name)}</span>
       </button>
       {open && (
         <div className="usermenu" id={id} ref={menu} role="menu" aria-label={texts.menu.account(name)} onKeyDown={keys}>

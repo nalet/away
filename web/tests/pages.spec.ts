@@ -1,0 +1,314 @@
+// Getting in and the frame, as a person meets them in a browser.
+import AxeBuilder from '@axe-core/playwright';
+import { expect, test } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
+
+import { AWAY, AWAY_WITHOUT_SERVICE, SIGN_IN_SERVICE } from '../playwright.config';
+
+// Tells the stand-in for the sign-in service how to behave from now on.
+async function service(told: Record<string, string>) {
+  const answer = await fetch(`${SIGN_IN_SERVICE}/stand-in?${new URLSearchParams(told)}`, { method: 'POST' });
+  expect(answer.ok).toBe(true);
+}
+
+// What the browser asked for while a test ran, and what it wrote to its console.
+function watch(page: Page) {
+  const asked: Request[] = [];
+  const complaints: string[] = [];
+  page.on('request', (request) => asked.push(request));
+  page.on('console', (message) => {
+    if (message.type() === 'error' || message.type() === 'warning') complaints.push(message.text());
+  });
+  page.on('pageerror', (error) => complaints.push(error.message));
+  return { asked, complaints };
+}
+
+// The rules a page has to meet: WCAG 2.2, levels A and AA.
+async function accessible(page: Page) {
+  const found = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(found.violations.map((violation) => `${violation.id}: ${violation.help} (${violation.nodes.length})`)).toEqual([]);
+}
+
+// What has the keyboard's focus, by its name.
+function focused(page: Page) {
+  return page.evaluate(() => {
+    const element = document.activeElement;
+    return element?.getAttribute('aria-label') ?? element?.textContent?.trim() ?? '';
+  });
+}
+
+test.beforeEach(async () => {
+  await service({ reset: 'true' });
+});
+
+test('someone who opens Away is signed in and sees the frame, and the pages load nothing from outside', async ({ page }) => {
+  const { asked, complaints } = watch(page);
+  const first = await page.goto('/');
+  await expect(page).toHaveURL(`${AWAY}/`);
+  await expect(page).toHaveTitle('home · away');
+  await expect(page.getByRole('banner').getByRole('link', { name: 'away, home' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Alex Urban, your account' }).locator('.av')).toHaveText('AU');
+  const rail = page.getByRole('navigation', { name: 'views' });
+  await expect(rail.getByRole('link')).toHaveCount(4);
+  await expect(rail.getByRole('link', { name: 'home' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('heading', { level: 1, name: 'home' })).toBeAttached();
+  await expect(page.getByRole('heading', { level: 2, name: 'nothing to open yet' })).toBeVisible();
+
+  // the page comes with the rule that lets a browser load Away's own files, and nothing else
+  expect(first?.headers()['content-security-policy']).toBe(
+    "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; " +
+      "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  );
+  // the browser went to the sign-in service to sign in, and for nothing else; everything
+  // a page loaded came from Away
+  const elsewhere = asked.filter((request) => !request.url().startsWith(`${AWAY}/`));
+  expect(elsewhere.length).toBeGreaterThan(0);
+  for (const request of elsewhere) {
+    expect(request.url().startsWith(`${SIGN_IN_SERVICE}/authorize?`)).toBe(true);
+    expect(request.isNavigationRequest()).toBe(true);
+  }
+  expect(asked.some((request) => request.resourceType() === 'font')).toBe(true);
+  expect(complaints).toEqual([]);
+  await accessible(page);
+});
+
+test('a link to a page of Away leads there after signing in', async ({ page }) => {
+  await page.goto('/settings');
+  await expect(page).toHaveURL(`${AWAY}/settings`);
+  await expect(page).toHaveTitle('settings · away');
+  await expect(page.getByRole('heading', { level: 1, name: 'settings' })).toBeVisible();
+  const about = page.getByRole('region', { name: 'about' });
+  await expect(about).toContainText('Alex Urban, alex.urban@example.com');
+  await expect(about).toContainText('Questions go to it-help@example.com.');
+  await expect(about.getByRole('link')).toHaveAttribute('href', /^https:\/\//);
+  await accessible(page);
+});
+
+test('nothing of the sign-in is in the page: one cookie that no script can read', async ({ page, context }) => {
+  await page.goto('/');
+  await expect(page).toHaveTitle('home · away');
+  const cookies = await context.cookies(AWAY);
+  expect(cookies.map((cookie) => cookie.name)).toEqual(['__Host-away']);
+  expect(cookies[0]).toMatchObject({ httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
+  expect(await page.evaluate(() => [document.cookie, window.localStorage.length, window.sessionStorage.length])).toEqual(['', 0, 0]);
+  // what the page is told about who is signed in holds no token
+  const who = await page.evaluate(() => fetch('/api/who').then((answer) => answer.text()));
+  expect(who).toContain('"signed_in":true');
+  expect(who).not.toMatch(/eyJ|token/);
+});
+
+test('every view has an address, and back and forward lead through them', async ({ page }) => {
+  await page.goto('/');
+  const rail = page.getByRole('navigation', { name: 'views' });
+  await rail.getByRole('link', { name: 'sessions' }).click();
+  await expect(page).toHaveURL(`${AWAY}/sessions`);
+  await expect(page.getByRole('heading', { name: 'no sessions are open' })).toBeVisible();
+  await accessible(page);
+  await rail.getByRole('link', { name: 'administration' }).click();
+  await expect(page).toHaveURL(`${AWAY}/administration`);
+  await expect(page.getByRole('heading', { name: 'nothing to administer yet' })).toBeVisible();
+  await accessible(page);
+  await page.goBack();
+  await expect(page).toHaveTitle('sessions · away');
+  await page.goBack();
+  await expect(page).toHaveTitle('home · away');
+  await page.goForward();
+  await expect(rail.getByRole('link', { name: 'sessions' })).toHaveAttribute('aria-current', 'page');
+  // a reload stays where it is, and the mark leads home
+  await page.reload();
+  await expect(page).toHaveTitle('sessions · away');
+  await page.getByRole('link', { name: 'away, home' }).click();
+  await expect(page).toHaveURL(`${AWAY}/`);
+  // an address that is nothing says so, inside the frame
+  await page.goto('/machines/no-such-machine');
+  await expect(page.getByRole('heading', { name: 'nothing is at this address' })).toBeVisible();
+  await accessible(page);
+  await page.getByRole('link', { name: 'go home' }).click();
+  await expect(page).toHaveTitle('home · away');
+});
+
+test('the whole frame works with the keyboard alone', async ({ page }) => {
+  await page.goto('/');
+  await expect(page).toHaveTitle('home · away');
+  // the Tab key goes from the link that skips to the page, to the mark, the avatar, the rail, and then the page
+  const order: string[] = [];
+  for (let stop = 0; stop < 7; stop += 1) {
+    await page.keyboard.press('Tab');
+    order.push(await focused(page));
+  }
+  expect(order).toEqual(['skip to the page', 'away, home', 'AU, Alex Urban, your account', 'home', 'sessions', 'administration', 'settings']);
+  // a view under the keyboard's focus says its name
+  await expect(page.locator('.rail .it-settings + .nc-tooltip__bubble')).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(`${AWAY}/settings`);
+
+  // the link that skips to the page
+  await page.goto('/');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'skip to the page' })).toBeInViewport();
+  await page.keyboard.press('Enter');
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe('page');
+
+  // the avatar's menu: opened, gone through and left again
+  const avatar = page.getByRole('button', { name: 'Alex Urban, your account' });
+  await avatar.focus();
+  await page.keyboard.press('Enter');
+  await expect(avatar).toHaveAttribute('aria-expanded', 'true');
+  const menu = page.getByRole('menu');
+  await expect(menu).toContainText('Alex Urban');
+  await expect(menu).toContainText('alex.urban@example.com');
+  expect(await focused(page)).toBe('settings');
+  await accessible(page);
+  await page.keyboard.press('ArrowDown');
+  expect(await focused(page)).toBe('sign out');
+  await page.keyboard.press('ArrowDown');
+  expect(await focused(page)).toBe('settings');
+  await page.keyboard.press('End');
+  expect(await focused(page)).toBe('sign out');
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(avatar).toBeFocused();
+
+  // signing out, and in again
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(`${AWAY}/?signed-out`);
+  await expect(page.getByRole('status')).toHaveText("You're signed out.");
+  await expect(page.getByText("You sign in with your organisation's account.")).toBeVisible();
+  await accessible(page);
+  await page.keyboard.press('Tab');
+  expect(await focused(page)).toBe('sign in');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(`${AWAY}/`);
+  await expect(page).toHaveTitle('home · away');
+});
+
+test('signing out ends the sign-in, and the page of someone who is signed out sends nobody on by itself', async ({ page, context }) => {
+  await page.goto('/sessions');
+  await page.getByRole('button', { name: 'Alex Urban, your account' }).click();
+  await page.getByRole('menuitem', { name: 'sign out' }).click();
+  await expect(page).toHaveURL(`${AWAY}/?signed-out`);
+  expect(await context.cookies(AWAY)).toEqual([]);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'sign in' })).toBeVisible();
+  // any other address of Away signs the person in again, and leads where it says
+  await page.goto('/sessions');
+  await expect(page).toHaveTitle('sessions · away');
+});
+
+test('on a phone the views are a bar of icons at the foot, and a rail when it is held sideways', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page).toHaveTitle('home · away');
+  const views = page.getByRole('navigation', { name: 'views' });
+  // one navigation shows: the bar at the foot, with the views and without the settings
+  await expect(views).toHaveCount(1);
+  await expect(views.getByRole('link')).toHaveText(['', '', '']);
+  const tabs = await views.getByRole('link').evaluateAll((links) =>
+    links.map((link) => {
+      const box = link.getBoundingClientRect();
+      return { name: link.getAttribute('aria-label'), height: box.height, bottom: Math.round(box.bottom), current: link.getAttribute('aria-current') };
+    }),
+  );
+  expect(tabs.map((tab) => tab.name)).toEqual(['home', 'sessions', 'administration']);
+  expect(tabs[0]?.current).toBe('page');
+  for (const tab of tabs) {
+    expect(tab.height).toBeGreaterThanOrEqual(48);
+    expect(tab.bottom).toBe(844);
+  }
+  await expect(page.getByRole('link', { name: 'away, home' })).toHaveText('away');
+  // nothing needs scrolling sideways, and everything that is pressed is at least 48 px high
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0);
+  const avatar = page.getByRole('button', { name: 'Alex Urban, your account' });
+  expect((await avatar.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+  await accessible(page);
+  // the settings are in the avatar's menu
+  await avatar.click();
+  for (const item of await page.getByRole('menuitem').all()) {
+    expect((await item.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+  }
+  await page.getByRole('menuitem', { name: 'settings' }).click();
+  await expect(page).toHaveURL(`${AWAY}/settings`);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0);
+  await accessible(page);
+
+  // held sideways: the views are a rail down the left edge, and the page keeps its height
+  await page.setViewportSize({ width: 780, height: 360 });
+  await expect(views).toHaveCount(1);
+  const rail = await views.boundingBox();
+  expect(rail?.x).toBe(0);
+  expect(rail?.width).toBe(80);
+  await expect(views.getByRole('link')).toHaveCount(3);
+  await accessible(page);
+});
+
+test('someone who administers nothing has no administration', async ({ page }) => {
+  await service({ person: 'person' });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Robin Meyer, your account' }).locator('.av')).toHaveText('RM');
+  const rail = page.getByRole('navigation', { name: 'views' });
+  await expect(rail.getByRole('link')).toHaveCount(3);
+  await expect(rail.getByRole('link', { name: 'administration' })).toHaveCount(0);
+  await page.goto('/administration');
+  await expect(page.getByRole('heading', { name: 'nothing is at this address' })).toBeVisible();
+});
+
+test('a sign-in that has run out asks for a new one over the page, and signing in again leads back', async ({ page, context }) => {
+  // what the service signs is good for a little over a minute, so the server renews it at once
+  await service({ signs_for: '61', refuses_renewals: 'true' });
+  await page.goto('/settings');
+  await expect(page).toHaveTitle('settings · away');
+  const before = (await context.cookies(AWAY))[0]?.value;
+  const card = page.getByRole('alertdialog', { name: 'sign in again' });
+  await expect(async () => {
+    await page.reload();
+    await expect(card).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect(card).toContainText('Your sign-in has run out.');
+  await expect(card.getByRole('button', { name: 'sign in' })).toBeFocused();
+  await accessible(page);
+
+  await service({ reset: 'true' });
+  await card.getByRole('button', { name: 'sign in' }).click();
+  await expect(page).toHaveURL(`${AWAY}/settings`);
+  await expect(card).toBeHidden();
+  expect((await context.cookies(AWAY))[0]?.value).toBe(before);
+});
+
+test('someone who gives up on the sign-in page sees how one signs in, and goes in no circles', async ({ page }) => {
+  await service({ sends_back_with: 'access_denied' });
+  const { asked } = watch(page);
+  await page.goto('/sessions');
+  await expect(page).toHaveURL(`${AWAY}/?sign-in=none`);
+  await expect(page.getByRole('heading', { level: 1, name: 'away' })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'sign in' })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(asked.filter((request) => request.url().startsWith(`${SIGN_IN_SERVICE}/authorize?`))).toHaveLength(1);
+  await accessible(page);
+  await service({ reset: 'true' });
+  await page.getByRole('button', { name: 'sign in' }).click();
+  await expect(page).toHaveTitle('home · away');
+});
+
+test('a sign-in service that does not answer is said not to answer, with the reason and whom to turn to', async ({ page }) => {
+  await page.goto(`${AWAY_WITHOUT_SERVICE}/settings`);
+  await expect(page).toHaveURL(`${AWAY_WITHOUT_SERVICE}/?sign-in=failed`);
+  await expect(page).toHaveTitle("couldn't sign you in · away");
+  await expect(page.getByRole('heading', { name: "couldn't sign you in" })).toBeVisible();
+  await expect(page.getByText("The sign-in service didn't answer.")).toBeVisible();
+  await expect(page.getByText('Questions go to it-help@example.com.')).toBeVisible();
+  const details = page.locator('details');
+  await expect(details.locator('p')).toBeHidden();
+  await details.locator('summary').click();
+  await expect(details.locator('p')).toContainText("The sign-in service: it couldn't be reached");
+  await accessible(page);
+  // trying again fails the same way, and says so again
+  await page.getByRole('button', { name: 'try again' }).click();
+  await expect(page).toHaveURL(`${AWAY_WITHOUT_SERVICE}/?sign-in=failed`);
+  await expect(page.getByRole('heading', { name: "couldn't sign you in" })).toBeVisible();
+  // a reload, with nothing new to say, shows how one signs in
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'sign in' })).toBeVisible();
+});

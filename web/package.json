@@ -11,7 +11,8 @@
   "scripts": {
     "dev": "vite",
     "check": "tsc --noEmit",
-    "build": "tsc --noEmit && vite build"
+    "build": "tsc --noEmit && vite build",
+    "test": "playwright test"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
@@ -22,6 +23,8 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
@@ -39,6 +42,8 @@
     "vite": "builds the pages into files whose names carry their content's hash",
     "@vitejs/plugin-react": "lets vite build what is written for React",
     "@types/react": "tells TypeScript what React offers",
-    "@types/react-dom": "tells TypeScript what react-dom offers"
+    "@types/react-dom": "tells TypeScript what react-dom offers",
+    "@playwright/test": "opens the pages in a real browser and goes through them as a person does, in the pages' tests",
+    "@axe-core/playwright": "checks each page against the rules for accessibility, in the pages' tests"
   }
 }

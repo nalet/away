@@ -43,13 +43,15 @@ and the build fails on a licence that `deny.toml` doesn't allow.
 | [lucide-react](https://www.npmjs.com/package/lucide-react) | the icons, which the design system's components use as well | 1.73.0 | yes |
 | [react](https://www.npmjs.com/package/react) | draws the pages | 19.3.1 | yes |
 | [react-dom](https://www.npmjs.com/package/react-dom) | puts what React draws into the browser's page | 19.3.1 | yes |
+| [@axe-core/playwright](https://www.npmjs.com/package/@axe-core/playwright) | checks each page against the rules for accessibility, in the pages' tests | 4.14.0 | no, it only builds them |
+| [@playwright/test](https://www.npmjs.com/package/@playwright/test) | opens the pages in a real browser and goes through them as a person does, in the pages' tests | 1.65.1 | no, it only builds them |
 | [@types/react](https://www.npmjs.com/package/@types/react) | tells TypeScript what React offers | 19.3.0 | no, it only builds them |
 | [@types/react-dom](https://www.npmjs.com/package/@types/react-dom) | tells TypeScript what react-dom offers | 19.3.0 | no, it only builds them |
 | [@vitejs/plugin-react](https://www.npmjs.com/package/@vitejs/plugin-react) | lets vite build what is written for React | 6.3.0 | no, it only builds them |
 | [typescript](https://www.npmjs.com/package/typescript) | checks the pages' code before it is built | 7.0.2 | no, it only builds them |
 | [vite](https://www.npmjs.com/package/vite) | builds the pages into files whose names carry their content's hash | 8.3.8 | no, it only builds them |
 
-The pages name 11 libraries, 6 of which are in them. With what those bring with them, the pages hold 9 in all, each in the version web/package-lock.json names.
+The pages name 13 libraries, 6 of which are in them. With what those bring with them, the pages hold 9 in all, each in the version web/package-lock.json names.
 <!-- end: pages -->
 
 ## What the build refuses

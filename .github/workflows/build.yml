@@ -1,7 +1,9 @@
 name: Build, test and publish Away
 
 # on every change: the libraries Away is built from are checked, then the program's form,
-# the compiler's warnings, its tests and the chart; and the image is installed on a fresh
+# the compiler's warnings, its tests and the chart; a browser goes through the pages, with
+# the keyboard alone and on a phone's screen, and each has to pass the accessibility
+# checks and load nothing from outside; and the image is installed on a fresh
 # Kubernetes cluster by someone with rights in one namespace alone, where
 # tests/install/kubernetes.sh tries it and the connections the cluster has to refuse.
 # Away's own protocol code is tried against real servers that the pipeline starts itself:
@@ -58,6 +60,12 @@ jobs:
 
       - name: The tests
         run: cargo test --locked
+
+      - name: The pages, gone through in a browser as a person does
+        run: |
+          cargo build --locked --package away-server --example pages --features stand-in
+          npx --prefix web playwright install --with-deps chromium
+          npm --prefix web test
 
       - name: The chart, with each way in
         run: |

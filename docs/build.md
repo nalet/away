@@ -46,6 +46,22 @@ The pages are then at the address the second command names, and change as
 their files are saved. `ROLE=person` before the first command signs in
 somebody who administers nothing.
 
+## Testing the pages
+
+A real browser goes through the pages as a person does: it is signed in, moves
+between the views, uses the frame with the keyboard alone and on a phone's
+screen, signs out, and meets a sign-in that failed and one that ran out. Every
+page it sees has to pass the accessibility checks, WCAG 2.2 at the levels A
+and AA, and may load nothing from anywhere but Away.
+
+```sh
+npx --prefix web playwright install chromium    # once
+make test-pages
+```
+
+The tests run the server beside the stand-in for a sign-in service, and tell
+the stand-in how to behave. The pipeline runs them on every change.
+
 The program is one file. Its first word chooses the part it runs as:
 
 ```sh
@@ -236,7 +252,7 @@ On every change, [the pipeline](../.github/workflows/build.yml):
 2. checks the pages' code and builds them, to be part of the program, then
    checks the program's form and the compiler's warnings, which count as
    failures;
-3. runs the tests;
+3. runs the tests, and goes through the pages in a browser;
 4. renders the chart with each way in;
 5. checks the libraries' licences, known security holes and sources;
 6. builds the image, checks that it holds the program and nothing else, and
