@@ -57,13 +57,13 @@ With Away's own authority, the key in the issuer can make a certificate for any 
 
 - **Without a domain.** Every test that needs no domain runs on an installation that names none, from the first work package on.
 - **Away's own authority**, with the domain controllers' certificates from it too, is proven in [package 3](../../plan/README.md), on a domain that exists for testing and has no authority of its own. A domain in use should not be asked to trust a test.
-- **The organisation's own authority** is proven at the start of [package 12](../../plan/README.md): Away asks an authority for a certificate in another person's name over one of its published interfaces, with nothing of Away's installed there. Which interface is not settled. If none serves, the owner chooses between a small helper beside the authority, which point 8 rules out today, and offering Away's own authority alone.
+- **The organisation's own authority** is proven at the start of [package 13](../../plan/README.md): Away asks an authority for a certificate in another person's name over one of its published interfaces, with nothing of Away's installed there. Which interface is not settled. If none serves, the owner chooses between a small helper beside the authority, which point 8 rules out today, and offering Away's own authority alone.
 
 ## Consequences
 
 - An organisation without a Windows domain installs Away and lacks nothing but what a domain would give.
 - An organisation with a domain and no authority can still sign people in as themselves, at the price of trusting Away's authority with the whole domain.
-- An organisation with an authority keeps the limit in its own directory, once package 12 is built.
+- An organisation with an authority keeps the limit in its own directory, once package 13 is built.
 - With Away's own authority, its key is the most valuable thing Away holds: whoever has it is anyone in the domain for as long as nobody notices. It lives in the issuer alone ([ADR-0003](./0003-three-parts-with-their-own-rights.md), [ADR-0010](./0010-secrets-live-in-the-cluster.md)), and the guide says how to replace it.
 - Where Away's authority also certifies the domain controllers, those certificates run out and are made again by hand. Signing in as oneself stops when one is forgotten, and the check of the setup says that this is why.
 - Putting an authority on a domain's list is done by whoever answers for the domain, once, by hand. Away can check it and can't do it.

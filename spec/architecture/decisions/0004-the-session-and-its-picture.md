@@ -26,7 +26,7 @@ Two questions follow. What carries a session between the browser and Away? And w
 
 ### Validation
 
-The first desktop, over VNC ([package 9](../../plan/README.md)), is measured against the proposed targets: 30 pictures a second on a local network and 15 on a line of 10 Mbit/s while a window is dragged at 1920 by 1080, office work on a line of 2 Mbit/s, a screen at rest exact within a second, and a delay of under 50 ms added by Away.
+The first desktop, a Windows one over RDP ([package 6](../../plan/README.md)), is measured against the proposed targets: 30 pictures a second on a local network and 15 on a line of 10 Mbit/s while a window is dragged at 1920 by 1080, office work on a line of 2 Mbit/s, a screen at rest exact within a second, and a delay of under 50 ms added by Away.
 
 The design holds if they are met with two picture formats and copies. If moving pictures cost more than the line has, the first thing to change is the format for what moves; the gateway keeping the picture stays.
 
