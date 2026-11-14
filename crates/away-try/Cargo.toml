@@ -11,6 +11,10 @@ publish.workspace = true
 [dependencies]
 away-rdp.workspace = true
 rustls.workspace = true
+getrandom.workspace = true
+
+[dev-dependencies]
+away-rdp = { workspace = true, features = ["stand-in"] }
 
 [lints]
 workspace = true

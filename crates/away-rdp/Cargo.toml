@@ -10,6 +10,14 @@ publish.workspace = true
 
 [dependencies]
 sha2.workspace = true
+md4.workspace = true
+md-5.workspace = true
+hmac.workspace = true
+rc4.workspace = true
+
+[features]
+# the machine's side of the sign-in, for tests and for whatever stands in for a machine
+stand-in = []
 
 [lints]
 workspace = true

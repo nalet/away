@@ -101,10 +101,9 @@ def table(libraries, held):
         version = ', '.join(held.get(lib['name'], [])) or 'not in Cargo.lock'
         features = ', '.join(f'`{f}`' for f in lib['features']) or '—'
         lines.append(f'| [{lib["name"]}](https://crates.io/crates/{lib["name"]}) | {lib["for"]} | {version} | {features} |')
-    others = sum(len(v) for v in held.values()) - sum(len(held.get(lib['name'], [])) for lib in libraries)
     lines.append('')
-    lines.append(f'Away names {len(libraries)} libraries. They bring {others} more with them, which makes '
-                 f'{sum(len(v) for v in held.values())} in all.')
+    lines.append(f'Away names {len(libraries)} libraries. With what they bring with them, a build holds '
+                 f'{sum(len(v) for v in held.values())} in all, each in the version Cargo.lock names.')
     return '\n'.join(lines) + '\n'
 
 

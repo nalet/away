@@ -38,13 +38,20 @@ stops when it is sent the signal a cluster sends.
 
 `away-try` reaches a machine with Away's own protocol code, with no browser
 and nothing else of Away around it, and says what happened at each step. It
-goes as far as that code goes: today it asks an RDP machine which security it
-takes, secures the connection, reads the certificate the machine shows, and
-begins the sign-in before the desktop, as far as the machine saying who it is.
+goes as far as that code goes. Today, over RDP, it asks a machine which
+security it takes, secures the connection, reads the certificate the machine
+shows, and signs an account in before the desktop: it proves the password,
+checks that the machine holds the certificate it showed, hands over the name
+and the password sealed, and reads the machine's word on whether the account
+may come in.
 
 ```sh
 cargo run --package away-try -- rdp fin-app-02.example.com
+cargo run --package away-try -- rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password
 ```
+
+The password is read from a file, so that it is on no command line and in no
+history.
 
 It is for the people who build Away, and it is not in the image.
 

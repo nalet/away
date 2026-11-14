@@ -3,6 +3,7 @@
 //!
 //! ```text
 //! away-try rdp fin-app-02.example.com
+//! away-try rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password
 //! ```
 //!
 //! It is for the people who build Away: the proof that the protocol code works against
@@ -15,20 +16,27 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use away_rdp::der;
 use away_rdp::identity::Identity;
 use away_rdp::negotiation::{self, Security};
+use away_rdp::ntlm::{self, Account, Challenge, Fresh};
+use away_rdp::secret::Secret;
+use away_rdp::sign_in::{self, Message, New, Next, SignIn};
 use away_rdp::tpkt::Frames;
-use away_rdp::{der, sign_in};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, CryptoProvider};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, ClientConnection, DigitallySignedStruct, SignatureScheme};
 
 const USAGE: &str = "\
-away-try rdp <address>
+away-try rdp <address> [--as <account> --password-file <file>]
 
   Reaches a machine over RDP with Away's own code and says what it shows, step by step.
   The address is a name or a number, with a port after a colon where it is not 3389.
+
+  With an account it signs in before the desktop. The account is written as people
+  write it: CORP\\alex.urban, alex.urban@corp.example.com, or a name alone. Its
+  password is read from a file, so that it is on no command line.
 ";
 
 /// How long a machine gets to answer, at each step.
@@ -36,27 +44,34 @@ const WITHIN: Duration = Duration::from_secs(10);
 
 fn main() -> ExitCode {
     let words: Vec<String> = std::env::args().skip(1).collect();
-    match words.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
-        ["rdp", address] => match rdp(address) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(why) => {
-                println!("   {why}");
-                ExitCode::FAILURE
+    let tried = match words.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        ["rdp", address] => rdp(address, None),
+        ["rdp", address, "--as", name, "--password-file", file] | ["rdp", address, "--password-file", file, "--as", name] => {
+            match std::fs::read_to_string(file) {
+                Ok(password) => rdp(address, Some(Account::named(name, Secret::new(password.trim_end_matches(['\r', '\n']))))),
+                Err(error) => Err(format!("The password's file can't be read: {error}.")),
             }
-        },
+        }
         ["help" | "--help" | "-h"] => {
             print!("{USAGE}");
-            ExitCode::SUCCESS
+            return ExitCode::SUCCESS;
         }
         _ => {
             eprint!("{USAGE}");
-            ExitCode::from(2)
+            return ExitCode::from(2);
+        }
+    };
+    match tried {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(why) => {
+            println!("   {why}");
+            ExitCode::FAILURE
         }
     }
 }
 
 /// The steps of a connection over RDP, as far as Away's code goes.
-fn rdp(address: &str) -> Result<(), String> {
+fn rdp(address: &str, account: Option<Account>) -> Result<(), String> {
     let (host, port) = match address.rsplit_once(':') {
         Some((host, port)) if !host.contains(':') => (host, port.parse::<u16>().map_err(|_| format!("{port} is no port."))?),
         _ => (address, 3389),
@@ -153,23 +168,83 @@ fn rdp(address: &str) -> Result<(), String> {
         return Ok(());
     }
 
-    println!("Signing in, before the desktop");
     let mut secured = rustls::Stream::new(&mut secured, &mut connection);
-    secured.write_all(&sign_in::begin()).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
+    let Some(account) = account else {
+        // with no account, the first exchange alone: the machine says who it is
+        println!("Signing in, before the desktop");
+        let first = Message { version: sign_in::VERSION, carried: Some(ntlm::negotiate()), ..Message::default() };
+        secured.write_all(&first.write()).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
+        let answer = Message::read(&message(&mut secured)?).map_err(|error| error.to_string())?;
+        let challenge = ntlm::read_challenge(&answer.carried.unwrap_or_default()).map_err(|error| error.to_string())?;
+        who_it_is(&challenge);
+        println!("   It speaks version {} of the sign-in.", answer.version);
+        println!("To go on, name an account: --as <account> --password-file <file>.");
+        return Ok(());
+    };
+
+    let written = if account.domain.is_empty() { account.name.clone() } else { format!("{}\\{}", account.domain, account.name) };
+    println!("Signing in, before the desktop, as {written}");
+    let mut random = [0u8; 56];
+    getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
+    let new = New {
+        for_the_proof: Fresh { challenge: random[..8].try_into().expect("8 bytes"), key: random[8..24].try_into().expect("16 bytes") },
+        number: random[24..].try_into().expect("32 bytes"),
+    };
+    let (mut signing_in, first) = SignIn::begin(account, host, &identity.public_key, new, clock());
+    secured.write_all(&first).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
+    let mut said_who = false;
+    loop {
+        let next = signing_in.receive(&message(&mut secured)?).map_err(|error| error.to_string())?;
+        if let (false, Some(challenge)) = (said_who, signing_in.machine()) {
+            who_it_is(challenge);
+            said_who = true;
+        }
+        match next {
+            Next::Send(bytes) => secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't go on: {error}."))?,
+            Next::SendLast(bytes) => {
+                secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't be ended: {error}."))?;
+                break;
+            }
+        }
+    }
+    println!("   It took the proof of the password, and proved that it holds the certificate it showed.");
+    println!("   The name and the password were handed over, sealed.");
+
+    if answer.security == (Security::SignInFirst { tells_result: true }) {
+        let mut verdict = [0u8; 4];
+        secured.read_exact(&mut verdict).map_err(|_| {
+            "It closed the connection where it should say whether the account may come in: the name or the password may be wrong."
+                .to_string()
+        })?;
+        sign_in::read_verdict(verdict).map_err(|error| error.to_string())?;
+        println!("   It says the account may come in.");
+    }
+    println!("The next step is what a client says of itself, which this version doesn't speak yet.");
+    Ok(())
+}
+
+/// One whole message of the sign-in, read from the secured connection.
+fn message(secured: &mut impl Read) -> Result<Vec<u8>, String> {
     let mut held = Vec::new();
-    let length = loop {
+    loop {
         match der::whole(&held).map_err(|error| error.to_string())? {
-            Some(length) if held.len() >= length => break length,
+            Some(length) if held.len() >= length => {
+                held.truncate(length);
+                return Ok(held);
+            }
             _ => {}
         }
-        let mut bytes = [0u8; 2048];
+        let mut bytes = [0u8; 4096];
         match secured.read(&mut bytes) {
             Ok(0) => return Err("It closed the connection in the middle of the sign-in.".to_string()),
             Ok(count) => held.extend_from_slice(&bytes[..count]),
             Err(_) => return Err(format!("It gave no answer to the sign-in within {} seconds.", WITHIN.as_secs())),
         }
-    };
-    let (version, challenge) = sign_in::read_challenge(&held[..length]).map_err(|error| error.to_string())?;
+    }
+}
+
+/// Says who a machine says it is.
+fn who_it_is(challenge: &Challenge) {
     let computer = challenge.computer.as_deref().unwrap_or("a machine without a name");
     match (&challenge.domain, &challenge.computer_dns) {
         (Some(domain), _) if domain == computer => println!("   It answers as {computer}, which is in no domain."),
@@ -180,9 +255,12 @@ fn rdp(address: &str) -> Result<(), String> {
     if let Some(windows) = challenge.version {
         println!("   It says it runs Windows {}.{}, build {}.", windows.major, windows.minor, windows.build);
     }
-    println!("   It speaks version {version} of the sign-in.");
-    println!("The next step is proving who one is, with a name and a password, which this version doesn't speak yet.");
-    Ok(())
+}
+
+/// The time now as Windows counts it: in ten-millionths of a second since 1601.
+fn clock() -> u64 {
+    let since_1970 = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+    (since_1970.as_secs() + 11_644_473_600) * 10_000_000 + u64::from(since_1970.subsec_nanos() / 100)
 }
 
 /// Takes whatever certificate a machine shows, and still makes the machine prove that it

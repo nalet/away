@@ -14,6 +14,7 @@
 //! | [`sign_in`] | the sign-in before the desktop, as far as the machine saying who it is |
 //! | [`ntlm`] | the messages of the way of signing in that needs no directory |
 //! | [`der`] | reads and writes the encoding certificates and the sign-in are written in |
+//! | [`secret`] | a value that can be used and can't be printed |
 //!
 //! The cryptography is never this crate's own: TLS is done by whoever holds the
 //! connection, and a hash comes from a library.
@@ -22,7 +23,10 @@ pub mod der;
 pub mod identity;
 pub mod negotiation;
 pub mod ntlm;
+pub mod secret;
 pub mod sign_in;
+#[cfg(any(test, feature = "stand-in"))]
+pub mod stand_in;
 pub mod tpkt;
 
 mod error;

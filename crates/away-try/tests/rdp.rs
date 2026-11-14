@@ -9,6 +9,10 @@ use std::process::{Command, Output};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
+use away_rdp::identity::Identity;
+use away_rdp::ntlm::Account;
+use away_rdp::secret::Secret;
+use away_rdp::stand_in::StandIn;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::{ServerConfig, ServerConnection};
 
@@ -21,10 +25,22 @@ const CHOSEN: [u8; 19] = [0x03, 0x00, 0x00, 0x13, 0x0e, 0xd0, 0x00, 0x00, 0x12, 
 const REFUSED: [u8; 19] =
     [0x03, 0x00, 0x00, 0x13, 0x0e, 0xd0, 0x00, 0x00, 0x12, 0x34, 0x00, 0x03, 0x00, 0x08, 0x00, 0x02, 0x00, 0x00, 0x00];
 
+/// The account the stand-in knows, and its password. Neither exists anywhere else.
+const KNOWN: &str = "CORP\\alex.urban";
+const PASSWORD: &str = "a password that exists for these tests alone";
+
+/// The stand-in's verdict on whether the account may come in: it may, or access is refused.
+const MAY_COME_IN: [u8; 4] = [0, 0, 0, 0];
+const MAY_NOT: [u8; 4] = [5, 0, 0, 0];
+
 /// A stand-in for a machine: it takes one connection, reads the first request, answers
-/// with these bytes and, when asked to, secures the connection. It gives the request it
-/// read.
+/// with these bytes and, when asked to, secures the connection and takes the sign-in
+/// before the desktop, ending with this verdict. It gives the request it read.
 fn machine(answer: &'static [u8], secures: bool) -> (String, JoinHandle<Vec<u8>>) {
+    machine_with_verdict(answer, secures, MAY_COME_IN)
+}
+
+fn machine_with_verdict(answer: &'static [u8], secures: bool, verdict: [u8; 4]) -> (String, JoinHandle<Vec<u8>>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("an address");
     let address = listener.local_addr().expect("its address").to_string();
     let running = std::thread::spawn(move || {
@@ -33,14 +49,14 @@ fn machine(answer: &'static [u8], secures: bool) -> (String, JoinHandle<Vec<u8>>
         connection.read_exact(&mut request).expect("the first request");
         connection.write_all(answer).expect("the answer goes out");
         if secures {
-            secure(&mut connection);
+            secure(&mut connection, verdict);
         }
         request.to_vec()
     });
     (address, running)
 }
 
-fn secure(connection: &mut TcpStream) {
+fn secure(connection: &mut TcpStream, verdict: [u8; 4]) {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let config = ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
@@ -54,28 +70,60 @@ fn secure(connection: &mut TcpStream) {
             return;
         }
     }
-    // the sign-in before the desktop: read its first message, and answer as a Windows
-    // machine of a domain does, saying who it is
+    // the sign-in before the desktop, answered as a Windows machine of a domain answers:
+    // it knows one account, and holds the certificate it showed
     let mut secured = rustls::Stream::new(&mut secured, connection);
-    let mut first = Vec::new();
+    let holds = Identity::read(CERTIFICATE).expect("the stand-in's certificate").public_key;
+    let mut stand_in = StandIn::new(Account::named(KNOWN, Secret::new(PASSWORD)), &holds);
     loop {
-        match away_rdp::der::whole(&first) {
-            Ok(Some(length)) if first.len() >= length => break,
-            Ok(_) => {}
+        let mut message = Vec::new();
+        loop {
+            match away_rdp::der::whole(&message) {
+                Ok(Some(length)) if message.len() >= length => break,
+                Ok(_) => {}
+                Err(_) => return,
+            }
+            let mut bytes = [0u8; 4096];
+            match secured.read(&mut bytes) {
+                Ok(count) if count > 0 => message.extend_from_slice(&bytes[..count]),
+                // the client left: it had no account, or it was refused
+                _ => return,
+            }
+        }
+        match stand_in.answer(&message) {
+            Ok(answer) if answer.is_empty() => break,
+            Ok(answer) => {
+                if secured.write_all(&answer).is_err() {
+                    return;
+                }
+            }
             Err(_) => return,
         }
-        let mut bytes = [0u8; 512];
-        match secured.read(&mut bytes) {
-            Ok(count) if count > 0 => first.extend_from_slice(&bytes[..count]),
-            _ => return,
-        }
     }
-    assert_eq!(first, away_rdp::sign_in::begin(), "the first message of the sign-in");
-    let challenge = away_rdp::ntlm::challenge_for_tests("FIN-APP-02", "CORP", "corp.example.com", 26_100);
-    let _ = secured.write_all(&away_rdp::sign_in::request(6, &challenge));
-    // the test program has nothing more to say: wait until it leaves
+    // the name and the password have arrived: say whether the account may come in
+    let _ = secured.write_all(&verdict);
     let mut rest = Vec::new();
     let _ = secured.read_to_end(&mut rest);
+}
+
+/// A file that holds a password, as the test program takes one.
+fn password_file(password: &str) -> std::path::PathBuf {
+    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let file =
+        std::env::temp_dir().join(format!("away-try-{}-{}", std::process::id(), NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
+    std::fs::write(&file, format!("{password}\n")).expect("a file for the password");
+    file
+}
+
+fn try_rdp_as(address: &str, account: &str, password: &str) -> Output {
+    let file = password_file(password);
+    let tried = Command::new(env!("CARGO_BIN_EXE_away-try"))
+        .args(["rdp", address, "--as", account, "--password-file"])
+        .arg(&file)
+        .output()
+        .expect("the test program runs");
+    let _ = std::fs::remove_file(file);
+    tried
 }
 
 fn try_rdp(address: &str) -> Output {
@@ -108,8 +156,63 @@ fn it_reaches_a_machine_secures_the_connection_and_says_what_the_machine_shows()
     assert_eq!(lines[12], "   It answers as FIN-APP-02 of the domain CORP, in full FIN-APP-02.corp.example.com.");
     assert_eq!(lines[13], "   It says it runs Windows 10.0, build 26100.");
     assert_eq!(lines[14], "   It speaks version 6 of the sign-in.");
-    assert_eq!(lines[15], "The next step is proving who one is, with a name and a password, which this version doesn't speak yet.");
+    assert_eq!(lines[15], "To go on, name an account: --as <account> --password-file <file>.");
     assert_eq!(lines.len(), 16);
+}
+
+#[test]
+fn it_signs_an_account_in_before_the_desktop() {
+    let (address, running) = machine(&CHOSEN, true);
+    let tried = try_rdp_as(&address, KNOWN, PASSWORD);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    running.join().expect("the stand-in ends");
+    assert!(tried.status.success(), "{said}");
+    let lines: Vec<&str> = said.lines().skip(11).collect();
+    assert_eq!(
+        lines,
+        [
+            "Signing in, before the desktop, as CORP\\alex.urban",
+            "   It answers as FIN-APP-02 of the domain CORP, in full FIN-APP-02.corp.example.com.",
+            "   It says it runs Windows 10.0, build 26100.",
+            "   It took the proof of the password, and proved that it holds the certificate it showed.",
+            "   The name and the password were handed over, sealed.",
+            "   It says the account may come in.",
+            "The next step is what a client says of itself, which this version doesn't speak yet.",
+        ],
+        "{said}"
+    );
+    assert!(!said.contains(PASSWORD), "the password is never said");
+}
+
+#[test]
+fn a_wrong_password_is_refused_and_said_so() {
+    let (address, running) = machine(&CHOSEN, true);
+    let tried = try_rdp_as(&address, KNOWN, "another password");
+    let said = String::from_utf8(tried.stdout).expect("text");
+    running.join().expect("the stand-in ends");
+    assert_eq!(tried.status.code(), Some(1));
+    assert!(said.ends_with("   It refused the sign-in: the name or the password is wrong (its own code 0xc000006d).\n"), "{said}");
+    assert!(!said.contains("another password"));
+}
+
+#[test]
+fn an_account_that_may_not_come_in_is_told_so() {
+    let (address, running) = machine_with_verdict(&CHOSEN, true, MAY_NOT);
+    let tried = try_rdp_as(&address, KNOWN, PASSWORD);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    running.join().expect("the stand-in ends");
+    assert_eq!(tried.status.code(), Some(1));
+    assert!(said.ends_with("   The name and the password were handed over, sealed.\n   It took the sign-in, and says this account may not come in over RDP here.\n"), "{said}");
+}
+
+#[test]
+fn a_password_file_that_is_not_there_is_said_to_be_missing() {
+    let tried = Command::new(env!("CARGO_BIN_EXE_away-try"))
+        .args(["rdp", "fin-app-02.example.com", "--as", KNOWN, "--password-file", "/nowhere/at/all"])
+        .output()
+        .expect("the test program runs");
+    assert_eq!(tried.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&tried.stdout).starts_with("   The password's file can't be read: "));
 }
 
 #[test]
@@ -145,7 +248,7 @@ fn a_port_nothing_listens_on_is_said_to_take_no_connection() {
 fn it_says_what_it_takes() {
     let none = Command::new(env!("CARGO_BIN_EXE_away-try")).output().expect("the test program runs");
     assert_eq!(none.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&none.stderr).contains("away-try rdp <address>"));
+    assert!(String::from_utf8_lossy(&none.stderr).contains("away-try rdp <address> [--as <account> --password-file <file>]"));
     let wrong = Command::new(env!("CARGO_BIN_EXE_away-try")).args(["rdp", "fin-app-02:port"]).output().expect("the test program runs");
     assert_eq!(wrong.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&wrong.stdout).contains("port is no port."));

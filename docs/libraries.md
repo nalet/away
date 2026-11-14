@@ -13,9 +13,14 @@ library has no line that says what it is for.
 | [hyper-util](https://crates.io/crates/hyper-util) | lets hyper use tokio's connections and timers | 0.1.21 | `tokio` |
 | [http-body-util](https://crates.io/crates/http-body-util) | holds the body of an HTTP answer | 0.1.5 | — |
 | [rustls](https://crates.io/crates/rustls) | secures the connection to a machine: TLS is never Away's own | 0.23.46 | `ring`, `std`, `tls12` |
-| [sha2](https://crates.io/crates/sha2) | makes the fingerprint a machine is known by | 0.11.1 | — |
+| [sha2](https://crates.io/crates/sha2) | makes the fingerprint a machine is known by, and binds a sign-in to its connection | 0.11.1 | — |
+| [md4](https://crates.io/crates/md4) | turns a password into the key Windows knows it by: part of signing in with a name and a password | 0.11.0 | — |
+| [md-5](https://crates.io/crates/md-5) | the hash that signing in with a name and a password is built on | 0.11.0 | — |
+| [hmac](https://crates.io/crates/hmac) | makes the proofs and the keys of signing in with a name and a password | 0.13.0 | — |
+| [rc4](https://crates.io/crates/rc4) | the cipher that signing in with a name and a password seals its messages with | 0.2.0 | — |
+| [getrandom](https://crates.io/crates/getrandom) | takes random bytes from the system, for keys and for numbers used once | 0.2.17, 0.4.3 | — |
 
-Away names 6 libraries. They bring 51 more with them, which makes 57 in all.
+Away names 11 libraries. With what they bring with them, a build holds 67 in all, each in the version Cargo.lock names.
 <!-- end: libraries -->
 
 ## What the build refuses

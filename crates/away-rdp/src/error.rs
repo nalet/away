@@ -38,6 +38,29 @@ pub enum Error {
     SignIn(&'static str),
     /// The machine refused the sign-in before the desktop, with this code of its own.
     SignInRefused(u32),
+    /// The machine took the sign-in and says this account may not come in over RDP, with
+    /// this code of its own.
+    MayNotComeIn(u32),
+}
+
+/// Why a machine refuses a sign-in, for the codes people meet.
+fn refusal(code: u32) -> Option<&'static str> {
+    Some(match code {
+        0xc000_006d => "the name or the password is wrong",
+        0xc000_006a => "the password is wrong",
+        0xc000_0064 => "it knows no account of that name",
+        0xc000_006e => "the account may not sign in here, or not now",
+        0xc000_006f => "the account may not sign in at this hour",
+        0xc000_0070 => "the account may not sign in from this device",
+        0xc000_0071 => "the account's password has run out",
+        0xc000_0072 => "the account is disabled",
+        0xc000_0193 => "the account has run out",
+        0xc000_0224 => "the account's password has to be changed first",
+        0xc000_0234 => "the account is locked",
+        0xc000_015b => "the account is not allowed this kind of sign-in on this machine",
+        0xc000_0022 => "it refuses access",
+        _ => return None,
+    })
 }
 
 impl fmt::Display for Error {
@@ -57,7 +80,12 @@ impl fmt::Display for Error {
             Error::NotAskedFor(chosen) => write!(out, "It chose a security it was not asked for: {chosen}."),
             Error::Certificate(what) => write!(out, "Its certificate can't be read: {what}."),
             Error::SignIn(what) => write!(out, "What it sent for the sign-in is not what the sign-in is: {what}."),
-            Error::SignInRefused(code) => write!(out, "It refused the sign-in, with its own code {code:#010x}."),
+            Error::SignInRefused(code) => match refusal(*code) {
+                Some(why) => write!(out, "It refused the sign-in: {why} (its own code {code:#010x})."),
+                None => write!(out, "It refused the sign-in, with its own code {code:#010x}."),
+            },
+            Error::MayNotComeIn(5) => out.write_str("It took the sign-in, and says this account may not come in over RDP here."),
+            Error::MayNotComeIn(code) => write!(out, "It took the sign-in, and then refused the account, with its own code {code:#010x}."),
         }
     }
 }
