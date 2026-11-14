@@ -4,6 +4,9 @@ name: Build, test and publish Away
 # the compiler's warnings, its tests and the chart; and the image is installed on a fresh
 # Kubernetes cluster by someone with rights in one namespace alone, where
 # tests/install/kubernetes.sh tries it and the connections the cluster has to refuse.
+# Away's own protocol code is tried against real servers that the pipeline starts itself:
+# so far a desktop over RDP on Linux, whose picture has to be the server's screen, pixel
+# for pixel.
 #
 # on the main branch and on a version's tag the image and the chart are then published:
 # built for two kinds of processor, signed with this pipeline's own identity, with a
@@ -91,9 +94,21 @@ jobs:
           IMAGE_TAG: test
           IMAGE_PULL_POLICY: Never
 
+  machines:
+    name: try real servers
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the test program
+        run: cargo build --locked --package away-try
+
+      - name: A desktop over RDP on Linux
+        run: tests/machines/linux/rdp.sh
+
   publish:
     name: publish the image and the chart
-    needs: [check, install]
+    needs: [check, install, machines]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-24.04
     permissions:

@@ -8,6 +8,7 @@
 use crate::gcc::{self, Client, Machine};
 use crate::mcs::{self, Arrived};
 use crate::pdu::{self, FromMachine};
+use crate::secret::Secret;
 use crate::tpkt::{self, Frame};
 use crate::update::{self, Rectangle, Updates};
 use crate::Error;
@@ -55,6 +56,7 @@ pub struct Connection {
     client: Client,
     domain: String,
     name: String,
+    password: Option<Secret>,
     machine: Machine,
     user: u16,
     share_id: u32,
@@ -64,14 +66,17 @@ pub struct Connection {
 
 impl Connection {
     /// Begins: what the client says of itself, to send first. The domain and the name are
-    /// of the account the desktop is for.
-    pub fn begin(client: Client, domain: &str, name: &str) -> (Connection, Vec<u8>) {
+    /// of the account the desktop is for. The password is given only where the machine
+    /// signs the account in itself: where the account signed in before the desktop, the
+    /// machine has it already.
+    pub fn begin(client: Client, domain: &str, name: &str, password: Option<Secret>) -> (Connection, Vec<u8>) {
         let first = tpkt::data_frame(&mcs::connect(&gcc::request(&client)));
         let connection = Connection {
             state: State::AwaitsMachine,
             client,
             domain: domain.to_string(),
             name: name.to_string(),
+            password,
             machine: Machine::default(),
             user: 0,
             share_id: 0,
@@ -114,7 +119,8 @@ impl Connection {
                 mcs::read_joined(message)?;
                 if left.is_empty() {
                     self.state = State::AwaitsLicence;
-                    let info = pdu::client_info(&self.domain, &self.name);
+                    // the password is used here and kept no longer
+                    let info = pdu::client_info(&self.domain, &self.name, self.password.take().as_ref());
                     let send = tpkt::data_frame(&mcs::send(self.user, self.machine.io_channel, &info));
                     return Ok((send, vec![Happened::Channels { user: self.user, desktop: self.machine.io_channel }]));
                 }

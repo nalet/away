@@ -216,67 +216,77 @@ fn rdp(address: &str, account: Option<Account>, save: Option<&str>) -> Result<()
     println!("   Valid from {} until {}.", identity.valid_from, identity.valid_until);
     println!("   Its fingerprint (SHA-256): {}", identity.fingerprint_text());
 
-    if answer.security == Security::Tls {
-        println!("It wants the sign-in on its own screen, which this version doesn't do yet.");
-        return Ok(());
-    }
-
     let mut secured = rustls::Stream::new(&mut secured, &mut connection);
-    let Some(account) = account else {
-        // with no account, the first exchange alone: the machine says who it is
-        println!("Signing in, before the desktop");
-        let first = Message { version: sign_in::VERSION, carried: Some(ntlm::negotiate()), ..Message::default() };
-        secured.write_all(&first.write()).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
-        let answer = Message::read(&message(&mut secured)?).map_err(|error| error.to_string())?;
-        let challenge = ntlm::read_challenge(&answer.carried.unwrap_or_default()).map_err(|error| error.to_string())?;
-        who_it_is(&challenge);
-        println!("   It speaks version {} of the sign-in.", answer.version);
-        println!("To go on, name an account: --as <account> --password-file <file>.");
-        return Ok(());
+    let written = |account: &Account| match account.domain.as_str() {
+        "" => account.name.clone(),
+        domain => format!("{domain}\\{}", account.name),
     };
+    let (domain, name, password) = if answer.security == Security::Tls {
+        // the machine signs the account in itself, with what the client tells it
+        let Some(account) = account else {
+            println!("To go on, name an account: --as <account> --password-file <file>.");
+            return Ok(());
+        };
+        println!("Opening the desktop as {}", written(&account));
+        println!("   The name and the password travel to the machine inside the secured connection.");
+        (account.domain, account.name, Some(account.password))
+    } else {
+        let Some(account) = account else {
+            // with no account, the first exchange alone: the machine says who it is
+            println!("Signing in, before the desktop");
+            let first = Message { version: sign_in::VERSION, carried: Some(ntlm::negotiate()), ..Message::default() };
+            secured.write_all(&first.write()).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
+            let answer = Message::read(&message(&mut secured)?).map_err(|error| error.to_string())?;
+            let challenge = ntlm::read_challenge(&answer.carried.unwrap_or_default()).map_err(|error| error.to_string())?;
+            who_it_is(&challenge);
+            println!("   It speaks version {} of the sign-in.", answer.version);
+            println!("To go on, name an account: --as <account> --password-file <file>.");
+            return Ok(());
+        };
 
-    let (domain, name) = (account.domain.clone(), account.name.clone());
-    let written = if account.domain.is_empty() { account.name.clone() } else { format!("{}\\{}", account.domain, account.name) };
-    println!("Signing in, before the desktop, as {written}");
-    let mut random = [0u8; 56];
-    getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
-    let new = New {
-        for_the_proof: Fresh { challenge: random[..8].try_into().expect("8 bytes"), key: random[8..24].try_into().expect("16 bytes") },
-        number: random[24..].try_into().expect("32 bytes"),
-    };
-    let (mut signing_in, first) = SignIn::begin(account, host, &identity.public_key, new, clock());
-    secured.write_all(&first).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
-    let mut said_who = false;
-    loop {
-        let next = signing_in.receive(&message(&mut secured)?).map_err(|error| error.to_string())?;
-        if let (false, Some(challenge)) = (said_who, signing_in.machine()) {
-            who_it_is(challenge);
-            said_who = true;
-        }
-        match next {
-            Next::Send(bytes) => secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't go on: {error}."))?,
-            Next::SendLast(bytes) => {
-                secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't be ended: {error}."))?;
-                break;
+        let (domain, name) = (account.domain.clone(), account.name.clone());
+        println!("Signing in, before the desktop, as {}", written(&account));
+        let mut random = [0u8; 56];
+        getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
+        let new = New {
+            for_the_proof: Fresh { challenge: random[..8].try_into().expect("8 bytes"), key: random[8..24].try_into().expect("16 bytes") },
+            number: random[24..].try_into().expect("32 bytes"),
+        };
+        let (mut signing_in, first) = SignIn::begin(account, host, &identity.public_key, new, clock());
+        secured.write_all(&first).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
+        let mut said_who = false;
+        loop {
+            let next = signing_in.receive(&message(&mut secured)?).map_err(|error| error.to_string())?;
+            if let (false, Some(challenge)) = (said_who, signing_in.machine()) {
+                who_it_is(challenge);
+                said_who = true;
+            }
+            match next {
+                Next::Send(bytes) => secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't go on: {error}."))?,
+                Next::SendLast(bytes) => {
+                    secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't be ended: {error}."))?;
+                    break;
+                }
             }
         }
-    }
-    println!("   It took the proof of the password, and proved that it holds the certificate it showed.");
-    println!("   The name and the password were handed over, sealed.");
+        println!("   It took the proof of the password, and proved that it holds the certificate it showed.");
+        println!("   The name and the password were handed over, sealed.");
 
-    if answer.security == (Security::SignInFirst { tells_result: true }) {
-        let mut verdict = [0u8; 4];
-        secured.read_exact(&mut verdict).map_err(|_| {
-            "It closed the connection where it should say whether the account may come in: the name or the password may be wrong."
-                .to_string()
-        })?;
-        sign_in::read_verdict(verdict).map_err(|error| error.to_string())?;
-        println!("   It says the account may come in.");
-    }
+        if answer.security == (Security::SignInFirst { tells_result: true }) {
+            let mut verdict = [0u8; 4];
+            secured.read_exact(&mut verdict).map_err(|_| {
+                "It closed the connection where it should say whether the account may come in: the name or the password may be wrong."
+                    .to_string()
+            })?;
+            sign_in::read_verdict(verdict).map_err(|error| error.to_string())?;
+            println!("   It says the account may come in.");
+        }
+        (domain, name, None)
+    };
 
     println!("Saying what Away is, and taking the channels");
     let client = Client { width: 1280, height: 800, security: answer.security.number(), name: "away".to_string() };
-    let (mut open, first) = Connection::begin(client, &domain, &name);
+    let (mut open, first) = Connection::begin(client, &domain, &name, password);
     secured.write_all(&first).map_err(|error| format!("It couldn't be sent: {error}."))?;
     let mut frames = Frames::new();
     let mut picture: Option<Picture> = None;

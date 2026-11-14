@@ -27,8 +27,8 @@ pub struct Seen {
     pub security: u32,
     /// The domain and the name of the account the desktop is for.
     pub account: (String, String),
-    /// Whether a password travelled with the account's name.
-    pub password_travelled: bool,
+    /// The password that travelled with the account's name, where one did.
+    pub password: Option<String>,
     /// How many bits a pixel the client takes.
     pub bits: u16,
     /// Whether the client takes drawing from instructions, which Away never does.
@@ -122,7 +122,8 @@ impl Desktop {
         let texts = arrived.get(22..).ok_or(WRONG)?;
         self.seen.account =
             (ntlm::utf16(texts.get(..domain).ok_or(WRONG)?), ntlm::utf16(texts.get(domain + 2..domain + 2 + name).ok_or(WRONG)?));
-        self.seen.password_travelled = password != 0;
+        let travelled = texts.get(domain + name + 4..domain + name + 4 + usize::from(password)).ok_or(WRONG)?;
+        self.seen.password = (password != 0).then(|| ntlm::utf16(travelled));
         self.state = State::Open;
 
         let mut licence = vec![0x80, 0, 0, 0, 0xff, 0x03, 0x10, 0x00];

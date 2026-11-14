@@ -2,6 +2,7 @@
 //! the desktop, the licence, what each side can do, and the last steps before the
 //! machine draws.
 
+use crate::secret::Secret;
 use crate::Error;
 
 fn wide(text: &str) -> Vec<u8> {
@@ -18,8 +19,9 @@ fn number32(bytes: &[u8], at: usize) -> Option<u32> {
 
 /// Who the desktop is for, and how the client would like it: the message that follows
 /// the channels. With the sign-in before the desktop the machine already has the name and
-/// the password, so no password travels here.
-pub fn client_info(domain: &str, name: &str) -> Vec<u8> {
+/// the password, so no password travels here. A machine that signs the account in itself
+/// is given the password, and asked to sign in with it without showing its own screen.
+pub fn client_info(domain: &str, name: &str, password: Option<&Secret>) -> Vec<u8> {
     let mut info = Vec::with_capacity(320);
     // this message is the client's information
     info.extend(0x0040u16.to_le_bytes());
@@ -27,8 +29,9 @@ pub fn client_info(domain: &str, name: &str) -> Vec<u8> {
     info.extend(0u32.to_le_bytes());
     // a mouse with a wheel, the Windows key, names in Unicode, the shell as large as the
     // desktop, word of how signing in went, and no sound
-    info.extend(0x000b_0173u32.to_le_bytes());
-    let texts = [wide(domain), wide(name), Vec::new(), Vec::new(), Vec::new()];
+    let signs_in = if password.is_some() { 0x0008 } else { 0 };
+    info.extend((0x000b_0173u32 | signs_in).to_le_bytes());
+    let texts = [wide(domain), wide(name), password.map(|password| wide(password.expose())).unwrap_or_default(), Vec::new(), Vec::new()];
     for text in &texts {
         info.extend((text.len() as u16).to_le_bytes());
     }
@@ -260,13 +263,24 @@ mod tests {
 
     #[test]
     fn the_clients_information_names_the_account_and_carries_no_password() {
-        let info = client_info("CORP", "alex.urban");
+        let info = client_info("CORP", "alex.urban", None);
         assert_eq!(&info[..4], &[0x40, 0, 0, 0]);
         assert_eq!(&info[8..12], &0x000b_0173u32.to_le_bytes());
         // the lengths of the domain, the name, and three empty texts
         assert_eq!(&info[12..22], &[8, 0, 20, 0, 0, 0, 0, 0, 0, 0]);
         assert_eq!(&info[22..32], &[b'C', 0, b'O', 0, b'R', 0, b'P', 0, 0, 0]);
         assert_eq!(info.len(), 22 + 10 + 22 + 6 + 2 + (2 + 16) + (2 + 10) + 172 + 4 + 4 + 2);
+    }
+
+    #[test]
+    fn a_machine_that_signs_in_itself_is_given_the_password_and_asked_to_use_it() {
+        let info = client_info("", "alex.urban", Some(&Secret::new("pw")));
+        assert_eq!(&info[8..12], &0x000b_017bu32.to_le_bytes(), "sign in with what follows");
+        assert_eq!(&info[12..22], &[0, 0, 20, 0, 4, 0, 0, 0, 0, 0]);
+        // an empty domain, the name, then the password
+        assert_eq!(&info[22 + 2 + 22..22 + 2 + 22 + 6], &[b'p', 0, b'w', 0, 0, 0]);
+        // two empty texts follow, then where the client is
+        assert_eq!(info.len(), 22 + 2 + 22 + 6 + 4 + 2 + (2 + 16) + (2 + 10) + 172 + 4 + 4 + 2);
     }
 
     #[test]

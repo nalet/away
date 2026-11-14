@@ -24,6 +24,9 @@ const KEY: &[u8] = include_bytes!("fixtures/machine.key.der");
 
 /// What a Windows machine answers when it chooses the sign-in before the desktop.
 const CHOSEN: [u8; 19] = [0x03, 0x00, 0x00, 0x13, 0x0e, 0xd0, 0x00, 0x00, 0x12, 0x34, 0x00, 0x02, 0x3f, 0x08, 0x00, 0x08, 0x00, 0x00, 0x00];
+/// What a machine answers that secures the connection and signs the account in itself.
+const CHOSEN_TLS: [u8; 19] =
+    [0x03, 0x00, 0x00, 0x13, 0x0e, 0xd0, 0x00, 0x00, 0x12, 0x34, 0x00, 0x02, 0x00, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00];
 /// What a machine answers that takes no connection over TLS.
 const REFUSED: [u8; 19] =
     [0x03, 0x00, 0x00, 0x13, 0x0e, 0xd0, 0x00, 0x00, 0x12, 0x34, 0x00, 0x03, 0x00, 0x08, 0x00, 0x02, 0x00, 0x00, 0x00];
@@ -63,14 +66,25 @@ struct Ended {
     seen: Option<Seen>,
 }
 
-/// A stand-in for a machine: it takes one connection, reads the first request, answers
-/// with these bytes and, when asked to, secures the connection, takes the sign-in before
-/// the desktop, says this verdict, and draws its desktop.
-fn machine(answer: &'static [u8], secures: bool) -> (String, JoinHandle<Ended>) {
-    machine_with_verdict(answer, secures, MAY_COME_IN)
+/// How a stand-in goes on after its first answer.
+#[derive(Clone, Copy)]
+enum Then {
+    /// It ends there.
+    Ends,
+    /// It secures the connection, takes the sign-in before the desktop, says this
+    /// verdict, and draws its desktop.
+    SignsInFirst([u8; 4]),
+    /// It secures the connection and draws its desktop for the account the client names.
+    SignsInItself,
 }
 
-fn machine_with_verdict(answer: &'static [u8], secures: bool, verdict: [u8; 4]) -> (String, JoinHandle<Ended>) {
+/// A stand-in for a machine: it takes one connection, reads the first request, answers
+/// with these bytes, and goes on as it is told to.
+fn machine(answer: &'static [u8], secures: bool) -> (String, JoinHandle<Ended>) {
+    machine_then(answer, if secures { Then::SignsInFirst(MAY_COME_IN) } else { Then::Ends })
+}
+
+fn machine_then(answer: &'static [u8], then: Then) -> (String, JoinHandle<Ended>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("an address");
     let address = listener.local_addr().expect("its address").to_string();
     let running = std::thread::spawn(move || {
@@ -78,13 +92,19 @@ fn machine_with_verdict(answer: &'static [u8], secures: bool, verdict: [u8; 4]) 
         let mut request = [0u8; 19];
         connection.read_exact(&mut request).expect("the first request");
         connection.write_all(answer).expect("the answer goes out");
-        let seen = if secures { secure(&mut connection, verdict) } else { None };
+        let seen = match then {
+            Then::Ends => None,
+            Then::SignsInFirst(verdict) => secure(&mut connection, Some(verdict)),
+            Then::SignsInItself => secure(&mut connection, None),
+        };
         Ended { request: request.to_vec(), seen }
     });
     (address, running)
 }
 
-fn secure(connection: &mut TcpStream, verdict: [u8; 4]) -> Option<Seen> {
+/// Secures the connection, takes the sign-in before the desktop where a verdict is given
+/// to end it with, and draws the desktop for as long as the client stays.
+fn secure(connection: &mut TcpStream, verdict: Option<[u8; 4]>) -> Option<Seen> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let config = ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
@@ -103,7 +123,7 @@ fn secure(connection: &mut TcpStream, verdict: [u8; 4]) -> Option<Seen> {
     let mut secured = rustls::Stream::new(&mut secured, connection);
     let holds = Identity::read(CERTIFICATE).expect("the stand-in's certificate").public_key;
     let mut stand_in = StandIn::new(Account::named(KNOWN, Secret::new(PASSWORD)), &holds);
-    loop {
+    while verdict.is_some() {
         let mut message = Vec::new();
         loop {
             match away_rdp::der::whole(&message) {
@@ -129,7 +149,9 @@ fn secure(connection: &mut TcpStream, verdict: [u8; 4]) -> Option<Seen> {
         }
     }
     // the name and the password have arrived: say whether the account may come in
-    let _ = secured.write_all(&verdict);
+    if let Some(verdict) = verdict {
+        let _ = secured.write_all(&verdict);
+    }
     // then the desktop, for as long as the client stays
     let mut desktop = Desktop::new(desktop());
     let mut frames = Frames::new();
@@ -273,7 +295,7 @@ fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
             name: "away".to_string(),
             security: 8,
             account: ("CORP".to_string(), "alex.urban".to_string()),
-            password_travelled: false,
+            password: None,
             bits: 32,
             takes_instructions: false,
             left: true,
@@ -294,6 +316,44 @@ fn without_a_file_the_picture_is_not_kept_and_its_sum_is_still_said() {
 }
 
 #[test]
+fn a_machine_that_signs_in_itself_is_told_the_name_and_the_password_once_the_connection_is_secured() {
+    let (address, running) = machine_then(&CHOSEN_TLS, Then::SignsInItself);
+    let tried = try_rdp_as(&address, KNOWN, PASSWORD);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    let seen = running.join().expect("the stand-in ends").seen.expect("the connection went on to the desktop");
+    assert!(tried.status.success(), "{said}");
+    let lines: Vec<&str> = said.lines().collect();
+    assert_eq!(lines[3], "   It chose TLS, with the sign-in on its own screen.");
+    assert_eq!(
+        lines[10..15],
+        [
+            "Opening the desktop as CORP\\alex.urban",
+            "   The name and the password travel to the machine inside the secured connection.",
+            "Saying what Away is, and taking the channels",
+            "   It gave the channel 1004 to this client, and 1003 is the desktop's.",
+            "   It takes the client as it is, without a licence.",
+        ],
+        "{said}"
+    );
+    assert!(lines[lines.len() - 2].starts_with("   200 by 120 pixels. Their SHA-256: "), "{said}");
+    assert!(!said.contains(PASSWORD), "the password is never said");
+    assert_eq!(seen.account, ("CORP".to_string(), "alex.urban".to_string()));
+    assert_eq!(seen.password.as_deref(), Some(PASSWORD));
+    assert_eq!(seen.security, 1);
+    assert!(seen.left);
+}
+
+#[test]
+fn a_machine_that_signs_in_itself_is_given_no_password_nobody_named() {
+    let (address, running) = machine_then(&CHOSEN_TLS, Then::SignsInItself);
+    let tried = try_rdp(&address);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    assert_eq!(running.join().expect("the stand-in ends").seen, Some(Seen::default()), "it went no further");
+    assert!(tried.status.success(), "{said}");
+    assert!(said.ends_with("To go on, name an account: --as <account> --password-file <file>.\n"), "{said}");
+}
+
+#[test]
 fn a_wrong_password_is_refused_and_said_so() {
     let (address, running) = machine(&CHOSEN, true);
     let tried = try_rdp_as(&address, KNOWN, "another password");
@@ -306,7 +366,7 @@ fn a_wrong_password_is_refused_and_said_so() {
 
 #[test]
 fn an_account_that_may_not_come_in_is_told_so() {
-    let (address, running) = machine_with_verdict(&CHOSEN, true, MAY_NOT);
+    let (address, running) = machine_then(&CHOSEN, Then::SignsInFirst(MAY_NOT));
     let tried = try_rdp_as(&address, KNOWN, PASSWORD);
     let said = String::from_utf8(tried.stdout).expect("text");
     assert!(running.join().expect("the stand-in ends").seen.is_some_and(|seen| seen == Seen::default()), "it went no further");

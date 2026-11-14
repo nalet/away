@@ -113,8 +113,8 @@ What builds, tests, installs and describes Away.
 - `chart`: No kinds of its own and no rights beyond its namespace. Code: `chart/`. Governed by [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](./decisions/0012-one-chart-no-special-rights.md).
 - `pipelines`: Code: `.github/workflows/`. Runs: on GitHub. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
 - `site-pipeline`: Code: `.github/workflows/site.yml`. Runs: on GitHub. Governed by [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
-- `test-program`: What the two proofs are shown with; it is not in the image. Code: `crates/away-try/`. Runs: by hand, and by the pipeline against a stand-in for a machine.
-- `test-servers`: A Windows machine in a domain needs a place of its own. Code: `tests/servers/`. Runs: started by the pipeline. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
+- `test-program`: What the two proofs are shown with; it is not in the image. Code: `crates/away-try/`. Runs: by hand, and by the pipeline: against a stand-in and the test servers.
+- `test-servers`: A desktop over RDP on Linux is there; a Windows machine in a domain needs a place of its own. Code: `tests/machines/`. Runs: started by the pipeline. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
 - `registry`: Keeps: the image and the chart, their signatures, the records of their builds, the lists of their contents. Governed by [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
 - `docs`: Code: `docs/`, `spec/`, `site/`. Runs: the site is built and published by its pipeline. Governed by [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
 <!-- end: components -->

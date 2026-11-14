@@ -54,9 +54,13 @@ cargo run --package away-try -- rdp fin-app-02.example.com --as 'CORP\alex.urban
 The password is read from a file, so that it is on no command line and in no
 history.
 
-It opens the desktop of a machine that signs the account in before the
-desktop, as Windows does unless it is told otherwise. A machine that wants the
-sign-in on its own screen is reached as far as its certificate.
+Windows signs the account in before the desktop unless it is told otherwise:
+the password is proven and never sent in the clear, and the machine has to
+prove that it holds the certificate it showed. A machine that signs the
+account in itself, as RDP servers on Linux do, is told the name and the
+password once the connection is secured. `away-try` takes whatever certificate
+a machine shows and says its fingerprint, so use it with accounts that exist
+for testing.
 
 Leaving doesn't sign the account out: what runs on the desktop stays on the
 machine for the account to come back to, until the account is signed out
@@ -98,6 +102,20 @@ differs.
 
 The script runs in the account's own session, so the account has to have
 signed in on the machine once before. It leaves nothing on the machine.
+
+### Against an RDP server on Linux
+
+`tests/machines/linux/rdp.sh` does the whole of it by itself: it starts an RDP
+server on Linux in a container, with one account and a desktop that shows one
+picture, signs in with `away-try`, and checks that the picture `away-try` took
+is the server's screen, pixel for pixel. It needs docker.
+
+```sh
+cargo build --package away-try
+tests/machines/linux/rdp.sh
+```
+
+The pipeline runs it on every change.
 
 ## What a part answers
 
@@ -198,7 +216,9 @@ On every change, [the pipeline](../.github/workflows/build.yml):
 4. renders the chart with each way in;
 5. checks the libraries' licences, known security holes and sources;
 6. builds the image, checks that it holds the program and nothing else, and
-   installs it on a fresh Kubernetes cluster, where the test above tries it.
+   installs it on a fresh Kubernetes cluster, where the test above tries it;
+7. tries Away's own protocol code against a real server that it starts itself:
+   a desktop over RDP on Linux.
 
 On the main branch and on a version's tag it then publishes the image and the
 chart, and checks what it published the way anyone can. Every tool the pipeline
