@@ -8,9 +8,11 @@ from. That is read from cargo itself, for the processors the image is published 
 only what is compiled for them is listed, not what a build for another system would take.
 
 It needs Python 3 and cargo, and nothing else."""
+import hashlib
 import json
 import subprocess
 import sys
+import uuid
 
 TARGETS = ['x86_64-unknown-linux-musl', 'aarch64-unknown-linux-musl']
 
@@ -83,6 +85,11 @@ def main():
         'metadata': {'component': component(program, 'application'), 'properties': [{'name': 'away:built-for', 'value': ', '.join(TARGETS)}]},
         'components': components,
     }
+    # the document's number is made from what it lists, so the same contents give the same
+    # document, and tools that ask for a number find one
+    listed = hashlib.sha256(json.dumps(document, sort_keys=True).encode()).hexdigest()
+    document = {'bomFormat': document.pop('bomFormat'), 'specVersion': document.pop('specVersion'),
+                'serialNumber': f'urn:uuid:{uuid.uuid5(uuid.NAMESPACE_OID, listed)}', **document}
     text = json.dumps(document, indent=1, ensure_ascii=False) + '\n'
     if output:
         with open(output, 'w', encoding='utf-8') as fh:
