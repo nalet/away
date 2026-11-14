@@ -144,10 +144,12 @@ struct State {
 
 impl State {
     /// Puts together what is in force: what the files say, and what each of their farms
-    /// was last read to publish. A machine of the files keeps its name: what a farm
-    /// publishes under the same name is left out.
+    /// was last read to publish, where the farm is written among the machines. A machine
+    /// of the files keeps its name: what a farm publishes under the same name is left out.
     fn put_together(&mut self) {
         let mut in_force = (*self.from_files).clone();
+        // how many machines the farms before this one brought
+        let mut brought = 0;
         for farm in &self.from_files.farms {
             let Some(read) = self.farms.get_mut(&farm.name).filter(|read| read.feed == farm.feed) else { continue };
             let host = Address::read(&farm.feed).map(|address| address.host).unwrap_or_default();
@@ -157,7 +159,9 @@ impl State {
                 if in_force.machines.iter().any(|other| same(&other.name, &machine.name)) {
                     read.left_out.push(machine.name);
                 } else {
-                    in_force.machines.push(machine);
+                    let at = (farm.after + brought).min(in_force.machines.len());
+                    in_force.machines.insert(at, machine);
+                    brought += 1;
                 }
             }
             in_force.pictures.extend(published.pictures);

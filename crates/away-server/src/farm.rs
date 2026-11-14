@@ -126,6 +126,7 @@ mod tests {
             name: "Work Resources".to_string(),
             feed: "https://broker.corp.example/RDWeb/Feed/webfeed.aspx".to_string(),
             groups: vec!["finance".to_string()],
+            after: 0,
             written_in: ("farms.yaml".to_string(), 2),
         };
         let items = [

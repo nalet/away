@@ -139,6 +139,9 @@ pub struct Farm {
     pub feed: String,
     /// The groups of machines that what it publishes is in.
     pub groups: Vec<String>,
+    /// How many machines of the files are written before it, in the files' order: what
+    /// it publishes shows after them, where the farm itself is written.
+    pub after: usize,
     /// The file it is written in, and the line.
     pub written_in: (String, usize),
 }
@@ -397,6 +400,12 @@ impl InForce {
                 }
             }
         }
+        // what a farm publishes shows where the farm is written: after the machines before it
+        let place = |written_in: &(String, usize)| (files.iter().position(|(name, _)| *name == written_in.0), written_in.1);
+        for farm in &mut farms {
+            let here = place(&farm.written_in);
+            farm.after = machines.iter().filter(|machine| place(&machine.written_in) < here).count();
+        }
         // a farm's programs are known as a machine of the farm's name: no machine has it too
         for farm in &farms {
             if let Some(machine) = machines.iter().find(|machine| same(&machine.name, &farm.name)) {
@@ -629,7 +638,7 @@ fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
     }
     let mut groups: Vec<String> = parts.texts("groups", &name)?.into_iter().map(|(group, _)| group).collect();
     groups.sort_by_key(|group| group.to_lowercase());
-    Ok(Farm { name, feed, groups, written_in: (file.to_string(), node.line) })
+    Ok(Farm { name, feed, groups, after: 0, written_in: (file.to_string(), node.line) })
 }
 
 /// Reads one rule.
@@ -1005,6 +1014,20 @@ rules:
             wrong("machines:\n  - name: a\n    kind: windows\n    address: a.example\n    programs: Ledger\n", &[]).why,
             "the programs of a are a list: of names, or of names with their icons"
         );
+    }
+
+    #[test]
+    fn a_farm_has_its_place_among_the_machines_in_the_files_order() {
+        let machine = |name: &str| format!("  - name: {name}\n    kind: linux\n    address: {name}.example\n    shell: true\n");
+        let farm = |name: &str| format!("  - name: {name}\n    feed: https://{name}.example/feed\n");
+        // a file with a machine and then a farm; one with a farm between two machines'
+        // lines, written before them; one with nothing but a farm
+        let first = format!("machines:\n{}farms:\n{}", machine("one"), farm("after-one"));
+        let second = format!("farms:\n{}machines:\n{}{}", farm("before-two"), machine("two"), machine("three"));
+        let third = format!("farms:\n{}", farm("last"));
+        let in_force = InForce::read(&files(&[("1.yaml", &first), ("2.yaml", &second), ("3.yaml", &third)])).unwrap();
+        let places: Vec<(&str, usize)> = in_force.farms.iter().map(|farm| (farm.name.as_str(), farm.after)).collect();
+        assert_eq!(places, [("after-one", 1), ("before-two", 1), ("last", 3)]);
     }
 
     #[test]

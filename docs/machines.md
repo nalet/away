@@ -143,6 +143,9 @@ rules:
 - **A machine of the files keeps its name.** A desktop that the farm
   publishes under the name of a machine in the files is left out, and the
   administration names it.
+- **What a farm publishes shows where the farm is written**: after the
+  machines that are written before it in the files' order, and before those
+  after it.
 
 Away reads the feeds as an account of its own, which the installation names
 ([installing Away](./install.md#the-farms-feeds)). A farm shows that account

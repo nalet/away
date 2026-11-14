@@ -366,7 +366,8 @@ test('a farm says itself what it publishes, and a new program shows without anyb
   await expect(page.getByRole('button', { name: 'Dana Kim, your account' })).toBeVisible();
   const count = page.locator('section.grp h2');
   await expect(count).toHaveText(['programs 6']);
-  expect((await tiles(page, 'programs 6')).slice(4)).toEqual([
+  // what the farm publishes comes where the farm is written: its file is the first
+  expect((await tiles(page, 'programs 6')).slice(0, 2)).toEqual([
     ['Calculator', 'program on Work Resources'],
     ['Notepad', 'program on Work Resources'],
   ]);
@@ -394,7 +395,7 @@ test('a farm says itself what it publishes, and a new program shows without anyb
 
   // the farm's desktop is a machine, and its programs are those of a machine with the farm's name
   await page.goto('/machines');
-  await expect(page.locator('section.grp h2')).toHaveText(['finance 2', 'published 2', 'other machines 1']);
+  await expect(page.locator('section.grp h2')).toHaveText(['published 2', 'finance 2', 'other machines 1']);
   expect(await tiles(page, 'published 2')).toEqual([
     ['Farm Desktop', 'Windows desktop'],
     ['Work Resources', '2 programs on Windows'],

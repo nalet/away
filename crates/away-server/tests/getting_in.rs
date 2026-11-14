@@ -447,10 +447,11 @@ fn a_machine_of_the_files_keeps_its_name_against_what_a_farm_publishes() {
     let mut browser = Browser::default();
     browser.sign_in(&world, "/");
     let machines = format!("{}/api/machines", world.away);
-    until("the farm's feed is read", || names(&browser.get(&machines).says(), "machines") == ["Desktop", "Work Resources"]);
+    // what the farm publishes comes where the farm is written: before the machine under it
+    until("the farm's feed is read", || names(&browser.get(&machines).says(), "machines") == ["Work Resources", "Desktop"]);
     let told = browser.get(&machines).says();
     let Some(Json::List(listed)) = told.get("machines") else { panic!() };
-    assert_eq!((listed[0].text_of("kind"), listed[0].text_of("address")), (Some("linux"), Some("desk.corp.example")));
+    assert_eq!((listed[1].text_of("kind"), listed[1].text_of("address")), (Some("linux"), Some("desk.corp.example")));
     assert_eq!(first_farm(&mut browser, &world).get("left_out").map(Json::write).as_deref(), Some(r#"["Desktop"]"#));
 }
 
