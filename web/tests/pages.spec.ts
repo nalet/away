@@ -449,6 +449,7 @@ test('the whole frame works with the keyboard alone', async ({ page }) => {
 
   // the link that skips to the page
   await page.goto('/');
+  await expect(page).toHaveTitle('home · away');
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'skip to the page' })).toBeInViewport();
   await page.keyboard.press('Enter');
