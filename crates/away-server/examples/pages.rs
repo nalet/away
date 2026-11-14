@@ -14,6 +14,10 @@
 //! names a folder of machines and rules; without it the server takes the tests' own.
 //! `FARM_PORT` starts a stand-in for a farm's web access at that port, which publishes
 //! a desktop and two programs, and writes the farm into the folder of files.
+//! `DATABASE` names a PostgreSQL for what Away keeps, as `localhost:15432`: the one
+//! `tests/machines/database/real.sh` starts. Without it Away keeps nothing. The server
+//! makes a database of its own there each time it starts, so that it starts with
+//! nothing kept; `DATABASE_NAME` names one to keep using in its place.
 
 use std::time::Duration;
 
@@ -23,7 +27,8 @@ use away_secret::Secret;
 use away_server::service;
 use away_server::stand_in::farm::Farm;
 use away_server::stand_in::{person, SignInService};
-use away_server::told::{Farms, SignIn, Told};
+use away_server::store::link::{Link, Settings as DatabaseAt};
+use away_server::told::{Database, Farms, SignIn, Told};
 use away_server::Server;
 
 #[tokio::main]
@@ -76,6 +81,42 @@ async fn main() -> std::io::Result<()> {
         farm = Some(stand_in);
     }
 
+    // the database, where one is named: one of its own for this start, unless one is named
+    let mut database = None;
+    if let Some(at) = said("DATABASE") {
+        let (host, port) = at.rsplit_once(':').expect("DATABASE is host:port");
+        let password = "a password for this machine alone";
+        let mut name = said("DATABASE_NAME");
+        if name.is_none() {
+            let mut random = [0u8; 24];
+            getrandom::fill(&mut random).map_err(std::io::Error::other)?;
+            let made = format!("pages_{}", random[..6].iter().map(|byte| format!("{byte:02x}")).collect::<String>());
+            let at = DatabaseAt {
+                host: host.to_string(),
+                port: port.parse().expect("DATABASE names a port"),
+                database: "away".to_string(),
+                account: "away".to_string(),
+                password: Secret::new(password),
+                secured: None,
+                within: Duration::from_secs(10),
+            };
+            let fresh: [u8; 18] = random[6..].try_into().expect("18 bytes");
+            let mut link = Link::open(&at, &fresh).await.map_err(|failed| std::io::Error::other(failed.to_string()))?;
+            link.run(&format!("create database {made}")).await.map_err(|failed| std::io::Error::other(failed.to_string()))?;
+            link.leave().await;
+            name = Some(made);
+        }
+        database = Some(Database {
+            host: host.to_string(),
+            port: port.parse().expect("DATABASE names a port"),
+            name: name.expect("named above"),
+            account: "away".to_string(),
+            password: Secret::new(password),
+            secured: false,
+            authorities: None,
+        });
+    }
+
     let told = Told {
         sign_in: Some(SignIn {
             public: Address::read(&away).expect("Away's address on this machine"),
@@ -95,6 +136,7 @@ async fn main() -> std::io::Result<()> {
         contact: Some("it-help@example.com".to_string()),
         files: Some(files.into()),
         farms,
+        database,
     };
 
     let lines = Lines::to_output("server");

@@ -87,6 +87,15 @@ export const texts = {
   kindNames: { windows: 'Windows', linux: 'Linux', mac: 'Mac' },
   programCount: (count: number) => (count === 1 ? '1 program' : `${count} programs`),
   programOn: (machine: string) => `program on ${machine}`,
+  stars: {
+    favourites: 'favourites',
+    add: 'add to favourites',
+    remove: 'remove from favourites',
+    // a star's name for whoever doesn't see it: what it does, and to what
+    named: (what: string, name: string) => `${what}: ${name}`,
+    none: 'nothing on home yet',
+    noneWhy: 'What you star is here. Every program and every machine you can reach is on its own page.',
+  },
   sessions: {
     title: 'no sessions are open',
   },

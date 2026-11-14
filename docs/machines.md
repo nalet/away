@@ -228,9 +228,15 @@ are put right.
 - **Machines** is a page of the machines a person may reach, in the groups of
   the files, with a field that finds a machine by its name, its address or its
   group. A machine in no group is under *other machines*.
-- **Home** shows both together in this version: the machines that have a
-  desktop or a shell, and after them every program. It becomes the place for
-  what a person opened last and what they starred once Away keeps those.
+- **Home** is the place for what a person starred: every tile has a star, on
+  the programs' page, on the machines' page and on a machine's own. What is
+  starred is kept with the person, so it is the same in every browser they
+  sign in with, and it shows for as long as a rule gives it to them. Someone
+  who starred nothing is told where the programs and the machines are.
+- **Without a database** nothing is kept
+  ([installing Away](./install.md#the-database)). There are no stars then,
+  and home shows everything: the machines that have a desktop or a shell, and
+  after them every program.
 - **The order is the files' own.** The files are read in the order of their
   names, and inside a file the machines and their programs keep their place.
   A group comes where a machine first names it.

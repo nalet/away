@@ -7,6 +7,8 @@
 //! | `GET /sign-in/back` | where the sign-in service sends the browser back to: takes what it signed, holds the sign-in, and goes to the page |
 //! | `GET /api/who` | who is signed in, or why signing in failed |
 //! | `POST /sign-out` | ends the sign-in |
+//! | `GET /api/favourites` | what the person starred, of what they reach |
+//! | `PUT /api/favourites?machine=…&program=…` | stars a machine, or a program of it; `DELETE` takes the star away |
 //!
 //! The browser holds two cookies and nothing else: one that names its sign-in, and for
 //! the minutes a sign-in is under way one that ties it to the browser that began it.
@@ -15,7 +17,7 @@
 use std::sync::Arc;
 
 use away_part::address::read_form;
-use away_part::client::Client;
+use away_part::client::{Client, Secures};
 use away_part::http::{answer, plain, Answer};
 use away_part::json::Json;
 use away_part::{time, version, Part};
@@ -26,6 +28,8 @@ use hyper::{Method, Request, StatusCode};
 use crate::register::files::Register;
 use crate::service::{Failed, Service};
 use crate::sign_ins::{Failure, Person, SignIns, KEPT_FOR};
+use crate::store::favourites::Favourite;
+use crate::store::{self, Store};
 use crate::told::{SignIn, Told};
 
 /// The cookie that names a browser's sign-in.
@@ -57,6 +61,10 @@ pub struct GettingIn {
     contact: Option<String>,
     signing: Option<Signing>,
     register: Arc<Register>,
+    /// What Away keeps, where it is given a database.
+    store: Option<Arc<Store>>,
+    /// Why the database last gave nothing, so that it is written once and not with every request.
+    said_of_the_store: std::sync::Mutex<Option<String>>,
     part: Part,
 }
 
@@ -72,7 +80,34 @@ impl GettingIn {
             None => None,
         };
         let register = Arc::new(Register::new(told.files, part.lines.clone(), time::now().as_secs()));
-        Ok(GettingIn { contact: told.contact, signing, register, part })
+        let store = match told.database {
+            None => None,
+            Some(database) => {
+                let secured = match database.secured {
+                    true => Some(
+                        Secures::new(database.authorities.as_deref(), b"postgresql")
+                            .map_err(|why| format!("The authorities to trust for the database can't be used: {why}."))?,
+                    ),
+                    false => None,
+                };
+                let settings = store::Settings {
+                    host: database.host,
+                    port: database.port,
+                    database: database.name,
+                    account: database.account,
+                    password: database.password,
+                    secured,
+                    within: std::time::Duration::from_secs(10),
+                };
+                Some(Arc::new(Store::new(settings, part.lines.clone())))
+            }
+        };
+        Ok(GettingIn { contact: told.contact, signing, register, store, said_of_the_store: std::sync::Mutex::new(None), part })
+    }
+
+    /// What Away keeps, where it is given a database.
+    pub fn store(&self) -> Option<Arc<Store>> {
+        self.store.clone()
     }
 
     /// Whether the installation is told about a sign-in service.
@@ -89,6 +124,9 @@ impl GettingIn {
             ("/api/built-from", true) => self.built_from(request),
             ("/api/machines", true) => self.machines(request),
             ("/api/register", true) => self.in_force(request),
+            ("/api/favourites", true) => self.favourites(request).await,
+            ("/api/favourites", _) if matches!(*request.method(), Method::PUT | Method::DELETE) => self.star(request).await,
+            ("/api/favourites", _) => plain(StatusCode::METHOD_NOT_ALLOWED, "This address answers GET, PUT and DELETE.\n"),
             ("/licence.txt", true) => answer(StatusCode::OK, "text/plain; charset=utf-8", LICENCE_TEXT),
             ("/sign-in", true) => self.begin(request).await,
             ("/sign-in/back", true) => self.back(request).await,
@@ -339,13 +377,93 @@ impl GettingIn {
         answer
     }
 
+    /// What whoever asks starred, of what they reach now: the first starred first.
+    async fn favourites(&self, request: &Request<Incoming>) -> Answer {
+        let Some((_, person)) = self.signed_in(request) else {
+            return plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n");
+        };
+        let says = |kept: bool, starred: Vec<Json>| {
+            answer(StatusCode::OK, "application/json", Json::object([("kept", kept.into()), ("favourites", Json::List(starred))]).write())
+        };
+        let Some(store) = &self.store else { return says(false, Vec::new()) };
+        let starred = match store.favourites(&person.subject).await {
+            Ok(starred) => starred,
+            Err(unusable) => return self.kept_nothing(&unusable),
+        };
+        self.store_answers();
+        let (in_force, _) = self.register.in_force();
+        let reached = in_force.reached_by(&person.groups);
+        let starred = starred
+            .into_iter()
+            .filter(|favourite| reached.iter().any(|(machine, _)| is_there(machine, favourite)))
+            .map(|favourite| {
+                Json::object([
+                    ("machine", favourite.machine.as_str().into()),
+                    ("program", favourite.program.as_deref().map_or(Json::Null, Json::from)),
+                ])
+            })
+            .collect();
+        says(true, starred)
+    }
+
+    /// Stars a machine or a program for whoever asks, or takes the star away: only
+    /// something they reach.
+    async fn star(&self, request: &Request<Incoming>) -> Answer {
+        let Some((signing, person)) = self.signed_in(request) else {
+            return plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n");
+        };
+        if !from_aways_page(request, signing) {
+            return plain(StatusCode::FORBIDDEN, "Only Away's own pages change what is starred.\n");
+        }
+        let named = read_form(request.uri().query().unwrap_or_default()).unwrap_or_default();
+        let named =
+            |name: &str| named.iter().find(|(its, _)| its == name).map(|(_, value)| value.clone()).filter(|value| !value.is_empty());
+        let Some(machine) = named("machine") else {
+            return plain(
+                StatusCode::BAD_REQUEST,
+                "A star is for a machine, named as machine=, or for a program of it, named as program= too.\n",
+            );
+        };
+        let favourite = Favourite { machine, program: named("program") };
+        let (in_force, _) = self.register.in_force();
+        if !in_force.reached_by(&person.groups).iter().any(|(machine, _)| is_there(machine, &favourite)) {
+            return plain(StatusCode::NOT_FOUND, "Nothing of that name is there for you.\n");
+        }
+        let Some(store) = &self.store else {
+            return plain(StatusCode::SERVICE_UNAVAILABLE, "Away keeps nothing here: it is given no database.\n");
+        };
+        match store.star(&person.subject, &favourite, *request.method() == Method::PUT).await {
+            Ok(()) => {
+                self.store_answers();
+                answer(StatusCode::OK, "application/json", "{}")
+            }
+            Err(unusable) => self.kept_nothing(&unusable),
+        }
+    }
+
+    /// The answer where the database gave nothing. Why is written once, and again only
+    /// when it is another reason or the database answered in between.
+    fn kept_nothing(&self, unusable: &store::Unusable) -> Answer {
+        let why = unusable.to_string();
+        let mut said = self.said_of_the_store.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if said.as_deref() != Some(why.as_str()) {
+            self.part.lines.warn("the database gave nothing", &[("why", why.as_str().into())]);
+            *said = Some(why);
+        }
+        plain(StatusCode::SERVICE_UNAVAILABLE, "What Away keeps can't be reached right now.\n")
+    }
+
+    fn store_answers(&self) {
+        let mut said = self.said_of_the_store.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if said.take().is_some() {
+            self.part.lines.info("the database answers again", &[]);
+        }
+    }
+
     /// Ends the sign-in of the browser that asks.
     async fn sign_out(&self, request: &Request<Incoming>) -> Answer {
         let Some(signing) = &self.signing else { return plain(StatusCode::NOT_FOUND, "Nobody is signed in here.\n") };
-        // only a page of Away's own can add this header, and a browser says where a request is from
-        let from_elsewhere =
-            request.headers().get(ORIGIN).is_some_and(|origin| origin.as_bytes() != signing.told.public.origin().as_bytes());
-        if request.headers().get(FROM_AWAYS_PAGE).is_none() || from_elsewhere {
+        if !from_aways_page(request, signing) {
             return plain(StatusCode::FORBIDDEN, "Only Away's own pages sign out.\n");
         }
         if let Some((person, renewal)) = cookie(request, SIGNED_IN).and_then(|name| signing.sign_ins.end(name)) {
@@ -444,6 +562,19 @@ fn set_cookie(answer: &mut Answer, name: &str, value: &str, for_seconds: u64) {
 }
 
 /// Sends the browser on to another address.
+/// Whether a request that changes something comes from a page of Away's own: only such
+/// a page can add the header, and a browser says where a request is from.
+fn from_aways_page(request: &Request<Incoming>, signing: &Signing) -> bool {
+    let from_elsewhere = request.headers().get(ORIGIN).is_some_and(|origin| origin.as_bytes() != signing.told.public.origin().as_bytes());
+    request.headers().get(FROM_AWAYS_PAGE).is_some() && !from_elsewhere
+}
+
+/// Whether a machine is what was starred, or offers the program that was.
+fn is_there(machine: &crate::register::Machine, favourite: &Favourite) -> bool {
+    machine.name == favourite.machine
+        && favourite.program.as_ref().is_none_or(|program| machine.programs.iter().any(|offered| offered.name == *program))
+}
+
 fn go_to(address: &str) -> Answer {
     let mut answer = plain(StatusCode::SEE_OTHER, "This way.\n");
     let to = HeaderValue::from_str(address).unwrap_or(HeaderValue::from_static("/"));

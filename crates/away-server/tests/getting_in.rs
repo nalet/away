@@ -15,7 +15,8 @@ use away_server::getting_in::{FROM_AWAYS_PAGE, NOT_SIGNED_IN, SIGNED_IN, SIGNING
 use away_server::service;
 use away_server::stand_in::farm::Farm;
 use away_server::stand_in::SignInService;
-use away_server::told::{Farms, SignIn, Told};
+use away_server::store::link::{Link, Settings as DatabaseAt};
+use away_server::told::{Database, Farms, SignIn, Told};
 use away_server::Server;
 
 /// The server, the sign-in service beside it, and what the server wrote.
@@ -64,7 +65,7 @@ fn world_with(change: impl FnOnce(&mut Told)) -> World {
         looks_every: Duration::from_millis(100),
     };
     let files = Some(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/files").into());
-    let mut told = Told { sign_in: Some(sign_in), contact: Some("it-help@example.com".to_string()), files, farms: None };
+    let mut told = Told { sign_in: Some(sign_in), contact: Some("it-help@example.com".to_string()), files, farms: None, database: None };
     change(&mut told);
     let (away, lines, stopper) = serve(&runtime, port, told);
     World { _runtime: runtime, service, away, lines, _stopper: stopper }
@@ -453,6 +454,178 @@ fn a_machine_of_the_files_keeps_its_name_against_what_a_farm_publishes() {
     let Some(Json::List(listed)) = told.get("machines") else { panic!() };
     assert_eq!((listed[1].text_of("kind"), listed[1].text_of("address")), (Some("linux"), Some("desk.corp.example")));
     assert_eq!(first_farm(&mut browser, &world).get("left_out").map(Json::write).as_deref(), Some(r#"["Desktop"]"#));
+}
+
+#[test]
+fn without_a_database_nothing_is_starred_and_only_aways_own_page_asks_for_a_star() {
+    let world = world();
+    let mut browser = Browser::default();
+    let favourites = format!("{}/api/favourites", world.away);
+    assert_eq!(browser.get(&favourites).status, 401);
+    assert_eq!(browser.ask("PUT", &format!("{favourites}?machine=fin-app-02"), &[(FROM_AWAYS_PAGE, "1")]).status, 401);
+    browser.sign_in(&world, "/");
+    assert_eq!(browser.get(&favourites).says().write(), r#"{"kept":false,"favourites":[]}"#);
+
+    // another site makes the browser ask: it can't add the header, and the browser says where it is from
+    let star = format!("{favourites}?machine=fin-app-02");
+    assert_eq!(browser.ask("PUT", &star, &[]).status, 403);
+    assert_eq!(browser.ask("DELETE", &star, &[(FROM_AWAYS_PAGE, "1"), ("origin", "https://elsewhere.example.com")]).status, 403);
+    let from_away = [(FROM_AWAYS_PAGE, "1"), ("origin", world.away.as_str())];
+    // a star is for something the person reaches, by its whole name
+    assert_eq!(browser.ask("PUT", &favourites, &from_away).status, 400);
+    for nothing in ["machine=nowhere", "machine=fin-app-02&program=Nothing", "machine=FIN-APP-02", "machine=build-01&program=Ledger"] {
+        let asked = browser.ask("PUT", &format!("{favourites}?{nothing}"), &from_away);
+        assert_eq!((asked.status, asked.body.as_str()), (404, "Nothing of that name is there for you.\n"), "{nothing}");
+    }
+    assert_eq!(browser.ask("POST", &star, &from_away).status, 405);
+    // and without a database there is nowhere to keep one
+    let asked = browser.ask("PUT", &star, &from_away);
+    assert_eq!((asked.status, asked.body.as_str()), (503, "Away keeps nothing here: it is given no database.\n"));
+}
+
+/// The tests' database, with a database of its own in it for one test: what the server
+/// is told of it. Nothing where no database is named (see `tests/database.rs`).
+fn a_database_of_its_own() -> Option<Database> {
+    let Some(at) = std::env::var("AWAY_TEST_DATABASE").ok().filter(|at| !at.is_empty()) else {
+        // the pipeline always has one: there, a test that finds none has not tested anything
+        assert!(std::env::var_os("CI").is_none(), "the pipeline's tests need a database: AWAY_TEST_DATABASE is not set");
+        eprintln!("no database to test against: AWAY_TEST_DATABASE is not set");
+        return None;
+    };
+    let (host, port) = at.rsplit_once(':').expect("AWAY_TEST_DATABASE is host:port");
+    let password = "a password for this machine alone";
+    let mut random = [0u8; 24];
+    getrandom::fill(&mut random).expect("random bytes");
+    let name = format!("test_{}", random[..6].iter().map(|byte| format!("{byte:02x}")).collect::<String>());
+    let at = DatabaseAt {
+        host: host.to_string(),
+        port: port.parse().expect("a port"),
+        database: "away".to_string(),
+        account: "away".to_string(),
+        password: Secret::new(password),
+        secured: None,
+        within: Duration::from_secs(10),
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("a runtime");
+    runtime.block_on(async {
+        let mut link = Link::open(&at, &random[6..].try_into().expect("18 bytes")).await.expect("the tests' database");
+        link.run(&format!("create database {name}")).await.expect("a database of its own");
+        link.leave().await;
+    });
+    Some(Database {
+        host: at.host,
+        port: at.port,
+        name,
+        account: at.account,
+        password: Secret::new(password),
+        secured: false,
+        authorities: None,
+    })
+}
+
+/// What a person starred, as the pages are told it: each a machine, or a program on one.
+fn starred(browser: &mut Browser, world: &World) -> Vec<String> {
+    let says = browser.get(&format!("{}/api/favourites", world.away)).says();
+    assert_eq!(says.get("kept"), Some(&Json::Flag(true)), "{}", says.write());
+    let Some(Json::List(listed)) = says.get("favourites") else { panic!("no favourites in {}", says.write()) };
+    listed
+        .iter()
+        .map(|one| match (one.text_of("machine"), one.text_of("program")) {
+            (Some(machine), Some(program)) => format!("{program} on {machine}"),
+            (Some(machine), None) => machine.to_string(),
+            _ => panic!("a favourite without a machine"),
+        })
+        .collect()
+}
+
+#[test]
+fn what_a_person_starred_is_theirs_on_every_browser_and_shows_for_as_long_as_they_reach_it() {
+    let Some(database) = a_database_of_its_own() else { return };
+    let machines = "machines:\n  - name: fin-app-02\n    kind: windows\n    address: fin-app-02.corp.example\n    groups: [finance]\n    desktop: true\n    programs: [Ledger, Pay & Benefits]\n  - name: build-01\n    kind: linux\n    address: build-01.corp.example\n    shell: true\n";
+    let rules = |reaches: &str| format!("rules:\n  - name: staff-all\n    who: [staff]\n    reaches: [{reaches}]\n");
+    let folder = Folder::with("stars", &[("machines.yaml", machines), ("rules.yaml", &rules("finance, build-01"))]);
+    let told = |told: &mut Told| {
+        told.files = Some(folder.0.clone());
+        told.database = Some(database.clone());
+    };
+    let world = world_with(told);
+    until("the database is reached", || world.lines.kept().iter().any(|line| line.contains("the database is reached, and in shape")));
+    let favourites = format!("{}/api/favourites", world.away);
+    let from_away = [(FROM_AWAYS_PAGE, "1"), ("origin", world.away.as_str())];
+    let mut browser = Browser::default();
+    browser.sign_in(&world, "/");
+    assert_eq!(starred(&mut browser, &world), Vec::<String>::new());
+
+    // a machine, a program of it whose name needs writing with care, and another machine
+    for star in ["machine=fin-app-02", "machine=fin-app-02&program=Pay+%26+Benefits", "machine=build-01", "machine=fin-app-02"] {
+        let asked = browser.ask("PUT", &format!("{favourites}?{star}"), &from_away);
+        assert_eq!((asked.status, asked.body.as_str()), (200, "{}"), "{star}");
+    }
+    assert_eq!(starred(&mut browser, &world), ["fin-app-02", "Pay & Benefits on fin-app-02", "build-01"]);
+
+    // they are the person's, on every browser they sign in with, and nobody else's
+    let mut second = Browser::default();
+    second.sign_in(&world, "/");
+    assert_eq!(starred(&mut second, &world), ["fin-app-02", "Pay & Benefits on fin-app-02", "build-01"]);
+    world.service.signs_in(away_server::stand_in::person());
+    let mut other = Browser::default();
+    other.sign_in(&world, "/");
+    assert_eq!(starred(&mut other, &world), Vec::<String>::new());
+    assert_eq!(other.ask("PUT", &format!("{favourites}?machine=build-01"), &from_away).status, 200);
+    assert_eq!(starred(&mut other, &world), ["build-01"]);
+    assert_eq!(starred(&mut browser, &world).len(), 3);
+
+    // taking a star away takes that one, and taking it twice is nothing
+    for _ in 0..2 {
+        assert_eq!(browser.ask("DELETE", &format!("{favourites}?machine=fin-app-02"), &from_away).status, 200);
+    }
+    assert_eq!(starred(&mut browser, &world), ["Pay & Benefits on fin-app-02", "build-01"]);
+
+    // what a rule no longer gives is not shown as starred, and can't be starred
+    std::fs::write(folder.0.join("rules.yaml"), rules("finance")).expect("the rules");
+    until("the rule is applied", || starred(&mut browser, &world) == ["Pay & Benefits on fin-app-02"]);
+    assert_eq!(browser.ask("PUT", &format!("{favourites}?machine=build-01"), &from_away).status, 404);
+    // it is kept all the same, and back with the rule
+    std::fs::write(folder.0.join("rules.yaml"), rules("finance, build-01")).expect("the rules");
+    until("the rule is back", || starred(&mut browser, &world) == ["Pay & Benefits on fin-app-02", "build-01"]);
+
+    // a server that starts anew on the same database has them all
+    let again = world_with(|told| {
+        told.files = Some(folder.0.clone());
+        told.database = Some(database.clone());
+    });
+    again.service.signs_in(away_server::stand_in::administrator());
+    let mut later = Browser::default();
+    later.sign_in(&again, "/");
+    assert_eq!(starred(&mut later, &again), ["Pay & Benefits on fin-app-02", "build-01"]);
+}
+
+#[test]
+fn a_database_that_is_not_there_keeps_nobody_from_the_machines_and_says_so_once() {
+    let absent = Database {
+        host: "127.0.0.1".to_string(),
+        port: free_port(),
+        name: "away".to_string(),
+        account: "away".to_string(),
+        password: Secret::new("a password"),
+        secured: false,
+        authorities: None,
+    };
+    let world = world_with(|told| told.database = Some(absent));
+    let mut browser = Browser::default();
+    browser.sign_in(&world, "/");
+    // the machines are there as ever
+    assert!(!names(&browser.get(&format!("{}/api/machines", world.away)).says(), "machines").is_empty());
+    let favourites = format!("{}/api/favourites", world.away);
+    for _ in 0..3 {
+        let asked = browser.get(&favourites);
+        assert_eq!((asked.status, asked.body.as_str()), (503, "What Away keeps can't be reached right now.\n"));
+    }
+    let from_away = [(FROM_AWAYS_PAGE, "1"), ("origin", world.away.as_str())];
+    assert_eq!(browser.ask("PUT", &format!("{favourites}?machine=fin-app-02"), &from_away).status, 503);
+    let lines = world.lines.kept();
+    assert_eq!(lines.iter().filter(|line| line.contains("\"event\":\"the database gave nothing\"")).count(), 1, "{lines:?}");
+    assert_eq!(lines.iter().filter(|line| line.contains("the database can't be used, so nothing Away keeps is at hand")).count(), 1);
 }
 
 #[test]

@@ -33,9 +33,24 @@ pub fn for_addresses(bytes: &[u8]) -> String {
     write(bytes, FOR_ADDRESSES, false)
 }
 
+/// The bytes that letters of the ordinary kind stand for, with their padding. Gives
+/// nothing where they are not such letters, lack their padding, or leave bits over.
+pub fn read_ordinary(letters: &str) -> Option<Vec<u8>> {
+    if !letters.len().is_multiple_of(4) {
+        return None;
+    }
+    let unpadded = letters.strip_suffix("==").or_else(|| letters.strip_suffix('=')).unwrap_or(letters);
+    read(unpadded, b'+', b'/')
+}
+
 /// The bytes that letters of the kind made for addresses stand for. Gives nothing where
 /// they are not such letters, are padded, or leave bits over.
 pub fn read_for_addresses(letters: &str) -> Option<Vec<u8>> {
+    read(letters, b'-', b'_')
+}
+
+/// Reads letters without padding, whose last two are these.
+fn read(letters: &str, last_but_one: u8, last: u8) -> Option<Vec<u8>> {
     let letters = letters.as_bytes();
     if letters.len() % 4 == 1 {
         return None;
@@ -48,8 +63,8 @@ pub fn read_for_addresses(letters: &str) -> Option<Vec<u8>> {
                 b'A'..=b'Z' => letter - b'A',
                 b'a'..=b'z' => letter - b'a' + 26,
                 b'0'..=b'9' => letter - b'0' + 52,
-                b'-' => 62,
-                b'_' => 63,
+                _ if *letter == last_but_one => 62,
+                _ if *letter == last => 63,
                 _ => return None,
             };
             held = (held << 6) | u32::from(six);
@@ -78,6 +93,9 @@ mod tests {
             let unpadded = letters.trim_end_matches('=');
             assert_eq!(for_addresses(bytes.as_bytes()), unpadded);
             assert_eq!(read_for_addresses(unpadded).as_deref(), Some(bytes.as_bytes()));
+            assert_eq!(read_ordinary(letters).as_deref(), Some(bytes.as_bytes()));
+            // the ordinary kind keeps its padding
+            assert_eq!(read_ordinary(unpadded).is_some(), unpadded == letters);
         }
     }
 

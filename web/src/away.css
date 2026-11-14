@@ -83,6 +83,17 @@ a { color: var(--cloud-blue); }
 .m .main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .m .name { font-weight: 500; overflow-wrap: anywhere; }
 .m .sub { color: var(--fg-muted); font-size: 13px; line-height: 1.4; }
+/* a tile's star: it marks a favourite, and is beside the tile's link, never inside it */
+.mgrid > li { position: relative; }
+.mgrid > li > a.m { height: 100%; }
+.star { flex: none; width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; background: none; color: var(--fg-dim); cursor: pointer; }
+.star:hover { color: var(--fg); }
+.star.on { color: var(--signal-amber); }
+.star.on svg { fill: currentColor; }
+.star:focus-visible { outline: none; border-color: var(--cloud-blue); }
+.mgrid > li > .star { position: absolute; top: 6px; right: 6px; }
+.mgrid > li:has(> .star) > .m, .mgrid > li.m:has(> .star) { padding-right: 44px; }
+.pghead .star { margin-left: 4px; }
 a.m:hover { background: var(--surface-2); }
 a.m:focus-visible { border-color: var(--cloud-blue); }
 .m.still { min-height: 56px; align-items: center; }

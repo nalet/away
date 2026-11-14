@@ -8,7 +8,7 @@ library has no line that says what it is for.
 <!-- generated: libraries -->
 | Library | What it is for | Version in this build | With |
 |---|---|---|---|
-| [tokio](https://crates.io/crates/tokio) | runs many connections at once | 1.54.1 | `rt-multi-thread`, `net`, `signal`, `macros`, `time`, `sync` |
+| [tokio](https://crates.io/crates/tokio) | runs many connections at once | 1.54.1 | `rt-multi-thread`, `net`, `signal`, `macros`, `time`, `sync`, `io-util` |
 | [hyper](https://crates.io/crates/hyper) | speaks HTTP to browsers, to the cluster's checks and to the sign-in service | 1.12.0 | `http1`, `server`, `client` |
 | [hyper-util](https://crates.io/crates/hyper-util) | lets hyper use tokio's connections and timers | 0.1.21 | `tokio` |
 | [http-body-util](https://crates.io/crates/http-body-util) | holds the body of an HTTP answer | 0.1.5 | — |

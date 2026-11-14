@@ -18,6 +18,7 @@ act in one namespace. It asks for no rights over the cluster.
 | an address, such as `away.example.com`, that leads to the cluster's ingress controller or router | reaching Away from outside the cluster |
 | a cluster that enforces network rules | the cluster refusing what Away doesn't need; without it Away runs, and nothing is refused |
 | a sign-in service that speaks OpenID Connect, and a client of it for Away | signing in; without it Away runs, and nobody can sign in |
+| a PostgreSQL database, and an account of it for Away | keeping what people star; without it Away runs, and keeps nothing |
 
 It needs no Windows domain, no certificate authority and no directory.
 
@@ -118,6 +119,48 @@ takes as values or from a ConfigMap of one's own.
 [The machines and the rules](./machines.md) says how they are written and how a
 change is applied.
 
+## The database
+
+Away keeps what people star in one PostgreSQL database, which only the server
+reaches. Without one Away runs, keeps nothing, and the pages show no stars.
+
+Bring a database and an account for Away. The account makes Away's tables
+itself, so it owns the database or may create in it:
+
+```sql
+create role away login password '…';
+create database away owner away;
+```
+
+```sh
+kubectl --namespace away create secret generic away-database --from-file=password=./password
+helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
+  --namespace away --reuse-values \
+  --set database.host=postgres.example.com --set database.secretName=away-database
+```
+
+- **The server signs in with a proof of its password** (SCRAM-SHA-256), which
+  is what PostgreSQL asks for unless it is set otherwise. It gives the
+  password itself, or its old hash, to no database.
+- **The connection is secured**, and the database has to show a certificate
+  for the name in `database.host`. Where the certificate is of the
+  organisation's own authority, name it: a ConfigMap with its certificate as
+  PEM, under the key `authorities.pem`, in `database.authoritiesConfigMap`.
+  `database.secured=false` turns that off, for a database that is reached over
+  a network nobody else is on.
+- **The server brings the database into shape itself** when it starts, and
+  writes a line: `the database was brought into shape`. A later version takes
+  the steps it adds, and never one back: a version that finds the database in
+  the shape of a later one says so and keeps nothing.
+- **A database that can't be reached keeps nobody from the machines.** The
+  pages show no stars for as long, the server writes why, once, and tries
+  again.
+- With the network rules on, the server reaches the database's port and the
+  cluster's name service. `networkRules.databaseAt` narrows that to the
+  addresses it names.
+
+Away is tried against PostgreSQL 17 on every change.
+
 ## The farms' feeds
 
 A farm of Windows machines that the files name says itself what it publishes
@@ -178,6 +221,11 @@ Everything an installation is told is one of these. The chart's
 | `files` | the machines, their groups and the rules, as files: each entry a file's name and what it holds ([the machines and the rules](./machines.md)) | none: Away knows no machines |
 | `pictures` | the pictures the files name as icons: each entry a picture's name and the picture in Base64 | none |
 | `filesConfigMap` | a ConfigMap of one's own that holds those files and pictures, in place of `files` and `pictures` | none |
+| `database.host`, `database.port` | the database server's name on the network, and its port ([the database](#the-database)) | none: Away keeps nothing; port 5432 |
+| `database.name`, `database.account` | the database of that server which is Away's, and the account the server signs in as | `away`, `away` |
+| `database.secretName` | the secret that holds that account's password, under the key `password` | none |
+| `database.secured` | whether the connection to the database is secured | yes |
+| `database.authoritiesConfigMap` | a ConfigMap with certificates of authorities to trust for the database besides the public ones, under the key `authorities.pem` | none |
 | `farms.account` | the account Away reads the farms' feeds with, such as `CORP\svc-away` ([the farms' feeds](#the-farms-feeds)) | none: a farm in the files shows nothing |
 | `farms.secretName` | the secret that holds the account's password, under the key `password` | none |
 | `farms.authoritiesConfigMap` | a ConfigMap with certificates of authorities to trust for the farms' web access besides the public ones, under the key `authorities.pem` | none |
@@ -193,6 +241,7 @@ Everything an installation is told is one of these. The chart's
 | `networkRules.wayInFrom` | who may reach Away's address, as the peers of a NetworkPolicy | the cluster's router with a route; every namespace otherwise |
 | `networkRules.measuresFrom` | who may read the measures | nobody |
 | `networkRules.signInServiceAt`, `networkRules.signInServicePort` | where the sign-in service is, as the peers of a NetworkPolicy, and its port | any address, port 443 |
+| `networkRules.databaseAt` | where the database is, as the peers of a NetworkPolicy; used once `database.host` is set | any address, at `database.port` |
 | `networkRules.farmsAt`, `networkRules.farmsPort` | where the farms' web access is, as the peers of a NetworkPolicy, and its port; used once `farms.account` is set | any address, port 443 |
 | `monitoring.serviceMonitor`, `monitoring.alerts` | make a ServiceMonitor, and alert rules | no |
 | `server.resources`, `gateway.resources`, `issuer.resources` | what each part may use | small requests, and a limit on memory |

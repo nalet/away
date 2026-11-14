@@ -41,6 +41,23 @@
 {{- end }}
 {{- end }}
 {{- end }}
+{{- with .Values.database }}
+{{- if or .host .secretName .authoritiesConfigMap }}
+{{- /* the database is named with the secret of its account or not at all */ -}}
+{{- $told = append $told (dict "name" "AWAY_DATABASE_HOST" "value" (required "database.host is not set" .host)) -}}
+{{- $told = append $told (dict "name" "AWAY_DATABASE_PORT" "value" (toString .port)) -}}
+{{- $told = append $told (dict "name" "AWAY_DATABASE_NAME" "value" .name) -}}
+{{- $told = append $told (dict "name" "AWAY_DATABASE_ACCOUNT" "value" .account) -}}
+{{- $told = append $told (dict "name" "AWAY_DATABASE_PASSWORD_FILE" "value" "/run/away/database/password") -}}
+{{- $told = append $told (dict "name" "AWAY_DATABASE_SECURED" "value" (ternary "yes" "no" .secured)) -}}
+{{- $secret := dict "secretName" (required "database.secretName is not set" .secretName) "items" (list (dict "key" "password" "path" "password")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/database" "volume" (dict "name" "database" "secret" $secret)) -}}
+{{- if .authoritiesConfigMap }}
+{{- $told = append $told (dict "name" "AWAY_DATABASE_AUTHORITIES_FILE" "value" "/run/away/database-authorities/authorities.pem") -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/database-authorities" "volume" (dict "name" "database-authorities" "configMap" (dict "name" .authoritiesConfigMap))) -}}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- /* the files of machines and rules, and the pictures they name as icons: from the values, or from a ConfigMap of the operator's own */ -}}
 {{- if and (or .Values.files .Values.pictures) .Values.filesConfigMap }}
 {{- fail "files or pictures, and filesConfigMap, are both set: the files of machines and rules come from one place" }}

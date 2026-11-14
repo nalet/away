@@ -96,6 +96,41 @@ export function useInForce(): [Asked<InForce>, () => void] {
   return useAsked<InForce>('/api/register');
 }
 
+// Something a person starred: a machine, or a program of one.
+export interface Favourite {
+  machine: string;
+  program: string | null;
+}
+
+// What a person starred, and the way to star something or to take its star away.
+// Where Away keeps nothing, because it is given no database or doesn't reach it,
+// nothing can be starred, and the pages show no stars.
+export interface Stars {
+  // still being asked
+  asking: boolean;
+  kept: boolean;
+  favourites: Favourite[];
+  has: (machine: string, program: string | null) => boolean;
+  star: (machine: string, program: string | null, starred: boolean) => void;
+}
+
+export function useFavourites(): Stars {
+  const [answer, again] = useAsked<{ kept: boolean; favourites: Favourite[] }>('/api/favourites');
+  // what the person just did shows at once, and is put right by the server's answer
+  const [done, setDone] = useState<Favourite[] | null>(null);
+  useEffect(() => setDone(null), [answer]);
+  const kept = typeof answer !== 'string' && answer.kept;
+  const favourites = done ?? (typeof answer === 'string' ? [] : answer.favourites);
+  const same = (one: Favourite, machine: string, program: string | null) => one.machine === machine && one.program === program;
+  const star = (machine: string, program: string | null, starred: boolean) => {
+    const without = favourites.filter((one) => !same(one, machine, program));
+    setDone(starred ? [...without, { machine, program }] : without);
+    const named = new URLSearchParams(program === null ? { machine } : { machine, program });
+    fetch(`/api/favourites?${named}`, { method: starred ? 'PUT' : 'DELETE', headers: { 'x-away': '1' } }).then(again, again);
+  };
+  return { asking: answer === 'asking', kept, favourites, has: (machine, program) => favourites.some((one) => same(one, machine, program)), star };
+}
+
 // Where a machine's own page is.
 export function pageOf(name: string): string {
   return `/machines/${encodeURIComponent(name)}`;

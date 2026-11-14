@@ -23,7 +23,7 @@ publish = false
 # every library Away is built from directly, each with what it is for. scripts/libraries.py
 # writes docs/libraries.md from these lines and fails when one says nothing.
 [workspace.dependencies]
-tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "net", "signal", "macros", "time", "sync"] } # runs many connections at once
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "net", "signal", "macros", "time", "sync", "io-util"] } # runs many connections at once
 hyper = { version = "1", default-features = false, features = ["http1", "server", "client"] } # speaks HTTP to browsers, to the cluster's checks and to the sign-in service
 hyper-util = { version = "0.1", default-features = false, features = ["tokio"] } # lets hyper use tokio's connections and timers
 http-body-util = { version = "0.1", default-features = false } # holds the body of an HTTP answer

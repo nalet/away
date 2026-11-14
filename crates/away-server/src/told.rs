@@ -18,6 +18,13 @@
 //! | `AWAY_FARMS_ACCOUNT` | the account the farms' feeds are read with: `CORP\svc-away` |
 //! | `AWAY_FARMS_PASSWORD_FILE` | the file that holds that account's password |
 //! | `AWAY_FARMS_AUTHORITIES_FILE` | certificates of authorities to trust for the farms' web access, as PEM |
+//! | `AWAY_DATABASE_HOST` | the database server's name on the network; without it Away keeps nothing |
+//! | `AWAY_DATABASE_PORT` | its port (`5432`) |
+//! | `AWAY_DATABASE_NAME` | the database of that server which is Away's (`away`) |
+//! | `AWAY_DATABASE_ACCOUNT` | the account the server signs in as there (`away`) |
+//! | `AWAY_DATABASE_PASSWORD_FILE` | the file that holds that account's password |
+//! | `AWAY_DATABASE_SECURED` | `no` where the connection to the database is not to be secured; it is otherwise |
+//! | `AWAY_DATABASE_AUTHORITIES_FILE` | certificates of authorities to trust for the database besides the public ones, as PEM |
 
 use std::time::Duration;
 
@@ -57,6 +64,28 @@ pub struct Told {
     pub files: Option<std::path::PathBuf>,
     /// The account Away reads the feeds of farms with. Without it no farm's feed is read.
     pub farms: Option<Farms>,
+    /// The database. Without it Away keeps nothing: no favourites, and no records.
+    pub database: Option<Database>,
+}
+
+/// What Away is told about its database.
+#[derive(Clone, Debug)]
+pub struct Database {
+    /// The database server's name on the network.
+    pub host: String,
+    /// Its port.
+    pub port: u16,
+    /// The database of that server which is Away's.
+    pub name: String,
+    /// The account the server signs in as.
+    pub account: String,
+    /// The account's password.
+    pub password: Secret,
+    /// Whether the connection is secured, and the database has to show a certificate
+    /// for its name.
+    pub secured: bool,
+    /// Certificates of authorities to trust for it besides the public ones, as PEM.
+    pub authorities: Option<Vec<u8>>,
 }
 
 /// What Away is told about reading the feeds of farms.
@@ -103,10 +132,53 @@ impl Told {
             }
             _ => return Err("AWAY_FARMS_ACCOUNT and AWAY_FARMS_PASSWORD_FILE go together: one of them is not set.".to_string()),
         };
+        let database = match (variable("AWAY_DATABASE_HOST"), variable("AWAY_DATABASE_PASSWORD_FILE")) {
+            (None, None) => None,
+            (Some(host), Some(path)) => {
+                let password =
+                    file(&path).map_err(|error| format!("AWAY_DATABASE_PASSWORD_FILE names {path}, which can't be read: {error}."))?;
+                let password =
+                    String::from_utf8(password).map_err(|_| "AWAY_DATABASE_PASSWORD_FILE names a file that holds no text.".to_string())?;
+                let password = password.trim_end_matches(['\r', '\n']);
+                if host.trim().is_empty() || password.is_empty() {
+                    return Err("AWAY_DATABASE_HOST or the file AWAY_DATABASE_PASSWORD_FILE names is empty.".to_string());
+                }
+                let port = match variable("AWAY_DATABASE_PORT") {
+                    None => 5432,
+                    Some(port) => port.trim().parse().map_err(|_| format!("AWAY_DATABASE_PORT is no port: {port}."))?,
+                };
+                let secured = match variable("AWAY_DATABASE_SECURED").as_deref().map(str::trim) {
+                    None | Some("yes") => true,
+                    Some("no") => false,
+                    Some(other) => return Err(format!("AWAY_DATABASE_SECURED is yes or no, and not {other}.")),
+                };
+                let authorities = variable("AWAY_DATABASE_AUTHORITIES_FILE")
+                    .map(|path| {
+                        file(&path).map_err(|error| format!("AWAY_DATABASE_AUTHORITIES_FILE names {path}, which can't be read: {error}."))
+                    })
+                    .transpose()?;
+                let or = |name: &str, otherwise: &str| {
+                    variable(name)
+                        .map(|said| said.trim().to_string())
+                        .filter(|said| !said.is_empty())
+                        .unwrap_or_else(|| otherwise.to_string())
+                };
+                Some(Database {
+                    host: host.trim().to_string(),
+                    port,
+                    name: or("AWAY_DATABASE_NAME", "away"),
+                    account: or("AWAY_DATABASE_ACCOUNT", "away"),
+                    password: Secret::new(password),
+                    secured,
+                    authorities,
+                })
+            }
+            _ => return Err("AWAY_DATABASE_HOST and AWAY_DATABASE_PASSWORD_FILE go together: one of them is not set.".to_string()),
+        };
         let needed = ["AWAY_PUBLIC_ADDRESS", "AWAY_SIGN_IN_SERVICE", "AWAY_SIGN_IN_CLIENT", "AWAY_SIGN_IN_SECRET_FILE"];
         let said: Vec<Option<String>> = needed.iter().map(|name| variable(name)).collect();
         if said.iter().all(Option::is_none) {
-            return Ok(Told { sign_in: None, contact, files, farms });
+            return Ok(Told { sign_in: None, contact, files, farms, database });
         }
         if let Some(missing) = needed.iter().zip(&said).find(|(_, said)| said.is_none()).map(|(name, _)| name) {
             return Err(format!("{missing} is not set, and signing in needs it."));
@@ -148,6 +220,7 @@ impl Told {
             contact,
             files,
             farms,
+            database,
         })
     }
 }

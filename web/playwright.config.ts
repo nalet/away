@@ -6,17 +6,26 @@
 //   npm --prefix web test
 import { defineConfig, devices } from '@playwright/test';
 
-const inThePipeline = Boolean((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.CI);
+const told = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
+const inThePipeline = Boolean(told.CI);
 const server = '../target/debug/examples/pages';
 // the machines and the rules of the tests, as a copy that a test may change
 export const FILES = '../target/pages-test-files';
-const withFiles = `rm -rf ${FILES} && cp -R ../crates/away-server/tests/fixtures/files ${FILES} && exec ${server}`;
+const fixtures = '../crates/away-server/tests/fixtures/files';
+const withFiles = `rm -rf ${FILES} && cp -R ${fixtures} ${FILES} && exec ${server}`;
+// a PostgreSQL for what Away keeps, as host:port, where there is one to test against:
+// tests/machines/database/real.sh starts it. The pipeline always has one.
+export const DATABASE = told.AWAY_TEST_DATABASE ?? '';
+if (inThePipeline && !DATABASE) throw new Error("The pipeline's tests need a database: AWAY_TEST_DATABASE is not set.");
 
 export const AWAY = 'http://127.0.0.1:18080';
 export const SIGN_IN_SERVICE = 'http://127.0.0.1:18081';
 export const AWAY_WITHOUT_SERVICE = 'http://127.0.0.1:18082';
 // a stand-in for a farm's web access, which the server asks what it publishes
 export const FARM = 'http://127.0.0.1:18083';
+// a third server, which is given a database, and so keeps what people star
+export const AWAY_THAT_KEEPS = 'http://127.0.0.1:18084';
+const keeps = { command: server, env: { PORT: '18084', SIGN_IN_PORT: '18085', DATABASE }, url: `${AWAY_THAT_KEEPS}/api/who`, reuseExistingServer: !inThePipeline };
 
 export default defineConfig({
   testDir: 'tests',
@@ -30,5 +39,6 @@ export default defineConfig({
   webServer: [
     { command: withFiles, env: { PORT: '18080', SIGN_IN_PORT: '18081', FARM_PORT: '18083', FILES }, url: `${AWAY}/api/who`, reuseExistingServer: !inThePipeline },
     { command: server, env: { PORT: '18082', SIGN_IN: 'absent' }, url: `${AWAY_WITHOUT_SERVICE}/api/who`, reuseExistingServer: !inThePipeline },
+    ...(DATABASE ? [keeps] : []),
   ],
 });

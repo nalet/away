@@ -5,7 +5,7 @@ import type { Page, Request } from '@playwright/test';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { AWAY, AWAY_WITHOUT_SERVICE, FARM, FILES, SIGN_IN_SERVICE } from '../playwright.config';
+import { AWAY, AWAY_THAT_KEEPS, AWAY_WITHOUT_SERVICE, DATABASE, FARM, FILES, SIGN_IN_SERVICE } from '../playwright.config';
 
 // Tells the stand-in for the sign-in service how to behave from now on.
 async function service(told: Record<string, string>) {
@@ -712,4 +712,95 @@ test('a sign-in service that does not answer is said not to answer, with the rea
   // a reload, with nothing new to say, shows how one signs in
   await page.reload();
   await expect(page.getByRole('button', { name: 'sign in' })).toBeVisible();
+});
+
+test.describe('with a database', () => {
+  test.skip(!DATABASE, 'no database to test against: AWAY_TEST_DATABASE is not set');
+
+  test('what a person stars is on home, in the order they starred it, on every browser they sign in with', async ({ page, browser }) => {
+    const seen = watch(page);
+    // nothing is starred yet: home says where the programs and the machines are
+    await page.goto(`${AWAY_THAT_KEEPS}/`);
+    await expect(page.getByRole('heading', { name: 'nothing on home yet' })).toBeVisible();
+    await expect(page.getByText('What you star is here. Every program and every machine you can reach is on its own page.')).toBeVisible();
+    await accessible(page);
+    await page.locator('.fill').getByRole('link', { name: 'programs' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/programs`);
+
+    // a star is a button beside the tile's link: with the pointer, and with the keyboard
+    const ledger = page.getByRole('button', { name: 'add to favourites: Ledger' });
+    await expect(ledger).toHaveAttribute('aria-pressed', 'false');
+    await expect(ledger).toHaveAttribute('title', 'add to favourites');
+    await ledger.click();
+    const starred = page.getByRole('button', { name: 'remove from favourites: Ledger' });
+    await expect(starred).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'add to favourites: Mail' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: 'remove from favourites: Mail' })).toBeVisible();
+    await accessible(page);
+
+    // a machine is starred on its own page, beside its name, and a program there too
+    await page.goto(`${AWAY_THAT_KEEPS}/machines`);
+    await page.getByRole('link', { name: /^fin-app-02/ }).click();
+    await expect(page.getByRole('button', { name: 'remove from favourites: Ledger' })).toBeVisible();
+    await page.getByRole('button', { name: 'add to favourites: fin-app-02' }).click();
+    await expect(page.getByRole('button', { name: 'remove from favourites: fin-app-02' })).toBeVisible();
+    await accessible(page);
+
+    // home holds them, the first starred first
+    const home = [
+      ['Ledger', 'program on fin-app-02'],
+      ['Mail', 'program on fin-app-02'],
+      ['fin-app-02', 'Windows desktop, 4 programs'],
+    ];
+    await page.goto(`${AWAY_THAT_KEEPS}/`);
+    await expect(page.locator('section.grp h2')).toHaveText(['favourites 3']);
+    expect(await tiles(page, 'favourites 3')).toEqual(home);
+    await accessible(page);
+    // the field finds among them
+    await page.getByRole('searchbox', { name: 'find a machine or a program…' }).fill('mail');
+    await expect(page.locator('section.grp h2')).toHaveText(['favourites 1']);
+    await page.getByRole('searchbox', { name: 'find a machine or a program…' }).fill('');
+
+    // they are kept with the person: another browser that signs in has them too
+    const elsewhere = await browser.newContext();
+    try {
+      const other = await elsewhere.newPage();
+      await other.goto(`${AWAY_THAT_KEEPS}/`);
+      await expect(other.locator('section.grp h2')).toHaveText(['favourites 3']);
+      expect(await tiles(other, 'favourites 3')).toEqual(home);
+    } finally {
+      await elsewhere.close();
+    }
+
+    // a star taken away on home takes the tile with it, and the programs' page knows
+    await page.getByRole('button', { name: 'remove from favourites: Ledger' }).click();
+    await expect(page.locator('section.grp h2')).toHaveText(['favourites 2']);
+    await page.reload();
+    expect(await tiles(page, 'favourites 2')).toEqual(home.slice(1));
+    await page.goto(`${AWAY_THAT_KEEPS}/programs`);
+    await expect(page.getByRole('button', { name: 'add to favourites: Ledger' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: 'remove from favourites: Mail' })).toHaveAttribute('aria-pressed', 'true');
+
+    // with the last star gone, home says again where everything is
+    await page.getByRole('button', { name: 'remove from favourites: Mail' }).click();
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/fin-app-02`);
+    await page.getByRole('button', { name: 'remove from favourites: fin-app-02' }).click();
+    await expect(page.getByRole('button', { name: 'add to favourites: fin-app-02' })).toBeVisible();
+    await page.goto(`${AWAY_THAT_KEEPS}/`);
+    await expect(page.getByRole('heading', { name: 'nothing on home yet' })).toBeVisible();
+
+    // nothing was asked of anyone but Away, and the browser complained of nothing
+    expect(seen.asked.filter((request) => !request.url().startsWith(AWAY_THAT_KEEPS) && !request.url().startsWith('http://127.0.0.1:18085')).map((request) => request.url())).toEqual([]);
+    expect(seen.complaints).toEqual([]);
+  });
+});
+
+test('without a database nothing can be starred, and the pages show no stars', async ({ page }) => {
+  await page.goto('/programs');
+  await expect(page.locator('section.grp h2')).toHaveText(['programs 4']);
+  await expect(page.getByRole('button', { name: /favourites/ })).toHaveCount(0);
+  await page.goto('/machines/fin-app-02');
+  await expect(page.getByRole('heading', { name: 'fin-app-02' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /favourites/ })).toHaveCount(0);
 });

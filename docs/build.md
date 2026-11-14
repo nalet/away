@@ -192,6 +192,29 @@ tests/machines/linux/rdp.sh
 
 The pipeline runs it on every change.
 
+## Against a real database
+
+The server speaks to its database with code of its own, and what it keeps is
+tried against a real PostgreSQL. A script starts one in a container, with the
+tests' certificate for `localhost`, and runs the tests that need it:
+
+```sh
+tests/machines/database/real.sh
+```
+
+`KEEP=1` before it leaves the database running at `localhost:15432`. The tests
+find it by a variable, and so do the pages' tests, which then run a server
+more, one that keeps what people star:
+
+```sh
+KEEP=1 tests/machines/database/real.sh
+AWAY_TEST_DATABASE=localhost:15432 cargo test
+AWAY_TEST_DATABASE=localhost:15432 make test-pages
+```
+
+Without the variable those tests say that they found no database, and pass.
+The pipeline always has one, and fails where a test finds none.
+
 ## Trying a farm's feed
 
 The server reads what a farm of Windows machines publishes from the farm's own

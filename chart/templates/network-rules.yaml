@@ -137,6 +137,44 @@ spec:
           protocol: TCP
         {{- end }}
 {{- end }}
+{{- if .Values.database.host }}
+---
+# the server, and no other part, reaches the database: it finds it by its name, and
+# reaches its port alone
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-server-to-database
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "away.picks" (dict "root" . "part" "server") | nindent 6 }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        {{- with .Values.networkRules.databaseAt }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - ipBlock:
+            cidr: 0.0.0.0/0
+        - ipBlock:
+            cidr: ::/0
+        {{- end }}
+      ports:
+        - port: {{ .Values.database.port }}
+          protocol: TCP
+    - to:
+        - namespaceSelector: {}
+      ports:
+        {{- range $port := list 53 5353 }}
+        - port: {{ $port }}
+          protocol: UDP
+        - port: {{ $port }}
+          protocol: TCP
+        {{- end }}
+{{- end }}
 {{- with .Values.networkRules.measuresFrom }}
 ---
 # the monitoring reads every part's measures

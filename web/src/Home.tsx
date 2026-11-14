@@ -2,12 +2,12 @@
 // another the machines in the groups an administrator made; and a page for each
 // machine. This version shows them and opens none yet.
 import { Banner, Button, Card, Chevron, Code, EmptyState, Input } from '@nalet/design-system';
-import { AppWindow, ArrowLeft, Monitor, Search, SquareTerminal } from 'lucide-react';
+import { AppWindow, ArrowLeft, Monitor, Search, SquareTerminal, Star } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import { entriesOf, found, pageOf, useMachines } from './machines';
-import type { Entry, Machine } from './machines';
+import { entriesOf, found, pageOf, useFavourites, useMachines } from './machines';
+import type { Entry, Machine, Stars } from './machines';
 import { addressOf, inPlace } from './place';
 import { texts } from './texts';
 
@@ -46,13 +46,44 @@ function entriesFor(which: Which, machines: Machine[]): Entry[] {
   return machines.map((machine) => ({ machine, program: null }));
 }
 
+// The star of a machine or of a program: it marks a favourite, and takes the mark away.
+function StarOf({ stars, machine, program }: { stars: Stars; machine: string; program: string | null }) {
+  if (!stars.kept) return null;
+  const on = stars.has(machine, program);
+  const what = on ? texts.stars.remove : texts.stars.add;
+  return (
+    <button
+      type="button"
+      className={on ? 'star on' : 'star'}
+      aria-pressed={on}
+      aria-label={texts.stars.named(what, program ?? machine)}
+      title={what}
+      onClick={() => stars.star(machine, program, !on)}
+    >
+      <Star size={16} aria-hidden="true" />
+    </button>
+  );
+}
+
+// What a person starred, as entries, of what they may open: in the order they starred it.
+function starred(stars: Stars, machines: Machine[]): Entry[] {
+  return stars.favourites.flatMap((favourite): Entry[] => {
+    const machine = machines.find((one) => one.name === favourite.machine);
+    if (!machine) return [];
+    if (favourite.program === null) return [{ machine, program: null }];
+    const program = machine.programs.find((one) => one.name === favourite.program);
+    return program ? [{ machine, program }] : [];
+  });
+}
+
 // A page of what one may open: home, the programs, or the machines.
 export function Opens({ which, go, contact }: { which: Which; go: (to: string) => void; contact: string | null }) {
   const [machines, again] = useMachines();
+  const stars = useFavourites();
   const [sought, setSought] = useState('');
   const t = texts.opens[which];
 
-  if (machines === 'asking') return <div className="fill" aria-busy="true" />;
+  if (machines === 'asking' || stars.asking) return <div className="fill" aria-busy="true" />;
   if (machines === 'unanswered') {
     return (
       <div className="fill">
@@ -61,7 +92,33 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
       </div>
     );
   }
-  const all = entriesFor(which, machines);
+  // where Away keeps what is starred, home is the place for it
+  const favourites = which === 'home' && stars.kept;
+  if (favourites && entriesFor(which, machines).length > 0 && starred(stars, machines).length === 0) {
+    return (
+      <div className="fill">
+        <h1 className="unseen">{texts.views[which]}</h1>
+        <EmptyState
+          illustration="empty"
+          size="lg"
+          headingLevel={2}
+          title={texts.stars.none}
+          description={texts.stars.noneWhy}
+          actions={
+            <>
+              <a className="nc-btn nc-btn--primary nc-btn--md" href={addressOf.programs} onClick={inPlace(go, addressOf.programs)}>
+                <span className="nc-btn__label">{texts.views.programs}</span>
+              </a>
+              <a className="nc-btn nc-btn--default nc-btn--md" href={addressOf.machines} onClick={inPlace(go, addressOf.machines)}>
+                <span className="nc-btn__label">{texts.views.machines}</span>
+              </a>
+            </>
+          }
+        />
+      </div>
+    );
+  }
+  const all = favourites ? starred(stars, machines) : entriesFor(which, machines);
   if (all.length === 0) {
     return (
       <div className="fill">
@@ -73,8 +130,9 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
   }
 
   const shown = sought.trim() ? all.filter((entry) => found(entry, sought)) : all;
-  // the programs are one grid; machines, and home, are in the groups of the files
-  const groups = which === 'programs' ? (shown.length > 0 ? [{ name: null, entries: shown }] : []) : grouped(shown);
+  // the programs are one grid, and so is what one starred; machines are in the groups of the files
+  const one = which === 'programs' || favourites;
+  const groups = one ? (shown.length > 0 ? [{ name: null, entries: shown }] : []) : grouped(shown);
   const named = groups.some((group) => group.name !== null);
   return (
     <div className="pg wide">
@@ -97,7 +155,7 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
         </div>
       )}
       {groups.map((group) => {
-        const title = which === 'programs' ? texts.views.programs : (group.name ?? (named ? texts.home.others : texts.home.machines));
+        const title = favourites ? texts.stars.favourites : which === 'programs' ? texts.views.programs : (group.name ?? (named ? texts.home.others : texts.home.machines));
         const id = `group-${group.name ?? ''}`.replace(/[^a-zA-Z0-9-]/g, '_');
         return (
           <section className="grp" key={id} aria-labelledby={id}>
@@ -118,6 +176,7 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
                         <span className="sub">{program === null ? whatItIs(machine) : texts.programOn(machine.name)}</span>
                       </span>
                     </a>
+                    <StarOf stars={stars} machine={machine.name} program={program?.name ?? null} />
                   </li>
                 );
               })}
@@ -132,7 +191,8 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
 // One machine: what it offers, and what it is.
 export function MachinePage({ name, go }: { name: string; go: (to: string) => void }) {
   const [machines, again] = useMachines();
-  if (machines === 'asking') return <div className="fill" aria-busy="true" />;
+  const stars = useFavourites();
+  if (machines === 'asking' || stars.asking) return <div className="fill" aria-busy="true" />;
   if (machines === 'unanswered') {
     return (
       <div className="fill">
@@ -170,6 +230,7 @@ export function MachinePage({ name, go }: { name: string; go: (to: string) => vo
         </a>
         <Icon size={22} className="kind" aria-hidden="true" />
         <h1 className="asis">{machine.name}</h1>
+        <StarOf stars={stars} machine={machine.name} program={null} />
       </div>
       <Banner state="information">{texts.machine.notYet}</Banner>
       <div className="cols rev">
@@ -201,6 +262,7 @@ export function MachinePage({ name, go }: { name: string; go: (to: string) => vo
                     <span className="main">
                       <span className="name">{program.name}</span>
                     </span>
+                    <StarOf stars={stars} machine={machine.name} program={program.name} />
                   </li>
                 ))}
               </ul>

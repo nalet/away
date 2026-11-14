@@ -63,6 +63,58 @@ impl std::fmt::Display for Failed {
     }
 }
 
+/// The authorities a service's certificate is checked against: the public ones, and
+/// those of these certificates that the operator added, written as PEM.
+fn trusted(also_trusted: Option<&[u8]>) -> Result<RootCertStore, String> {
+    let mut trusted = RootCertStore { roots: webpki_roots::TLS_SERVER_ROOTS.to_vec() };
+    if let Some(also) = also_trusted {
+        let mut added = 0;
+        for certificate in CertificateDer::pem_slice_iter(also) {
+            let certificate = certificate.map_err(|error| format!("a certificate of an added authority can't be read: {error}"))?;
+            trusted.add(certificate).map_err(|error| format!("a certificate of an added authority can't be used: {error}"))?;
+            added += 1;
+        }
+        if added == 0 {
+            return Err("the added authorities hold no certificate".to_string());
+        }
+    }
+    Ok(trusted)
+}
+
+/// What secures connections, for a service that speaks this protocol on them.
+fn securing(also_trusted: Option<&[u8]>, speaks: &[u8]) -> Result<TlsConnector, String> {
+    let mut config = ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+        .with_safe_default_protocol_versions()
+        .map_err(|error| error.to_string())?
+        .with_root_certificates(trusted(also_trusted)?)
+        .with_no_client_auth();
+    config.alpn_protocols = vec![speaks.to_vec()];
+    Ok(TlsConnector::from(Arc::new(config)))
+}
+
+/// A connection that is secured.
+pub type Secured = tokio_rustls::client::TlsStream<TcpStream>;
+
+/// Secures connections to a service that speaks something else than HTTP, such as a
+/// database: the service's certificate is checked as [`Client`] checks one.
+#[derive(Clone)]
+pub struct Secures(TlsConnector);
+
+impl Secures {
+    /// For a service that speaks this protocol, as it is named when a connection is
+    /// secured. It trusts the public authorities, and those of these certificates that
+    /// the operator added, written as PEM.
+    pub fn new(also_trusted: Option<&[u8]>, speaks: &[u8]) -> Result<Secures, String> {
+        securing(also_trusted, speaks).map(Secures)
+    }
+
+    /// Secures a connection that is open, to the service of this name.
+    pub async fn secure(&self, host: &str, connection: TcpStream) -> Result<Secured, String> {
+        let name = ServerName::try_from(host.to_string()).map_err(|error| error.to_string())?;
+        self.0.connect(name, connection).await.map_err(|error| error.to_string())
+    }
+}
+
 /// Asks services.
 #[derive(Clone)]
 pub struct Client {
@@ -75,25 +127,7 @@ impl Client {
     /// A client that trusts the public authorities, and those of these certificates
     /// that the operator added, written as PEM.
     pub fn new(also_trusted: Option<&[u8]>) -> Result<Client, String> {
-        let mut trusted = RootCertStore { roots: webpki_roots::TLS_SERVER_ROOTS.to_vec() };
-        if let Some(also) = also_trusted {
-            let mut added = 0;
-            for certificate in CertificateDer::pem_slice_iter(also) {
-                let certificate = certificate.map_err(|error| format!("a certificate of an added authority can't be read: {error}"))?;
-                trusted.add(certificate).map_err(|error| format!("a certificate of an added authority can't be used: {error}"))?;
-                added += 1;
-            }
-            if added == 0 {
-                return Err("the added authorities hold no certificate".to_string());
-            }
-        }
-        let mut config = ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-            .with_safe_default_protocol_versions()
-            .map_err(|error| error.to_string())?
-            .with_root_certificates(trusted)
-            .with_no_client_auth();
-        config.alpn_protocols = vec![b"http/1.1".to_vec()];
-        Ok(Client { secures: TlsConnector::from(Arc::new(config)), within: Duration::from_secs(10), at_most: 1024 * 1024 })
+        Ok(Client { secures: securing(also_trusted, b"http/1.1")?, within: Duration::from_secs(10), at_most: 1024 * 1024 })
     }
 
     /// The same client, with another time an answer has to come within and another

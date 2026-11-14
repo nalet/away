@@ -11,6 +11,7 @@ pub mod pages;
 pub mod register;
 pub mod service;
 pub mod sign_ins;
+pub mod store;
 pub mod token;
 pub mod told;
 
@@ -113,6 +114,29 @@ impl Server {
                 let _ = tokio::task::spawn_blocking(move || register.look(away_part::time::now().as_secs())).await;
             }
         });
+        // the database is reached as the server starts, and tried again until it is
+        let store = self.getting_in.store();
+        let lines = self.part.lines.clone();
+        let reaching = tokio::spawn(async move {
+            let Some(store) = store else { return };
+            let mut said: Option<String> = None;
+            loop {
+                match store.begin().await {
+                    Ok(()) => {
+                        lines.info("the database is reached, and in shape", &[]);
+                        return;
+                    }
+                    Err(unusable) => {
+                        let why = unusable.to_string();
+                        if said.as_deref() != Some(why.as_str()) {
+                            lines.warn("the database can't be used, so nothing Away keeps is at hand", &[("why", why.as_str().into())]);
+                            said = Some(why);
+                        }
+                    }
+                }
+                tokio::time::sleep(LOOKS_AT_THE_FILES_EVERY).await;
+            }
+        });
         // the farms' feeds are read as time passes, each when it is due
         let register = self.getting_in.register();
         let farms = self.farms.clone();
@@ -151,6 +175,7 @@ impl Server {
         renewing.abort();
         looking.abort();
         reading.abort();
+        reaching.abort();
     }
 }
 

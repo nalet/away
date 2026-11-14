@@ -56,6 +56,29 @@ farms:
   # certificate of the organisation's own authority.
   authoritiesConfigMap: ""
 
+# The database: one PostgreSQL, which only the server reaches. Away keeps there what
+# people star. Without it Away runs, keeps nothing, and the pages show no stars.
+database:
+  # The database server's name on the network, such as postgres.example.com
+  host: ""
+  port: 5432
+  # The database of that server which is Away's, and the account the server signs in
+  # as. The account makes Away's tables there itself, so it owns the database or may
+  # create in it.
+  name: away
+  account: away
+  # The secret that holds the account's password, under the key "password". It is made
+  # beside the chart, so that it is in no file of values.
+  secretName: ""
+  # Whether the connection is secured: the database then has to show a certificate for
+  # its name. Turn it off only for a database that is reached over a network nobody
+  # else is on.
+  secured: true
+  # A ConfigMap with the certificates of authorities to trust besides the public ones,
+  # as PEM under the key "authorities.pem": for a database whose certificate is of the
+  # organisation's own authority.
+  authoritiesConfigMap: ""
+
 image:
   repository: ghcr.io/nalet/away
   # The image's tag. Empty takes the version of Away this chart was published with.
@@ -104,6 +127,9 @@ networkRules:
   # farms.account is set.
   farmsAt: []
   farmsPort: 443
+  # Where the database is, as the peers of a NetworkPolicy. Empty takes any address: the
+  # server reaches database.port and nothing else. It is used once database.host is set.
+  databaseAt: []
 
 monitoring:
   # Make a ServiceMonitor, so the Prometheus operator finds the measures by itself.
