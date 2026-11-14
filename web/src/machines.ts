@@ -132,11 +132,11 @@ export function useFavourites(): Stars {
 }
 
 // Whether this version of Away opens a machine's desktop: the desktop of a Windows
-// machine, or of another that speaks RDP, reached at its own address. The desktop of a
-// farm, which a broker hands out, is not opened yet.
+// machine, or of another that speaks RDP. A farm's desktop is one of them: its broker
+// says which machine serves it.
 export function opensDesktop(machine: Machine): boolean {
   const over = machine.desktop?.over ?? (machine.kind === 'windows' ? 'rdp' : 'vnc');
-  return machine.desktop !== null && over === 'rdp' && machine.collection === null;
+  return machine.desktop !== null && over === 'rdp';
 }
 
 // Where a machine's own page is.

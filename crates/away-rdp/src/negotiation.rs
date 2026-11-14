@@ -55,13 +55,40 @@ pub struct Answer {
 
 /// The first bytes of a connection: the request, asking for what Away takes.
 pub fn request() -> Vec<u8> {
-    let mut asked = Vec::with_capacity(15);
+    request_with(None).expect("a request that says nothing first is as long as it may be")
+}
+
+/// The longest thing a client may say first to a farm.
+pub const LONGEST_TOKEN: usize = 200;
+
+/// The same request, with what the client says first to a farm: the collection it wants
+/// of a broker, or what a broker gave it for the machine it was sent on to. A farm reads
+/// it as one line.
+pub fn request_with(token: Option<&[u8]>) -> Result<Vec<u8>, Error> {
+    let token = token.map(|token| token.strip_suffix(b"\r\n").unwrap_or(token));
+    if token.is_some_and(|token| token.len() > LONGEST_TOKEN || token.iter().any(|byte| matches!(byte, b'\r' | b'\n'))) {
+        return Err(Error::NotRdp("what is said first to a farm is one line, of 200 bytes at most"));
+    }
+    let line = token.map_or(0, |token| token.len() + 2);
+    let mut asked = Vec::with_capacity(15 + line);
     // the connection request: its length after this byte, what it is, no references, class 0
-    asked.extend_from_slice(&[14, 0xe0, 0, 0, 0, 0, 0]);
+    asked.extend_from_slice(&[(14 + line) as u8, 0xe0, 0, 0, 0, 0, 0]);
+    if let Some(token) = token {
+        asked.extend_from_slice(token);
+        asked.extend_from_slice(b"\r\n");
+    }
     // the negotiation request: its kind, no flags, its length, what is asked for
     asked.extend_from_slice(&[1, 0, 8, 0]);
     asked.extend_from_slice(&ASKED_FOR.to_le_bytes());
-    tpkt::frame(&asked)
+    Ok(tpkt::frame(&asked))
+}
+
+/// What a client said first to a farm, read from what its request's frame carries: for
+/// the tests' stand-in for a machine.
+#[cfg(any(test, feature = "stand-in"))]
+pub fn read_token(carried: &[u8]) -> Option<Vec<u8>> {
+    let said = carried.get(7..carried.len().checked_sub(8)?)?;
+    said.strip_suffix(b"\r\n").map(<[u8]>::to_vec)
 }
 
 /// Reads what the frame of a machine's answer carries.

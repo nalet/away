@@ -6,9 +6,9 @@ act in one namespace. It asks for no rights over the cluster.
 > **What this version is.** Away's three parts run and say whether they are
 > well. Someone who opens Away is signed in through the organisation's sign-in
 > service, sees the machines and the programs a rule gives them, stars what
-> they use, and opens the desktop of a Windows machine that is reached at its
-> own address, with a name and a password they type. It doesn't open programs,
-> shells, other desktops or the desktop of a farm yet.
+> they use, and opens Windows desktops, that of one machine and that of a
+> farm of machines, with a name and a password they type. It doesn't open
+> programs, shells or other desktops yet.
 > [The work packages](../spec/plan/README.md) say what comes next.
 
 ## What it needs
@@ -180,6 +180,8 @@ The gateway opens the machines. Three things have to be there:
   `networkRules.machinePorts` says otherwise, and the cluster's name service.
   `networkRules.machinesAt` narrows that to the addresses it names. A machine
   whose file names another port needs that port in `networkRules.machinePorts`.
+  For a farm, the gateway reaches the broker and every machine that serves a
+  collection: the broker sends it on to one of them.
 - **A way in that passes WebSockets on**, as every ingress controller and the
   OpenShift router do. A session's connection arrives at `/session` on Away's
   address and is passed on to the gateway.

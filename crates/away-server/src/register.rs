@@ -139,6 +139,9 @@ pub struct Farm {
     pub feed: String,
     /// The groups of machines that what it publishes is in.
     pub groups: Vec<String>,
+    /// The machines that serve what it publishes, by their addresses: Away goes on to
+    /// no other machine for it, whatever the farm's broker says.
+    pub served_by: Vec<String>,
     /// How many machines of the files are written before it, in the files' order: what
     /// it publishes shows after them, where the farm itself is written.
     pub after: usize,
@@ -597,7 +600,7 @@ fn machine(
     if let (None, Some((_, line))) = (&collection, served_by.first()) {
         return Err(refused(file, *line, format!("{name} names machines that serve it, and no collection for them to serve")));
     }
-    if let Some((other, line)) = served_by.iter().find(|(address, _)| !is_an_address(address)) {
+    if let Some((other, line)) = served_by.iter().find(|(address, _)| !serves(address)) {
         return Err(refused(file, *line, format!("“{other}” is no address of a machine")));
     }
     Ok(Machine {
@@ -618,7 +621,7 @@ fn machine(
 /// Reads one farm.
 fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
     let shape = "a farm is written as its name, its feed and its groups, beginning with “- name:”";
-    let parts = Parts::of(file, node, &["name", "feed", "groups"], "a farm", shape)?;
+    let parts = Parts::of(file, node, &["name", "feed", "groups", "served-by"], "a farm", shape)?;
     let Some((name, _)) = parts.text("name", "a farm")? else { return Err(refused(file, node.line, "the farm has no name")) };
     if !name.chars().all(|character| character.is_alphanumeric() || " -_.()+&".contains(character)) {
         return Err(refused(
@@ -638,7 +641,12 @@ fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
     }
     let mut groups: Vec<String> = parts.texts("groups", &name)?.into_iter().map(|(group, _)| group).collect();
     groups.sort_by_key(|group| group.to_lowercase());
-    Ok(Farm { name, feed, groups, after: 0, written_in: (file.to_string(), node.line) })
+    let served_by = parts.texts("served-by", &name)?;
+    if let Some((other, line)) = served_by.iter().find(|(address, _)| !serves(address)) {
+        return Err(refused(file, *line, format!("“{other}” is no address of a machine")));
+    }
+    let served_by = served_by.into_iter().map(|(address, _)| address).collect();
+    Ok(Farm { name, feed, groups, served_by, after: 0, written_in: (file.to_string(), node.line) })
 }
 
 /// Reads one rule.
@@ -656,6 +664,15 @@ fn rule(file: &str, node: &Node) -> Result<Rule, Refused> {
         return Err(refused(file, node.line, format!("the rule {name} reaches nothing: “reaches:” names machines and groups of machines")));
     }
     Ok(Rule { name, who, reaches, written_in: (file.to_string(), node.line) })
+}
+
+/// Whether a text can be where a machine that serves a collection is: an address, or an
+/// address with the port its desktop is opened on after a colon.
+fn serves(text: &str) -> bool {
+    is_an_address(text)
+        || text.rsplit_once(':').is_some_and(|(address, port)| {
+            is_an_address(address) && port.bytes().all(|digit| digit.is_ascii_digit()) && port.parse::<u16>().is_ok_and(|port| port != 0)
+        })
 }
 
 /// Whether a text can be where a machine is: a name of the network, or a number. What
@@ -1041,15 +1058,26 @@ rules:
             ("Work Resources", "https://broker.corp.example/RDWeb/Feed/webfeed.aspx", &["published".to_string()][..])
         );
         assert_eq!(read.written_in, ("farm.yaml".to_string(), 2));
+        assert!(read.served_by.is_empty());
+        // a farm may name the machines that serve what it publishes
+        let named =
+            farm.replace("    groups: [published]\n", "    groups: [published]\n    served-by: [rdsh-01.corp.example, 10.20.0.18:3390]\n");
+        let in_force = InForce::read(&files(&[("farm.yaml", &named)])).unwrap();
+        assert_eq!(in_force.farms[0].served_by, ["rdsh-01.corp.example", "10.20.0.18:3390"]);
         // what a farm publishes is not in the files: nobody reaches anything until its feed is read
         assert!(in_force.machines.is_empty() && in_force.reached_by(&["staff".to_string()]).is_empty());
 
         let wrong = |file: &str| InForce::read(&files(&[("machines/finance.yaml", MACHINES), ("farm.yaml", file)])).unwrap_err();
-        let reasons: [(&str, usize, &str); 7] = [
+        let reasons: [(&str, usize, &str); 8] = [
             ("farms:\n  - feed: https://a.example/feed\n", 2, "the farm has no name"),
             ("farms:\n  - name: A\n", 2, "the farm A has no feed: the address where the farm says what it publishes"),
             ("farms:\n  - name: A\n    feed: http://a.example/feed\n", 3, "the feed of the farm A is no address Away can use: "),
             ("farms:\n  - name: A\n    feed: https://a.example/feed\n    account: svc\n", 4, "“account” is not something a farm has"),
+            (
+                "farms:\n  - name: A\n    feed: https://a.example/feed\n    served-by: [rdsh-01.corp.example, rdsh 02]\n",
+                4,
+                "“rdsh 02” is no address of a machine",
+            ),
             (
                 "farms:\n  - name: A\n    feed: https://a.example/feed\n  - name: a\n    feed: https://b.example/feed\n",
                 4,
@@ -1089,6 +1117,22 @@ rules:
         }
         for address in ["", "a b", "a..b", "-a.example", "a-.example", "a/b", "http://a.example", "a.example:3389", "[]", &"a".repeat(64)] {
             assert!(!is_an_address(address), "{address}");
+        }
+        // a machine that serves a collection may name the port its desktop is opened on
+        for address in ["rdsh-01.corp.example", "rdsh-01.corp.example:3390", "10.20.0.17:3389", "[fd00::17]", "[fd00::17]:3390"] {
+            assert!(serves(address), "{address}");
+        }
+        for address in [
+            "",
+            "rdsh-01.corp.example:",
+            "rdsh-01.corp.example:0",
+            "rdsh-01.corp.example:65536",
+            "rdsh-01.corp.example:rdp",
+            ":3389",
+            "a:1:2",
+            "fd00::17",
+        ] {
+            assert!(!serves(address), "{address}");
         }
     }
 

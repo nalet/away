@@ -41,7 +41,14 @@ async fn main() -> std::process::ExitCode {
         getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
         let fresh = Fresh { challenge: random[..8].try_into().expect("8 bytes"), key: random[8..].try_into().expect("16 bytes") };
         let clock = (away_part::time::now().as_secs() + 11_644_473_600) * 10_000_000;
-        let farm = Farm { name: "the farm".to_string(), feed: feed.clone(), groups: Vec::new(), after: 0, written_in: (String::new(), 0) };
+        let farm = Farm {
+            name: "the farm".to_string(),
+            feed: feed.clone(),
+            groups: Vec::new(),
+            served_by: Vec::new(),
+            after: 0,
+            written_in: (String::new(), 0),
+        };
         println!("Reading {feed} as {account}");
         reader.read(&farm, &[], clock, fresh).await
     }

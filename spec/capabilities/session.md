@@ -28,8 +28,8 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 | Open a machine straight into a given program or command | admin | later | — | later | — | `start-with-command` |
 | See the programs of several machines side by side, in one list of windows | person | later | — | — | — | `programs-of-several-machines` |
 | Use the small icons a program puts beside the machine's clock | person | later | — | — | — | `use-tray-icons` |
-| Reach a farm of Windows machines through its broker and land on the right one | system | v1 | — | — | — | `follow-broker` |
-| Take the licence that a machine for many people hands every client | system | v1 | — | — | — | `take-licence` |
+| Reach a farm of Windows machines through its broker and land on the right one | system | built | — | — | — | `follow-broker` |
+| Take the licence that a machine for many people hands every client | system | built | — | — | — | `take-licence` |
 | Reach a shell that is only reachable through another machine | system | — | — | later | — | `jump-through` |
 | Open other kinds of target: Telnet, a serial console, a database, a web page | person | — | — | — | no | `open-other-kinds` |
 

@@ -494,16 +494,10 @@ impl GettingIn {
         let Some((machine, _)) = reached.iter().find(|(machine, _)| machine.name == name) else {
             return plain(StatusCode::NOT_FOUND, "Nothing of that name is there for you.\n");
         };
-        // what Away opens so far: the desktop of one Windows machine, reached at its own address
+        // what Away opens so far: a Windows desktop, of one machine or of a farm's collection
         let Some((Over::Rdp, port)) = machine.desktop else {
             return plain(StatusCode::NOT_IMPLEMENTED, "Away opens Windows desktops so far, and this machine offers none.\n");
         };
-        if machine.collection.is_some() {
-            return plain(
-                StatusCode::NOT_IMPLEMENTED,
-                "Away doesn't open the desktop of a farm yet: it can't follow a farm's broker so far.\n",
-            );
-        }
         if !self.records.are_kept() {
             return plain(StatusCode::SERVICE_UNAVAILABLE, "Away opens no machine here: it is given no database to keep its records in.\n");
         }
@@ -541,6 +535,8 @@ impl GettingIn {
             machine: machine.name.clone(),
             address: machine.address.clone(),
             port,
+            collection: machine.collection.clone(),
+            served_by: machine.served_by.clone(),
             at: time::now().as_secs(),
         };
         match self.sessions.ask(asked) {
@@ -586,6 +582,8 @@ impl GettingIn {
                             ("name", asked.machine.as_str().into()),
                             ("address", asked.address.as_str().into()),
                             ("port", u64::from(asked.port).into()),
+                            ("collection", asked.collection.as_deref().map_or(Json::Null, Json::from)),
+                            ("served_by", Json::List(asked.served_by.iter().map(|served| served.as_str().into()).collect())),
                         ]),
                     ),
                 ]);
@@ -628,8 +626,14 @@ impl GettingIn {
                 }
             }
             Some("opened") => {
-                let details = Json::object([("session", session.into()), ("width", count("width")), ("height", count("height"))]);
-                match self.records.add(&record("opened", details)).await {
+                let mut details = vec![
+                    ("session".to_string(), Json::from(session)),
+                    ("width".to_string(), count("width")),
+                    ("height".to_string(), count("height")),
+                ];
+                // the machine a farm's broker chose for it, where one did
+                details.extend(said("served_by").map(|served_by| ("served_by".to_string(), Json::from(served_by))));
+                match self.records.add(&record("opened", Json::Object(details))).await {
                     Ok(()) => answer(StatusCode::OK, "application/json", "{}"),
                     Err(unusable) => self.kept_nothing(&unusable),
                 }

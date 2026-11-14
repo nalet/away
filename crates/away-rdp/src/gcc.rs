@@ -22,6 +22,9 @@ pub struct Client {
     /// one of the United States. A machine gives the session this layout, so that a key
     /// writes there what it writes at the person's own device.
     pub layout: u32,
+    /// The session a farm's broker sent the client on to, where this connection is to
+    /// the machine it was sent to.
+    pub sent_on_to: Option<u32>,
 }
 
 /// The keyboard layout of the United States, which a client has where nothing says otherwise.
@@ -80,8 +83,11 @@ pub fn request(client: &Client) -> Vec<u8> {
     blocks.extend(block(0xc002, &[0; 8]));
     // no further channels yet
     blocks.extend(block(0xc003, &0u32.to_le_bytes()));
-    // it follows a redirection to another machine of a farm, in the current form
-    blocks.extend(block(0xc004, &[0x0d, 0, 0, 0, 0, 0, 0, 0]));
+    // it follows a farm's word on where the connection belongs, in the current form; on the
+    // machine it was sent to, it says which session the broker named
+    let mut farm = vec![if client.sent_on_to.is_some() { 0x0f } else { 0x0d }, 0, 0, 0];
+    farm.extend(client.sent_on_to.unwrap_or(0).to_le_bytes());
+    blocks.extend(block(0xc004, &farm));
 
     let mut request = vec![0x00, 0x05, 0x00, 0x14, 0x7c, 0x00, 0x01];
     length(&mut request, blocks.len() + 14);
@@ -153,7 +159,7 @@ mod tests {
     use super::*;
 
     fn client() -> Client {
-        Client { width: 1280, height: 800, security: 8, name: "away".to_string(), layout: LAYOUT_US }
+        Client { width: 1280, height: 800, security: 8, name: "away".to_string(), layout: LAYOUT_US, sent_on_to: None }
     }
 
     #[test]

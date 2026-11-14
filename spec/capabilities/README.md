@@ -115,15 +115,15 @@ has the steps.
 <!-- generated: overview -->
 | Part | Areas | Capabilities | built | partly built | first release | later | not planned |
 |---|---|---|---|---|---|---|---|
-| [in a session](./session.md) | 7 | 64 | 1 | 3 | 35 | 21 | 4 |
+| [in a session](./session.md) | 7 | 64 | 3 | 3 | 33 | 21 | 4 |
 | [around the sessions](./app.md) | 5 | 49 | 15 | 3 | 10 | 17 | 4 |
 | [administration](./admin.md) | 4 | 56 | 11 | 2 | 14 | 26 | 3 |
 | [the platform](./platform.md) | 3 | 33 | 15 | 1 | 8 | 7 | 2 |
-| all | 19 | 202 | 42 | 9 | 67 | 71 | 13 |
+| all | 19 | 202 | 44 | 9 | 65 | 71 | 13 |
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
-| a session over RDP | 3 | 2 | 32 | 23 | 4 | 138 |
+| a session over RDP | 5 | 2 | 30 | 23 | 4 | 138 |
 | a session over VNC | 0 | 0 | 26 | 11 | 13 | 152 |
 | a session over SSH | 0 | 0 | 27 | 12 | 2 | 161 |
 | Away itself | 42 | 4 | 28 | 45 | 9 | 74 |

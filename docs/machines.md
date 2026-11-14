@@ -5,10 +5,10 @@ where an operator keeps configuration, are reviewed like code, and are applied
 as they change. Nothing in the browser changes them.
 
 This version reads the files, tells each person the machines a rule gives
-them, shows those who administer Away what is in force, and opens the desktop
-of a Windows machine that is reached at its own address
-([opening a desktop](#opening-a-desktop)). It doesn't open programs, shells,
-other desktops or the desktop of a farm yet.
+them, shows those who administer Away what is in force, and opens Windows
+desktops: that of one machine, and that of a farm of machines
+([opening a desktop](#opening-a-desktop)). It doesn't open programs, shells
+or other desktops yet.
 
 ## The files
 
@@ -57,8 +57,8 @@ rules:
 | `desktop` | its desktop: `true`, or its port and what it is reached over | none |
 | `programs` | the programs of a Windows machine that open in windows of their own: each its name, or its name and its icon | none |
 | `shell` | its shell: `true`, or its port | none |
-| `collection` | for a farm of Windows machines that people see as one: the collection this entry stands for | none |
-| `served-by` | the machines that serve the collection, by their addresses | none |
+| `collection` | for a farm of Windows machines that people see as one: the collection this entry stands for. Its address is then the farm's broker | none |
+| `served-by` | the machines that serve the collection, by their addresses. One that opens its desktop on another port than the broker names it after a colon, as `rdsh-02.corp.example:3390`. Away goes on to no other machine for the collection | none |
 
 A machine offers at least one way in: a desktop, programs, or a shell.
 
@@ -114,6 +114,7 @@ farms:
   - name: Work Resources
     feed: https://broker.corp.example/RDWeb/Feed/webfeed.aspx
     groups: [published]
+    served-by: [rdsh-01.corp.example, rdsh-02.corp.example]
 
 rules:
   - name: staff-published
@@ -126,9 +127,11 @@ rules:
 | `name` | what the farm is called. Its programs show as the programs of a machine of this name, so no machine and no other farm shares it | needed |
 | `feed` | the address of the farm's feed, over HTTPS | needed |
 | `groups` | the groups of machines that everything the farm publishes is in | none |
+| `served-by` | the machines that serve what the farm publishes, by their addresses. Away goes on to no other machine for it, so a farm names them unless its broker serves everything itself | none |
 
 - **A desktop the farm publishes is a machine**, by the name the farm gives
-  it.
+  it. It is opened through the farm's broker
+  ([opening a desktop](#opening-a-desktop)).
 - **The farm's programs are the programs of one machine**, which has the
   farm's name. Each keeps the icon the farm gives it.
 - **The rules give them like everything else.** A rule reaches the farm by
@@ -243,6 +246,17 @@ machine that offers more is opened from its own page, where each way in is.
 - **The person types a name and a password** when the machine asks. Away
   passes them on to the machine and keeps them nowhere. A Windows machine
   takes them before it shows anything, so a wrong one is asked for again.
+- **A farm's desktop is opened through its broker.** Away tells the broker
+  which collection is wanted and signs the person in there. The broker says
+  which machine serves the session, and Away goes on to that machine, where
+  the same name and password sign in. The person sees the same steps and
+  types once.
+- **A broker's word alone leads Away to no machine.** Away goes on only to a
+  machine the files name for the collection: one under `served-by`, or the
+  entry's own address, where the broker serves the collection itself. To any
+  other machine it doesn't go, and says so. The broker and each machine behind
+  it is known by what it showed the first time, and the record of the open
+  desktop names the machine that served it.
 - **The machine has the whole window.** Every key, every click and the wheel go
   to it. A small handle at the top edge opens the session's bar, and so does
   Ctrl + Alt + Shift, pressed and let go with no other key. The bar fills the

@@ -15,6 +15,7 @@ use away_rdp::input::Input;
 use away_rdp::negotiation::{self, Security};
 use away_rdp::ntlm::{Account, Fresh};
 use away_rdp::picture::Picture;
+use away_rdp::redirection::Redirection;
 use away_rdp::sign_in::{self, New, Next, SignIn};
 use away_rdp::tpkt::Frames;
 use away_rdp::{der, licence};
@@ -56,6 +57,8 @@ pub enum Why {
     SignInRefused,
     /// It took the sign-in and showed nothing in time.
     NoPicture,
+    /// A farm's broker sent the connection to a machine the files don't name for it.
+    SentElsewhere,
     /// The connection broke, or the machine said something Away can't go on with.
     Broken,
 }
@@ -83,9 +86,13 @@ pub struct Reached {
 }
 
 /// Finds a machine at its address, connects to it, and asks which security it takes.
-pub async fn reach(host: &str, port: u16) -> Result<Reached, Failure> {
+/// A farm is told something first: its broker which collection is wanted, and the
+/// machine a broker sent the client on to what the broker gave for it.
+pub async fn reach(host: &str, port: u16, says_first: Option<&[u8]>) -> Result<Reached, Failure> {
     let reaching = async {
-        let found = tokio::net::lookup_host((host, port))
+        // a number of the newer kind is written in brackets, which are not part of it
+        let written = host.strip_prefix('[').and_then(|rest| rest.strip_suffix(']')).unwrap_or(host);
+        let found = tokio::net::lookup_host((written, port))
             .await
             .map_err(|error| failure(Step::Reaching, Why::NoAddress, format!("{host} leads to no address: {error}")))?;
         // a name may lead to several addresses, and the machine may answer on one of them alone
@@ -103,7 +110,8 @@ pub async fn reach(host: &str, port: u16) -> Result<Reached, Failure> {
         let mut connection = connection?;
         let _ = connection.set_nodelay(true);
         let broken = |error: std::io::Error| failure(Step::Reaching, Why::Broken, format!("the first request: {error}"));
-        connection.write_all(&negotiation::request()).await.map_err(broken)?;
+        let request = negotiation::request_with(says_first).map_err(|error| failure(Step::Reaching, Why::Broken, error))?;
+        connection.write_all(&request).await.map_err(broken)?;
         let mut frames = Frames::new();
         let carried = loop {
             let not_rdp = |error: away_rdp::Error| failure(Step::Reaching, Why::Broken, error);
@@ -173,8 +181,17 @@ impl Secured {
     }
 
     /// Signs the account in, and opens the desktop at this size, for a keyboard of this
-    /// layout, as Windows numbers them.
-    pub async fn sign_in(mut self, account: Account, width: u16, height: u16, layout: u32) -> Result<Desktop, Failure> {
+    /// layout, as Windows numbers them. On the machine a farm's broker sent the client
+    /// on to, the session the broker named is said. A broker opens nothing: it says
+    /// where the connection belongs.
+    pub async fn sign_in(
+        mut self,
+        account: Account,
+        width: u16,
+        height: u16,
+        layout: u32,
+        sent_on_to: Option<u32>,
+    ) -> Result<Opened, Failure> {
         let signing_in = async {
             let random =
                 |step: Step| move |error: getrandom::Error| failure(step, Why::Broken, format!("the system gave no random bytes: {error}"));
@@ -219,7 +236,7 @@ impl Secured {
             };
 
             // what Away is, the channels, the licence, and what each side can do
-            let client = Client { width, height, security: self.security.number(), name: "away".to_string(), layout };
+            let client = Client { width, height, security: self.security.number(), name: "away".to_string(), layout, sent_on_to };
             let mut fresh = [0u8; 80];
             getrandom::fill(&mut fresh).map_err(random(Step::SigningIn))?;
             let for_a_licence = licence::New {
@@ -237,6 +254,7 @@ impl Secured {
                 open,
                 picture: None,
                 is_open: false,
+                sent_on: None,
                 drawn: Vec::new(),
                 scratch: vec![0u8; 32 * 1024],
             };
@@ -248,14 +266,25 @@ impl Secured {
                 }
                 // what the machine draws along with its last word is kept for whoever takes it first
                 desktop.draw().await.map_err(|failed| Failure { step: Step::SigningIn, ..failed })?;
+                if let Some(to) = desktop.sent_on.take() {
+                    return Ok(Opened::SentOn(to));
+                }
             }
-            Ok(desktop)
+            Ok(Opened::Desktop(Box::new(desktop)))
         };
         match tokio::time::timeout(WITHIN * 3, signing_in).await {
             Ok(desktop) => desktop,
             Err(_) => Err(failure(Step::SigningIn, Why::NoAnswer, "the sign-in was not answered in time")),
         }
     }
+}
+
+/// What signing in on a machine gave.
+pub enum Opened {
+    /// Its desktop.
+    Desktop(Box<Desktop>),
+    /// A farm's word: the machine is a broker, and the connection belongs elsewhere.
+    SentOn(Redirection),
 }
 
 /// An area of the picture that the machine drew anew.
@@ -279,6 +308,8 @@ pub struct Desktop {
     open: Connection,
     picture: Option<Picture>,
     is_open: bool,
+    /// Where a broker sends the connection, where the machine turned out to be one.
+    sent_on: Option<Redirection>,
     /// The areas that were drawn and not yet taken.
     drawn: Vec<Area>,
     scratch: Vec<u8>,
@@ -341,6 +372,7 @@ impl Desktop {
                             }
                         }
                     }
+                    Happened::SentOn(to) => self.sent_on = Some(to),
                     Happened::Channels { .. } | Happened::Licensed | Happened::AsksToTakeALicence { .. } | Happened::LicenceTaken(_) => {}
                 }
             }

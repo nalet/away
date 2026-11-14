@@ -181,6 +181,8 @@ pub enum FromMachine<'a> {
     },
     /// What the machine can do is void: it will say it again.
     Again,
+    /// A farm's word on where the connection belongs.
+    SentOn(&'a [u8]),
     /// Data of this kind.
     Data(u8, &'a [u8]),
     /// A message of a kind this code doesn't act on.
@@ -223,6 +225,8 @@ pub fn read_from_machine(mut arrived: &[u8]) -> Result<Vec<FromMachine<'_>>, Err
                 FromMachine::CanDo { share_id, width, height, bits }
             }
             6 => FromMachine::Again,
+            // after two bytes that say nothing
+            10 => FromMachine::SentOn(holds.get(2..).ok_or(WRONG)?),
             7 => {
                 // the number of the sharing, how it travels, its length, then its kind and
                 // whether it is compressed

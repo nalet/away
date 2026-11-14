@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 use away_rdp::identity::Identity;
 use away_rdp::ntlm::Account;
 use away_rdp::picture::Picture;
+pub use away_rdp::redirection::Redirection;
 use away_rdp::stand_in::desktop::{Desktop, Seen};
 use away_rdp::stand_in::StandIn;
 use away_rdp::tpkt::{Frame, Frames};
@@ -55,6 +56,8 @@ struct Kept {
     seen: Vec<Seen>,
     /// The desktop's picture as the last connection has it now.
     picture: Option<Picture>,
+    /// What each client said first, where it said something: what a farm is told.
+    said_first: Vec<Option<Vec<u8>>>,
 }
 
 /// A stand-in for a machine, listening.
@@ -71,8 +74,18 @@ impl Machine {
         Machine::start_at("127.0.0.1:0", account, password, shows).await
     }
 
+    /// A stand-in for a farm's broker: it signs the account in, and sends whoever comes
+    /// on to another machine.
+    pub async fn start_broker(account: &str, password: &str, sends_on: Redirection) -> Machine {
+        Machine::listen("127.0.0.1:0", account, password, desktop(), Some(sends_on)).await
+    }
+
     /// The same, at this address.
     pub async fn start_at(at: &str, account: &str, password: &str, shows: Picture) -> Machine {
+        Machine::listen(at, account, password, shows, None).await
+    }
+
+    async fn listen(at: &str, account: &str, password: &str, shows: Picture, sends_on: Option<Redirection>) -> Machine {
         let listener = TcpListener::bind(at).await.expect("an address for the stand-in machine");
         let address = listener.local_addr().expect("its address");
         let kept = Arc::new(Mutex::new(Kept::default()));
@@ -91,10 +104,10 @@ impl Machine {
         let keeps = kept.clone();
         let listening = tokio::spawn(async move {
             while let Ok((connection, _)) = listener.accept().await {
-                let (secures, keeps, shows) = (secures.clone(), keeps.clone(), shows.clone());
+                let (secures, keeps, shows, sends_on) = (secures.clone(), keeps.clone(), shows.clone(), sends_on.clone());
                 let knows = Account::named(&account, Secret::new(password.clone()));
                 tokio::spawn(async move {
-                    let _ = serve(connection, secures, knows, shows, keeps).await;
+                    let _ = serve(connection, secures, knows, shows, sends_on, keeps).await;
                 });
             }
         });
@@ -121,6 +134,11 @@ impl Machine {
         self.kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).picture.clone()
     }
 
+    /// What each client said first, where it said something, the last one last.
+    pub fn said_first(&self) -> Vec<Option<Vec<u8>>> {
+        self.kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).said_first.clone()
+    }
+
     /// Stops listening.
     pub fn stop(&self) {
         self.listening.abort();
@@ -139,17 +157,22 @@ async fn serve(
     secures: TlsAcceptor,
     knows: Account,
     shows: Picture,
+    sends_on: Option<Redirection>,
     keeps: Arc<Mutex<Kept>>,
 ) -> std::io::Result<()> {
     // the first request, and the answer of a machine that signs in before the desktop
     let mut frames = Frames::new();
-    while frames.next_frame().map_err(std::io::Error::other)?.is_none() {
+    let request = loop {
+        if let Some(request) = frames.next_frame().map_err(std::io::Error::other)? {
+            break request;
+        }
         let mut bytes = [0u8; 512];
         match connection.read(&mut bytes).await? {
             0 => return Ok(()),
             count => frames.push(&bytes[..count]),
         }
-    }
+    };
+    keeps.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).said_first.push(away_rdp::negotiation::read_token(&request));
     connection.write_all(&CHOSEN).await?;
     let mut secured = secures.accept(connection).await?;
 
@@ -180,7 +203,10 @@ async fn serve(
     secured.write_all(&MAY_COME_IN).await?;
 
     // then the desktop, for as long as the client stays
-    let mut desktop = Desktop::new(shows);
+    let mut desktop = match sends_on {
+        Some(to) => Desktop::new(shows).that_sends_on(to),
+        None => Desktop::new(shows),
+    };
     let mut frames = Frames::new();
     let nth = {
         let mut kept = keeps.lock().unwrap_or_else(|poisoned| poisoned.into_inner());

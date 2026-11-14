@@ -245,7 +245,7 @@ test('a machine has a page of its own, which says what it offers and what it is'
   await expect(page.getByRole('heading', { level: 1, name: 'fin-app-02' })).toBeVisible();
   // it is a page of the machines
   await expect(page.getByRole('navigation', { name: 'views' }).getByRole('link', { name: 'machines' })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByText("This version of Away opens the desktop of a Windows machine that is reached at its own address. It doesn't open programs, shells, other desktops or the desktop of a farm yet.")).toBeVisible();
+  await expect(page.getByText("This version of Away opens Windows desktops. It doesn't open programs, shells or other desktops yet.")).toBeVisible();
   await expect(page.getByRole('region', { name: 'desktop' })).toContainText('Windows desktop');
   const programs = page.getByRole('region', { name: 'programs 4' });
   await expect(programs.getByRole('listitem')).toHaveText(['Ledger', 'Payroll', 'Reports', 'Mail']);
@@ -894,6 +894,47 @@ test.describe('a session', () => {
     expect(seen.complaints).toEqual([]);
   });
 
+  test("a farm's desktop opens on the machine its broker names, and a broker that names another machine is not followed", async ({ page }) => {
+    const seen = watch(page);
+    // a farm's desktop is opened by a click on its tile, as a machine's is
+    await page.goto(`${AWAY_THAT_KEEPS}/machines`);
+    await page.getByRole('link', { name: /^Farm Desk/ }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/Farm%20Desk/desktop`);
+    await expect(page.getByText("Farm Desk asks for a name and a password. Away passes them on and doesn't keep them.")).toBeVisible();
+    const steps = page.getByRole('list', { name: 'the steps to Farm Desk' }).getByRole('listitem');
+    await expect(steps).toHaveText([/^Reaching Farm Desk$/, /^Checking that it is Farm Desk$/, /^Signing in on Farm Desk/, /^Waiting for its first picture$/]);
+    await page.getByLabel('Name').fill('CORP\\alex.urban');
+    await page.getByLabel('Password').fill('a password that exists for these tests alone');
+    await page.getByRole('button', { name: 'sign in' }).click();
+
+    // the screen is that of the machine the broker named, and it takes the pointer
+    const screen = page.getByRole('application', { name: 'the desktop of Farm Desk' });
+    await expect(screen).toBeVisible();
+    await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
+    await expect.poll(() => pixel(page, 60, 20)).toEqual([80, 60, 40]);
+    await screen.click({ position: { x: 50, y: 60 } });
+    await expect.poll(() => pixel(page, 55, 65)).toEqual([224, 64, 32]);
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await page.getByRole('toolbar', { name: "the session's bar" }).getByRole('button', { name: 'end' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/Farm%20Desk`);
+    // its page offers the desktop, and says nothing of what Away doesn't open
+    await expect(page.getByRole('link', { name: 'Windows desktop' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'about this machine' })).toContainText('CollectionDesks');
+    await expect(page.getByText("It doesn't open programs, shells or other desktops yet.")).toHaveCount(0);
+
+    // a broker that sends Away on to a machine which is not among those named for the collection
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/Lost%20Desk/desktop`);
+    await page.getByLabel('Name').fill('CORP\\alex.urban');
+    await page.getByLabel('Password').fill('a password that exists for these tests alone');
+    await page.getByRole('button', { name: 'sign in' }).click();
+    await expect(page.getByRole('alert')).toHaveText("Its farm sent Away on to a machine that isn't among those named for it, so Away doesn't connect there.");
+    await expect(page.getByRole('button', { name: 'try again' })).toHaveCount(0);
+    await page.getByText('details', { exact: true }).click();
+    await expect(page.locator('.dtl p')).toContainText("which the files don't name for the collection");
+    await accessible(page);
+    expect(seen.complaints).toEqual([]);
+  });
+
   test('a machine that is not there fails at its step and says why, and what Away does not open yet says so', async ({ page }) => {
     await page.goto(`${AWAY_THAT_KEEPS}/machines/gone-02/desktop`);
     const steps = page.getByRole('list', { name: 'the steps to gone-02' }).getByRole('listitem');
@@ -913,7 +954,7 @@ test.describe('a session', () => {
     // a shell, which this version doesn't open
     await page.goto(`${AWAY_THAT_KEEPS}/machines/build-01/desktop`);
     await expect(page.getByRole('heading', { name: "build-01 can't be opened yet" })).toBeVisible();
-    await expect(page.getByText('This version of Away opens the desktop of a Windows machine that is reached at its own address.')).toBeVisible();
+    await expect(page.getByText('This version of Away opens Windows desktops, and nothing else yet.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'try again' })).toHaveCount(0);
     await accessible(page);
     // and a machine no rule gives is not there

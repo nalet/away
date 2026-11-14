@@ -21,8 +21,11 @@
 //! `MACHINE_PORT` starts a stand-in for a Windows machine at that port, and the gateway
 //! beside the server, so that a desktop opens: `desk-01`, for the account
 //! `CORP\alex.urban` with the password `a password that exists for these tests alone`.
-//! A session's connection then goes to the gateway and everything else to the server,
-//! as a way in passes them on. No machine opens without a database.
+//! Beside it stand two stand-ins for a farm's broker. One sends whoever signs in on to
+//! that machine, and `Farm Desk` is its collection, whose files name the machine. The
+//! other sends them on to a machine the files don't name: `Lost Desk`. A session's
+//! connection then goes to the gateway and everything else to the server, as a way in
+//! passes them on. No machine opens without a database.
 
 use std::time::Duration;
 
@@ -116,26 +119,45 @@ async fn main() -> std::io::Result<()> {
     }
 
     // a machine beside the server, for the tests that open a desktop: it is in a file of
-    // the folder, with one that is not there, and a rule gives both to everyone of staff
+    // the folder, with one that is not there, and a rule gives both to everyone of staff.
+    // And two brokers of farms: one sends whoever signs in on to that machine, which the
+    // files name for its collection, and one to a machine the files don't name
     let mut machine = None;
     if let Some(at) = said("MACHINE_PORT").and_then(|port| port.parse::<u16>().ok()) {
-        let stand_in = away_gateway::stand_in::Machine::start_at(
-            &format!("127.0.0.1:{at}"),
-            "CORP\\alex.urban",
-            "a password that exists for these tests alone",
-            away_gateway::stand_in::desktop(),
-        )
-        .await;
+        let (account, password) = ("CORP\\alex.urban", "a password that exists for these tests alone");
+        let stand_in =
+            away_gateway::stand_in::Machine::start_at(&format!("127.0.0.1:{at}"), account, password, away_gateway::stand_in::desktop())
+                .await;
+        let sends_on = away_gateway::stand_in::Redirection {
+            session: 7,
+            address: Some("127.0.0.1".to_string()),
+            name: Some("localhost".to_string()),
+            ..Default::default()
+        };
+        let broker = away_gateway::stand_in::Machine::start_broker(account, password, sends_on).await;
+        let (_, broker_at) = broker.address();
+        let astray = away_gateway::stand_in::Redirection {
+            session: 8,
+            address: Some("10.20.0.7".to_string()),
+            name: Some("rdsh-07.corp.example".to_string()),
+            ..Default::default()
+        };
+        let lost = away_gateway::stand_in::Machine::start_broker(account, password, astray).await;
+        let (_, lost_at) = lost.address();
         let nothing = std::net::TcpListener::bind("127.0.0.1:0")?.local_addr()?.port();
         std::fs::write(
             std::path::Path::new(&files).join("desks.yaml"),
             format!(
                 "machines:\n  - name: desk-01\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {at} }}\n  \
-                 - name: gone-02\n    kind: windows\n    address: 127.0.0.1\n    groups: [desks]\n    desktop: {{ port: {nothing} }}\n\
+                 - name: gone-02\n    kind: windows\n    address: 127.0.0.1\n    groups: [desks]\n    desktop: {{ port: {nothing} }}\n  \
+                 - name: Farm Desk\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {broker_at} }}\n    \
+                 collection: Desks\n    served-by: [localhost:{at}]\n  \
+                 - name: Lost Desk\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {lost_at} }}\n    \
+                 collection: Lost\n    served-by: [127.0.0.9]\n\
                  rules:\n  - name: staff-desks\n    who: [staff]\n    reaches: [desks]\n"
             ),
         )?;
-        machine = Some(stand_in);
+        machine = Some((stand_in, broker, lost));
     }
 
     let told = Told {

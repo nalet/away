@@ -63,7 +63,7 @@ pub fn publish(farm: &Farm, host: &str, items: &[Item]) -> Published {
                 programs: Vec::new(),
                 shell: None,
                 collection: item.reached.collection.clone(),
-                served_by: Vec::new(),
+                served_by: farm.served_by.clone(),
                 farm: Some(farm.name.clone()),
                 written_in: farm.written_in.clone(),
             });
@@ -89,7 +89,7 @@ pub fn publish(farm: &Farm, host: &str, items: &[Item]) -> Published {
             programs,
             shell: None,
             collection,
-            served_by: Vec::new(),
+            served_by: farm.served_by.clone(),
             farm: Some(farm.name.clone()),
             written_in: farm.written_in.clone(),
         });
@@ -126,6 +126,7 @@ mod tests {
             name: "Work Resources".to_string(),
             feed: "https://broker.corp.example/RDWeb/Feed/webfeed.aspx".to_string(),
             groups: vec!["finance".to_string()],
+            served_by: vec!["rdsh-01.corp.example".to_string()],
             after: 0,
             written_in: ("farms.yaml".to_string(), 2),
         };

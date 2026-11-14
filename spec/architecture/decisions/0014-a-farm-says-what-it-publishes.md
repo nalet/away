@@ -1,6 +1,6 @@
 # ADR-0014: A farm says itself what it publishes, and the server asks it
 
-**Status:** Accepted · 2026-11-14. The owner chose this way the same day, among three that were put to them. It is built: the server reads a farm's feed, and what the farm publishes is in force beside the files ([the machines and the rules](../../../docs/machines.md#a-farm)).
+**Status:** Accepted · 2026-11-14. The owner chose this way the same day, among three that were put to them. It is built: the server reads a farm's feed, what the farm publishes is in force beside the files ([the machines and the rules](../../../docs/machines.md#a-farm)), and a desktop the farm publishes opens through its broker.
 
 ## Context
 
@@ -31,6 +31,7 @@ Two things in the architecture bear on A:
 6. **The account that reads the feeds is the server's own secret**, a secret of the cluster like its others ([ADR-0010](./0010-secrets-live-in-the-cluster.md)). It is no kept account: nobody is signed in on a machine with it, and the issuer never sees it. One account reads every farm of an installation.
 7. **The account signs in the way the farm's web access asks**, with NTLM inside the secured connection. The hashes and the cipher of it are libraries', as everywhere ([ADR-0001](./0001-own-protocol-code.md)); the messages are the ones Away already writes for signing in before a desktop.
 8. **What the account sees is what Away offers.** A farm shows an account what that account may use. Away gives it to the people its rules name, and whether one of them may open a program stays the farm's to say, when they open it.
+9. **The files name the machines that serve a farm, and the gateway goes on to no other.** A feed says what a farm publishes and not which machines serve it, and a farm's broker sends each connection on to one of them. The farm's entry names those machines, and what the farm publishes carries them like a collection written in the files: the gateway goes on to one of them, or to the broker's own address, and nowhere else (`follow-broker`).
 
 ## Consequences
 
@@ -38,7 +39,8 @@ Two things in the architecture bear on A:
 - The files hold what only the operator knows: that there is a farm, where its feed is, and who is given what it publishes.
 - The server holds the password of an account of the directory. Whoever breaks the server learns it, and can read what the farm publishes. An account made for this alone, which may sign in on no machine, gives them nothing more; the installation guide says to make it so.
 - The server reaches addresses outside the cluster beside the sign-in service. The chart's network rules name the farms' port, and an operator can narrow them to the farms' addresses.
-- What a farm publishes is not reviewed like a file. Who may see it still is: the rule that gives the farm's group is in the files.
+- What a farm publishes is not reviewed like a file. Who may see it still is: the rule that gives the farm's group is in the files. So are the machines a session may land on.
+- A machine that is added to a farm is added to the farm's entry too. Until it is, a connection the broker sends there is not made, and the page says so.
 - A farm whose web access takes no NTLM, or sends its readers to another address to sign in, is not read. The administration says which of the two it is.
 - A person may be shown a program that the farm won't open for them, where the account sees more than they may use. The farm refuses it when it is opened.
 

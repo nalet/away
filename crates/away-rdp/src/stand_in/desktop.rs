@@ -6,6 +6,7 @@
 use crate::input::{self, Button, Input};
 use crate::licence::stand_in::HandsOut;
 use crate::picture::Picture;
+use crate::redirection::{self, Redirection};
 use crate::{der, interleaved, mcs, ntlm, pdu, tpkt, Error};
 
 const WRONG: Error = Error::NotRdp("the client's message is not built as one");
@@ -42,6 +43,8 @@ pub struct Seen {
     pub licence: Option<crate::licence::stand_in::Seen>,
     /// The keys and the pointer, as the client told of them.
     pub input: Vec<Input>,
+    /// The session the client says a farm's broker sent it on to, where it says one.
+    pub sent_on_to: Option<u32>,
 }
 
 /// How wide and how high the mark is that the stand-in draws where a button went down,
@@ -80,13 +83,15 @@ pub struct Desktop {
     bits: u16,
     seen: Seen,
     hands_out: Option<(HandsOut, Licences)>,
+    /// Where it sends its clients on to, where it stands in for a farm's broker.
+    sends_on: Option<Redirection>,
 }
 
 impl Desktop {
     /// A stand-in that offers a desktop of the picture's size, and draws the picture at
     /// 32 bits a pixel, as a workstation does.
     pub fn new(picture: Picture) -> Desktop {
-        Desktop { state: State::AwaitsClient, picture, bits: 32, seen: Seen::default(), hands_out: None }
+        Desktop { state: State::AwaitsClient, picture, bits: 32, seen: Seen::default(), hands_out: None, sends_on: None }
     }
 
     /// The same, drawing at 16 bits a pixel, as a Windows Server does unless it is set
@@ -105,6 +110,13 @@ impl Desktop {
     /// client to take a licence, and after the client's answer takes it as it is.
     pub fn that_asks_for_a_licence_and_hands_none_over(self) -> Desktop {
         Desktop { hands_out: Some((HandsOut::new([0x4c; 32]), Licences::NoneHandedOver)), ..self }
+    }
+
+    /// The same, as a farm's broker: once the account is signed in it shows nothing, and
+    /// sends the client on to the machine that serves it. A client that says it was sent
+    /// on already is shown the desktop, as a broker does that serves a collection itself.
+    pub fn that_sends_on(self, to: Redirection) -> Desktop {
+        Desktop { sends_on: Some(to), ..self }
     }
 
     /// What it saw of the client so far.
@@ -127,6 +139,15 @@ impl Desktop {
                 self.seen.asked = (number16(core, 8)?, number16(core, 10)?);
                 self.seen.name = ntlm::utf16(&core[24..56]).trim_end_matches('\0').to_string();
                 self.seen.security = u32::from(number16(core, 212)?);
+                // what the client says of a farm: whether it was sent on, and to which session
+                let mut rest = blocks;
+                while let (Ok(kind), Ok(length)) = (number16(rest, 0), number16(rest, 2)) {
+                    let block = rest.get(..usize::from(length)).filter(|block| block.len() >= 4).ok_or(WRONG)?;
+                    if kind == 0xc004 && block.len() >= 12 && block[4] & 0x02 != 0 {
+                        self.seen.sent_on_to = Some(u32::from_le_bytes([block[8], block[9], block[10], block[11]]));
+                    }
+                    rest = &rest[block.len()..];
+                }
                 self.state = State::AwaitsUser;
                 Ok(tpkt::data_frame(&connect_answer()))
             }
@@ -187,6 +208,13 @@ impl Desktop {
         licence.extend(2u32.to_le_bytes());
         licence.extend([4, 0, 0, 0]);
         let mut send = to_the_client(&licence);
+        // a broker shows nothing: it says where the connection belongs. A client that
+        // comes as it was told to is where it belongs
+        if let Some(to) = self.sends_on.as_ref().filter(|_| self.seen.sent_on_to.is_none()) {
+            let word = [&[0, 0][..], &redirection::write(to), &[0]].concat();
+            send.extend(to_the_client(&pdu::share(10, mcs::MACHINE, &word)));
+            return Ok(send);
+        }
         send.extend(self.can_do());
         Ok(send)
     }

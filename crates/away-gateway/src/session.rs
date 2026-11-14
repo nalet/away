@@ -25,7 +25,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 
-use crate::machine::{self, Area, Desktop, Failure, Step, Why};
+use crate::machine::{self, Area, Desktop, Failure, Opened, Step, Why};
 
 /// How long a browser gets to say which session it is, once its connection is open.
 const BEGINS_WITHIN: Duration = Duration::from_secs(10);
@@ -55,6 +55,11 @@ pub struct Taken {
     pub address: String,
     /// On which port.
     pub port: u16,
+    /// The collection of a farm that this is, where the address is a farm's broker.
+    pub collection: Option<String>,
+    /// The machines that serve the collection, by their addresses, as the files name
+    /// them: each may name its port after a colon.
+    pub served_by: Vec<String>,
 }
 
 impl Server {
@@ -80,8 +85,16 @@ impl Server {
         let machine = said.get("machine");
         let text = |held: Option<&Json>, name: &str| held.and_then(|held| held.text_of(name)).map(str::to_string);
         let port = machine.and_then(|machine| machine.get("port")).and_then(Json::count).and_then(|port| u16::try_from(port).ok());
+        let collection = text(machine, "collection");
+        let served_by: Vec<String> = machine
+            .and_then(|machine| machine.get("served_by"))
+            .and_then(Json::list)
+            .map(|served| served.iter().filter_map(Json::text).map(str::to_string).collect())
+            .unwrap_or_default();
         match (status, text(Some(&said), "session"), text(machine, "name"), text(machine, "address"), port) {
-            (200, Some(session), Some(machine), Some(address), Some(port)) => Ok(Some(Taken { session, machine, address, port })),
+            (200, Some(session), Some(machine), Some(address), Some(port)) => {
+                Ok(Some(Taken { session, machine, address, port, collection, served_by }))
+            }
             _ => Err(format!("the server answered the ticket with the status {status}, and with nothing a session can begin with")),
         }
     }
@@ -140,14 +153,22 @@ where
 
     let opened = open(&mut browser, server, &taken, width, height, layout).await;
     let (why, details) = match opened {
-        Ok(Some(mut desktop)) => {
+        Ok(Some(Open { mut desktop, served_by })) => {
             let picture = desktop.picture();
             let (wide, high) = (picture.width.to_string(), picture.height.to_string());
-            around
-                .lines
-                .info("a desktop is open", &[("session", taken.session.as_str().into()), ("machine", taken.machine.as_str().into())]);
-            // the record that it is open, before anything of it is shown
-            let recorded = server.told(&taken.session, "opened", &[("width", &wide), ("height", &high)]).await;
+            around.lines.info(
+                "a desktop is open",
+                &[
+                    ("session", taken.session.as_str().into()),
+                    ("machine", taken.machine.as_str().into()),
+                    ("served_by", served_by.as_deref().unwrap_or(taken.address.as_str()).into()),
+                ],
+            );
+            // the record that it is open, before anything of it is shown: with the machine
+            // that serves it, where a farm's broker chose one
+            let mut says = vec![("width", wide.as_str()), ("height", high.as_str())];
+            says.extend(served_by.as_deref().map(|served_by| ("served_by", served_by)));
+            let recorded = server.told(&taken.session, "opened", &says).await;
             let ended = match recorded {
                 Ok(200) => show(&mut browser, &mut desktop).await,
                 Ok(status) => Ended::Machine(format!("the server did not take the record that the desktop is open: status {status}")),
@@ -191,6 +212,13 @@ where
     end(&mut browser, why).await;
 }
 
+/// A desktop that is open.
+struct Open {
+    desktop: Desktop,
+    /// The machine that serves it, where a farm's broker sent the connection on to one.
+    served_by: Option<String>,
+}
+
 /// The way to the desktop, step by step, each said to the browser as it begins. Nothing
 /// where the person left on the way.
 async fn open<Connection>(
@@ -200,37 +228,22 @@ async fn open<Connection>(
     width: u16,
     height: u16,
     layout: u32,
-) -> Result<Option<Desktop>, Failure>
+) -> Result<Option<Open>, Failure>
 where
     Connection: AsyncRead + AsyncWrite + Unpin,
 {
     let gone = |step: Step| Failure { step, why: Why::Broken, details: "the browser's connection ended".to_string() };
+    // a farm's broker is told which collection is wanted, in the words a farm knows
+    let wanted = taken.collection.as_ref().map(|collection| format!("tsv://MS Terminal Services Plugin.1.{collection}"));
+    let wanted = wanted.as_deref().map(str::as_bytes);
     tell(browser, ToBrowser::Step("reaching")).await.map_err(|()| gone(Step::Reaching))?;
-    let reached = machine::reach(&taken.address, taken.port).await?;
+    let reached = machine::reach(&taken.address, taken.port, wanted).await?;
 
     // what the machine shows of itself, against what Away knows of it: kept the first time
     tell(browser, ToBrowser::Step("checking")).await.map_err(|()| gone(Step::Checking))?;
     let secured = reached.secure().await?;
     let shows = secured.identity().fingerprint_text();
-    let at = format!("{}:{}", taken.address, taken.port);
-    match server.told(&taken.session, "identity", &[("at", &at), ("shows", &shows)]).await {
-        Ok(200) => {}
-        Ok(409) => {
-            return Err(Failure {
-                step: Step::Checking,
-                why: Why::AnotherIdentity,
-                details: format!("it shows the identity {shows}, which is not the one Away knows"),
-            })
-        }
-        Ok(status) => {
-            return Err(Failure {
-                step: Step::Checking,
-                why: Why::Broken,
-                details: format!("the server could not say what it knows of the machine: status {status}"),
-            })
-        }
-        Err(why) => return Err(Failure { step: Step::Checking, why: Why::Broken, details: why }),
-    }
+    known(server, taken, &taken.address, taken.port, &shows).await?;
     // the connection that showed it is let go: the person may take their time to type,
     // and a machine doesn't wait that long
     drop(secured);
@@ -239,7 +252,7 @@ where
     tell(browser, ToBrowser::Step("signing-in")).await.map_err(|()| gone(Step::SigningIn))?;
     let (width, height) = (width.clamp(640, 4096) & !3, height.clamp(480, 2160));
     let mut again = false;
-    let mut desktop = 'asked: {
+    let (mut desktop, served_by) = 'asked: {
         for _ in 0..ASKS_AT_MOST {
             tell(browser, ToBrowser::Asks { again }).await.map_err(|()| gone(Step::SigningIn))?;
             let typed = tokio::time::timeout(TYPED_WITHIN, async {
@@ -253,25 +266,37 @@ where
             })
             .await;
             let Ok(Some((name, password))) = typed else { return Ok(None) };
-            let secured = machine::reach(&taken.address, taken.port).await?.secure().await?;
+            let secured = machine::reach(&taken.address, taken.port, wanted).await?.secure().await?;
             if secured.identity().fingerprint_text() != shows {
-                return Err(Failure {
-                    step: Step::Checking,
-                    why: Why::AnotherIdentity,
-                    details: "it showed another identity than a moment before".to_string(),
-                });
+                let details = "it showed another identity than a moment before".to_string();
+                return Err(Failure { step: Step::Checking, why: Why::AnotherIdentity, details });
             }
-            match secured.sign_in(Account::named(&name, password), width, height, layout).await {
-                Ok(desktop) => break 'asked desktop,
+            let sent_on = match secured.sign_in(Account::named(&name, password.clone()), width, height, layout, None).await {
+                Ok(Opened::Desktop(desktop)) => break 'asked (*desktop, None),
+                Ok(Opened::SentOn(to)) => to,
+                Err(Failure { why: Why::SignInRefused, .. }) => {
+                    again = true;
+                    continue;
+                }
+                Err(failed) => return Err(failed),
+            };
+            // the machine is a farm's broker, and says which machine serves the collection:
+            // Away goes there where the files name that machine, and nowhere otherwise
+            let (host, port) = served_by(&sent_on, taken).await?;
+            let secured = machine::reach(&host, port, sent_on.token.as_deref()).await?.secure().await?;
+            known(server, taken, &host, port, &secured.identity().fingerprint_text()).await?;
+            match secured.sign_in(Account::named(&name, password), width, height, layout, Some(sent_on.session)).await {
+                Ok(Opened::Desktop(desktop)) => break 'asked (*desktop, Some(format!("{host}:{port}"))),
+                Ok(Opened::SentOn(_)) => {
+                    let details = format!("{host} sends the connection on again, which a machine of a farm doesn't");
+                    return Err(Failure { step: Step::SigningIn, why: Why::Broken, details });
+                }
                 Err(Failure { why: Why::SignInRefused, .. }) => again = true,
                 Err(failed) => return Err(failed),
             }
         }
-        return Err(Failure {
-            step: Step::SigningIn,
-            why: Why::SignInRefused,
-            details: "the machine took none of the names and passwords".to_string(),
-        });
+        let details = "the machine took none of the names and passwords".to_string();
+        return Err(Failure { step: Step::SigningIn, why: Why::SignInRefused, details });
     };
 
     // then its first picture
@@ -288,12 +313,62 @@ where
     })
     .await;
     match first {
-        Ok(Ok(())) => Ok(Some(desktop)),
+        Ok(Ok(())) => Ok(Some(Open { desktop, served_by })),
         Ok(Err(failed)) => Err(Failure { step: Step::FirstPicture, ..failed }),
         Err(_) => {
             Err(Failure { step: Step::FirstPicture, why: Why::NoPicture, details: "it showed nothing within 30 seconds".to_string() })
         }
     }
+}
+
+/// Compares what a machine shows of itself with what Away knows of the machine at that
+/// address: the server keeps what it showed the first time.
+async fn known(server: &Server, taken: &Taken, host: &str, port: u16, shows: &str) -> Result<(), Failure> {
+    let at = format!("{host}:{port}");
+    let failed = |why: Why, details: String| Failure { step: Step::Checking, why, details };
+    match server.told(&taken.session, "identity", &[("at", &at), ("shows", shows)]).await {
+        Ok(200) => Ok(()),
+        Ok(409) => Err(failed(Why::AnotherIdentity, format!("{at} shows the identity {shows}, which is not the one Away knows"))),
+        Ok(status) => Err(failed(Why::Broken, format!("the server could not say what it knows of the machine: status {status}"))),
+        Err(why) => Err(failed(Why::Broken, why)),
+    }
+}
+
+/// The machine a farm's broker sends the connection to, and its port. It is one the
+/// files name: one of those that serve the collection, or the address the entry itself
+/// is reached at, where the broker serves the collection too. Otherwise the connection
+/// goes nowhere: a broker's word alone leads Away to no machine.
+async fn served_by(sent_on: &away_rdp::redirection::Redirection, taken: &Taken) -> Result<(String, u16), Failure> {
+    for served in taken.served_by.iter().map(String::as_str).chain([taken.address.as_str()]) {
+        // an address, or an address and the port its desktop is opened on
+        let (host, port) = match served.rsplit_once(':') {
+            Some((host, port)) if !host.is_empty() && !host.ends_with(':') && port.parse::<u16>().is_ok() => {
+                (host, port.parse().unwrap_or(taken.port))
+            }
+            _ => (served, taken.port),
+        };
+        // a number of the newer kind is written in brackets, which are not part of it
+        let written = host.strip_prefix('[').and_then(|rest| rest.strip_suffix(']')).unwrap_or(host);
+        let is = |name: Option<&str>| name.is_some_and(|name| name.eq_ignore_ascii_case(written));
+        let by_address = match &sent_on.address {
+            Some(address) if address == written => true,
+            // the broker names a number, and the files a name: the name's addresses say whether they are one machine
+            Some(address) => {
+                tokio::net::lookup_host((written, port)).await.is_ok_and(|mut found| found.any(|found| found.ip().to_string() == *address))
+            }
+            None => false,
+        };
+        if is(sent_on.name.as_deref()) || is(sent_on.short_name.as_deref()) || by_address {
+            return Ok((host.to_string(), port));
+        }
+    }
+    let to =
+        sent_on.name.as_deref().or(sent_on.short_name.as_deref()).or(sent_on.address.as_deref()).unwrap_or("a machine it doesn't name");
+    let details = match taken.served_by.is_empty() {
+        true => format!("the farm's broker sends the connection to {to}, and the files name no machine that serves the collection"),
+        false => format!("the farm's broker sends the connection to {to}, which the files don't name for the collection"),
+    };
+    Err(Failure { step: Step::SigningIn, why: Why::SentElsewhere, details })
 }
 
 /// Shows an open desktop to the browser, and passes keys and the pointer on, until one
@@ -493,6 +568,7 @@ fn why_word(why: Why) -> &'static str {
         Why::AnotherIdentity => "another-identity",
         Why::SignInRefused => "sign-in-refused",
         Why::NoPicture => "no-picture",
+        Why::SentElsewhere => "sent-elsewhere",
         Why::Broken => "broken",
     }
 }

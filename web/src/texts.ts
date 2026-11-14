@@ -68,7 +68,7 @@ export const texts = {
     notHere: 'no machine of that name for you',
     notHereWhy: "It doesn't exist, or no rule gives it to you.",
     home: 'go home',
-    notYet: "This version of Away opens the desktop of a Windows machine that is reached at its own address. It doesn't open programs, shells, other desktops or the desktop of a farm yet.",
+    notYet: "This version of Away opens Windows desktops. It doesn't open programs, shells or other desktops yet.",
     desktop: 'desktop',
     programs: 'programs',
     shell: 'shell',
@@ -129,6 +129,7 @@ export const texts = {
         'reaching refused': { says: 'It refused the connection. Remote access may be switched off there.', again: true },
         'checking another-identity': { says: "It showed another identity than the one Away knows, so Away doesn't connect to it.", again: false },
         'signing-in sign-in-refused': { says: `${machine} didn't accept that name and password.`, again: true },
+        'signing-in sent-elsewhere': { says: "Its farm sent Away on to a machine that isn't among those named for it, so Away doesn't connect there.", again: false },
         'first-picture no-picture': { says: 'It took the sign-in and showed nothing within 30 seconds.', again: true },
       };
       return known[`${step} ${why}`] ?? { says: 'Something went wrong on the way to it.', again: true };
@@ -136,7 +137,7 @@ export const texts = {
     // the server didn't begin the session: what the page says, and whether trying again can help
     refused: (status: number, machine: string): { title: string; why: string; again: boolean } => {
       if (status === 404) return { title: 'no machine of that name for you', why: "It doesn't exist, or no rule gives it to you.", again: false };
-      if (status === 501) return { title: `${machine} can't be opened yet`, why: 'This version of Away opens the desktop of a Windows machine that is reached at its own address.', again: false };
+      if (status === 501) return { title: `${machine} can't be opened yet`, why: 'This version of Away opens Windows desktops, and nothing else yet.', again: false };
       if (status === 503) return { title: "away can't open machines right now", why: "No machine is opened without a record, and Away can't write its records right now.", again: true };
       return { title: `couldn't open ${machine}`, why: 'Away did not begin the session.', again: true };
     },

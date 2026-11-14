@@ -17,6 +17,7 @@ use away_part::address::Address;
 use away_part::json::Json;
 use away_part::{stop, Lines, Part, Settings, Stopper};
 use away_rdp::picture::Picture;
+use away_rdp::redirection::Redirection;
 use away_rdp::stand_in::desktop::{typed, CLICKED};
 use away_secret::Secret;
 use away_server::service;
@@ -84,6 +85,12 @@ struct World {
     gateway: String,
     _service: SignInService,
     machine: Machine,
+    /// A farm's broker, which sends whoever signs in on to the machine.
+    broker: Machine,
+    /// The broker of a farm of one machine, which sends whoever signs in on to itself.
+    alone: Machine,
+    /// A broker that sends whoever signs in on to a machine that is nowhere in the files.
+    _lost: Machine,
     database: Database,
     server_lines: Lines,
     _stoppers: (Stopper, Stopper),
@@ -103,6 +110,34 @@ async fn world(name: &str) -> Option<World> {
     let database = a_database_of_its_own().await?;
     let machine = Machine::start(KNOWN, PASSWORD, stand_in::desktop()).await;
     let (host, port) = machine.address();
+    // a farm's broker beside it: it sends whoever signs in on to the machine, by its name and its number
+    let sends_on = Redirection {
+        session: 7,
+        address: Some("127.0.0.1".to_string()),
+        name: Some(host.clone()),
+        token: Some(b"Cookie: msts=285216778.15629.0000\r\n".to_vec()),
+        ..Redirection::default()
+    };
+    let broker = Machine::start_broker(KNOWN, PASSWORD, sends_on).await;
+    let (broker_host, broker_port) = broker.address();
+    // one that sends whoever signs in on to a machine that is nowhere in the files
+    let astray = Redirection {
+        session: 8,
+        address: Some("10.20.0.7".to_string()),
+        name: Some("rdsh-07.corp.example".to_string()),
+        ..Redirection::default()
+    };
+    let lost = Machine::start_broker(KNOWN, PASSWORD, astray).await;
+    let (_, lost_port) = lost.address();
+    // and a farm of one machine, whose broker serves its collection itself: it sends
+    // whoever signs in on to itself
+    let alone = Machine::start_broker(
+        KNOWN,
+        PASSWORD,
+        Redirection { session: 9, address: Some("127.0.0.1".to_string()), ..Redirection::default() },
+    )
+    .await;
+    let (_, alone_port) = alone.address();
     // a port of this machine that nothing listens on, for a machine that is not there
     let nothing = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
     let folder = Folder(std::env::temp_dir().join(format!("away-session-{}-{name}", std::process::id())));
@@ -112,9 +147,15 @@ async fn world(name: &str) -> Option<World> {
         "machines:\n  - name: desk-01\n    kind: windows\n    address: {host}\n    desktop: {{ port: {port} }}\n  \
          - name: gone-02\n    kind: windows\n    address: 127.0.0.1\n    desktop: {{ port: {nothing} }}\n  \
          - name: build-01\n    kind: linux\n    address: build-01.corp.example\n    shell: true\n  \
-         - name: Desktops\n    kind: windows\n    address: broker.corp.example\n    desktop: true\n    collection: Desktops\n    served-by: [rdsh-01.corp.example]\n  \
+         - name: Desktops\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {broker_port} }}\n    collection: Desktops\n    \
+         served-by: [127.0.0.9, {host}:{port}]\n  \
+         - name: Elsewhere\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {lost_port} }}\n    collection: Elsewhere\n    \
+         served-by: [127.0.0.9, \"127.0.0.8:{port}\"]\n  \
+         - name: Unnamed\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {lost_port} }}\n    collection: Unnamed\n  \
+         - name: Alone\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {alone_port} }}\n    collection: Alone\n  \
+         - name: Anywhere\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {port} }}\n    collection: Anywhere\n  \
          - name: hidden-09\n    kind: windows\n    address: hidden-09.corp.example\n    desktop: true\n\
-         rules:\n  - name: staff-desks\n    who: [staff]\n    reaches: [desk-01, gone-02, build-01, Desktops]\n"
+         rules:\n  - name: staff-desks\n    who: [staff]\n    reaches: [desk-01, gone-02, build-01, Desktops, Elsewhere, Unnamed, Alone, Anywhere]\n"
     );
     std::fs::write(folder.0.join("machines.yaml"), files).expect("the files");
 
@@ -171,6 +212,9 @@ async fn world(name: &str) -> Option<World> {
         gateway: at,
         _service: service,
         machine,
+        broker,
+        alone,
+        _lost: lost,
         database,
         server_lines,
         _stoppers: (server_stopper, gateway_stopper),
@@ -450,12 +494,8 @@ async fn only_what_a_rule_gives_is_opened_and_a_ticket_is_good_once_for_the_brow
     for machine in ["hidden-09", "nowhere"] {
         assert_eq!(browser.open(&world, machine), (404, "Nothing of that name is there for you.\n".to_string()));
     }
-    // what Away doesn't open yet says so: a shell, and the desktop of a farm
-    assert_eq!(browser.open(&world, "build-01").0, 501);
-    assert_eq!(
-        browser.open(&world, "Desktops"),
-        (501, "Away doesn't open the desktop of a farm yet: it can't follow a farm's broker so far.\n".to_string())
-    );
+    // what Away doesn't open yet says so: a shell
+    assert_eq!(browser.open(&world, "build-01"), (501, "Away opens Windows desktops so far, and this machine offers none.\n".to_string()));
     assert_eq!(browser.ask("GET", &format!("{}/api/sessions?machine=desk-01", world.away), true).0, 405);
 
     let sign_in = browser.signed_in_as(&world);
@@ -518,6 +558,114 @@ async fn a_machine_that_is_not_there_or_is_another_than_the_one_away_knows_fails
         (last.3.text_of("step"), last.3.text_of("why"), last.2.as_deref()),
         (Some("checking"), Some("another-identity"), Some("desk-01"))
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_desktop_of_a_farm_opens_on_the_machine_its_broker_names_where_the_files_name_that_machine() {
+    let Some(world) = world("farm").await else { return };
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+    let (host, port) = world.machine.address();
+
+    // the same steps as for one machine: the broker is reached, checked, and asks who it is for
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "Desktops")).await;
+    let (steps, asks) = session.steps().await;
+    assert_eq!(steps, ["reaching", "checking", "signing-in"]);
+    assert_eq!(asks.write(), r#"{"asks":{"again":false}}"#);
+    // a password the broker doesn't take: asked again, and no machine was gone to
+    session.say(credentials(KNOWN, "another password")).await;
+    assert_eq!(session.next().await.map(|says| says.write()).as_deref(), Some(r#"{"asks":{"again":true}}"#));
+    assert!(world.machine.said_first().is_empty(), "nobody went on to the machine");
+    // the right one: the broker says where the connection belongs, and the desktop is the machine's
+    session.say(credentials(KNOWN, PASSWORD)).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!(steps, ["first-picture"]);
+    assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120}}"#);
+    let shows = stand_in::desktop();
+    while session.picture.as_ref() != Some(&shows) {
+        let drawn = session.until("drawn").await.get("drawn").and_then(Json::count).expect("a number");
+        session.say(Json::object([("seen", drawn.into())])).await;
+    }
+
+    // the broker was told the collection each time, and the machine what the broker gave
+    // for it and the session the broker named
+    let wanted = b"tsv://MS Terminal Services Plugin.1.Desktops".to_vec();
+    let told = world.broker.said_first();
+    assert!(!told.is_empty() && told.iter().all(|said| said.as_ref() == Some(&wanted)), "{told:?}");
+    assert_eq!(world.machine.said_first(), [Some(b"Cookie: msts=285216778.15629.0000".to_vec())]);
+    let seen = world.machine.seen();
+    assert_eq!(seen.len(), 1);
+    assert_eq!((seen[0].sent_on_to, seen[0].account.clone()), (Some(7), ("CORP".to_string(), "alex.urban".to_string())));
+
+    session.say(Json::object([("leaves", true.into())])).await;
+    assert_eq!(session.until("ended").await.write(), r#"{"ended":"left"}"#);
+
+    // the record says which machine served the session, and Away knows both by what they showed
+    let kept = records(&world.database).await;
+    let of_sessions: Vec<_> = kept.iter().filter(|(kind, ..)| kind.starts_with("session-")).collect();
+    assert_eq!(
+        of_sessions.iter().map(|(kind, ..)| kind.as_str()).collect::<Vec<_>>(),
+        ["session-asked", "session-opened", "session-ended"]
+    );
+    assert!(of_sessions.iter().all(|(_, _, machine, _)| machine.as_deref() == Some("Desktops")));
+    assert_eq!(of_sessions[1].3.text_of("served_by"), Some(format!("{host}:{port}").as_str()));
+    let known = beside(&world.database).await.query("select machine from machine_identity order by machine", &[]).await.unwrap();
+    let mut known: Vec<String> = known.iter().map(|row| row.get(0)).collect();
+    let (broker_host, broker_port) = world.broker.address();
+    let mut both = vec![format!("{broker_host}:{broker_port}"), format!("{host}:{port}")];
+    known.sort();
+    both.sort();
+    assert_eq!(known, both);
+
+    // a collection whose machines the files name, and the broker names another: Away goes nowhere
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "Elsewhere")).await;
+    assert_eq!(session.steps().await.0, ["reaching", "checking", "signing-in"]);
+    session.say(credentials(KNOWN, PASSWORD)).await;
+    let failed = session.until("failed").await.get("failed").expect("a step that failed").clone();
+    assert_eq!((failed.text_of("step"), failed.text_of("why")), (Some("signing-in"), Some("sent-elsewhere")));
+    assert!(session.next().await.is_none());
+    assert_eq!(world.machine.seen().len(), 1, "nobody else came to the machine");
+    let last = records(&world.database).await.pop().expect("a record");
+    assert_eq!(
+        (last.0.as_str(), last.2.as_deref(), last.3.text_of("step"), last.3.text_of("why")),
+        ("session-failed", Some("Elsewhere"), Some("signing-in"), Some("sent-elsewhere"))
+    );
+    assert_eq!(
+        last.3.text_of("details"),
+        Some("the farm's broker sends the connection to rdsh-07.corp.example, which the files don't name for the collection")
+    );
+
+    // a collection whose machines the files don't name at all: a broker's word alone leads nowhere
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "Unnamed")).await;
+    assert_eq!(session.steps().await.0, ["reaching", "checking", "signing-in"]);
+    session.say(credentials(KNOWN, PASSWORD)).await;
+    let failed = session.until("failed").await.get("failed").expect("a step that failed").clone();
+    assert_eq!((failed.text_of("step"), failed.text_of("why")), (Some("signing-in"), Some("sent-elsewhere")));
+    assert!(failed.text_of("details").is_some_and(|details| details.ends_with("the files name no machine that serves the collection")));
+    assert_eq!(world.machine.seen().len(), 1, "nobody else came to the machine");
+
+    // a broker that serves its collection itself sends the connection on to the address the
+    // files name for the entry: Away comes again as it was told to, and the desktop opens
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "Alone")).await;
+    assert_eq!(session.steps().await.0, ["reaching", "checking", "signing-in"]);
+    session.say(credentials(KNOWN, PASSWORD)).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!((steps, desktop.get("desktop").is_some()), (vec!["first-picture".to_string()], true));
+    let came: Vec<Option<u32>> = world.alone.seen().iter().map(|seen| seen.sent_on_to).collect();
+    assert_eq!(came, [None, Some(9)]);
+    session.say(Json::object([("leaves", true.into())])).await;
+    session.until("ended").await;
+
+    // a collection that is written at a machine which is no broker: its desktop opens as any machine's
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "Anywhere")).await;
+    assert_eq!(session.steps().await.0, ["reaching", "checking", "signing-in"]);
+    session.say(credentials(KNOWN, PASSWORD)).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!((steps, desktop.get("desktop").is_some()), (vec!["first-picture".to_string()], true));
+    let seen = world.machine.seen();
+    assert_eq!((seen.len(), seen[1].sent_on_to), (2, None));
+    assert_eq!(world.machine.said_first().last(), Some(&Some(b"tsv://MS Terminal Services Plugin.1.Anywhere".to_vec())));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

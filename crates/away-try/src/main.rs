@@ -35,7 +35,7 @@ use rustls::{ClientConfig, ClientConnection, DigitallySignedStruct, SignatureSch
 use sha2::{Digest, Sha256};
 
 const USAGE: &str = "\
-away-try rdp <address> [--as <account> --password-file <file> [--save <file>]]
+away-try rdp <address> [--as <account> --password-file <file> [--save <file>]] [--collection <name>]
 
   Reaches a machine over RDP with Away's own code and says what it shows, step by step.
   The address is a name or a number, with a port after a colon where it is not 3389.
@@ -46,6 +46,9 @@ away-try rdp <address> [--as <account> --password-file <file> [--save <file>]]
 
   With --save it writes the desktop's picture to a file, as a BMP, once the machine
   has stopped drawing.
+
+  With --collection the address is a farm's broker, which is asked for that collection
+  and says which machine serves it.
 
   It says the SHA-256 of the picture's pixels: three bytes each (blue, green, red), row
   by row from the top. A screenshot taken on the machine at that moment has the same.
@@ -72,6 +75,7 @@ struct Asked {
     account: Option<String>,
     password_file: Option<String>,
     save: Option<String>,
+    collection: Option<String>,
 }
 
 /// Reads the words the program was started with. Gives nothing where they make no sense.
@@ -81,12 +85,13 @@ fn asked(words: &[String]) -> Option<Asked> {
     if kind != "rdp" || address.starts_with('-') {
         return None;
     }
-    let mut asked = Asked { address: address.clone(), account: None, password_file: None, save: None };
+    let mut asked = Asked { address: address.clone(), account: None, password_file: None, save: None, collection: None };
     while let [option, value, after @ ..] = rest {
         let into = match option.as_str() {
             "--as" => &mut asked.account,
             "--password-file" => &mut asked.password_file,
             "--save" => &mut asked.save,
+            "--collection" => &mut asked.collection,
             _ => return None,
         };
         if into.replace(value.clone()).is_some() {
@@ -115,11 +120,11 @@ fn main() -> ExitCode {
         (Some(name), Some(file)) => match std::fs::read_to_string(file) {
             Ok(password) => {
                 let account = Account::named(name, Secret::new(password.trim_end_matches(['\r', '\n'])));
-                rdp(&asked.address, Some(account), asked.save.as_deref())
+                rdp(&asked.address, Some(account), asked.save.as_deref(), asked.collection.as_deref())
             }
             Err(error) => Err(format!("The password's file can't be read: {error}.")),
         },
-        _ => rdp(&asked.address, None, None),
+        _ => rdp(&asked.address, None, None, asked.collection.as_deref()),
     };
     match tried {
         Ok(()) => ExitCode::SUCCESS,
@@ -131,7 +136,7 @@ fn main() -> ExitCode {
 }
 
 /// The steps of a connection over RDP, as far as Away's code goes.
-fn rdp(address: &str, account: Option<Account>, save: Option<&str>) -> Result<(), String> {
+fn rdp(address: &str, account: Option<Account>, save: Option<&str>, collection: Option<&str>) -> Result<(), String> {
     let (host, port) = match address.rsplit_once(':') {
         Some((host, port)) if !host.contains(':') => (host, port.parse::<u16>().map_err(|_| format!("{port} is no port."))?),
         _ => (address, 3389),
@@ -160,7 +165,10 @@ fn rdp(address: &str, account: Option<Account>, save: Option<&str>) -> Result<()
     let waits = connection.try_clone().map_err(|error| error.to_string())?;
 
     println!("Asking which security it takes");
-    connection.write_all(&negotiation::request()).map_err(|error| format!("The request couldn't be sent: {error}."))?;
+    // a farm's broker is told which collection is wanted, in the words a farm knows
+    let wanted = collection.map(|collection| format!("tsv://MS Terminal Services Plugin.1.{collection}"));
+    let request = negotiation::request_with(wanted.as_deref().map(str::as_bytes)).map_err(|error| error.to_string())?;
+    connection.write_all(&request).map_err(|error| format!("The request couldn't be sent: {error}."))?;
     let mut frames = Frames::new();
     let carried = loop {
         if let Some(carried) = frames.next_frame().map_err(|error| error.to_string())? {
@@ -294,8 +302,14 @@ fn rdp(address: &str, account: Option<Account>, save: Option<&str>) -> Result<()
     };
 
     println!("Saying what Away is, and taking the channels");
-    let client =
-        Client { width: 1280, height: 800, security: answer.security.number(), name: "away".to_string(), layout: away_rdp::gcc::LAYOUT_US };
+    let client = Client {
+        width: 1280,
+        height: 800,
+        security: answer.security.number(),
+        name: "away".to_string(),
+        layout: away_rdp::gcc::LAYOUT_US,
+        sent_on_to: None,
+    };
     let mut random = [0u8; 80];
     getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
     let for_a_licence = licence::New {
@@ -347,6 +361,21 @@ fn rdp(address: &str, account: Option<Account>, save: Option<&str>) -> Result<()
                         println!("Taking what it draws, until it has drawn nothing for {} seconds", QUIET_FOR.as_secs());
                         opened = Some(Instant::now());
                         waits.set_read_timeout(Some(Duration::from_millis(250))).map_err(|error| error.to_string())?;
+                    }
+                    Happened::SentOn(sent) => {
+                        println!("   It is a farm's broker, and sends the client on:");
+                        println!(
+                            "   to the machine {}, at {}, as the session {}.",
+                            sent.name.as_deref().unwrap_or("without a name"),
+                            sent.address.as_deref().unwrap_or("no address it names"),
+                            sent.session
+                        );
+                        match &sent.token {
+                            Some(token) => println!("   The client is to say first there: {}", String::from_utf8_lossy(token).trim_end()),
+                            None => println!("   It gives nothing to say first there."),
+                        }
+                        println!("   This program goes no further: it reaches one machine.");
+                        return Ok(());
                     }
                     Happened::Drawn(rectangles) => {
                         for rectangle in &rectangles {

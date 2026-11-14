@@ -106,10 +106,16 @@ and, given a file, saves the picture there as a BMP.
 cargo run --package away-try -- rdp fin-app-02.example.com
 cargo run --package away-try -- rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password
 cargo run --package away-try -- rdp fin-app-02.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password --save desktop.bmp
+cargo run --package away-try -- rdp broker.example.com --as 'CORP\alex.urban' --password-file ~/.config/away/password --collection Desktops
 ```
 
 The password is read from a file, so that it is on no command line and in no
 history.
+
+With `--collection` the address is a farm's broker. `away-try` tells it which
+collection is wanted, signs the account in, and says where the broker sends
+the client: the machine's name, its address, the session it names, and what
+the client is to say first there. It goes no further: it reaches one machine.
 
 Windows signs the account in before the desktop unless it is told otherwise:
 the password is proven and never sent in the clear, and the machine has to

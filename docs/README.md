@@ -20,8 +20,11 @@ how far the build is.
 
 What is built so far: the program with its three parts, the chart and the
 pipelines; Away's own RDP code, proven against real machines; signing in, and
-the frame of the pages; and the machines and the rules as files, with home
-showing each person the machines a rule gives them. No machine is opened yet.
+the frame of the pages; the machines and the rules as files, with home
+showing each person the machines a rule gives them; and the first sessions: a
+Windows desktop, of one machine or of a farm of machines, opens in the browser
+with a name and a password the person types. Programs, shells and other
+desktops are not opened yet.
 
 | To | Read |
 |---|---|

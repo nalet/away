@@ -10,6 +10,7 @@ use crate::input::{self, Input};
 use crate::licence::{self, Said, Taking};
 use crate::mcs::{self, Arrived};
 use crate::pdu::{self, FromMachine};
+use crate::redirection::{self, Redirection};
 use crate::secret::Secret;
 use crate::tpkt::{self, Frame};
 use crate::update::{self, Rectangle, Updates};
@@ -49,6 +50,9 @@ pub enum Happened {
     Open,
     /// The machine drew these rectangles.
     Drawn(Vec<Rectangle>),
+    /// The machine is a farm's broker, and sends the client on to the machine that
+    /// serves it. This connection is at its end.
+    SentOn(Redirection),
 }
 
 enum State {
@@ -199,6 +203,7 @@ impl Connection {
                     happened.push(Happened::Desktop { width, height, bits });
                 }
                 FromMachine::Again => self.state = State::AwaitsWhatItCanDo,
+                FromMachine::SentOn(packet) => happened.push(Happened::SentOn(redirection::read(packet)?)),
                 // the machine names the fonts: the last step, after which it draws
                 FromMachine::Data(0x28, _) => {
                     if matches!(self.state, State::Finishes) {
