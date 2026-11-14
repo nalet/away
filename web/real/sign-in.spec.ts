@@ -40,7 +40,9 @@ test('a person signs in through a real sign-in service, and what it says later i
   await page.goto('/settings');
   await type(page);
   await expect(page).toHaveURL(`${AWAY}/settings`);
-  await expect(page.getByRole('region', { name: 'about' })).toContainText('Alex Urban, alex.urban@example.com');
+  const account = page.getByRole('region', { name: 'account' });
+  await expect(account).toContainText('Alex Urban');
+  await expect(account).toContainText('alex.urban@example.com');
   const rail = page.getByRole('navigation', { name: 'views' });
   await expect(rail.getByRole('link', { name: 'administration' })).toBeVisible();
 

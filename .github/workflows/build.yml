@@ -43,6 +43,9 @@ jobs:
       - name: The libraries are listed, each with what it is for
         run: python3 scripts/libraries.py --check
 
+      - name: What Away says it is built from is what the lock files say
+        run: python3 scripts/contents.py --parts crates/away-server/built-from.json --check
+
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26

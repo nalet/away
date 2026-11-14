@@ -53,6 +53,37 @@ a { color: var(--cloud-blue); }
 .facts dt { color: var(--fg-muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
 .mono { font-family: var(--ff-mono); }
+.pg section + section { margin-top: 16px; }
+.pg section + .turn-to { margin-top: 16px; }
+.pg .nc-card h2 { margin: 0; }
+.pg .small { margin: 12px 0; color: var(--fg-2); font-size: 13px; }
+
+/* a row of a card: what it is about, and what there is to do with it at its end */
+.li { display: flex; align-items: center; gap: 12px; min-height: 48px; color: inherit; text-decoration: none; }
+.li .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.li .ttl { font-weight: 500; overflow-wrap: anywhere; }
+.li .sub { color: var(--fg-muted); font-size: 13px; overflow-wrap: anywhere; }
+.li.to:hover .ttl { color: var(--cloud-blue); }
+.li.to svg { flex: none; color: var(--fg-muted); }
+
+/* what Away says of itself: the facts beside the list of its parts, where there is room */
+.pg.ab { max-width: 1200px; }
+.pghead { display: flex; align-items: center; gap: 8px; margin: 0 0 24px; }
+.pghead h1 { margin: 0; }
+.pghead .nc-iconbtn { text-decoration: none; }
+.ab .cols { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.ab .cols section + section { margin-top: 0; }
+.ab .facts { margin: 0 0 12px; }
+.listhead { display: flex; align-items: center; gap: 12px; min-height: 40px; margin: 0 0 8px; flex-wrap: wrap; }
+.listhead h2 { margin: 0; }
+.listhead .count { color: var(--fg-muted); font-size: 13px; }
+.listhead .find { margin-left: auto; width: 220px; }
+.ab .said { display: flex; align-items: center; gap: 12px; }
+.ab .said p { margin: 0; }
+@media (max-width: 900px) {
+  .ab .cols { grid-template-columns: minmax(0, 1fr); }
+  .listhead .find { margin-left: 0; width: 100%; }
+}
 
 /* ── the avatar and its menu ── */
 .user { position: relative; display: flex; }

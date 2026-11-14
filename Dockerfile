@@ -20,7 +20,7 @@ RUN npm run build
 FROM rust:1.99-alpine@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383 AS build
 RUN apk add --no-cache musl-dev
 WORKDIR /src
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml Cargo.lock LICENSE ./
 COPY crates crates
 COPY --from=pages /src/web/dist web/dist
 # the commit the image is built from, which the program then names as its own

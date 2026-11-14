@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""contents.py [--output PATH] : the list of what Away's image holds, written as a CycloneDX
-document: the program, every library compiled into it with its version, its licence and
-the checksum of its source, and the compiler's own libraries.
+"""contents.py [--output PATH] [--parts PATH [--check]] : the list of what Away's image
+holds, written as a CycloneDX document: the program, every library compiled into it with
+its version, its licence and the checksum of its source, and the compiler's own libraries.
+
+With --parts it writes the same list in short, each part with its version and its licence,
+to the file the program holds and shows on its own page about itself. With --check it
+writes nothing and fails when that file is not what the lock files say.
 
 The image holds one file, the program, so what it holds is what the program was built
 from. That is read from cargo itself, for the processors the image is published for:
@@ -78,7 +82,8 @@ def main():
     in_pages = []
     lock = json.load(open(os.path.join('web', 'package-lock.json'), encoding='utf-8'))['packages']
     for path, entry in sorted(lock.items()):
-        if not path or entry.get('dev'):
+        # what only builds the pages, or only tells the compiler of types, is not in them
+        if not path or entry.get('dev') or entry.get('devOptional'):
             continue
         name = path.split('node_modules/')[-1]
         ref = f'pkg:npm/{name.replace("@", "%40")}@{entry["version"]}'
@@ -98,6 +103,8 @@ def main():
          'description': "The C library the program is linked with, as the compiler's libraries for this target bring it.",
          'licenses': [{'expression': 'MIT'}]},
     ]
+    if '--parts' in sys.argv:
+        return parts(sys.argv[sys.argv.index('--parts') + 1], components, '--check' in sys.argv)
     document = {
         'bomFormat': 'CycloneDX',
         'specVersion': '1.5',
@@ -120,5 +127,27 @@ def main():
         sys.stdout.write(text)
 
 
+def parts(path, components, check):
+    """what the program is built from, in short: one part a line, by name"""
+    def licence(part):
+        # one way of writing a choice, whichever way a library wrote it
+        return ' OR '.join(piece.strip() for piece in part.get('licenses', [{}])[0].get('expression', '').split('/'))
+
+    listed = sorted(({'name': p['name'], 'version': p.get('version', ''), 'licence': licence(p)} for p in components
+                     if not p['name'].startswith('away-')), key=lambda p: (p['name'].lower(), p['version']))
+    text = '[\n' + ',\n'.join(json.dumps(p, ensure_ascii=False) for p in listed) + '\n]\n'
+    if check:
+        held = open(path, encoding='utf-8').read() if os.path.exists(path) else ''
+        if held != text:
+            print(f'{path} is not what Cargo.lock and web/package-lock.json say: run python3 scripts/contents.py --parts {path}')
+            return 1
+        print(f'0 problems; {len(listed)} parts in {path}')
+        return 0
+    with open(path, 'w', encoding='utf-8') as fh:
+        fh.write(text)
+    print(f'{len(listed)} parts written to {path}')
+    return 0
+
+
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

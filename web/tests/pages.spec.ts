@@ -77,11 +77,82 @@ test('a link to a page of Away leads there after signing in', async ({ page }) =
   await expect(page).toHaveURL(`${AWAY}/settings`);
   await expect(page).toHaveTitle('settings · away');
   await expect(page.getByRole('heading', { level: 1, name: 'settings' })).toBeVisible();
+  const account = page.getByRole('region', { name: 'account' });
+  await expect(account).toContainText('Alex Urban');
+  await expect(account).toContainText('alex.urban@example.com');
+  await expect(page.getByText('Questions go to it-help@example.com.')).toBeVisible();
   const about = page.getByRole('region', { name: 'about' });
-  await expect(about).toContainText('Alex Urban, alex.urban@example.com');
-  await expect(about).toContainText('Questions go to it-help@example.com.');
-  await expect(about.getByRole('link')).toHaveAttribute('href', /^https:\/\//);
+  await expect(about.getByRole('link', { name: /^About Away/ })).toHaveAttribute('href', '/settings/about');
+  await expect(about).toContainText(/Version \d+\.\d+\.\d+, its source and its licences\./);
   await accessible(page);
+});
+
+test('Away says which version runs, under which licence, and what it is built from', async ({ page }) => {
+  const { asked, complaints } = watch(page);
+  await page.goto('/settings');
+  await page.getByRole('link', { name: /^About Away/ }).click();
+  await expect(page).toHaveURL(`${AWAY}/settings/about`);
+  await expect(page).toHaveTitle('about away · away');
+  await expect(page.getByRole('heading', { level: 1, name: 'about away' })).toBeVisible();
+  // it is a page of the settings, which stay the view one is in
+  await expect(page.getByRole('navigation', { name: 'views' }).getByRole('link', { name: 'settings' })).toHaveAttribute('aria-current', 'page');
+
+  const itself = page.getByRole('region', { name: 'this away' });
+  await expect(itself).toContainText(/Version\s*\d+\.\d+\.\d+/);
+  await expect(itself).toContainText('Mozilla Public License 2.0');
+  await expect(itself.getByRole('link', { name: 'its text' })).toHaveAttribute('href', '/licence.txt');
+  await expect(itself.getByRole('link', { name: 'How to report it in private' })).toHaveAttribute('href', /^https:\/\/.+\/security\/policy$/);
+  await expect(itself).toContainText('This Away asks nobody outside for anything: no fonts, no scripts, no statistics and no checks for updates.');
+  // the licence's text comes from Away itself
+  expect(await page.evaluate(() => fetch('/licence.txt').then((answer) => answer.text()))).toMatch(/^Mozilla Public License Version 2\.0/);
+
+  // every part, with its version and its licence
+  const parts = page.locator('section[aria-labelledby="built-from"]');
+  await expect(parts.getByRole('heading', { level: 2, name: 'what it is built from' })).toBeVisible();
+  await expect(parts.getByRole('status')).toHaveText(/^\d+ parts$/);
+  const all = Number(((await parts.getByRole('status').textContent()) ?? '').split(' ')[0]);
+  expect(all).toBeGreaterThan(20);
+  const rows = parts.getByRole('table', { name: 'what it is built from' }).getByRole('row');
+  await expect(rows).toHaveCount(all + 1);
+  await expect(rows.nth(0)).toHaveText(/part\s*version\s*licence/);
+  await expect(parts.getByRole('row', { name: /^rustls \d/ })).toContainText('Apache-2.0 or ISC or MIT');
+
+  // found by a name or by a licence, with the keyboard alone
+  const find = parts.getByRole('searchbox', { name: 'find a part…' });
+  await find.focus();
+  await page.keyboard.type('ofl');
+  await expect(parts.getByRole('status')).toHaveText(`2 of ${all} parts`);
+  await expect(rows).toHaveCount(3);
+  await find.fill('no such part');
+  await expect(parts).toContainText('No part has that in its name or its licence.');
+  await accessible(page);
+  await find.fill('');
+  await expect(rows).toHaveCount(all + 1);
+
+  // nothing was loaded from outside, and nothing went wrong
+  expect(asked.filter((request) => !request.url().startsWith(`${AWAY}/`) && !request.url().startsWith(`${SIGN_IN_SERVICE}/authorize?`))).toEqual([]);
+  expect(complaints).toEqual([]);
+  await accessible(page);
+
+  // on a phone the page is one column, and nothing is wider than the screen
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(itself).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await accessible(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // and back to the settings, with the keyboard
+  await page.getByRole('main').getByRole('link', { name: 'settings' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(`${AWAY}/settings`);
+  await page.goBack();
+  await expect(page).toHaveTitle('about away · away');
+});
+
+test('what Away is built from is said only to those who are signed in', async ({ request }) => {
+  const refused = await request.get(`${AWAY}/api/built-from`);
+  expect(refused.status()).toBe(401);
+  expect((await request.get(`${AWAY}/licence.txt`)).status()).toBe(200);
 });
 
 test('nothing of the sign-in is in the page: one cookie that no script can read', async ({ page, context }) => {

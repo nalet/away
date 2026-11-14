@@ -12,7 +12,11 @@ export const addressOf: Record<View, string> = {
   settings: '/settings',
 };
 
+// What Away says about itself: a page of the settings, with an address of its own.
+export const ABOUT = '/settings/about';
+
 export function viewAt(path: string): View | null {
+  if (path === ABOUT) return 'settings';
   const found = (Object.keys(addressOf) as View[]).find((view) => addressOf[view] === path);
   return found ?? null;
 }

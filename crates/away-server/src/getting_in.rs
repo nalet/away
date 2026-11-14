@@ -38,6 +38,13 @@ pub const FROM_AWAYS_PAGE: &str = "x-away";
 /// page that says how one signs in.
 pub const NOT_SIGNED_IN: &str = "/?sign-in=none";
 
+/// What the program is built from: every part with its version and its licence, as
+/// `scripts/contents.py --parts` writes it from the lock files. The build fails when
+/// the two differ.
+const BUILT_FROM: &str = include_str!("../built-from.json");
+/// The text of the licence Away is under.
+const LICENCE_TEXT: &str = include_str!("../../../LICENSE");
+
 struct Signing {
     told: SignIn,
     service: Service,
@@ -75,13 +82,27 @@ impl GettingIn {
         let reading = matches!(*request.method(), Method::GET | Method::HEAD);
         Some(match (request.uri().path(), reading) {
             ("/api/who", true) => self.who(request),
+            ("/api/built-from", true) => self.built_from(request),
+            ("/licence.txt", true) => answer(StatusCode::OK, "text/plain; charset=utf-8", LICENCE_TEXT),
             ("/sign-in", true) => self.begin(request).await,
             ("/sign-in/back", true) => self.back(request).await,
             ("/sign-out", _) if request.method() == Method::POST => self.sign_out(request).await,
-            ("/api/who" | "/sign-in" | "/sign-in/back", _) => plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers GET.\n"),
+            ("/api/who" | "/api/built-from" | "/licence.txt" | "/sign-in" | "/sign-in/back", _) => {
+                plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers GET.\n")
+            }
             ("/sign-out", _) => plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers POST.\n"),
             _ => return None,
         })
+    }
+
+    /// What Away is built from, for whoever is signed in.
+    fn built_from(&self, request: &Request<Incoming>) -> Answer {
+        let now = time::now().as_secs();
+        let signed_in = self.signing.as_ref().and_then(|signing| signing.sign_ins.who(cookie(request, SIGNED_IN)?, now));
+        match signed_in {
+            Some((_, false)) => answer(StatusCode::OK, "application/json", BUILT_FROM),
+            _ => plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n"),
+        }
     }
 
     /// Who is signed in, for the page.
@@ -91,6 +112,7 @@ impl GettingIn {
             ("version", version::VERSION.into()),
             ("commit", version::COMMIT.into()),
             ("source", version::SOURCE.into()),
+            ("licence", version::LICENCE.into()),
             ("contact", self.contact.as_deref().map_or(Json::Null, Json::from)),
             ("set_up", self.signing.is_some().into()),
         ];

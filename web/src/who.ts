@@ -16,6 +16,20 @@ export interface Who {
   version: string;
   commit: string;
   source: string;
+  licence: string;
+}
+
+// One part Away is built from.
+export interface Part {
+  name: string;
+  version: string;
+  licence: string;
+}
+
+export async function askBuiltFrom(): Promise<Part[]> {
+  const answer = await fetch('/api/built-from', { headers: { accept: 'application/json' }, cache: 'no-store' });
+  if (!answer.ok) throw new Error(`the server answered ${answer.status}`);
+  return (await answer.json()) as Part[];
 }
 
 export async function askWho(): Promise<Who> {

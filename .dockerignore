@@ -2,6 +2,7 @@
 *
 !Cargo.toml
 !Cargo.lock
+!LICENSE
 !crates/
 !web/
 web/node_modules/

@@ -166,6 +166,39 @@ impl Browser {
     }
 }
 
+#[test]
+fn away_says_what_it_is_built_from_to_those_who_are_signed_in_and_its_licence_to_anyone() {
+    let world = world();
+    let mut browser = Browser::default();
+    // the licence's text is for anyone, as the licence itself asks
+    let licence = browser.get(&format!("{}/licence.txt", world.away));
+    assert_eq!((licence.status, licence.header("content-type")), (200, Some("text/plain; charset=utf-8")));
+    assert!(licence.body.starts_with("Mozilla Public License Version 2.0"), "{}", &licence.body[..60.min(licence.body.len())]);
+    assert_eq!(browser.who(&world).text_of("licence"), Some("MPL-2.0"));
+    // the parts are for those who are signed in
+    let refused = browser.get(&format!("{}/api/built-from", world.away));
+    assert_eq!((refused.status, refused.body.as_str()), (401, "This is for people who are signed in.\n"));
+    assert_eq!(browser.ask("POST", &format!("{}/api/built-from", world.away), &[]).status, 405);
+
+    browser.sign_in(&world, "/");
+    let parts = browser.get(&format!("{}/api/built-from", world.away)).says();
+    let Json::List(parts) = parts else { panic!("a list of parts") };
+    assert!(parts.len() > 20, "{} parts", parts.len());
+    for part in &parts {
+        assert!(part.text_of("name").is_some_and(|name| !name.is_empty()), "every part has a name");
+        assert!(part.text_of("licence").is_some_and(|licence| !licence.is_empty()), "{:?} has a licence", part.text_of("name"));
+        assert!(part.text_of("version").is_some());
+        assert!(!part.text_of("name").unwrap().starts_with("away-"), "Away's own parts are not what it is built from");
+    }
+    // in the order of their names, whichever way a name is written
+    let names: Vec<String> = parts.iter().map(|part| part.text_of("name").unwrap().to_lowercase()).collect();
+    assert!(names.is_sorted(), "{names:?}");
+    // the libraries that secure connections and that run them are among them, and the pages' faces
+    for held in ["rustls", "tokio", "@fontsource/inter"] {
+        assert!(names.iter().any(|name| name == held), "{held} is listed");
+    }
+}
+
 /// Waits until something is the case, for a few seconds at most.
 fn until(what: &str, mut is: impl FnMut() -> bool) {
     let began = Instant::now();

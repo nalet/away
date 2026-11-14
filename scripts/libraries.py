@@ -123,7 +123,8 @@ def pages():
     allowed = set(tomllib.loads(read('deny.toml'))['licenses']['allow'])
     held = []
     for path, entry in lock.items():
-        if not path or entry.get('dev'):
+        # what only builds the pages, or only tells the compiler of types, is not in them
+        if not path or entry.get('dev') or entry.get('devOptional'):
             continue
         name = path.split('node_modules/')[-1]
         licence = entry.get('license', '')

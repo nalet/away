@@ -8,11 +8,11 @@ import { House, Layers, Settings, Shield } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
-import { addressOf, inPlace, viewAt } from './place';
+import { ABOUT, addressOf, inPlace, viewAt } from './place';
 import type { View } from './place';
 import { texts } from './texts';
 import { UserMenu } from './UserMenu';
-import { Administration, Home, Nowhere, Sessions, SettingsPage } from './views';
+import { About, Administration, Home, Nowhere, Sessions, SettingsPage } from './views';
 import type { Who } from './who';
 
 const ICONS: Record<View, LucideIcon> = { home: House, sessions: Layers, administration: Shield, settings: Settings };
@@ -33,8 +33,9 @@ export function Frame({ who, path, go, signOut, signInAgain }: FrameProps) {
   const views: View[] = administers ? ['home', 'sessions', 'administration'] : ['home', 'sessions'];
 
   useEffect(() => {
-    document.title = `${view ? texts.views[view] : texts.nowhere.title} · ${texts.name}`;
-  }, [view]);
+    const title = path === ABOUT ? texts.about.title : view ? texts.views[view] : texts.nowhere.title;
+    document.title = `${title} · ${texts.name}`;
+  }, [view, path]);
 
   const link = (to: View, where: 'rail' | 'tabs') => {
     const Icon = ICONS[to];
@@ -96,7 +97,7 @@ export function Frame({ who, path, go, signOut, signInAgain }: FrameProps) {
         {view === 'home' && <Home />}
         {view === 'sessions' && <Sessions />}
         {view === 'administration' && (administers ? <Administration /> : <Nowhere go={go} />)}
-        {view === 'settings' && <SettingsPage who={who} />}
+        {view === 'settings' && (path === ABOUT ? <About who={who} go={go} /> : <SettingsPage who={who} go={go} />)}
         {view === null && <Nowhere go={go} />}
       </main>
       <nav className="tabs" aria-label="views">

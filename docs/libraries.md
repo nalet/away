@@ -53,7 +53,7 @@ and the build fails on a licence that `deny.toml` doesn't allow.
 | [typescript](https://www.npmjs.com/package/typescript) | checks the pages' code before it is built | 7.0.2 | no, it only builds them |
 | [vite](https://www.npmjs.com/package/vite) | builds the pages into files whose names carry their content's hash | 8.3.8 | no, it only builds them |
 
-The pages name 13 libraries, 6 of which are in them. With what those bring with them, the pages hold 9 in all, each in the version web/package-lock.json names.
+The pages name 13 libraries, 6 of which are in them. With what those bring with them, the pages hold 7 in all, each in the version web/package-lock.json names.
 <!-- end: pages -->
 
 ## What the build refuses
@@ -79,6 +79,13 @@ checksum of its source. The list of what a published image holds, with every
 licence, is attached to the image; [building and checking](./build.md) says how
 to read it.
 
+Away shows the same in itself: in the settings, *About Away* lists every part
+the program is built from, with its version and its licence, beside the version
+that runs, where its source is, and the licence Away is under. The program
+holds that list as `crates/away-server/built-from.json`, which
+`scripts/contents.py --parts` writes from the lock files; the build fails when
+the two differ.
+
 ## Adding a library
 
 1. Name it under `[workspace.dependencies]` in `Cargo.toml`, with the features
@@ -86,6 +93,8 @@ to read it.
    line.
 2. Take it into a part with `name.workspace = true`.
 3. Run `python3 scripts/libraries.py`, which writes the table above.
+4. Run `python3 scripts/contents.py --parts crates/away-server/built-from.json`,
+   which writes the list Away shows of itself.
 
 A library that could be twenty lines of Away's own is twenty lines of Away's
 own.

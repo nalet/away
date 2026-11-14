@@ -31,6 +31,7 @@ test-pages: pages
 check: pages
 	python3 scripts/model.py --check
 	python3 scripts/libraries.py --check
+	python3 scripts/contents.py --parts crates/away-server/built-from.json --check
 	cargo fmt --all --check
 	cargo clippy --all-targets --locked -- -D warnings
 	helm lint chart
