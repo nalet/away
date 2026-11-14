@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use away_part::address::Address;
+use away_part::json::Json;
 use away_part::lines::Lines;
 use sha2::{Digest, Sha256};
 
@@ -86,6 +87,29 @@ fn collect(root: &Path, folder: &Path, depth: usize, holds: &mut Folder) -> Resu
     Ok(())
 }
 
+/// Something that changed in what is in force, to be kept as a record: the files were
+/// applied or refused, or a farm publishes something else than before.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Change {
+    /// What happened: `files-applied`, `files-refused` or `farm-read`.
+    pub kind: &'static str,
+    /// The farm, where it is a farm that changed.
+    pub farm: Option<String>,
+    /// What is the case now. Two changes of one kind with the same details are the same
+    /// state, met twice: after the server started anew, say.
+    pub details: Json,
+}
+
+/// The kinds of change that are about the files.
+pub const FILE_CHANGES: [&str; 2] = ["files-applied", "files-refused"];
+/// The kind of change that is about what a farm publishes.
+pub const FARM_CHANGE: &str = "farm-read";
+
+/// A sum as it is written: in hex.
+fn written(sum: &[u8; 32]) -> String {
+    sum.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 /// A change that was refused: when, and why.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Refusal {
@@ -140,6 +164,8 @@ struct State {
     seen: Option<[u8; 32]>,
     /// What was read from the farms' feeds, by the farms' names.
     farms: BTreeMap<String, Read>,
+    /// What changed and is not yet taken to be recorded.
+    changes: Vec<Change>,
 }
 
 impl State {
@@ -190,6 +216,7 @@ impl Register {
                 refused: None,
                 seen: None,
                 farms: BTreeMap::new(),
+                changes: Vec::new(),
             }),
         };
         register.look(now);
@@ -205,6 +232,12 @@ impl Register {
     pub fn in_force(&self) -> (Arc<InForce>, u64) {
         let state = self.state.read().unwrap_or_else(|poisoned| poisoned.into_inner());
         (state.in_force.clone(), state.since)
+    }
+
+    /// Takes what changed since this was last asked, to be kept as records: the oldest
+    /// first.
+    pub fn take_changes(&self) -> Vec<Change> {
+        std::mem::take(&mut self.state.write().unwrap_or_else(|poisoned| poisoned.into_inner()).changes)
     }
 
     /// The last change that was refused, where the files as they are now are refused.
@@ -240,6 +273,20 @@ impl Register {
             Ok(items) => {
                 if before.at.is_none() || before.failed.is_some() || before.items != items {
                     let desktops = items.iter().filter(|item| item.resource.desktop).count();
+                    // what it publishes now, by name: a record, where it is not what it published before
+                    let names = |items: &[Item]| -> Vec<String> { items.iter().map(|item| item.resource.title.clone()).collect() };
+                    if before.at.is_none() || names(&before.items) != names(&items) {
+                        state.changes.push(Change {
+                            kind: FARM_CHANGE,
+                            farm: Some(farm.name.clone()),
+                            details: Json::object([
+                                ("farm", farm.name.as_str().into()),
+                                ("desktops", (desktops as u64).into()),
+                                ("programs", ((items.len() - desktops) as u64).into()),
+                                ("publishes", Json::List(names(&items).iter().map(|name| name.as_str().into()).collect())),
+                            ]),
+                        });
+                    }
                     self.lines.info(
                         "a farm's feed was read",
                         &[
@@ -323,6 +370,17 @@ impl Register {
                         ("rules", (in_force.rules.len() as u64).into()),
                     ],
                 );
+                state.changes.push(Change {
+                    kind: FILE_CHANGES[0],
+                    farm: None,
+                    details: Json::object([
+                        ("sum", written(&seen).as_str().into()),
+                        ("files", (files as u64).into()),
+                        ("machines", (in_force.machines.len() as u64).into()),
+                        ("rules", (in_force.rules.len() as u64).into()),
+                        ("farms", (in_force.farms.len() as u64).into()),
+                    ]),
+                });
                 state.from_files = Arc::new(in_force);
                 state.since = now;
                 state.refused = None;
@@ -336,6 +394,16 @@ impl Register {
                     "a change to the files was refused, and what was in force stays",
                     &[("file", why.file.as_str().into()), ("line", (why.line as u64).into()), ("why", why.why.as_str().into())],
                 );
+                state.changes.push(Change {
+                    kind: FILE_CHANGES[1],
+                    farm: None,
+                    details: Json::object([
+                        ("sum", written(&seen).as_str().into()),
+                        ("file", why.file.as_str().into()),
+                        ("line", (why.line as u64).into()),
+                        ("why", why.why.as_str().into()),
+                    ]),
+                });
                 state.refused = Some(Refusal { at: now, why });
             }
         }

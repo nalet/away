@@ -40,7 +40,7 @@ For the goal [Work on a machine that is somewhere else](../goals/README.md#work-
 | Expected | State | Met by | Note |
 |---|---|---|---|
 | A Windows desktop in the browser | first release | [`open-desktop`](./session.md#opening-a-machine) first release, [`fit-to-window`](./session.md#the-picture) first release, [`desktop-as-at-machine`](./session.md#the-picture) first release | — |
-| One program of a Windows machine, without its desktop | first release | [`open-program`](./session.md#opening-a-machine) first release, [`see-programs`](./app.md#finding-a-machine) first release, [`see-all-programs`](./app.md#finding-a-machine) first release, [`offer-programs`](./admin.md#the-register-of-machines) first release | — |
+| One program of a Windows machine, without its desktop | partly | [`open-program`](./session.md#opening-a-machine) first release, [`see-programs`](./app.md#finding-a-machine) first release, [`see-all-programs`](./app.md#finding-a-machine) built, [`offer-programs`](./admin.md#the-register-of-machines) first release | — |
 | Several programs side by side, with a way to switch between them | first release | [`switch-programs`](./session.md#opening-a-machine) first release, [`list-open-windows`](./session.md#opening-a-machine) first release | — |
 | A Mac or a Linux desktop in the browser | first release | [`open-desktop`](./session.md#opening-a-machine) first release, [`fit-to-window`](./session.md#the-picture) first release, [`pointer-without-delay`](./session.md#the-picture) first release | — |
 | A shell in the browser | first release | [`open-shell`](./session.md#opening-a-machine) first release, [`run-full-screen-programs`](./session.md#the-shell) first release, [`scroll-back`](./session.md#the-shell) first release, [`select-shell-text`](./session.md#the-shell) first release | — |
@@ -55,7 +55,7 @@ For the goal [Work on a machine that is somewhere else](../goals/README.md#work-
 | Usable on a phone or a tablet | partly | [`use-on-phone`](./session.md#on-a-phone-or-a-tablet) built, [`work-by-touch`](./session.md#on-a-phone-or-a-tablet) first release, [`zoom-by-touch`](./session.md#on-a-phone-or-a-tablet) first release, [`use-extra-keys`](./session.md#on-a-phone-or-a-tablet) first release | — |
 | A dropped connection comes back by itself | first release | [`reconnect-by-itself`](./session.md#opening-a-machine) first release, [`keep-while-away`](./session.md#opening-a-machine) first release | — |
 | Several machines open at once | first release | [`open-several`](./session.md#opening-a-machine) first release, [`open-in-own-tab`](./session.md#opening-a-machine) first release, [`see-open-sessions`](./app.md#the-frame) first release | — |
-| A link or a bookmark that opens a machine | first release | [`open-by-address`](./app.md#finding-a-machine) first release | — |
+| A link or a bookmark that opens a machine | there | [`open-by-address`](./app.md#finding-a-machine) built | — |
 | A connection that fails says which step failed | first release | [`see-connecting-steps`](./session.md#opening-a-machine) first release, [`test-machine`](./admin.md#the-register-of-machines) first release | — |
 | A session that ends says why, and opens again from there | first release | [`see-why-ended`](./session.md#opening-a-machine) first release | — |
 | The interface in one's own language | later | [`choose-language`](./app.md#the-frame) later | — |
@@ -104,16 +104,16 @@ For the goal [Know the machines](../goals/README.md#know-the-machines).
 
 | Expected | State | Met by | Note |
 |---|---|---|---|
-| A list of the machines one may reach, with a search | first release | [`see-machines`](./app.md#finding-a-machine) first release, [`search-machines`](./app.md#finding-a-machine) first release, [`find-from-anywhere`](./app.md#the-frame) first release | — |
-| Machines in groups | first release | [`see-groups`](./app.md#finding-a-machine) first release, [`group-machines`](./admin.md#the-register-of-machines) first release | — |
+| A list of the machines one may reach, with a search | partly | [`see-machines`](./app.md#finding-a-machine) built, [`search-machines`](./app.md#finding-a-machine) built, [`find-from-anywhere`](./app.md#the-frame) first release | — |
+| Machines in groups | there | [`see-groups`](./app.md#finding-a-machine) built, [`group-machines`](./admin.md#the-register-of-machines) built | — |
 | One machine with several ways in: its desktop, its programs, its shell | first release | [`choose-way-in`](./app.md#finding-a-machine) first release | — |
-| The machines used last, and favourites, first | first release | [`see-last-used`](./app.md#finding-a-machine) first release, [`keep-favourites`](./app.md#finding-a-machine) first release | — |
+| The machines used last, and favourites, first | partly | [`see-last-used`](./app.md#finding-a-machine) first release, [`keep-favourites`](./app.md#finding-a-machine) built | — |
 | Machines come from the directory or the hypervisor by themselves | later | [`take-from-directory`](./admin.md#the-register-of-machines) later, [`take-from-hypervisor`](./admin.md#the-register-of-machines) later | — |
 | See whether a machine is on | later | [`see-machine-state`](./app.md#finding-a-machine) later | — |
 | Wake a sleeping machine before connecting | later | [`wake-machine`](./app.md#finding-a-machine) later | — |
-| Machines and rules kept as files, in a repository | first release | [`keep-as-files`](./admin.md#the-register-of-machines) first release, [`see-what-is-in-force`](./admin.md#the-register-of-machines) first release, [`see-refused-change`](./admin.md#the-register-of-machines) first release | — |
+| Machines and rules kept as files, in a repository | there | [`keep-as-files`](./admin.md#the-register-of-machines) built, [`see-what-is-in-force`](./admin.md#the-register-of-machines) built, [`see-refused-change`](./admin.md#the-register-of-machines) built | — |
 | Add and change machines in the browser | later | [`add-machine-in-browser`](./admin.md#the-register-of-machines) later | — |
-| The programs a Windows machine publishes show up by themselves | first release | [`read-programs-from-host`](./admin.md#the-register-of-machines) first release | — |
+| The programs a Windows machine publishes show up by themselves | there | [`read-programs-from-host`](./admin.md#the-register-of-machines) built | — |
 | A person adds a machine of their own | later | [`add-own-machine`](./app.md#finding-a-machine) later | — |
 | A fresh desktop made for whoever asks | not planned | [`make-desktops`](./admin.md#the-register-of-machines) not planned | — |
 | A machine in a network Away is not in is reached too | later | [`reach-other-networks`](./platform.md#installing-and-configuring) later, [`install-helper-on-machine`](./admin.md#the-register-of-machines) not planned | — |
@@ -124,8 +124,8 @@ For the goal [Decide who reaches what](../goals/README.md#decide-who-reaches-wha
 
 | Expected | State | Met by | Note |
 |---|---|---|---|
-| Who reaches what follows the organisation's groups | partly | [`allow-by-group`](./admin.md#who-reaches-what) first release, [`take-people-from-provider`](./admin.md#who-reaches-what) built | — |
-| A person sees only the machines they may reach | first release | [`show-only-allowed`](./admin.md#who-reaches-what) first release | — |
+| Who reaches what follows the organisation's groups | there | [`allow-by-group`](./admin.md#who-reaches-what) built, [`take-people-from-provider`](./admin.md#who-reaches-what) built | — |
+| A person sees only the machines they may reach | there | [`show-only-allowed`](./admin.md#who-reaches-what) built | — |
 | An administrator sees what a person reaches, and why | first release | [`see-who-reaches`](./admin.md#who-reaches-what) first release | — |
 | Two people do not end up on one desktop unnoticed | first release | [`see-in-use`](./session.md#opening-a-machine) first release | — |
 | Rules on what may pass: the clipboard, files, printing, sound | first release in part | [`limit-clipboard`](./admin.md#who-reaches-what) first release, [`limit-files`](./admin.md#who-reaches-what) later, [`limit-other-channels`](./admin.md#who-reaches-what) later | — |
@@ -145,7 +145,7 @@ For the goal [Know what happened](../goals/README.md#know-what-happened).
 | Expected | State | Met by | Note |
 |---|---|---|---|
 | A record of who connected to what, when, from where and as whom | first release | [`record-connections`](./admin.md#what-happened) first release, [`record-sign-ins-made`](./admin.md#what-happened) first release, [`read-records`](./admin.md#what-happened) first release | — |
-| A record of every change an administrator made | first release | [`record-changes`](./admin.md#what-happened) first release | — |
+| A record of every change an administrator made | there | [`record-changes`](./admin.md#what-happened) built | — |
 | Sessions recorded and played back | later | [`record-session`](./admin.md#what-happened) later, [`play-recording`](./admin.md#what-happened) later, [`tell-when-recorded`](./admin.md#what-happened) later | — |
 | Find a moment in a recording by what was typed or shown | later | [`search-recording`](./admin.md#what-happened) later | — |
 | Records sent on to the organisation's own log system | first release | [`send-records-on`](./admin.md#what-happened) first release | — |
@@ -172,7 +172,7 @@ For the goal [Run it oneself](../goals/README.md#run-it-oneself).
 | Health and measures for the monitoring that is there | partly | [`see-health`](./platform.md#running-it) first release, [`give-measures`](./platform.md#running-it) partly built, [`write-logs`](./platform.md#running-it) built | — |
 | More than one instance, for load and for failure | later | [`run-several`](./platform.md#running-it) later | — |
 | Back up what it holds and bring it back | later | [`back-up`](./platform.md#running-it) later | — |
-| Everything an administrator does can be done by a script | first release in part | [`do-by-script`](./platform.md#running-it) later, [`keep-as-files`](./admin.md#the-register-of-machines) first release | — |
+| Everything an administrator does can be done by a script | partly | [`do-by-script`](./platform.md#running-it) later, [`keep-as-files`](./admin.md#the-register-of-machines) built | — |
 | A private network to the machines, for other traffic too | not planned | [`carry-other-traffic`](./platform.md#installing-and-configuring) not planned, [`forward-port`](./session.md#the-shell) not planned | — |
 | What can sign people in is kept apart from the rest | there | [`sign-apart`](./platform.md#installing-and-configuring) built, [`protect-secrets`](./platform.md#installing-and-configuring) built | — |
 | Kept passwords are changed on the machines from time to time | not planned | [`change-kept-secret`](./admin.md#the-register-of-machines) not planned | — |

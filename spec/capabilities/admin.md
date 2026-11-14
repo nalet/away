@@ -11,17 +11,17 @@ Which machines there are, how each is reached and how people are signed in on it
 
 | Capability | Who | Away | Key |
 |---|---|---|---|
-| Keep machines, groups and rules as files, applied as they change | operator | v1 | `keep-as-files` |
-| See the machines, groups and rules that are in force, and the file each comes from | admin | v1 | `see-what-is-in-force` |
-| See that a changed file was refused, and why, while what was in force stays | operator | v1 | `see-refused-change` |
+| Keep machines, groups and rules as files, applied as they change | operator | built | `keep-as-files` |
+| See the machines, groups and rules that are in force, and the file each comes from | admin | built | `see-what-is-in-force` |
+| See that a changed file was refused, and why, while what was in force stays | operator | built | `see-refused-change` |
 | Add a machine in the browser: its address, its kind, how one gets in | admin | later | `add-machine-in-browser` |
-| Put machines in groups | admin | v1 | `group-machines` |
+| Put machines in groups | admin | built | `group-machines` |
 | Say for a machine how people are signed in: as themselves, with a kept secret, or by typing | admin | v1 | `set-sign-in-way` |
 | Keep a name and password or a key for a machine, never shown again | admin | v1 | `keep-secret` |
 | Change a kept password on the machine by itself from time to time | system | no | `change-kept-secret` |
 | Say which programs of a Windows machine people may open | admin | v1 | `offer-programs` |
-| Give a program an icon of its own, which people know it by | admin | v1 | `give-program-icons` |
-| Read the desktops and programs a farm of Windows machines publishes from the farm itself, as it changes | system | v1 | `read-programs-from-host` |
+| Give a program an icon of its own, which people know it by | admin | built | `give-program-icons` |
+| Read the desktops and programs a farm of Windows machines publishes from the farm itself, as it changes | system | built | `read-programs-from-host` |
 | Set how a machine is reached: its port, its screen, what may pass | admin | v1 | `set-connection-options` |
 | Test a machine: is it reached, does signing in work, and if not, which step fails | admin | v1 | `test-machine` |
 | Say how a machine proves who it is, and accept a changed identity on purpose | admin | v1 | `know-machine-identity` |
@@ -46,8 +46,8 @@ The rules: which people reach which machines, and what they may do there. For th
 
 | Capability | Who | Away | Key |
 |---|---|---|---|
-| Allow a group of people to reach a machine or a group of machines | admin | v1 | `allow-by-group` |
-| Show a person only the machines a rule gives them | system | v1 | `show-only-allowed` |
+| Allow a group of people to reach a machine or a group of machines | admin | built | `allow-by-group` |
+| Show a person only the machines a rule gives them | system | built | `show-only-allowed` |
 | See what a person reaches, and by which rule | admin | v1 | `see-who-reaches` |
 | Take people and their groups from the identity provider, and keep none of its own | system | built | `take-people-from-provider` |
 | Say who administers Away, who reads its records, and who only connects | admin | built | `name-roles` |
@@ -88,7 +88,7 @@ The records of every connection and change, and the recordings of sessions. For 
 |---|---|---|---|---|---|---|
 | Keep a record of every connection: who, which machine, as whom, when, from where, how it ended | system | — | — | — | v1 | `record-connections` |
 | Keep a record of every sign-in Away made on a machine for someone | system | — | — | — | v1 | `record-sign-ins-made` |
-| Keep a record of every change to machines, rules and settings | system | — | — | — | v1 | `record-changes` |
+| Keep a record of every change to machines, rules and settings | system | — | — | — | built | `record-changes` |
 | Read the records and search them | admin | — | — | — | v1 | `read-records` |
 | Send every record on to the organisation's own log system as it is written | system | — | — | — | v1 | `send-records-on` |
 | Keep a record of every file moved and of what the clipboard carried | system | — | — | — | later | `record-moved-content` |

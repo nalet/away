@@ -595,6 +595,101 @@ fn what_a_person_starred_is_theirs_on_every_browser_and_shows_for_as_long_as_the
     assert_eq!(starred(&mut later, &again), ["Pay & Benefits on fin-app-02", "build-01"]);
 }
 
+/// The records of a database, as the tests read them beside the server: each its kind,
+/// the machine or farm it is about, and its details.
+fn records(database: &Database) -> Vec<(String, Option<String>, Json)> {
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("a runtime");
+    runtime.block_on(async {
+        let mut at = tokio_postgres::Config::new();
+        at.host(&database.host)
+            .port(database.port)
+            .dbname(&database.name)
+            .user(&database.account)
+            .password("a password for this machine alone");
+        let (client, connection) = at.connect(tokio_postgres::NoTls).await.expect("the tests' database");
+        let carried = tokio::spawn(connection);
+        // before the server has brought the database into shape there are no records to read
+        let rows = client.query("select kind, machine, details from record order by number", &[]).await.unwrap_or_default();
+        let read = rows
+            .iter()
+            .map(|row| {
+                (row.get::<_, String>(0), row.get::<_, Option<String>>(1), Json::read(&row.get::<_, String>(2)).expect("details as JSON"))
+            })
+            .collect();
+        drop(client);
+        let _ = carried.await;
+        read
+    })
+}
+
+#[test]
+fn every_change_of_the_files_and_of_what_a_farm_publishes_is_a_record_and_a_start_anew_is_none() {
+    let Some(database) = a_database_of_its_own() else { return };
+    let (_runtime, farm) = farm();
+    let machines = "machines:\n  - name: build-01\n    kind: linux\n    address: build-01.corp.example\n    shell: true\n";
+    let folder = Folder::with("records", &[("machines.yaml", machines), ("farm.yaml", &farm_files(&farm.feed()))]);
+    let told = |told: &mut Told| {
+        told.files = Some(folder.0.clone());
+        told.farms = reads_farms("the password of the account that reads the feed");
+        told.database = Some(database.clone());
+    };
+    let world = world_with(told);
+    let kinds = |database: &Database| records(database).into_iter().map(|(kind, machine, _)| (kind, machine)).collect::<Vec<_>>();
+    let applied = ("files-applied".to_string(), None);
+    let read = ("farm-read".to_string(), Some("Work Resources".to_string()));
+    until("the files and the farm are records", || kinds(&database) == [applied.clone(), read.clone()]);
+    let kept = records(&database);
+    assert_eq!(
+        (
+            kept[0].2.get("files").and_then(Json::count),
+            kept[0].2.get("machines").and_then(Json::count),
+            kept[0].2.get("farms").and_then(Json::count)
+        ),
+        (Some(2), Some(1), Some(1))
+    );
+    assert!(kept[0].2.text_of("sum").is_some_and(|sum| sum.len() == 64));
+    assert_eq!(kept[1].2.get("publishes").map(Json::write).as_deref(), Some(r#"["Ledger","Pay & Benefits","Desktop"]"#));
+    // each record is a line on the server's output too
+    let lines = world.lines.kept();
+    assert_eq!(lines.iter().filter(|line| line.contains("\"event\":\"record\"") && line.contains("\"kind\":\"files-applied\"")).count(), 1);
+
+    // a file with a mistake in it: refused, with the file, the line and the reason
+    std::fs::write(folder.0.join("machines.yaml"), format!("{machines}    prot: 22\n")).expect("the file");
+    until("the refusal is a record", || kinds(&database).len() == 3);
+    let kept = records(&database);
+    assert_eq!(kept[2].0, "files-refused");
+    assert_eq!((kept[2].2.text_of("file"), kept[2].2.get("line").and_then(Json::count)), (Some("machines.yaml"), Some(6)));
+    assert_eq!(kept[2].2.text_of("why"), Some("“prot” is not something a machine has"));
+    // put right again: the same files as at first, and a change all the same
+    std::fs::write(folder.0.join("machines.yaml"), machines).expect("the file");
+    until("the files are applied again", || kinds(&database).len() == 4);
+    let kept = records(&database);
+    assert_eq!((kept[3].0.as_str(), kept[3].2.text_of("sum")), ("files-applied", kept[0].2.text_of("sum")));
+
+    // the farm publishes a program more
+    farm.publishes("Reports", false, "Finance", None);
+    until("what the farm publishes now is a record", || kinds(&database).len() == 5);
+    assert_eq!(
+        records(&database)[4].2.get("publishes").map(Json::write).as_deref(),
+        Some(r#"["Ledger","Pay & Benefits","Desktop","Reports"]"#)
+    );
+
+    // a server that starts anew on the same files and the same database finds nothing changed
+    let again = world_with(|told| {
+        told.files = Some(folder.0.clone());
+        told.farms = reads_farms("the password of the account that reads the feed");
+        told.database = Some(database.clone());
+    });
+    let mut browser = Browser::default();
+    browser.sign_in(&again, "/");
+    until("the server that started anew has read the farm", || {
+        names(&browser.get(&format!("{}/api/machines", again.away)).says(), "machines").contains(&"Work Resources".to_string())
+    });
+    std::thread::sleep(Duration::from_millis(1500));
+    assert_eq!(kinds(&database).len(), 5, "{:?}", kinds(&database));
+    drop(world);
+}
+
 #[test]
 fn a_database_that_is_not_there_keeps_nobody_from_the_machines_and_says_so_once() {
     let absent = Database {

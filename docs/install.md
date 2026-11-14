@@ -121,8 +121,9 @@ change is applied.
 
 ## The database
 
-Away keeps what people star in one PostgreSQL database, which only the server
-reaches. Without one Away runs, keeps nothing, and the pages show no stars.
+Away keeps what people star, and a record of every change to the machines and
+the rules, in one PostgreSQL database, which only the server reaches. Without
+one Away runs, keeps nothing, and the pages show no stars.
 
 Bring a database and an account for Away. The account makes Away's tables
 itself, so it owns the database or may create in it:

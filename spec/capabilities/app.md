@@ -61,16 +61,16 @@ The machines a person may reach: the list, its groups, the search, what was used
 
 | Capability | Who | Away | Key |
 |---|---|---|---|
-| See the machines one may reach, on a page of their own | person | v1 | `see-machines` |
-| Find a machine by its name, its address or its group | person | v1 | `search-machines` |
-| See the machines in the groups an administrator made | person | v1 | `see-groups` |
+| See the machines one may reach, on a page of their own | person | built | `see-machines` |
+| Find a machine by its name, its address or its group | person | built | `search-machines` |
+| See the machines in the groups an administrator made | person | built | `see-groups` |
 | See the machines used last | person | v1 | `see-last-used` |
-| Mark machines and programs as favourites, and see them on home | person | v1 | `keep-favourites` |
-| See what a machine is: its kind, its address, how one gets in | person | v1 | `see-machine-details` |
+| Mark machines and programs as favourites, and see them on home | person | built | `keep-favourites` |
+| See what a machine is: its kind, its address, how one gets in | person | built | `see-machine-details` |
 | See the programs a Windows machine offers, and open one | person | v1 | `see-programs` |
-| See every program one may open on a page of their own, each as an entry, and find it by its name | person | v1 | `see-all-programs` |
+| See every program one may open on a page of their own, each as an entry, and find it by its name | person | built | `see-all-programs` |
 | Choose how to open a machine that offers more than one way: its desktop, its programs, its shell | person | v1 | `choose-way-in` |
-| Open a machine from a link or a bookmark | person | v1 | `open-by-address` |
+| Open a machine from a link or a bookmark | person | built | `open-by-address` |
 | See whether a machine is on and can be reached | person | later | `see-machine-state` |
 | Wake a machine that sleeps or is off, and connect once it is up | person | later | `wake-machine` |
 | Add a machine of one's own that nobody else sees | person | later | `add-own-machine` |

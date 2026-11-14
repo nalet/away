@@ -9,9 +9,11 @@
 use std::time::Duration;
 
 use away_part::client::{encrypting_unchecked, securing};
+use away_part::json::Json;
 use away_part::Lines;
 use away_secret::Secret;
 use away_server::store::favourites::Favourite;
+use away_server::store::records::Record;
 use away_server::store::{Failed, Secured, Settings, Store, Unusable, SHAPE};
 
 const PASSWORD: &str = "a password for this machine alone";
@@ -169,6 +171,61 @@ async fn what_a_person_starred_is_kept_with_the_person_in_the_order_they_starred
 }
 
 #[tokio::test]
+async fn records_are_added_and_the_database_itself_keeps_them_from_being_changed() {
+    let Some(settings) = database() else { return };
+    let settings = a_database_of_its_own(&settings).await;
+    let store = store(&settings);
+    let record = |key: &str, kind: &str, machine: Option<&str>| Record {
+        key: key.to_string(),
+        kind: kind.to_string(),
+        person: Some(("7c1f".to_string(), "Alex Urban".to_string())),
+        machine: machine.map(str::to_string),
+        details: Json::object([("way", "desktop".into()), ("from", "'; drop table record; --".into())]),
+    };
+    store.record(&record("one", "session-asked", Some("fin-app-02"))).await.unwrap();
+    store.record(&Record { person: None, ..record("two", "files-applied", None) }).await.unwrap();
+    // a record that is added twice, as after a connection that broke in the middle, is one record
+    store.record(&record("one", "session-asked", Some("fin-app-02"))).await.unwrap();
+
+    let beside = beside(&settings).await;
+    let kept = beside
+        .query("select number, key, kind, person, person_name, machine, details, at <= now() from record order by number", &[])
+        .await
+        .unwrap();
+    assert_eq!(kept.len(), 2);
+    assert_eq!(
+        (kept[0].get::<_, i64>(0), kept[0].get::<_, String>(1), kept[0].get::<_, String>(2), kept[0].get::<_, Option<String>>(3)),
+        (1, "one".to_string(), "session-asked".to_string(), Some("7c1f".to_string()))
+    );
+    assert_eq!(
+        (kept[0].get::<_, Option<String>>(4), kept[0].get::<_, Option<String>>(5)),
+        (Some("Alex Urban".to_string()), Some("fin-app-02".to_string()))
+    );
+    assert_eq!(kept[0].get::<_, String>(6), r#"{"way":"desktop","from":"'; drop table record; --"}"#);
+    assert!(kept[0].get::<_, bool>(7));
+    assert_eq!((kept[1].get::<_, Option<String>>(3), kept[1].get::<_, Option<String>>(5)), (None, None));
+
+    // the last of a kind, about a machine or about none
+    assert_eq!(
+        store.last_record(&["session-asked"], Some("fin-app-02")).await.unwrap().map(|(kind, _)| kind).as_deref(),
+        Some("session-asked")
+    );
+    assert_eq!(store.last_record(&["session-asked"], None).await.unwrap(), None);
+    assert_eq!(
+        store.last_record(&["files-applied", "files-refused"], None).await.unwrap().map(|(kind, _)| kind).as_deref(),
+        Some("files-applied")
+    );
+
+    // nobody changes a record, removes one or empties the records: not even the account that adds them
+    for forbidden in ["update record set kind = 'other'", "delete from record where key = 'one'", "truncate record"] {
+        let refused = beside.batch_execute(forbidden).await.expect_err(forbidden);
+        let refused = refused.as_db_error().expect("the database's own refusal");
+        assert_eq!((refused.code().code(), refused.message()), ("23001", "a record is never changed and never removed"), "{forbidden}");
+    }
+    assert_eq!(beside.query_one("select count(*) from record", &[]).await.unwrap().get::<_, i64>(0), 2);
+}
+
+#[tokio::test]
 async fn a_connection_the_database_closed_is_opened_anew() {
     let Some(settings) = database() else { return };
     let settings = a_database_of_its_own(&settings).await;
@@ -213,17 +270,15 @@ async fn a_wrong_password_an_unknown_account_and_a_database_that_is_not_there_sa
 #[tokio::test]
 async fn a_connection_is_secured_where_it_is_to_be_and_the_database_proves_who_it_is() {
     let Some(settings) = database() else { return };
+    // how many of the connections to a database of the tests are encrypted, and Away's
+    let encrypted = "select count(*) from pg_stat_ssl join pg_stat_activity using (pid) \
+                     where ssl and application_name = 'away' and datname = current_database()";
     let authority = include_bytes!("../../away-part/tests/fixtures/authority.pem");
     let verified = Secured::Verified(securing(Some(authority), b"postgresql").unwrap());
-    let secured = Settings { secured: verified, ..settings.clone() };
-    store(&secured).begin().await.expect("secured and signed in");
-    let beside = beside(&settings).await;
-    let encrypted = "select count(*) from pg_stat_ssl join pg_stat_activity using (pid) where ssl and application_name = 'away'";
-    // the store's own connection is gone with the store: one that is held shows as secured
+    let secured = Settings { secured: verified, ..a_database_of_its_own(&settings).await };
     let held = store(&secured);
-    held.begin().await.unwrap();
-    assert_eq!(beside.query_one(encrypted, &[]).await.unwrap().get::<_, i64>(0), 1);
-    drop(held);
+    held.begin().await.expect("secured and signed in");
+    assert_eq!(beside(&secured).await.query_one(encrypted, &[]).await.unwrap().get::<_, i64>(0), 1);
 
     // a database whose certificate is of no authority the server trusts is not spoken to
     let unknown = Settings { secured: Secured::Verified(securing(None, b"postgresql").unwrap()), ..settings.clone() };
@@ -237,11 +292,11 @@ async fn a_connection_is_secured_where_it_is_to_be_and_the_database_proves_who_i
     let unchecked = Settings {
         host: "127.0.0.1".to_string(),
         secured: Secured::Encrypted(encrypting_unchecked(b"postgresql").unwrap()),
-        ..settings.clone()
+        ..a_database_of_its_own(&settings).await
     };
     let held = store(&unchecked);
     held.begin().await.expect("encrypted, and the certificate not checked");
-    assert_eq!(beside.query_one(encrypted, &[]).await.unwrap().get::<_, i64>(0), 1);
+    assert_eq!(beside(&unchecked).await.query_one(encrypted, &[]).await.unwrap().get::<_, i64>(0), 1);
 }
 
 #[tokio::test]

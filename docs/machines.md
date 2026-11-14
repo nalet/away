@@ -220,6 +220,14 @@ In line 14, “prot” is not something a machine has. What was in force before 
 When the files are wrong as the server starts, nothing is in force until they
 are put right.
 
+With a database ([installing Away](./install.md#the-database)), each of the two
+is kept as a record, and so is what a farm publishes whenever it is something
+else than before. A record is only ever added: the database itself refuses to
+change or to remove one. Each is also a line on the server's output at the
+moment it is written, `record`, with its kind and its details, so that the
+organisation's log system holds a copy. A server that starts anew and finds
+the files as they were adds no record.
+
 ## What people and administrators see
 
 - **Programs** is a page of every program a person may open, each an entry of

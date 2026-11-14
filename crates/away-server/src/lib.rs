@@ -8,6 +8,7 @@
 pub mod farm;
 pub mod getting_in;
 pub mod pages;
+pub mod records;
 pub mod register;
 pub mod service;
 pub mod sign_ins;
@@ -51,6 +52,9 @@ pub const ADDRESS: &str = "0.0.0.0:8080";
 
 /// How often the server looks whether the files of machines and rules changed.
 const LOOKS_AT_THE_FILES_EVERY: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// How often what changed is looked for, to be kept as records.
+const RECORDS_ARE_WRITTEN_EVERY: std::time::Duration = std::time::Duration::from_millis(500);
 
 /// How long reading one farm's feed may take.
 const A_FARM_IS_READ_WITHIN: std::time::Duration = std::time::Duration::from_secs(120);
@@ -137,6 +141,43 @@ impl Server {
                 tokio::time::sleep(LOOKS_AT_THE_FILES_EVERY).await;
             }
         });
+        // what changes in what is in force is kept as a record, in the order it happened;
+        // while the database gives nothing the changes wait, and nothing of them is lost
+        let register = self.getting_in.register();
+        let records = records::Records::new(self.getting_in.store(), self.part.lines.clone());
+        let lines = self.part.lines.clone();
+        let recording = tokio::spawn(async move {
+            let mut waiting: std::collections::VecDeque<(String, register::files::Change)> = std::collections::VecDeque::new();
+            let mut said = false;
+            loop {
+                for change in register.take_changes() {
+                    if !records.are_kept() {
+                        continue;
+                    }
+                    match records::Records::key() {
+                        Ok(key) => waiting.push_back((key, change)),
+                        Err(why) => lines.error("a change could not be kept as a record", &[("why", why.as_str().into())]),
+                    }
+                }
+                while let Some((key, change)) = waiting.front() {
+                    match records.changed(change, key).await {
+                        Ok(_) => {
+                            waiting.pop_front();
+                            said = false;
+                        }
+                        Err(unusable) => {
+                            if !said {
+                                let why = unusable.to_string();
+                                lines.warn("a change waits to be kept as a record", &[("why", why.as_str().into())]);
+                                said = true;
+                            }
+                            break;
+                        }
+                    }
+                }
+                tokio::time::sleep(RECORDS_ARE_WRITTEN_EVERY).await;
+            }
+        });
         // the farms' feeds are read as time passes, each when it is due
         let register = self.getting_in.register();
         let farms = self.farms.clone();
@@ -176,6 +217,7 @@ impl Server {
         looking.abort();
         reading.abort();
         reaching.abort();
+        recording.abort();
     }
 }
 

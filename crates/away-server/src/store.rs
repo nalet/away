@@ -10,6 +10,7 @@
 //! [`SHAPE`] is taken once, in its order, and the database remembers which were taken.
 
 pub mod favourites;
+pub mod records;
 
 use std::time::Duration;
 
@@ -23,16 +24,38 @@ use tokio_postgres_rustls::MakeRustlsConnect;
 
 /// The database's shape, as steps: what each is for, and what it does. A step is never
 /// changed once a version with it was published; what comes later is a step more.
-pub const SHAPE: &[(&str, &str)] = &[(
-    "what people starred",
-    "create table favourite (
-        person text not null,
-        machine text not null,
-        program text not null default '',
-        since timestamptz not null default now(),
-        primary key (person, machine, program)
-    )",
-)];
+pub const SHAPE: &[(&str, &str)] = &[
+    (
+        "what people starred",
+        "create table favourite (
+            person text not null,
+            machine text not null,
+            program text not null default '',
+            since timestamptz not null default now(),
+            primary key (person, machine, program)
+        )",
+    ),
+    (
+        "the records, which are only ever added",
+        "create table record (
+            number bigint generated always as identity primary key,
+            key text not null unique,
+            at timestamptz not null default now(),
+            kind text not null,
+            person text,
+            person_name text,
+            machine text,
+            details text not null
+        );
+        create function record_stays() returns trigger language plpgsql as $record$
+        begin
+            raise exception 'a record is never changed and never removed' using errcode = 'restrict_violation';
+        end $record$;
+        create trigger record_is_not_changed before update or delete on record for each row execute function record_stays();
+        create trigger record_is_not_emptied before truncate on record for each statement execute function record_stays();
+        create index record_by_kind on record (kind, machine, number)",
+    ),
+];
 
 /// The number the servers of one database agree on, so that one of them at a time
 /// changes its shape.
