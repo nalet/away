@@ -194,9 +194,9 @@ The pipeline runs it on every change.
 
 ## Against a real database
 
-The server speaks to its database with code of its own, and what it keeps is
-tried against a real PostgreSQL. A script starts one in a container, with the
-tests' certificate for `localhost`, and runs the tests that need it:
+What the server keeps is tried against a real PostgreSQL. A script starts one
+in a container, with the tests' certificate for `localhost`, and runs the
+tests that need it:
 
 ```sh
 tests/machines/database/real.sh

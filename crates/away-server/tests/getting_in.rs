@@ -15,8 +15,7 @@ use away_server::getting_in::{FROM_AWAYS_PAGE, NOT_SIGNED_IN, SIGNED_IN, SIGNING
 use away_server::service;
 use away_server::stand_in::farm::Farm;
 use away_server::stand_in::SignInService;
-use away_server::store::link::{Link, Settings as DatabaseAt};
-use away_server::told::{Database, Farms, SignIn, Told};
+use away_server::told::{Database, DatabaseConnection, Farms, SignIn, Told};
 use away_server::Server;
 
 /// The server, the sign-in service beside it, and what the server wrote.
@@ -493,32 +492,28 @@ fn a_database_of_its_own() -> Option<Database> {
         return None;
     };
     let (host, port) = at.rsplit_once(':').expect("AWAY_TEST_DATABASE is host:port");
+    let port: u16 = port.parse().expect("a port");
     let password = "a password for this machine alone";
-    let mut random = [0u8; 24];
+    let mut random = [0u8; 6];
     getrandom::fill(&mut random).expect("random bytes");
-    let name = format!("test_{}", random[..6].iter().map(|byte| format!("{byte:02x}")).collect::<String>());
-    let at = DatabaseAt {
-        host: host.to_string(),
-        port: port.parse().expect("a port"),
-        database: "away".to_string(),
-        account: "away".to_string(),
-        password: Secret::new(password),
-        secured: None,
-        within: Duration::from_secs(10),
-    };
+    let name = format!("test_{}", random.iter().map(|byte| format!("{byte:02x}")).collect::<String>());
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("a runtime");
     runtime.block_on(async {
-        let mut link = Link::open(&at, &random[6..].try_into().expect("18 bytes")).await.expect("the tests' database");
-        link.run(&format!("create database {name}")).await.expect("a database of its own");
-        link.leave().await;
+        let mut at = tokio_postgres::Config::new();
+        at.host(host).port(port).dbname("away").user("away").password(password);
+        let (client, connection) = at.connect(tokio_postgres::NoTls).await.expect("the tests' database");
+        let carried = tokio::spawn(connection);
+        client.batch_execute(&format!("create database {name}")).await.expect("a database of its own");
+        drop(client);
+        let _ = carried.await;
     });
     Some(Database {
-        host: at.host,
-        port: at.port,
+        host: host.to_string(),
+        port,
         name,
-        account: at.account,
+        account: "away".to_string(),
         password: Secret::new(password),
-        secured: false,
+        connection: DatabaseConnection::Plain,
         authorities: None,
     })
 }
@@ -608,7 +603,7 @@ fn a_database_that_is_not_there_keeps_nobody_from_the_machines_and_says_so_once(
         name: "away".to_string(),
         account: "away".to_string(),
         password: Secret::new("a password"),
-        secured: false,
+        connection: DatabaseConnection::Plain,
         authorities: None,
     };
     let world = world_with(|told| told.database = Some(absent));

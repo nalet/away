@@ -139,15 +139,20 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
   --set database.host=postgres.example.com --set database.secretName=away-database
 ```
 
-- **The server signs in with a proof of its password** (SCRAM-SHA-256), which
-  is what PostgreSQL asks for unless it is set otherwise. It gives the
-  password itself, or its old hash, to no database.
 - **The connection is secured**, and the database has to show a certificate
   for the name in `database.host`. Where the certificate is of the
   organisation's own authority, name it: a ConfigMap with its certificate as
   PEM, under the key `authorities.pem`, in `database.authoritiesConfigMap`.
-  `database.secured=false` turns that off, for a database that is reached over
-  a network nobody else is on.
+- **A database that shows a certificate no authority signed** is reached with
+  `database.connection=encrypted`: the connection is encrypted, and the
+  certificate is not checked. What travels can't be read on the way, and
+  whoever can put themselves between the server and the database is not
+  noticed, so it is for a network nobody else is on. `database.connection=plain`
+  secures nothing.
+- **The server signs in the way the database asks.** A PostgreSQL of today
+  asks for a proof of the password (SCRAM-SHA-256), and the password itself
+  never travels. Let the database ask for that: over a connection that is
+  not secured, a database set to ask for the password itself is given it.
 - **The server brings the database into shape itself** when it starts, and
   writes a line: `the database was brought into shape`. A later version takes
   the steps it adds, and never one back: a version that finds the database in
@@ -224,7 +229,7 @@ Everything an installation is told is one of these. The chart's
 | `database.host`, `database.port` | the database server's name on the network, and its port ([the database](#the-database)) | none: Away keeps nothing; port 5432 |
 | `database.name`, `database.account` | the database of that server which is Away's, and the account the server signs in as | `away`, `away` |
 | `database.secretName` | the secret that holds that account's password, under the key `password` | none |
-| `database.secured` | whether the connection to the database is secured | yes |
+| `database.connection` | how the connection to the database is secured: `verified`, `encrypted` without checking the database's certificate, or `plain` | `verified` |
 | `database.authoritiesConfigMap` | a ConfigMap with certificates of authorities to trust for the database besides the public ones, under the key `authorities.pem` | none |
 | `farms.account` | the account Away reads the farms' feeds with, such as `CORP\svc-away` ([the farms' feeds](#the-farms-feeds)) | none: a farm in the files shows nothing |
 | `farms.secretName` | the secret that holds the account's password, under the key `password` | none |

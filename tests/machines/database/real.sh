@@ -30,11 +30,13 @@ openssl pkey -inform der -in "$fixtures/localhost.key.der" -out "$work/server.ke
 
 echo "Starting PostgreSQL"
 docker rm --force "$name" >/dev/null 2>&1 || true
+# the database asks for a password the way each account's is kept: with a proof for one
+# kept the way of today, with its old hash for one kept the old way, which a test makes
 # the database takes a key only from a file of its own account, so the two are put into
 # the container before it starts, and copied there to where the database reads them
 docker create --name "$name" --publish "127.0.0.1:$port:5432" \
   --env POSTGRES_USER=away --env POSTGRES_DB=away --env "POSTGRES_PASSWORD=a password for this machine alone" \
-  --entrypoint sh "$image" -c '
+  --env POSTGRES_HOST_AUTH_METHOD=md5 --entrypoint sh "$image" -c '
     cp /given/server.crt /given/server.key /var/lib/postgresql/ &&
     chown postgres /var/lib/postgresql/server.crt /var/lib/postgresql/server.key &&
     chmod 600 /var/lib/postgresql/server.key &&

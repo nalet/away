@@ -15,16 +15,13 @@ pub struct Favourite {
 impl Store {
     /// What a person starred, the first starred first.
     pub async fn favourites(&self, person: &str) -> Result<Vec<Favourite>, Unusable> {
-        let answer =
-            self.ask("select machine, program from favourite where person = $1 order by since, machine, program", &[Some(person)]).await?;
-        Ok(answer
-            .rows
-            .into_iter()
-            .filter_map(|row| {
-                let mut values = row.into_iter();
-                let machine = values.next()??;
-                let program = values.next()?.filter(|program| !program.is_empty());
-                Some(Favourite { machine, program })
+        let rows =
+            self.rows("select machine, program from favourite where person = $1 order by since, machine, program", &[&person]).await?;
+        Ok(rows
+            .iter()
+            .map(|row| {
+                let program: String = row.get(1);
+                Favourite { machine: row.get(0), program: Some(program).filter(|program| !program.is_empty()) }
             })
             .collect())
     }
@@ -32,12 +29,12 @@ impl Store {
     /// Stars something for a person, or takes the star away again. Starring what is
     /// starred, or taking a star from what has none, changes nothing.
     pub async fn star(&self, person: &str, favourite: &Favourite, starred: bool) -> Result<(), Unusable> {
-        let values = [Some(person), Some(favourite.machine.as_str()), Some(favourite.program.as_deref().unwrap_or(""))];
+        let program = favourite.program.as_deref().unwrap_or("");
         let statement = if starred {
             "insert into favourite (person, machine, program) values ($1, $2, $3) on conflict do nothing"
         } else {
             "delete from favourite where person = $1 and machine = $2 and program = $3"
         };
-        self.ask(statement, &values).await.map(|_| ())
+        self.change(statement, &[&person, &favourite.machine, &program]).await.map(|_| ())
     }
 }

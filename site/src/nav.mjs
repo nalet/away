@@ -104,7 +104,7 @@ const SECTIONS = [
       ['spec/architecture/decisions/0012-one-chart-no-special-rights.md', '0012 one chart'],
       ['spec/architecture/decisions/0013-built-tested-signed-by-the-pipelines.md', '0013 the pipelines'],
       ['spec/architecture/decisions/0014-a-farm-says-what-it-publishes.md', '0014 a farm says what it publishes'],
-      ['spec/architecture/decisions/0015-own-database-client.md', '0015 the database client'],
+      ['spec/architecture/decisions/0015-a-widely-used-database-client.md', '0015 the database client'],
     ],
   },
   {

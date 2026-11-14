@@ -49,7 +49,10 @@
 {{- $told = append $told (dict "name" "AWAY_DATABASE_NAME" "value" .name) -}}
 {{- $told = append $told (dict "name" "AWAY_DATABASE_ACCOUNT" "value" .account) -}}
 {{- $told = append $told (dict "name" "AWAY_DATABASE_PASSWORD_FILE" "value" "/run/away/database/password") -}}
-{{- $told = append $told (dict "name" "AWAY_DATABASE_SECURED" "value" (ternary "yes" "no" .secured)) -}}
+{{- if not (has .connection (list "verified" "encrypted" "plain")) }}
+{{- fail (printf "database.connection is verified, encrypted or plain, and not \"%v\"" .connection) }}
+{{- end }}
+{{- $told = append $told (dict "name" "AWAY_DATABASE_CONNECTION" "value" .connection) -}}
 {{- $secret := dict "secretName" (required "database.secretName is not set" .secretName) "items" (list (dict "key" "password" "path" "password")) -}}
 {{- $mounts = append $mounts (dict "at" "/run/away/database" "volume" (dict "name" "database" "secret" $secret)) -}}
 {{- if .authoritiesConfigMap }}

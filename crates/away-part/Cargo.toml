@@ -18,6 +18,9 @@ rustls.workspace = true
 tokio-rustls.workspace = true
 webpki-roots.workspace = true
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["io-util"] }
+
 
 [lints]
 workspace = true

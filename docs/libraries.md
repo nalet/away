@@ -8,7 +8,7 @@ library has no line that says what it is for.
 <!-- generated: libraries -->
 | Library | What it is for | Version in this build | With |
 |---|---|---|---|
-| [tokio](https://crates.io/crates/tokio) | runs many connections at once | 1.54.1 | `rt-multi-thread`, `net`, `signal`, `macros`, `time`, `sync`, `io-util` |
+| [tokio](https://crates.io/crates/tokio) | runs many connections at once | 1.54.1 | `rt-multi-thread`, `net`, `signal`, `macros`, `time`, `sync` |
 | [hyper](https://crates.io/crates/hyper) | speaks HTTP to browsers, to the cluster's checks and to the sign-in service | 1.12.0 | `http1`, `server`, `client` |
 | [hyper-util](https://crates.io/crates/hyper-util) | lets hyper use tokio's connections and timers | 0.1.21 | `tokio` |
 | [http-body-util](https://crates.io/crates/http-body-util) | holds the body of an HTTP answer | 0.1.5 | — |
@@ -25,8 +25,10 @@ library has no line that says what it is for.
 | [num-bigint](https://crates.io/crates/num-bigint) | does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is | 0.5.1 | — |
 | [getrandom](https://crates.io/crates/getrandom) | takes random bytes from the system, for keys and for numbers used once | 0.2.17, 0.4.3 | — |
 | [saphyr-parser](https://crates.io/crates/saphyr-parser) | reads the files of machines and rules, which are YAML, and knows the line each thing is written in | 0.3.4 | — |
+| [tokio-postgres](https://crates.io/crates/tokio-postgres) | speaks to the database: the client that most programs in this language use | 0.7.18 | `runtime` |
+| [tokio-postgres-rustls](https://crates.io/crates/tokio-postgres-rustls) | lets rustls secure the connection to the database | 0.14.0 | `ring` |
 
-Away names 17 libraries. With what they bring with them, a build holds 80 in all, each in the version Cargo.lock names.
+Away names 19 libraries. With what they bring with them, a build holds 145 in all, each in the version Cargo.lock names.
 <!-- end: libraries -->
 
 ## The pages

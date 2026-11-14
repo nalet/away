@@ -81,37 +81,74 @@ fn trusted(also_trusted: Option<&[u8]>) -> Result<RootCertStore, String> {
     Ok(trusted)
 }
 
-/// What secures connections, for a service that speaks this protocol on them.
-fn securing(also_trusted: Option<&[u8]>, speaks: &[u8]) -> Result<TlsConnector, String> {
+/// How connections are secured to a service that speaks this protocol on them, as it
+/// is named when a connection is secured: the service's certificate is checked against
+/// the public authorities, and those of these certificates that the operator added,
+/// written as PEM. It is what [`Client`] secures its own connections with, for a library
+/// that speaks something else than HTTP, such as the one that speaks to a database.
+pub fn securing(also_trusted: Option<&[u8]>, speaks: &[u8]) -> Result<ClientConfig, String> {
     let mut config = ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
         .with_safe_default_protocol_versions()
         .map_err(|error| error.to_string())?
         .with_root_certificates(trusted(also_trusted)?)
         .with_no_client_auth();
     config.alpn_protocols = vec![speaks.to_vec()];
-    Ok(TlsConnector::from(Arc::new(config)))
+    Ok(config)
 }
 
-/// A connection that is secured.
-pub type Secured = tokio_rustls::client::TlsStream<TcpStream>;
+/// How connections are encrypted to a service whose certificate is not checked: for a
+/// service that shows a certificate no authority signed, where the installation says
+/// so. What travels can't be read on the way. Whoever can put themselves between the
+/// two is not noticed, so it is for a network nobody else is on.
+pub fn encrypting_unchecked(speaks: &[u8]) -> Result<ClientConfig, String> {
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let mut config = ClientConfig::builder_with_provider(provider.clone())
+        .with_safe_default_protocol_versions()
+        .map_err(|error| error.to_string())?
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(Unchecked(provider)))
+        .with_no_client_auth();
+    config.alpn_protocols = vec![speaks.to_vec()];
+    Ok(config)
+}
 
-/// Secures connections to a service that speaks something else than HTTP, such as a
-/// database: the service's certificate is checked as [`Client`] checks one.
-#[derive(Clone)]
-pub struct Secures(TlsConnector);
+/// Takes whatever certificate a service shows. That the service holds the key of the
+/// certificate it shows is still proven, as the protocol asks.
+#[derive(Debug)]
+struct Unchecked(Arc<rustls::crypto::CryptoProvider>);
 
-impl Secures {
-    /// For a service that speaks this protocol, as it is named when a connection is
-    /// secured. It trusts the public authorities, and those of these certificates that
-    /// the operator added, written as PEM.
-    pub fn new(also_trusted: Option<&[u8]>, speaks: &[u8]) -> Result<Secures, String> {
-        securing(also_trusted, speaks).map(Secures)
+impl rustls::client::danger::ServerCertVerifier for Unchecked {
+    fn verify_server_cert(
+        &self,
+        _shown: &CertificateDer<'_>,
+        _between: &[CertificateDer<'_>],
+        _name: &ServerName<'_>,
+        _stapled: &[u8],
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        Ok(rustls::client::danger::ServerCertVerified::assertion())
     }
 
-    /// Secures a connection that is open, to the service of this name.
-    pub async fn secure(&self, host: &str, connection: TcpStream) -> Result<Secured, String> {
-        let name = ServerName::try_from(host.to_string()).map_err(|error| error.to_string())?;
-        self.0.connect(name, connection).await.map_err(|error| error.to_string())
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        shown: &CertificateDer<'_>,
+        signed: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls12_signature(message, shown, signed, &self.0.signature_verification_algorithms)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        shown: &CertificateDer<'_>,
+        signed: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls13_signature(message, shown, signed, &self.0.signature_verification_algorithms)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        self.0.signature_verification_algorithms.supported_schemes()
     }
 }
 
@@ -127,7 +164,8 @@ impl Client {
     /// A client that trusts the public authorities, and those of these certificates
     /// that the operator added, written as PEM.
     pub fn new(also_trusted: Option<&[u8]>) -> Result<Client, String> {
-        Ok(Client { secures: securing(also_trusted, b"http/1.1")?, within: Duration::from_secs(10), at_most: 1024 * 1024 })
+        let secures = TlsConnector::from(Arc::new(securing(also_trusted, b"http/1.1")?));
+        Ok(Client { secures, within: Duration::from_secs(10), at_most: 1024 * 1024 })
     }
 
     /// The same client, with another time an answer has to come within and another

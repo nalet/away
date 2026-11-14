@@ -17,7 +17,7 @@
 use std::sync::Arc;
 
 use away_part::address::read_form;
-use away_part::client::{Client, Secures};
+use away_part::client::{self, Client};
 use away_part::http::{answer, plain, Answer};
 use away_part::json::Json;
 use away_part::{time, version, Part};
@@ -30,7 +30,7 @@ use crate::service::{Failed, Service};
 use crate::sign_ins::{Failure, Person, SignIns, KEPT_FOR};
 use crate::store::favourites::Favourite;
 use crate::store::{self, Store};
-use crate::told::{SignIn, Told};
+use crate::told::{DatabaseConnection, SignIn, Told};
 
 /// The cookie that names a browser's sign-in.
 pub const SIGNED_IN: &str = "__Host-away";
@@ -83,12 +83,15 @@ impl GettingIn {
         let store = match told.database {
             None => None,
             Some(database) => {
-                let secured = match database.secured {
-                    true => Some(
-                        Secures::new(database.authorities.as_deref(), b"postgresql")
-                            .map_err(|why| format!("The authorities to trust for the database can't be used: {why}."))?,
-                    ),
-                    false => None,
+                let unusable = |why: String| format!("The authorities to trust for the database can't be used: {why}.");
+                let secured = match database.connection {
+                    DatabaseConnection::Verified => {
+                        store::Secured::Verified(client::securing(database.authorities.as_deref(), b"postgresql").map_err(unusable)?)
+                    }
+                    DatabaseConnection::Encrypted => {
+                        store::Secured::Encrypted(client::encrypting_unchecked(b"postgresql").map_err(unusable)?)
+                    }
+                    DatabaseConnection::Plain => store::Secured::Plain,
                 };
                 let settings = store::Settings {
                     host: database.host,

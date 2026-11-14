@@ -23,7 +23,7 @@
 //! | `AWAY_DATABASE_NAME` | the database of that server which is Away's (`away`) |
 //! | `AWAY_DATABASE_ACCOUNT` | the account the server signs in as there (`away`) |
 //! | `AWAY_DATABASE_PASSWORD_FILE` | the file that holds that account's password |
-//! | `AWAY_DATABASE_SECURED` | `no` where the connection to the database is not to be secured; it is otherwise |
+//! | `AWAY_DATABASE_CONNECTION` | how the connection to the database is secured: `verified` (as it is unless said otherwise), `encrypted` without checking the database's certificate, or `plain` |
 //! | `AWAY_DATABASE_AUTHORITIES_FILE` | certificates of authorities to trust for the database besides the public ones, as PEM |
 
 use std::time::Duration;
@@ -68,6 +68,19 @@ pub struct Told {
     pub database: Option<Database>,
 }
 
+/// How the connection to the database is secured.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DatabaseConnection {
+    /// Secured, and the database has to show a certificate for its name, of an
+    /// authority the server trusts.
+    Verified,
+    /// Encrypted, and the database's certificate is not checked: for a database that
+    /// shows a certificate no authority signed.
+    Encrypted,
+    /// Not secured.
+    Plain,
+}
+
 /// What Away is told about its database.
 #[derive(Clone, Debug)]
 pub struct Database {
@@ -81,9 +94,8 @@ pub struct Database {
     pub account: String,
     /// The account's password.
     pub password: Secret,
-    /// Whether the connection is secured, and the database has to show a certificate
-    /// for its name.
-    pub secured: bool,
+    /// How the connection is secured.
+    pub connection: DatabaseConnection,
     /// Certificates of authorities to trust for it besides the public ones, as PEM.
     pub authorities: Option<Vec<u8>>,
 }
@@ -147,10 +159,11 @@ impl Told {
                     None => 5432,
                     Some(port) => port.trim().parse().map_err(|_| format!("AWAY_DATABASE_PORT is no port: {port}."))?,
                 };
-                let secured = match variable("AWAY_DATABASE_SECURED").as_deref().map(str::trim) {
-                    None | Some("yes") => true,
-                    Some("no") => false,
-                    Some(other) => return Err(format!("AWAY_DATABASE_SECURED is yes or no, and not {other}.")),
+                let connection = match variable("AWAY_DATABASE_CONNECTION").as_deref().map(str::trim) {
+                    None | Some("verified") => DatabaseConnection::Verified,
+                    Some("encrypted") => DatabaseConnection::Encrypted,
+                    Some("plain") => DatabaseConnection::Plain,
+                    Some(other) => return Err(format!("AWAY_DATABASE_CONNECTION is verified, encrypted or plain, and not {other}.")),
                 };
                 let authorities = variable("AWAY_DATABASE_AUTHORITIES_FILE")
                     .map(|path| {
@@ -169,7 +182,7 @@ impl Told {
                     name: or("AWAY_DATABASE_NAME", "away"),
                     account: or("AWAY_DATABASE_ACCOUNT", "away"),
                     password: Secret::new(password),
-                    secured,
+                    connection,
                     authorities,
                 })
             }

@@ -23,7 +23,7 @@ publish = false
 # every library Away is built from directly, each with what it is for. scripts/libraries.py
 # writes docs/libraries.md from these lines and fails when one says nothing.
 [workspace.dependencies]
-tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "net", "signal", "macros", "time", "sync", "io-util"] } # runs many connections at once
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "net", "signal", "macros", "time", "sync"] } # runs many connections at once
 hyper = { version = "1", default-features = false, features = ["http1", "server", "client"] } # speaks HTTP to browsers, to the cluster's checks and to the sign-in service
 hyper-util = { version = "0.1", default-features = false, features = ["tokio"] } # lets hyper use tokio's connections and timers
 http-body-util = { version = "0.1", default-features = false } # holds the body of an HTTP answer
@@ -40,6 +40,8 @@ sha1 = { version = "0.11", default-features = false } # the second hash that the
 num-bigint = { version = "0.5", default-features = false } # does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is
 getrandom = { version = "0.4", default-features = false } # takes random bytes from the system, for keys and for numbers used once
 saphyr-parser = { version = "0.3", default-features = false } # reads the files of machines and rules, which are YAML, and knows the line each thing is written in
+tokio-postgres = { version = "0.7", default-features = false, features = ["runtime"] } # speaks to the database: the client that most programs in this language use
+tokio-postgres-rustls = { version = "0.14", default-features = false, features = ["ring"] } # lets rustls secure the connection to the database
 
 away-secret = { path = "crates/away-secret" }
 away-part = { path = "crates/away-part" }

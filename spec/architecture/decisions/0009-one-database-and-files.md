@@ -1,6 +1,6 @@
 # ADR-0009: Machines and rules are files; everything else Away keeps is in one database
 
-**Status:** Accepted · 2026-11-14. The files are built: the server reads machines and rules from them, checks a set as one, and applies it whole or not at all ([the machines and the rules](../../../docs/machines.md)). The database is begun: the server reaches one, changes its shape itself, and keeps what people star there ([ADR-0015](./0015-own-database-client.md) proposes how it speaks to it). The records are not built yet, so neither outcome of a change to the files is a record so far: each is a line on the server's output.
+**Status:** Accepted · 2026-11-14. The files are built: the server reads machines and rules from them, checks a set as one, and applies it whole or not at all ([the machines and the rules](../../../docs/machines.md)). The database is begun: the server reaches one, changes its shape itself, and keeps what people star there ([ADR-0015](./0015-a-widely-used-database-client.md) says how it speaks to it). The records are not built yet, so neither outcome of a change to the files is a record so far: each is a line on the server's output.
 
 ## Context
 

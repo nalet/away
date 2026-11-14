@@ -70,10 +70,14 @@ database:
   # The secret that holds the account's password, under the key "password". It is made
   # beside the chart, so that it is in no file of values.
   secretName: ""
-  # Whether the connection is secured: the database then has to show a certificate for
-  # its name. Turn it off only for a database that is reached over a network nobody
-  # else is on.
-  secured: true
+  # How the connection is secured:
+  #   verified   the database shows a certificate for its name, of an authority that is
+  #              trusted
+  #   encrypted  the connection is encrypted and the certificate is not checked: for a
+  #              database that shows a certificate no authority signed. Whoever can put
+  #              themselves between the server and the database is not noticed
+  #   plain      not secured: only for a network nobody else is on
+  connection: verified
   # A ConfigMap with the certificates of authorities to trust besides the public ones,
   # as PEM under the key "authorities.pem": for a database whose certificate is of the
   # organisation's own authority.
