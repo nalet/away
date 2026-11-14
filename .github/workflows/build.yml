@@ -8,7 +8,9 @@ name: Build, test and publish Away
 # on the main branch and on a version's tag the image and the chart are then published:
 # built for two kinds of processor, signed with this pipeline's own identity, with a
 # record of how the image was built and a list of what it holds. docs/build.md says how
-# anyone checks each.
+# anyone checks each, and the last job does it: with no right to the registry, it checks
+# the signatures, the record and the list, and installs the published chart on a fresh
+# cluster.
 #
 # every tool is fixed to one commit; the version it is, is beside it.
 
@@ -99,6 +101,10 @@ jobs:
       packages: write
       id-token: write
       attestations: write
+    outputs:
+      version: ${{ steps.name.outputs.version }}
+      image: ${{ steps.name.outputs.image }}
+      charts: ${{ steps.name.outputs.charts }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -201,3 +207,56 @@ jobs:
             echo "| Its digest | \`$DIGEST\` |"
             echo "| Chart | \`oci://$CHARTS/away\`, version \`$VERSION\` |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    name: check what was published, as anyone can
+    needs: publish
+    runs-on: ubuntu-24.04
+    # no right to the registry: what is checked here, anyone can check
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.publish.outputs.version }}
+      IMAGE: ${{ needs.publish.outputs.image }}
+      CHARTS: ${{ needs.publish.outputs.charts }}
+      SIGNED_BY: ^https://github\.com/${{ github.repository }}/\.github/workflows/build\.yml@
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - name: The image and the chart are signed by this pipeline
+        run: |
+          for signed in "$IMAGE:$VERSION" "$CHARTS/away:$VERSION"; do
+            cosign verify "$signed" --certificate-identity-regexp "$SIGNED_BY" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null
+            echo "signed: $signed"
+          done
+
+      - name: The record of how the image was built names this commit
+        run: |
+          gh attestation verify "oci://$IMAGE:$VERSION" --repo "$GITHUB_REPOSITORY" --format json \
+            | jq --exit-status --arg commit "$GITHUB_SHA" 'any(.[]; .verificationResult.signature.certificate.sourceRepositoryDigest == $commit)'
+
+      - name: The list of what the image holds names every library with its licence
+        run: |
+          gh attestation verify "oci://$IMAGE:$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --predicate-type https://cyclonedx.org/bom --format json \
+            | jq --raw-output '.[0].verificationResult.statement.predicate.components[] | [.name, (.version // "-"), (.licenses[0].expression // "NO LICENCE")] | @tsv' \
+            | tee held.tsv
+          [ "$(wc -l < held.tsv)" -ge 10 ]
+          ! grep -q 'NO LICENCE' held.tsv
+
+      - name: Start a cluster
+        uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
+        with:
+          cluster_name: away
+
+      - name: Install the published chart, with the published image, and try it
+        run: tests/install/kubernetes.sh
+        env:
+          CHART: oci://${{ needs.publish.outputs.charts }}/away
+          CHART_VERSION: ${{ needs.publish.outputs.version }}
+          IMAGE_REPOSITORY: ${{ needs.publish.outputs.image }}
+          IMAGE_TAG: ${{ needs.publish.outputs.version }}

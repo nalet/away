@@ -13,6 +13,8 @@
 # It needs kubectl, helm, curl and jq, a cluster that enforces network rules, and the
 # image in a place the cluster can pull it from (or already has):
 #
+#   CHART              the chart: a folder, or oci://...    (the chart of this repository)
+#   CHART_VERSION      a published chart's version
 #   IMAGE_REPOSITORY   the image, without its tag           (ghcr.io/nalet/away)
 #   IMAGE_TAG          its tag                              (main)
 #   IMAGE_PULL_POLICY  IfNotPresent, or Never for an image the cluster already holds
@@ -29,6 +31,8 @@ OUTSIDE=${NAMESPACE}-outside
 PROBE_IMAGE=curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
+CHART=${CHART:-$ROOT/chart}
+CHART_VERSION=${CHART_VERSION:-}
 WORK=$(mktemp -d)
 FORWARDS=()
 
@@ -109,13 +113,13 @@ fi
 ok "the installer may act in $NAMESPACE and nowhere else"
 
 say "One command installs it"
-KUBECONFIG="$WORK/installer.kubeconfig" helm install away "$ROOT/chart" --namespace "$NAMESPACE" \
+KUBECONFIG="$WORK/installer.kubeconfig" helm install away "$CHART" ${CHART_VERSION:+--version "$CHART_VERSION"} --namespace "$NAMESPACE" \
   --set image.repository="$IMAGE_REPOSITORY" --set image.tag="$IMAGE_TAG" --set image.pullPolicy="$IMAGE_PULL_POLICY" \
   --wait --timeout 240s >/dev/null || {
     kubectl --namespace "$NAMESPACE" get pods,events >&2 || true
     fail "helm install"
   }
-ok "helm install, with its three parts ready"
+ok "helm install of $CHART${CHART_VERSION:+ $CHART_VERSION}, with its three parts ready"
 
 say "Each part says that it is well, gives its measures and writes its lines"
 for part in server gateway issuer; do

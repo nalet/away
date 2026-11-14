@@ -78,8 +78,8 @@ first release unless its note begins with *There* or *Later*.
 
 | From |  | To | On | Note |
 |---|---|---|---|---|
-| `chart` | fetches | `registry` | the image | — |
-| `pipelines` | publishes | `registry` | the image and the chart, signed | — |
+| `chart` | fetches | `registry` | the image | There. |
+| `pipelines` | publishes | `registry` | the image and the chart, signed | There. |
 | `pipelines` | tests | `test-servers` | on every change | — |
 | `site-pipeline` | publishes | `docs` | the site | There. |
 <!-- end: connections -->

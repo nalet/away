@@ -161,20 +161,20 @@ For the goal [Run it oneself](../goals/README.md#run-it-oneself).
 | Expected | State | Met by | Note |
 |---|---|---|---|
 | It runs where there is no Windows domain | first release | [`use-own-provider`](./platform.md#installing-and-configuring) first release, [`make-shells-trust`](./platform.md#installing-and-configuring) first release, [`use-kept-secret`](./app.md#signing-in) first release, [`type-credentials`](./app.md#signing-in) first release | people come from the sign-in service; a Windows domain is a part one turns on |
-| Install it in one step | first release in part | [`install-with-chart`](./platform.md#installing-and-configuring) first release, [`install-as-one-container`](./platform.md#installing-and-configuring) later | — |
-| Runs on Kubernetes and OpenShift, without special rights | first release | [`install-with-chart`](./platform.md#installing-and-configuring) first release, [`run-without-special-rights`](./platform.md#installing-and-configuring) first release | — |
+| Install it in one step | partly | [`install-with-chart`](./platform.md#installing-and-configuring) partly built, [`install-as-one-container`](./platform.md#installing-and-configuring) later | — |
+| Runs on Kubernetes and OpenShift, without special rights | partly | [`install-with-chart`](./platform.md#installing-and-configuring) partly built, [`run-without-special-rights`](./platform.md#installing-and-configuring) partly built | — |
 | Works with the identity provider that is there | first release | [`use-own-provider`](./platform.md#installing-and-configuring) first release, [`name-account-claim`](./platform.md#installing-and-configuring) first release | — |
 | An identity provider comes along for those who have none | not planned | [`bring-provider-along`](./platform.md#installing-and-configuring) not planned | — |
-| Works behind the reverse proxy and with the certificates that are there | first release | [`set-address`](./platform.md#installing-and-configuring) first release, [`use-own-certificates`](./platform.md#installing-and-configuring) first release | — |
+| Works behind the reverse proxy and with the certificates that are there | partly | [`set-address`](./platform.md#installing-and-configuring) partly built, [`use-own-certificates`](./platform.md#installing-and-configuring) partly built | — |
 | A check that says what is wrong with the setup | first release | [`check-setup`](./platform.md#installing-and-configuring) first release, [`test-machine`](./admin.md#the-register-of-machines) first release | — |
 | People learn whom to ask when something fails | first release | [`name-support-contact`](./platform.md#installing-and-configuring) first release | — |
 | An update in one step, and a way back | first release in part | [`update-in-one-step`](./platform.md#running-it) first release, [`go-back-a-version`](./platform.md#running-it) later | — |
-| Health and measures for the monitoring that is there | first release | [`see-health`](./platform.md#running-it) first release, [`give-measures`](./platform.md#running-it) first release, [`write-logs`](./platform.md#running-it) first release | — |
+| Health and measures for the monitoring that is there | partly | [`see-health`](./platform.md#running-it) first release, [`give-measures`](./platform.md#running-it) partly built, [`write-logs`](./platform.md#running-it) built | — |
 | More than one instance, for load and for failure | later | [`run-several`](./platform.md#running-it) later | — |
 | Back up what it holds and bring it back | later | [`back-up`](./platform.md#running-it) later | — |
 | Everything an administrator does can be done by a script | first release in part | [`do-by-script`](./platform.md#running-it) later, [`keep-as-files`](./admin.md#the-register-of-machines) first release | — |
 | A private network to the machines, for other traffic too | not planned | [`carry-other-traffic`](./platform.md#installing-and-configuring) not planned, [`forward-port`](./session.md#the-shell) not planned | — |
-| What can sign people in is kept apart from the rest | first release | [`sign-apart`](./platform.md#installing-and-configuring) first release, [`protect-secrets`](./platform.md#installing-and-configuring) first release | — |
+| What can sign people in is kept apart from the rest | partly | [`sign-apart`](./platform.md#installing-and-configuring) built, [`protect-secrets`](./platform.md#installing-and-configuring) first release | — |
 | Kept passwords are changed on the machines from time to time | not planned | [`change-kept-secret`](./admin.md#the-register-of-machines) not planned | — |
 
 ## Trust it
@@ -183,8 +183,8 @@ For the goal [Trust it](../goals/README.md#trust-it).
 
 | Expected | State | Met by | Note |
 |---|---|---|---|
-| Check that what runs is what the project built | first release | [`verify-image`](./platform.md#checking-it) first release, [`see-image-contents`](./platform.md#checking-it) first release, [`see-version-and-licences`](./platform.md#checking-it) first release | — |
-| Build it oneself and run its tests | first release | [`build-from-source`](./platform.md#checking-it) first release, [`run-its-tests`](./platform.md#checking-it) first release | — |
+| Check that what runs is what the project built | partly | [`verify-image`](./platform.md#checking-it) built, [`see-image-contents`](./platform.md#checking-it) built, [`see-version-and-licences`](./platform.md#checking-it) first release | — |
+| Build it oneself and run its tests | partly | [`build-from-source`](./platform.md#checking-it) built, [`run-its-tests`](./platform.md#checking-it) first release | — |
 | It tells nobody what is done with it | first release | [`call-nobody-else`](./platform.md#checking-it) first release | — |
-| A security hole can be reported in private | first release | [`report-in-private`](./platform.md#checking-it) first release | — |
+| A security hole can be reported in private | there | [`report-in-private`](./platform.md#checking-it) built | — |
 <!-- end: expectations -->

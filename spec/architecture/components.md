@@ -28,9 +28,9 @@ What the chart runs from Away's one image.
 
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
-| `server` | the server: the pages, the requests, people's sign-ins, the rules, the records | service | first release | 52 |
-| `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | first release | 45 |
-| `issuer` | the issuer: makes the sign-ins on machines | service | first release | 15 |
+| `server` | the server: the pages, the requests, people's sign-ins, the rules, the records | service | there | 52 |
+| `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | there | 45 |
+| `issuer` | the issuer: makes the sign-ins on machines | service | there | 15 |
 | `relay` | a relay placed in a network Away is not in | relay | later | — |
 
 - `server`: The only part that reaches the database and the sign-in service; it reaches no machine. Keeps: nothing itself; what it holds is in the database. Code: `crates/away-server/`. Runs: run by the chart, as server. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0009](./decisions/0009-one-database-and-files.md).
@@ -102,15 +102,15 @@ What builds, tests, installs and describes Away.
 
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
-| `chart` | the chart that installs Away | chart | first release | 12 |
-| `pipelines` | the pipelines: build, test, sign, list, publish | pipeline | first release | 6 |
+| `chart` | the chart that installs Away | chart | there | 12 |
+| `pipelines` | the pipelines: build, test, sign, list, publish | pipeline | there | 6 |
 | `site-pipeline` | the pipeline that checks the model and publishes the site | pipeline | there | — |
 | `test-servers` | the servers the tests run against: a shell, a desktop over VNC, a desktop over RDP | tests | first release | 1 |
-| `registry` | the registry the project publishes to | registry | first release | — |
+| `registry` | the registry the project publishes to | registry | there | — |
 | `docs` | the documentation, the specification and the site | docs | there | 5 |
 
 - `chart`: No kinds of its own and no rights beyond its namespace. Code: `chart/`. Governed by [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](./decisions/0012-one-chart-no-special-rights.md).
-- `pipelines`: Beside the one that is there. Code: `.github/workflows/`. Runs: on GitHub. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
+- `pipelines`: Code: `.github/workflows/`. Runs: on GitHub. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
 - `site-pipeline`: Code: `.github/workflows/site.yml`. Runs: on GitHub. Governed by [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
 - `test-servers`: A Windows machine in a domain needs a place of its own. Code: `tests/servers/`. Runs: started by the pipeline. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).
 - `registry`: Keeps: the image and the chart, their signatures, the records of their builds, the lists of their contents. Governed by [ADR‑0013](./decisions/0013-built-tested-signed-by-the-pipelines.md).

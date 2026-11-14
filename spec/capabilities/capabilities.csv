@@ -165,18 +165,18 @@ tell-when-recorded,records,"Tell a person that their session is recorded, before
 keep-for-set-time,records,"Keep records and recordings for a set time, then remove them",system,—,—,—,later,
 show-tampering,records,Make a changed or missing record show,system,—,—,—,later,
 see-use-over-time,records,"See how Away is used over time: by whom, which machines, for how long",admin,—,—,—,later,
-install-with-chart,install,Install it on Kubernetes or OpenShift with one chart,operator,—,—,—,v1,
-run-without-special-rights,install,Run with no special rights on the cluster,system,—,—,—,v1,
+install-with-chart,install,Install it on Kubernetes or OpenShift with one chart,operator,—,—,—,partial,shown on a fresh Kubernetes cluster on every change; an installation on OpenShift is still to be shown
+run-without-special-rights,install,Run with no special rights on the cluster,system,—,—,—,partial,"shown on Kubernetes, in a namespace that takes only the strictest profile; still to be shown on OpenShift"
 install-as-one-container,install,Run it as one container on one machine,operator,—,—,—,later,
 use-own-provider,install,"Use the identity provider that is there, over OpenID Connect",operator,—,—,—,v1,
 name-account-claim,install,Say which part of a person's sign-in names their account on the machines,operator,—,—,—,v1,"a Windows domain knows a person by a name and an identifier of its own, a shell by another name"
 bring-provider-along,install,Bring an identity provider along for those who have none,operator,—,—,—,no,Away asks an identity provider and is none
-set-address,install,"Set the address it answers on, behind the reverse proxy that is there",operator,—,—,—,v1,
-use-own-certificates,install,"Use the cluster's certificates, or one's own",operator,—,—,—,v1,
+set-address,install,"Set the address it answers on, behind the reverse proxy that is there",operator,—,—,—,partial,the chart makes an ingress or routes for the address; not yet shown behind a real reverse proxy
+use-own-certificates,install,"Use the cluster's certificates, or one's own",operator,—,—,—,partial,the chart takes one's own certificate or the cluster's; not yet shown with either
 connect-domain-authority,install,Choose who issues the sign-ins on a Windows domain's machines: Away's own authority or the organisation's,operator,—,—,—,v1,Away's own is made known to the domain once; the organisation's issues on Away's request; an installation without a domain sets neither
 certify-domain-controllers,install,"Give a domain's controllers the certificates they need, where the domain has no authority of its own",operator,—,—,—,v1,"signing in with a certificate needs them, and Away's own authority issues them on the operator's request"
 make-shells-trust,install,"Have the shells trust Away's sign-in, with one line on each machine",operator,—,—,—,v1,
-sign-apart,install,"Run the part that signs people in on machines apart from the rest, with rights of its own",operator,—,—,—,v1,
+sign-apart,install,"Run the part that signs people in on machines apart from the rest, with rights of its own",operator,—,—,—,built,
 protect-secrets,install,"Keep what has to stay secret encrypted, with the key kept elsewhere",system,—,—,—,v1,
 check-setup,install,"Check the whole setup and say what is wrong: the provider, the authority, each kind of machine",operator,—,—,—,v1,
 name-support-contact,install,"Say whom people turn to, and show it wherever something fails",operator,—,—,—,v1,
@@ -185,16 +185,16 @@ carry-other-traffic,install,"Carry other traffic to the machines' network, as a 
 update-in-one-step,operate,"Update to a new version in one step, with people told and their desktops back by themselves",operator,—,—,—,v1,
 go-back-a-version,operate,Go back to the version before,operator,—,—,—,later,
 see-health,operate,See whether Away and what it rests on are well,operator,—,—,—,v1,
-give-measures,operate,"Give the monitoring that is there its measures: sessions, sign-ins, failures, delay",system,—,—,—,v1,
-write-logs,operate,Write what happens as lines a log collector reads,system,—,—,—,v1,
+give-measures,operate,"Give the monitoring that is there its measures: sessions, sign-ins, failures, delay",system,—,—,—,partial,"each part gives its own: its version, its start, whether it is ready, the requests it answered; those of sessions and sign-ins come with them"
+write-logs,operate,Write what happens as lines a log collector reads,system,—,—,—,built,
 back-up,operate,Back up what Away holds and bring it back elsewhere,operator,—,—,—,later,
 run-several,operate,"Run more than one instance, so that load is shared and one may fail",operator,—,—,—,later,
 do-by-script,operate,Do by a script everything an administrator does in the browser,operator,—,—,—,later,
 collect-for-support,operate,"Collect what a helper needs to see into one file, with every secret left out",operator,—,—,—,later,
-verify-image,check,Check that an image is the one the project built,anyone,—,—,—,v1,
-see-image-contents,check,"See what an image holds: every part, its version, its licence",anyone,—,—,—,v1,
-build-from-source,check,Build it from its source with one command,anyone,—,—,—,v1,
+verify-image,check,Check that an image is the one the project built,anyone,—,—,—,built,
+see-image-contents,check,"See what an image holds: every part, its version, its licence",anyone,—,—,—,built,
+build-from-source,check,Build it from its source with one command,anyone,—,—,—,built,
 run-its-tests,check,"Run its tests on one's own machine, against a real server of each protocol",anyone,—,—,—,v1,
 call-nobody-else,check,"Run it with no call to anyone outside: no fonts, scripts, statistics or update checks",system,—,—,—,v1,
 see-version-and-licences,check,"See in Away itself which version runs, where its source is and the licences of what it is built from",anyone,—,—,—,v1,
-report-in-private,check,"Report a security hole in private, and learn what happens next",anyone,—,—,—,v1,
+report-in-private,check,"Report a security hole in private, and learn what happens next",anyone,—,—,—,built,

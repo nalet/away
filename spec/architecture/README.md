@@ -149,12 +149,12 @@ decided, why, what follows from it, and what it rules out.
 | Layer | Components | there | first release | later |
 |---|---|---|---|---|
 | In the browser | 2 |  | 2 |  |
-| Away's parts | 4 |  | 3 | 1 |
+| Away's parts | 4 | 3 |  | 1 |
 | Away's own protocol code | 7 |  | 7 |  |
 | What Away rests on | 4 |  | 4 |  |
 | Outside Away | 6 |  | 6 |  |
-| Making and shipping it | 6 | 2 | 4 |  |
-| all | 29 | 2 | 26 | 1 |
+| Making and shipping it | 6 | 5 | 1 |  |
+| all | 29 | 8 | 20 | 1 |
 
 | Connections | Rows | Means |
 |---|---|---|

@@ -37,8 +37,8 @@ issuer,log-system,puts out,lines on its output,v1,A line of its own for every si
 monitoring,server,measures,/metrics,v1,
 monitoring,gateway,measures,/metrics,v1,
 monitoring,issuer,measures,/metrics,v1,
-chart,registry,fetches,the image,v1,
-pipelines,registry,publishes,"the image and the chart, signed",v1,
+chart,registry,fetches,the image,built,
+pipelines,registry,publishes,"the image and the chart, signed",built,
 pipelines,test-servers,tests,on every change,v1,
 site-pipeline,docs,publishes,the site,built,
 gateway,relay,opens,,later,The relay connects out to the gateway and machines are opened through it

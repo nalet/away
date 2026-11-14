@@ -103,7 +103,16 @@ gh attestation verify oci://ghcr.io/nalet/away:main --repo nalet/away \
 ```
 
 The chart is published beside the image, as `oci://ghcr.io/nalet/charts/away`,
-and signed the same way.
+and signed the same way:
+
+```sh
+cosign verify ghcr.io/nalet/charts/away:<version> \
+  --certificate-identity-regexp '^https://github\.com/nalet/away/\.github/workflows/build\.yml@' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+After every publication the pipeline runs these checks itself, with no right to
+the registry, and installs the published chart on a fresh cluster.
 
 ## What the pipeline does
 
@@ -119,4 +128,5 @@ On every change, [the pipeline](../.github/workflows/build.yml):
    installs it on a fresh Kubernetes cluster, where the test above tries it.
 
 On the main branch and on a version's tag it then publishes the image and the
-chart. Every tool the pipeline uses is fixed to one commit.
+chart, and checks what it published the way anyone can. Every tool the pipeline
+uses is fixed to one commit.

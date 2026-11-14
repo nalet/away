@@ -128,6 +128,8 @@ LAYERS = [('browser', 'In the browser', "What a person's browser runs."),
 OWN = ['browser', 'parts', 'code', 'making']
 COMPONENT_KINDS = ['web', 'service', 'relay', 'library', 'contract', 'database', 'files', 'store', 'proxy', 'identity',
                    'machine', 'directory', 'authority', 'logs', 'monitoring', 'chart', 'pipeline', 'tests', 'registry', 'docs']
+# the kinds of component that are code in this repository: one that is there names where
+CODE_KINDS = ['web', 'service', 'relay', 'library', 'contract', 'chart', 'pipeline', 'tests', 'docs']
 RELEASES = ['built', 'v1', 'later']
 RELEASE_WORD = {'built': 'there', 'v1': 'first release', 'later': 'later'}
 CONNECT = [('loads', "the browser gets the pages' files from the other"),
@@ -757,7 +759,7 @@ def check_architecture(components, connections, carries, decisions, recs, cap_ke
         if c['layer'] not in OWN and c['code']:
             problem(w, "is not Away's own, and names code")
         if c['release'] == 'built':
-            if not split(c['code']):
+            if not split(c['code']) and c['kind'] in CODE_KINDS:
                 problem(w, 'is there, and names no code')
             for path in split(c['code']):
                 if not os.path.exists(os.path.join(ROOT, path)):

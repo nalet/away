@@ -113,8 +113,8 @@ flowchart TD
 | [Know the machines](#know-the-machines) | what that takes | [Run it oneself](#run-it-oneself) | 13: 5 first release, 7 later, 1 not planned | 30 in 2 areas: 19 first release, 8 later, 3 not planned | 2, 2 with a target |
 | [Decide who reaches what](#decide-who-reaches-what) | what that takes | [Run it oneself](#run-it-oneself) | 13: 7 first release, 2 first release in part, 4 later | 24 in 2 areas: 10 first release, 14 later | 2, 2 with a target |
 | [Know what happened](#know-what-happened) | what that takes | [Run it oneself](#run-it-oneself) | 9: 3 first release, 1 first release in part, 5 later | 13 in 1 area: 5 first release, 8 later | 3, 3 with a target |
-| [Run it oneself](#run-it-oneself) | what that takes | [Trust it](#trust-it) | 16: 8 first release, 3 first release in part, 2 later, 3 not planned | 26 in 2 areas: 17 first release, 7 later, 2 not planned | 7, 7 with a target |
-| [Trust it](#trust-it) | what being open adds | — | 4: 4 first release | 7 in 1 area: 7 first release | 6, 6 with a target |
+| [Run it oneself](#run-it-oneself) | what that takes | [Trust it](#trust-it) | 16: 5 partly, 4 first release, 2 first release in part, 2 later, 3 not planned | 26 in 2 areas: 2 built, 5 partly built, 10 first release, 7 later, 2 not planned | 7, 7 with a target |
+| [Trust it](#trust-it) | what being open adds | — | 4: 1 there, 2 partly, 1 first release | 7 in 1 area: 4 built, 3 first release | 6, 6 with a target |
 <!-- end: goals -->
 
 <!-- generated: by-goal -->
@@ -204,8 +204,8 @@ Whoever answers for the machines can say afterwards who was on which one, when, 
 
 Somebody runs it: installs it, makes it reachable, keeps it up to date, and learns when it fails. It needs: [Trust it](#trust-it). Needed by: [Work on a machine that is somewhere else](#work-on-a-machine-that-is-somewhere-else), [Get in without another password](#get-in-without-another-password), [Look at a machine together](#look-at-a-machine-together), [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Know what happened](#know-what-happened).
 
-- **Expected of it:** [16 expectations](../capabilities/expectations.md#run-it-oneself): 8 first release, 3 first release in part, 2 later, 3 not planned.
-- **Capabilities:** [Installing and configuring](../capabilities/platform.md#installing-and-configuring) (17), [Running it](../capabilities/platform.md#running-it) (9). Of the 26: 17 first release, 7 later, 2 not planned.
+- **Expected of it:** [16 expectations](../capabilities/expectations.md#run-it-oneself): 5 partly, 4 first release, 2 first release in part, 2 later, 3 not planned.
+- **Capabilities:** [Installing and configuring](../capabilities/platform.md#installing-and-configuring) (17), [Running it](../capabilities/platform.md#running-it) (9). Of the 26: 2 built, 5 partly built, 10 first release, 7 later, 2 not planned.
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
@@ -221,8 +221,8 @@ Somebody runs it: installs it, makes it reachable, keeps it up to date, and lear
 
 It opens the door to every machine it knows, so anyone can see what it does, check it, change it, and count on it staying open. Needed by: [Run it oneself](#run-it-oneself).
 
-- **Expected of it:** [4 expectations](../capabilities/expectations.md#trust-it): 4 first release.
-- **Capabilities:** [Checking it](../capabilities/platform.md#checking-it) (7). Of the 7: 7 first release.
+- **Expected of it:** [4 expectations](../capabilities/expectations.md#trust-it): 1 there, 2 partly, 1 first release.
+- **Capabilities:** [Checking it](../capabilities/platform.md#checking-it) (7). Of the 7: 4 built, 3 first release.
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
