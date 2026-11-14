@@ -118,6 +118,33 @@ takes as values or from a ConfigMap of one's own.
 [The machines and the rules](./machines.md) says how they are written and how a
 change is applied.
 
+## The farms' feeds
+
+A farm of Windows machines that the files name says itself what it publishes
+([a farm](./machines.md#a-farm)). Away asks its feed as an account of the
+organisation's directory, which the installation gives it:
+
+```sh
+kubectl --namespace away create secret generic away-farms --from-file=password=./password
+helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
+  --namespace away --reuse-values \
+  --set 'farms.account=CORP\svc-away' --set farms.secretName=away-farms
+```
+
+- **An account for this alone.** It is in the groups the farms publish to, so
+  that a farm shows it what there is, and it needs nothing else. Where the
+  directory can, refuse it signing in on the machines themselves: Away never
+  does that with it.
+- **Its password is a secret of the cluster**, under the key `password`. The
+  server reads it as it starts, so a changed password takes a restart of the
+  server.
+- **A web access with a certificate of the organisation's own authority**
+  needs that authority named: a ConfigMap with its certificate as PEM, under
+  the key `authorities.pem`, in `farms.authoritiesConfigMap`.
+- With the network rules on, the server reaches the farms' port, 443 unless
+  `networkRules.farmsPort` says otherwise, and the cluster's name service.
+  `networkRules.farmsAt` narrows that to the addresses it names.
+
 ## What it makes
 
 | What | For |
@@ -151,6 +178,9 @@ Everything an installation is told is one of these. The chart's
 | `files` | the machines, their groups and the rules, as files: each entry a file's name and what it holds ([the machines and the rules](./machines.md)) | none: Away knows no machines |
 | `pictures` | the pictures the files name as icons: each entry a picture's name and the picture in Base64 | none |
 | `filesConfigMap` | a ConfigMap of one's own that holds those files and pictures, in place of `files` and `pictures` | none |
+| `farms.account` | the account Away reads the farms' feeds with, such as `CORP\svc-away` ([the farms' feeds](#the-farms-feeds)) | none: a farm in the files shows nothing |
+| `farms.secretName` | the secret that holds the account's password, under the key `password` | none |
+| `farms.authoritiesConfigMap` | a ConfigMap with certificates of authorities to trust for the farms' web access besides the public ones, under the key `authorities.pem` | none |
 | `image.repository`, `image.tag`, `image.digest` | the image; a digest goes before a tag | the project's image, in the chart's version |
 | `image.pullSecrets` | secrets to pull the image with | none |
 | `ingress.enabled` | make an ingress | no |
@@ -163,6 +193,7 @@ Everything an installation is told is one of these. The chart's
 | `networkRules.wayInFrom` | who may reach Away's address, as the peers of a NetworkPolicy | the cluster's router with a route; every namespace otherwise |
 | `networkRules.measuresFrom` | who may read the measures | nobody |
 | `networkRules.signInServiceAt`, `networkRules.signInServicePort` | where the sign-in service is, as the peers of a NetworkPolicy, and its port | any address, port 443 |
+| `networkRules.farmsAt`, `networkRules.farmsPort` | where the farms' web access is, as the peers of a NetworkPolicy, and its port; used once `farms.account` is set | any address, port 443 |
 | `monitoring.serviceMonitor`, `monitoring.alerts` | make a ServiceMonitor, and alert rules | no |
 | `server.resources`, `gateway.resources`, `issuer.resources` | what each part may use | small requests, and a limit on memory |
 | `nodeSelector`, `tolerations` | where the parts run | anywhere |

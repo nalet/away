@@ -85,33 +85,7 @@ impl StandIn {
     /// all three messages. Gives the key for what follows, or nothing when the proof is
     /// not one for this account.
     fn check(&self, third: &[u8]) -> Result<Option<[u8; 16]>, Error> {
-        const WRONG: Error = Error::SignIn("the client's proof is not built as one");
-        let field = |at: usize| ntlm::field(third, at);
-        if third.len() < 88 || &third[..12] != b"NTLMSSP\0\x03\0\0\0" {
-            return Err(WRONG);
-        }
-        let response = field(20)?;
-        if response.len() < 16 || ntlm::utf16(field(36)?) != self.account.name || ntlm::utf16(field(28)?) != self.account.domain {
-            return Ok(None);
-        }
-        let password_key = ntlm::password_key(&self.account);
-        let challenge = &self.second[24..32];
-        if ntlm::hmac(&password_key, &[challenge, &response[16..]]) != response[..16] {
-            return Ok(None);
-        }
-        // the key the proof gives opens the key the client sent for what follows
-        let from_proof = ntlm::hmac(&password_key, &[&response[..16]]);
-        let mut key: [u8; 16] = field(52)?.try_into().map_err(|_| WRONG)?;
-        {
-            use rc4::{KeyInit, Rc4, StreamCipher};
-            Rc4::new_from_slice(&from_proof).expect("a key of 16 bytes").apply_keystream(&mut key);
-        }
-        let mut unchecked = third.to_vec();
-        unchecked[72..88].fill(0);
-        if ntlm::hmac(&key, &[&self.first, &self.second, &unchecked]) != third[72..88] {
-            return Err(Error::SignIn("the check over the three messages is wrong: one of them was changed on the way"));
-        }
-        Ok(Some(key))
+        ntlm::check_for_tests(&self.first, &self.second, third, &self.account)
     }
 }
 

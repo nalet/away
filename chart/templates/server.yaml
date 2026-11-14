@@ -28,6 +28,19 @@
 {{- with .Values.contact }}
 {{- $told = append $told (dict "name" "AWAY_CONTACT" "value" .) -}}
 {{- end }}
+{{- with .Values.farms }}
+{{- if or .account .secretName .authoritiesConfigMap }}
+{{- /* the account for the farms' feeds is named with its secret or not at all */ -}}
+{{- $told = append $told (dict "name" "AWAY_FARMS_ACCOUNT" "value" (required "farms.account is not set" .account)) -}}
+{{- $told = append $told (dict "name" "AWAY_FARMS_PASSWORD_FILE" "value" "/run/away/farms/password") -}}
+{{- $secret := dict "secretName" (required "farms.secretName is not set" .secretName) "items" (list (dict "key" "password" "path" "password")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/farms" "volume" (dict "name" "farms" "secret" $secret)) -}}
+{{- if .authoritiesConfigMap }}
+{{- $told = append $told (dict "name" "AWAY_FARMS_AUTHORITIES_FILE" "value" "/run/away/farms-authorities/authorities.pem") -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/farms-authorities" "volume" (dict "name" "farms-authorities" "configMap" (dict "name" .authoritiesConfigMap))) -}}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- /* the files of machines and rules, and the pictures they name as icons: from the values, or from a ConfigMap of the operator's own */ -}}
 {{- if and (or .Values.files .Values.pictures) .Values.filesConfigMap }}
 {{- fail "files or pictures, and filesConfigMap, are both set: the files of machines and rules come from one place" }}

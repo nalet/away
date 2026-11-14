@@ -5,6 +5,7 @@
 //! tells each person the machines a rule gives them, serves the pages, and says whether
 //! it is well. It reaches no machine.
 
+pub mod farm;
 pub mod getting_in;
 pub mod pages;
 pub mod register;
@@ -23,6 +24,7 @@ use away_part::part::Bound;
 use away_part::{Part, Settings};
 use hyper::{Method, StatusCode};
 
+use crate::farm::reader::Reader;
 use crate::getting_in::GettingIn;
 use crate::told::Told;
 
@@ -49,17 +51,36 @@ pub const ADDRESS: &str = "0.0.0.0:8080";
 /// How often the server looks whether the files of machines and rules changed.
 const LOOKS_AT_THE_FILES_EVERY: std::time::Duration = std::time::Duration::from_secs(5);
 
+/// How long reading one farm's feed may take.
+const A_FARM_IS_READ_WITHIN: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// What a farm's state says where Away is given no account to read feeds with.
+const NO_ACCOUNT: &str = "Away is given no account to read a farm's feed with: the installation guide says how to give it one.";
+
 /// The server, bound and not yet answering.
 pub struct Server {
     part: Part,
     public: Listener,
     health: Listener,
     getting_in: Arc<GettingIn>,
+    /// What reads the feeds of farms, and how often, where Away is given an account for it.
+    farms: Option<(Arc<Reader>, std::time::Duration)>,
 }
 
 impl Server {
     /// Binds the server's addresses, and takes what the installation tells it.
-    pub async fn bind(settings: &Settings, told: Told, part: Part) -> std::io::Result<Server> {
+    pub async fn bind(settings: &Settings, mut told: Told, part: Part) -> std::io::Result<Server> {
+        let farms = match told.farms.take() {
+            None => None,
+            Some(farms) => match away_part::client::Client::new(farms.authorities.as_deref()) {
+                Ok(client) => Some((Arc::new(Reader::new(client, &farms.account, farms.password)), farms.every)),
+                Err(why) => {
+                    let why = format!("The authorities to trust for the farms' feeds can't be used: {why}.");
+                    part.lines.error("could not start", &[("why", (&why).into())]);
+                    return Err(std::io::Error::other(why));
+                }
+            },
+        };
         let getting_in = match GettingIn::new(told, part.clone()) {
             Ok(getting_in) => Arc::new(getting_in),
             Err(why) => {
@@ -72,7 +93,7 @@ impl Server {
         }
         let public = part.listen("public", &settings.address).await?;
         let health = part.listen("health", &settings.health_address).await?;
-        Ok(Server { part, public, health, getting_in })
+        Ok(Server { part, public, health, getting_in, farms })
     }
 
     /// The addresses it is bound to.
@@ -92,9 +113,44 @@ impl Server {
                 let _ = tokio::task::spawn_blocking(move || register.look(away_part::time::now().as_secs())).await;
             }
         });
+        // the farms' feeds are read as time passes, each when it is due
+        let register = self.getting_in.register();
+        let farms = self.farms.clone();
+        let reading = tokio::spawn(async move {
+            let every = farms.as_ref().map_or(std::time::Duration::from_secs(300), |(_, every)| *every);
+            loop {
+                let now = away_part::time::now().as_secs();
+                for (farm, kept) in register.farms_to_read(now, every.as_secs().max(1)) {
+                    let outcome = match &farms {
+                        None => Err(NO_ACCOUNT.to_string()),
+                        Some((reader, _)) => {
+                            let mut random = [0u8; 24];
+                            match getrandom::fill(&mut random) {
+                                Err(_) => Err("The system gave no random bytes for the sign-in at the farm.".to_string()),
+                                Ok(()) => {
+                                    let fresh = away_rdp::ntlm::Fresh {
+                                        challenge: random[..8].try_into().expect("8 bytes"),
+                                        key: random[8..].try_into().expect("16 bytes"),
+                                    };
+                                    // the time now as Windows counts it: in ten-millionths of a second since 1601
+                                    let clock = (now + 11_644_473_600) * 10_000_000;
+                                    match tokio::time::timeout(A_FARM_IS_READ_WITHIN, reader.read(&farm, &kept, clock, fresh)).await {
+                                        Ok(outcome) => outcome,
+                                        Err(_) => Err("The farm's feed took longer to read than a feed may.".to_string()),
+                                    }
+                                }
+                            }
+                        }
+                    };
+                    register.farm_was_read(&farm, outcome, away_part::time::now().as_secs());
+                }
+                tokio::time::sleep(every.min(std::time::Duration::from_secs(5))).await;
+            }
+        });
         self.part.run(self.health, vec![(self.public, public(self.getting_in))]).await;
         renewing.abort();
         looking.abort();
+        reading.abort();
     }
 }
 

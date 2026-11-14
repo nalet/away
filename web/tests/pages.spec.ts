@@ -5,7 +5,7 @@ import type { Page, Request } from '@playwright/test';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { AWAY, AWAY_WITHOUT_SERVICE, FILES, SIGN_IN_SERVICE } from '../playwright.config';
+import { AWAY, AWAY_WITHOUT_SERVICE, FARM, FILES, SIGN_IN_SERVICE } from '../playwright.config';
 
 // Tells the stand-in for the sign-in service how to behave from now on.
 async function service(told: Record<string, string>) {
@@ -327,7 +327,8 @@ test('those who administer see what is in force and the file each thing comes fr
   await expect(page.getByRole('tab', { name: 'machines' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByText(/^In force since .+, when the files were last applied\. To change a machine, change its file\.$/)).toBeVisible();
   const machines = page.getByRole('table', { name: 'machines' });
-  await expect(machines.getByRole('row')).toHaveCount(8);
+  // the seven machines of the files, and the two that the farm publishes
+  await expect(machines.getByRole('row')).toHaveCount(10);
   await expect(machines.getByRole('row').nth(0)).toHaveText(/machine\s*what it is\s*groups\s*who reaches it\s*file/);
   const farm = machines.getByRole('row', { name: /^Desktops/ });
   await expect(farm).toContainText('Windows desktop');
@@ -344,11 +345,101 @@ test('those who administer see what is in force and the file each thing comes fr
   await expect(page).toHaveURL(`${AWAY}/administration/rules`);
   await expect(page.getByRole('navigation', { name: 'views' }).getByRole('link', { name: 'administration' })).toHaveAttribute('aria-current', 'page');
   const rules = page.getByRole('table', { name: 'rules' });
-  await expect(rules.getByRole('row')).toHaveText([/rule\s*who\s*reaches\s*file/, /staff-finance\s*staff\s*finance, Desktops\s*rules\/access\.yaml:4/, /admins-engineering\s*away-admins\s*engineering, mac-design-01\s*rules\/access\.yaml:8/]);
+  // in the files' order: the farm's file comes before the folder of rules
+  await expect(rules.getByRole('row')).toHaveText([/rule\s*who\s*reaches\s*file/, /farm-users-published\s*farm-users\s*published\s*farm\.yaml:6/, /staff-finance\s*staff\s*finance, Desktops\s*rules\/access\.yaml:4/, /admins-engineering\s*away-admins\s*engineering, mac-design-01\s*rules\/access\.yaml:8/]);
   await expect(page.getByText('To change a rule, change its file.')).toBeVisible();
   await accessible(page);
   await page.reload();
   await expect(page.getByRole('tab', { name: 'rules' })).toHaveAttribute('aria-selected', 'true');
+});
+
+// Tells the stand-in for a farm what to publish from now on.
+async function farm(told: Record<string, string>) {
+  const answer = await fetch(`${FARM}/stand-in?${new URLSearchParams(told)}`, { method: 'POST' });
+  expect(answer.ok).toBe(true);
+}
+
+test('a farm says itself what it publishes, and a new program shows without anybody touching a file', async ({ page }) => {
+  // someone a rule gives what the farm publishes, and the finance machines as everyone of staff
+  await service({ person: 'of the farm' });
+  await page.goto('/programs');
+  await expect(page.getByRole('button', { name: 'Dana Kim, your account' })).toBeVisible();
+  const count = page.locator('section.grp h2');
+  await expect(count).toHaveText(['programs 6']);
+  expect((await tiles(page, 'programs 6')).slice(4)).toEqual([
+    ['Calculator', 'program on Work Resources'],
+    ['Notepad', 'program on Work Resources'],
+  ]);
+  // a program's icon is the farm's own, and Away serves it
+  const icon = page.getByRole('link', { name: /^Calculator/ }).locator('img.icon');
+  await expect(icon).toHaveAttribute('src', /^\/api\/icons\/[0-9a-f]{32}\.png$/);
+  expect(await icon.evaluate((picture: HTMLImageElement) => picture.complete && picture.naturalWidth)).toBe(32);
+
+  try {
+    // the farm publishes a program more: Away shows it by itself
+    await farm({ publishes: 'Paint', collection: 'Tools' });
+    await expect(async () => {
+      await page.reload();
+      await expect(count).toHaveText(['programs 7'], { timeout: 1000 });
+    }).toPass({ timeout: 20_000 });
+    await expect(page.getByRole('link', { name: /^Paint/ })).toContainText('program on Work Resources');
+  } finally {
+    await farm({ withdraws: 'Paint' });
+  }
+  // and what the farm publishes no longer is gone
+  await expect(async () => {
+    await page.reload();
+    await expect(count).toHaveText(['programs 6'], { timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+
+  // the farm's desktop is a machine, and its programs are those of a machine with the farm's name
+  await page.goto('/machines');
+  await expect(page.locator('section.grp h2')).toHaveText(['finance 2', 'published 2', 'other machines 1']);
+  expect(await tiles(page, 'published 2')).toEqual([
+    ['Farm Desktop', 'Windows desktop'],
+    ['Work Resources', '2 programs on Windows'],
+  ]);
+  await page.getByRole('link', { name: /^Work Resources/ }).click();
+  await expect(page.getByRole('region', { name: 'about this machine' })).toContainText('CollectionTools');
+  await accessible(page);
+});
+
+test('those who administer see the farms, and what keeps a feed from being read', async ({ page }) => {
+  await page.goto('/administration');
+  await page.getByRole('tab', { name: 'farms' }).click();
+  await expect(page).toHaveURL(`${AWAY}/administration/farms`);
+  await expect(page.getByText('A farm says itself what it publishes: Away asks its feed every few minutes.')).toBeVisible();
+  const farms = page.getByRole('table', { name: 'farms' });
+  await expect(farms.getByRole('row').nth(0)).toHaveText(/farm\s*feed\s*groups\s*publishes\s*last read\s*file/);
+  const row = farms.getByRole('row', { name: /^Work Resources/ });
+  await expect(row).toContainText(`${FARM}/RDWeb/Feed/webfeed.aspx`);
+  await expect(row).toContainText('published');
+  await expect(row).toContainText('1 desktop, 2 programs');
+  await expect(row).toContainText('farm.yaml:2');
+  await accessible(page);
+
+  // what the farm publishes is in force like the machines of the files
+  await page.getByRole('tab', { name: 'machines' }).click();
+  await expect(page.getByRole('table', { name: 'machines' }).getByRole('row', { name: /^Farm Desktop/ })).toContainText('farm-users-published gives it to farm-users');
+
+  try {
+    // the farm answers no longer: what it published stays, and the reason shows
+    await farm({ answers: 'false' });
+    const failed = page.getByRole('status').filter({ hasText: 'The feed of Work Resources could not be read.' });
+    await expect(async () => {
+      await page.reload();
+      await expect(failed).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 20_000 });
+    await expect(failed).toContainText("The farm's feed answered with the status 503. What it published before stays.");
+    await expect(page.getByRole('table', { name: 'machines' }).getByRole('row', { name: /^Farm Desktop/ })).toHaveCount(1);
+    await accessible(page);
+  } finally {
+    await farm({ answers: 'true' });
+  }
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByRole('status').filter({ hasText: 'could not be read' })).toHaveCount(0, { timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
 });
 
 test('a changed file with a mistake in it is refused with its line and its reason, and what was in force stays', async ({ page }) => {
@@ -364,7 +455,7 @@ test('a changed file with a mistake in it is refused with its line and its reaso
       await expect(refused).toBeVisible({ timeout: 1000 });
     }).toPass({ timeout: 20_000 });
     await expect(refused).toContainText('In line 24, “prot” is not something a machine has. What was in force before stays.');
-    await expect(page.getByRole('table', { name: 'machines' }).getByRole('row')).toHaveCount(8);
+    await expect(page.getByRole('table', { name: 'machines' }).getByRole('row')).toHaveCount(10);
     await accessible(page);
     // and people go on seeing what they saw
     await page.goto('/');
@@ -377,7 +468,7 @@ test('a changed file with a mistake in it is refused with its line and its reaso
       await expect(page.locator('section.grp h2')).toHaveText(['engineering 3', 'design 1', 'finance 7', 'other machines 1'], { timeout: 1000 });
     }).toPass({ timeout: 20_000 });
     await page.goto('/administration');
-    await expect(page.getByRole('table', { name: 'machines' }).getByRole('row')).toHaveCount(9);
+    await expect(page.getByRole('table', { name: 'machines' }).getByRole('row')).toHaveCount(11);
     await expect(refused).toHaveCount(0);
   } finally {
     writeFileSync(file, before);

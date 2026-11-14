@@ -2,6 +2,9 @@
 //! a connection, an answer of a bounded length within a bounded time, and no redirect
 //! is followed.
 //!
+//! A [`Conversation`] is one connection that stays open for several requests, for a
+//! service whose sign-in is tied to the connection it was made on.
+//!
 //! The service's certificate is checked against the public authorities, which are in
 //! the build since the image holds none, and against those the operator adds.
 
@@ -150,6 +153,120 @@ impl Client {
     }
 }
 
+/// What came back in a conversation: the answer with its headers.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Answered {
+    /// The answer's status.
+    pub status: u16,
+    /// Its headers: each name in small letters, and its value where that is text.
+    pub headers: Vec<(String, String)>,
+    /// What it carries.
+    pub body: Bytes,
+}
+
+impl Answered {
+    /// The first header of this name, in small letters.
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers.iter().find(|(its, _)| its == name).map(|(_, value)| value.as_str())
+    }
+
+    /// Every header of this name.
+    pub fn headers_named<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a str> {
+        self.headers.iter().filter(move |(its, _)| its == name).map(|(_, value)| value.as_str())
+    }
+}
+
+/// One connection to a service, kept open for several requests one after the other.
+pub struct Conversation {
+    sender: hyper::client::conn::http1::SendRequest<Full<Bytes>>,
+    driving: tokio::task::JoinHandle<()>,
+    host: String,
+    within: Duration,
+    at_most: usize,
+}
+
+impl Drop for Conversation {
+    fn drop(&mut self) {
+        self.driving.abort();
+    }
+}
+
+impl Client {
+    /// Opens a connection to the service at an address, to ask it several things on.
+    pub async fn talk(&self, address: &Address) -> Result<Conversation, Failed> {
+        let opened = async {
+            let connection =
+                TcpStream::connect((address.host.as_str(), address.port)).await.map_err(|error| Failed::NotReached(error.to_string()))?;
+            let broken = |error: hyper::Error| Failed::Broken(error.to_string());
+            if !address.secured {
+                let (sender, driven) = hyper::client::conn::http1::handshake(TokioIo::new(connection)).await.map_err(broken)?;
+                return Ok((
+                    sender,
+                    tokio::spawn(async move {
+                        let _ = driven.await;
+                    }),
+                ));
+            }
+            let name = ServerName::try_from(address.host.clone()).map_err(|error| Failed::NotSecured(error.to_string()))?;
+            let secured = self.secures.connect(name, connection).await.map_err(|error| Failed::NotSecured(error.to_string()))?;
+            let (sender, driven) = hyper::client::conn::http1::handshake(TokioIo::new(secured)).await.map_err(broken)?;
+            Ok((
+                sender,
+                tokio::spawn(async move {
+                    let _ = driven.await;
+                }),
+            ))
+        };
+        match tokio::time::timeout(self.within, opened).await {
+            Ok(Ok((sender, driving))) => {
+                Ok(Conversation { sender, driving, host: address.host_named(), within: self.within, at_most: self.at_most })
+            }
+            Ok(Err(failed)) => Err(failed),
+            Err(_) => Err(Failed::NoAnswerInTime),
+        }
+    }
+}
+
+impl Conversation {
+    /// Asks for what is at a path of the service, with these headers. A header whose
+    /// value is secret is never written to a log.
+    pub async fn get(&mut self, path: &str, headers: &[(&str, &Secret)]) -> Result<Answered, Failed> {
+        let broken = |error: hyper::http::Error| Failed::Broken(error.to_string());
+        let mut request = Request::builder()
+            .method(Method::GET)
+            .uri(path)
+            .header(HOST, &self.host)
+            .header(USER_AGENT, format!("away/{}", version::VERSION));
+        for (name, value) in headers {
+            let mut value = HeaderValue::from_str(value.expose()).map_err(|error| Failed::Broken(error.to_string()))?;
+            value.set_sensitive(true);
+            request = request.header(*name, value);
+        }
+        let request = request.body(Full::new(Bytes::new())).map_err(broken)?;
+        let at_most = self.at_most;
+        let asked = async {
+            let broken = |error: hyper::Error| Failed::Broken(error.to_string());
+            self.sender.ready().await.map_err(broken)?;
+            let answer = self.sender.send_request(request).await.map_err(broken)?;
+            let status = answer.status().as_u16();
+            let headers: Vec<(String, String)> = answer
+                .headers()
+                .iter()
+                .filter_map(|(name, value)| Some((name.as_str().to_ascii_lowercase(), value.to_str().ok()?.to_string())))
+                .collect();
+            match Limited::new(answer.into_body(), at_most).collect().await {
+                Ok(whole) => Ok(Answered { status, headers, body: whole.to_bytes() }),
+                Err(error) if error.downcast_ref::<LengthLimitError>().is_some() => Err(Failed::TooLong),
+                Err(error) => Err(Failed::Broken(error.to_string())),
+            }
+        };
+        match tokio::time::timeout(self.within, asked).await {
+            Ok(answered) => answered,
+            Err(_) => Err(Failed::NoAnswerInTime),
+        }
+    }
+}
+
 /// Sends one request on a connection and reads its answer.
 async fn answer_of<Connection>(connection: Connection, request: Request<Full<Bytes>>, at_most: usize) -> Result<Got, Failed>
 where
@@ -205,6 +322,41 @@ mod tests {
                 answer(StatusCode::OK, "text/plain", format!("{head}\n{}", String::from_utf8_lossy(&sent)))
             })
         })
+    }
+
+    #[tokio::test]
+    async fn a_conversation_asks_several_things_on_one_connection_and_reads_the_headers() {
+        // a service that says which connection a request came on, and counts them
+        let connections = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let listener = Listener::bind("test", "127.0.0.1:0").await.unwrap();
+        let address = Address::read(&format!("http://127.0.0.1:{}/", listener.address().port())).unwrap();
+        let (_stopper, stop) = crate::stop::pair();
+        let counted = connections.clone();
+        let answers: Answers = Arc::new(move |request| {
+            let counted = counted.clone();
+            Box::pin(async move {
+                let secret = request.headers().get("x-secret").and_then(|value| value.to_str().ok()).unwrap_or("-").to_string();
+                let mut answered = answer(StatusCode::UNAUTHORIZED, "text/plain", format!("{} [{secret}]", request.uri()));
+                answered.headers_mut().append("www-authenticate", HeaderValue::from_static("Negotiate"));
+                answered.headers_mut().append("www-authenticate", HeaderValue::from_static("NTLM"));
+                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                answered
+            })
+        });
+        tokio::spawn(listener.answer_with(answers, stop, Lines::kept_for("test"), Measures::of("test")));
+
+        let client = Client::new(None).unwrap();
+        let mut conversation = client.talk(&address).await.unwrap();
+        let first = conversation.get("/one?a=b", &[]).await.unwrap();
+        assert_eq!((first.status, &first.body[..]), (401, &b"/one?a=b [-]"[..]));
+        assert_eq!(first.headers_named("www-authenticate").collect::<Vec<_>>(), ["Negotiate", "NTLM"]);
+        assert_eq!(first.header("content-type"), Some("text/plain"));
+        let second = conversation.get("/two", &[("x-secret", &Secret::new("held"))]).await.unwrap();
+        assert_eq!(&second.body[..], b"/two [held]");
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 2);
+        // a service that isn't there
+        let nowhere = Address::read("http://127.0.0.1:1/").unwrap();
+        assert!(matches!(client.talk(&nowhere).await, Err(Failed::NotReached(_))));
     }
 
     #[tokio::test]

@@ -41,6 +41,21 @@ pictures: {}
 # Or a ConfigMap of one's own that holds the files and the pictures, each under its name.
 filesConfigMap: ""
 
+# The farms the files name say themselves what they publish: Away asks each farm's web
+# access for its feed, as an account of its own. Without the account a farm in the
+# files shows nothing, and the administration says so.
+farms:
+  # The account Away reads the feeds with, such as CORP\svc-away. It needs to see what
+  # the farms publish, and nothing else: it opens no machine.
+  account: ""
+  # The secret that holds the account's password, under the key "password". It is made
+  # beside the chart, so that it is in no file of values.
+  secretName: ""
+  # A ConfigMap with the certificates of authorities to trust besides the public ones,
+  # as PEM under the key "authorities.pem": for a farm whose web access has a
+  # certificate of the organisation's own authority.
+  authoritiesConfigMap: ""
+
 image:
   repository: ghcr.io/nalet/away
   # The image's tag. Empty takes the version of Away this chart was published with.
@@ -84,6 +99,11 @@ networkRules:
   # takes any address: the server reaches that port and nothing else.
   signInServiceAt: []
   signInServicePort: 443
+  # Where the farms' web access is, as the peers of a NetworkPolicy, and its port. Empty
+  # takes any address: the server reaches that port and nothing else. It is used once
+  # farms.account is set.
+  farmsAt: []
+  farmsPort: 443
 
 monitoring:
   # Make a ServiceMonitor, so the Prometheus operator finds the measures by itself.

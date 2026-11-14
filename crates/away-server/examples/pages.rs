@@ -12,6 +12,8 @@
 //! stand-in at a port that is known, so that a test can tell it how to behave, and
 //! `SIGN_IN=absent` tells the server of a sign-in service that isn't there. `FILES`
 //! names a folder of machines and rules; without it the server takes the tests' own.
+//! `FARM_PORT` starts a stand-in for a farm's web access at that port, which publishes
+//! a desktop and two programs, and writes the farm into the folder of files.
 
 use std::time::Duration;
 
@@ -19,8 +21,9 @@ use away_part::address::Address;
 use away_part::{stop, Lines, Part, Settings};
 use away_secret::Secret;
 use away_server::service;
+use away_server::stand_in::farm::Farm;
 use away_server::stand_in::{person, SignInService};
-use away_server::told::{SignIn, Told};
+use away_server::told::{Farms, SignIn, Told};
 use away_server::Server;
 
 #[tokio::main]
@@ -45,6 +48,34 @@ async fn main() -> std::io::Result<()> {
         service_at = format!("http://127.0.0.1:{free}");
     }
 
+    // a farm beside the server, for the tests that want one: its feed is named in a file
+    // of the folder, and a rule gives what it publishes to the people of the farm
+    let files = said("FILES").unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/files").to_string());
+    let mut farms = None;
+    let mut farm = None;
+    if let Some(port) = said("FARM_PORT").and_then(|port| port.parse::<u16>().ok()) {
+        let password = "the password of the account that reads the feed";
+        let stand_in = Farm::start_at(&format!("127.0.0.1:{port}"), "CORP\\svc-away", password).await;
+        let icon = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/files/icons/ledger.png"))?;
+        stand_in.publishes("Farm Desktop", true, "Desktops", None);
+        stand_in.publishes("Calculator", false, "Tools", Some(&icon));
+        stand_in.publishes("Notepad", false, "Tools", None);
+        std::fs::write(
+            std::path::Path::new(&files).join("farm.yaml"),
+            format!(
+                "farms:\n  - name: Work Resources\n    feed: {}\n    groups: [published]\nrules:\n  - name: farm-users-published\n    who: [farm-users]\n    reaches: [published]\n",
+                stand_in.feed()
+            ),
+        )?;
+        farms = Some(Farms {
+            account: "CORP\\svc-away".to_string(),
+            password: Secret::new(password),
+            authorities: None,
+            every: Duration::from_millis(300),
+        });
+        farm = Some(stand_in);
+    }
+
     let told = Told {
         sign_in: Some(SignIn {
             public: Address::read(&away).expect("Away's address on this machine"),
@@ -62,7 +93,8 @@ async fn main() -> std::io::Result<()> {
             looks_every: Duration::from_secs(5),
         }),
         contact: Some("it-help@example.com".to_string()),
-        files: Some(said("FILES").unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/files").to_string()).into()),
+        files: Some(files.into()),
+        farms,
     };
 
     let lines = Lines::to_output("server");
@@ -71,5 +103,6 @@ async fn main() -> std::io::Result<()> {
     let settings = Settings { address: format!("127.0.0.1:{port}"), health_address: "127.0.0.1:0".to_string() };
     let server = Server::bind(&settings, told, Part::new("server", lines, stop)).await?;
     server.run().await;
+    drop(farm);
     Ok(())
 }

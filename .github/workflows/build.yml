@@ -91,6 +91,13 @@ jobs:
             | grep -q 'path: icons/ledger.png'
           helm template away chart --namespace away --set filesConfigMap=away-files | grep -q 'name: AWAY_FILES'
           ! helm template away chart --namespace away --set filesConfigMap=away-files --set 'files.a\.yaml=x' 2> /dev/null
+          # the account that reads the farms' feeds: its secret, its authorities, and the way out to the farms
+          helm template away chart --namespace away --set 'farms.account=CORP\\svc-away' --set farms.secretName=away-farms \
+            --set farms.authoritiesConfigMap=away-farms-authorities > "$RUNNER_TEMP/farms.yaml"
+          grep -q 'name: AWAY_FARMS_PASSWORD_FILE' "$RUNNER_TEMP/farms.yaml"
+          grep -q 'name: AWAY_FARMS_AUTHORITIES_FILE' "$RUNNER_TEMP/farms.yaml"
+          grep -q 'name: away-server-to-farms' "$RUNNER_TEMP/farms.yaml"
+          ! helm template away chart --namespace away --set 'farms.account=CORP\\svc-away' 2> /dev/null
           # a sign-in service that is named in part is refused, and says what is missing
           ! helm template away chart --namespace away --set signIn.service=https://sign-in.example.com 2> /dev/null
 

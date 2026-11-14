@@ -83,6 +83,7 @@ name = "away-server"
 version = "0.1.0"
 dependencies = [
  "away-part",
+ "away-rdp",
  "away-secret",
  "away-server",
  "getrandom 0.4.3",

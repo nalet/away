@@ -113,7 +113,7 @@ For the goal [Know the machines](../goals/README.md#know-the-machines).
 | Wake a sleeping machine before connecting | later | [`wake-machine`](./app.md#finding-a-machine) later | — |
 | Machines and rules kept as files, in a repository | first release | [`keep-as-files`](./admin.md#the-register-of-machines) first release, [`see-what-is-in-force`](./admin.md#the-register-of-machines) first release, [`see-refused-change`](./admin.md#the-register-of-machines) first release | — |
 | Add and change machines in the browser | later | [`add-machine-in-browser`](./admin.md#the-register-of-machines) later | — |
-| The programs a Windows machine publishes show up by themselves | later | [`read-programs-from-host`](./admin.md#the-register-of-machines) later | — |
+| The programs a Windows machine publishes show up by themselves | first release | [`read-programs-from-host`](./admin.md#the-register-of-machines) first release | — |
 | A person adds a machine of their own | later | [`add-own-machine`](./app.md#finding-a-machine) later | — |
 | A fresh desktop made for whoever asks | not planned | [`make-desktops`](./admin.md#the-register-of-machines) not planned | — |
 | A machine in a network Away is not in is reached too | later | [`reach-other-networks`](./platform.md#installing-and-configuring) later, [`install-helper-on-machine`](./admin.md#the-register-of-machines) not planned | — |

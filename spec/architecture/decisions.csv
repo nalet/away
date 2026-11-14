@@ -12,3 +12,4 @@ adr,components,capabilities,note
 0011,web ; session-view,move-between-views ; use-on-phone ; use-without-mouse ; call-nobody-else,
 0012,chart,install-with-chart ; run-without-special-rights ; set-address ; use-own-certificates ; check-setup ; see-health ; give-measures,
 0013,pipelines ; site-pipeline ; test-servers ; registry ; docs,verify-image ; see-image-contents ; build-from-source ; run-its-tests ; report-in-private,
+0014,server ; files ; farm-feed ; cluster-secrets,read-programs-from-host ; see-all-programs ; give-program-icons,

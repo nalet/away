@@ -33,6 +33,7 @@ flowchart TB
   subgraph l_outside["Outside Away"]
     c_sign_in_service["the sign-in service"]
     c_machines["the machines"]
+    c_farm_feed["a farm's feed"]
     c_domain["the Windows domain"]
     c_authority["the organisation's authority"]
   end
@@ -42,6 +43,7 @@ flowchart TB
   c_server -- "signs in" --> c_sign_in_service
   c_server -- "writes" --> c_database
   c_server -- "reads" --> c_files
+  c_server -- "fetches" --> c_farm_feed
   c_gateway -- "asks" --> c_issuer
   c_gateway -- "opens" --> c_machines
   c_gateway -- "calls" --> c_domain
@@ -152,9 +154,9 @@ decided, why, what follows from it, and what it rules out.
 | Away's parts | 4 | 3 |  | 1 |
 | Away's own protocol code | 7 |  | 7 |  |
 | What Away rests on | 4 |  | 4 |  |
-| Outside Away | 6 |  | 6 |  |
+| Outside Away | 7 |  | 7 |  |
 | Making and shipping it | 7 | 6 | 1 |  |
-| all | 30 | 9 | 20 | 1 |
+| all | 31 | 9 | 21 | 1 |
 
 | Connections | Rows | Means |
 |---|---|---|
@@ -167,20 +169,20 @@ decided, why, what follows from it, and what it rules out.
 | asks | 2 | it asks the other to make something for one session |
 | reads | 4 | it reads what the other holds, and changes nothing |
 | writes | 1 | it changes what the other holds |
-| fetches | 3 | it gets a file from the other |
+| fetches | 4 | it gets a file from the other |
 | passes on | 2 | it hands what arrives on to the other |
 | puts out | 3 | it writes lines that the other collects |
 | measures | 3 | it reads the other's measures |
 | uses | 10 | it is built from the other's code |
 | publishes | 2 | it puts what it built where the other holds or shows it |
 | tests | 1 | it runs its tests against the other |
-| all | 44 |  |
+| all | 45 |  |
 
 | Decision records | Proposed | Accepted | Superseded | Rejected |
 |---|---|---|---|---|
-| 13 |  | 13 |  |  |
+| 14 |  | 14 |  |  |
 
-The first release holds 117 capabilities, and a component of Away's own carries each: 28 are carried by one component, the others by up to 6.
+The first release holds 118 capabilities, and a component of Away's own carries each: 28 are carried by one component, the others by up to 6.
 <!-- end: state -->
 
 ## What follows for the first release

@@ -192,6 +192,27 @@ tests/machines/linux/rdp.sh
 
 The pipeline runs it on every change.
 
+## Trying a farm's feed
+
+The server reads what a farm of Windows machines publishes from the farm's own
+feed ([a farm](./machines.md#a-farm)). The same code, with nothing of Away
+around it, says what a real farm publishes to an account:
+
+```sh
+cargo run --package away-server --example farm -- https://broker.corp.example/RDWeb/Feed/webfeed.aspx \
+  --as 'CORP\svc-away' --password-file ~/.config/away/password
+```
+
+It says how many desktops and programs the farm publishes, and for each its
+name, the address and the collection it is reached at, and the size of its
+icon. `--authorities <file>` names the certificate of an authority to trust
+besides the public ones, as PEM. The password is read from a file, and nothing
+is printed of the account but its name.
+
+The pages' tests run the server beside a stand-in for a farm's web access,
+which signs its readers in as Windows does and publishes what a test tells it
+to: `FARM_PORT` starts it with the pages' example.
+
 ## What a part answers
 
 Every part answers three addresses on a listener of its own, port 9090, which

@@ -15,6 +15,8 @@ const withFiles = `rm -rf ${FILES} && cp -R ../crates/away-server/tests/fixtures
 export const AWAY = 'http://127.0.0.1:18080';
 export const SIGN_IN_SERVICE = 'http://127.0.0.1:18081';
 export const AWAY_WITHOUT_SERVICE = 'http://127.0.0.1:18082';
+// a stand-in for a farm's web access, which the server asks what it publishes
+export const FARM = 'http://127.0.0.1:18083';
 
 export default defineConfig({
   testDir: 'tests',
@@ -26,7 +28,7 @@ export default defineConfig({
   use: { baseURL: AWAY, trace: 'retain-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } }],
   webServer: [
-    { command: withFiles, env: { PORT: '18080', SIGN_IN_PORT: '18081', FILES }, url: `${AWAY}/api/who`, reuseExistingServer: !inThePipeline },
+    { command: withFiles, env: { PORT: '18080', SIGN_IN_PORT: '18081', FARM_PORT: '18083', FILES }, url: `${AWAY}/api/who`, reuseExistingServer: !inThePipeline },
     { command: server, env: { PORT: '18082', SIGN_IN: 'absent' }, url: `${AWAY_WITHOUT_SERVICE}/api/who`, reuseExistingServer: !inThePipeline },
   ],
 });

@@ -422,6 +422,37 @@ pub(crate) fn utf16(bytes: &[u8]) -> String {
     String::from_utf16_lossy(&units)
 }
 
+/// Checks a client's third message as a machine does: that it proves the account's
+/// password for the challenge of the second message, and that its check over all three
+/// messages holds. Gives the key for what follows, or nothing where the proof is not one
+/// for this account. For tests, here and in whatever stands in for a machine.
+#[cfg(any(test, feature = "stand-in"))]
+pub fn check_for_tests(first: &[u8], second: &[u8], third: &[u8], account: &Account) -> Result<Option<[u8; 16]>, Error> {
+    const WRONG: Error = Error::SignIn("the client's proof is not built as one");
+    if third.len() < 88 || &third[..12] != b"NTLMSSP\0\x03\0\0\0" || second.len() < 32 {
+        return Err(WRONG);
+    }
+    let response = field(third, 20)?;
+    if response.len() < 16 || utf16(field(third, 36)?) != account.name || utf16(field(third, 28)?) != account.domain {
+        return Ok(None);
+    }
+    let password_key = password_key(account);
+    let challenge = &second[24..32];
+    if hmac(&password_key, &[challenge, &response[16..]]) != response[..16] {
+        return Ok(None);
+    }
+    // the key the proof gives opens the key the client sent for what follows
+    let from_proof = hmac(&password_key, &[&response[..16]]);
+    let mut key: [u8; 16] = field(third, 52)?.try_into().map_err(|_| WRONG)?;
+    Rc4::new_from_slice(&from_proof).expect("a key of 16 bytes").apply_keystream(&mut key);
+    let mut unchecked = third.to_vec();
+    unchecked[72..88].fill(0);
+    if hmac(&key, &[first, second, &unchecked]) != third[72..88] {
+        return Err(Error::SignIn("the check over the three messages is wrong: one of them was changed on the way"));
+    }
+    Ok(Some(key))
+}
+
 /// A machine's challenge, built the way a Windows machine builds one. For tests, here
 /// and in whatever stands in for a machine.
 pub fn challenge_for_tests(computer: &str, domain: &str, dns_domain: &str, build: u16) -> Vec<u8> {

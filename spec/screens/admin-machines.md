@@ -45,6 +45,15 @@ The other tabs are [rules](./admin-rules.md),
 - The list is sorted by name. A column's head sorts by that column.
 - Nothing on this tab changes a machine. Its sentence says where a machine is
   changed: in its file.
+- What a farm publishes is in force like a machine of the files
+  ([ADR-0014](../architecture/decisions/0014-a-farm-says-what-it-publishes.md)).
+  Its row names the farm's entry in the files.
+- The tab **farms** lists the farms the files name: each with its feed, its
+  groups, how many desktops and programs it publishes, when its feed was last
+  read, and its file. A feed that could not be read shows as a banner over the
+  list, with the reason, and what the farm published before stays. A desktop
+  that a farm publishes under the name of a machine of the files is left out,
+  and a banner names it.
 
 ## 12.2 A changed file that was refused
 
@@ -172,7 +181,10 @@ knows. **Cancel** changes nothing.
 
 | Where | Text |
 |---|---|
-| The page's heading and its tabs | administration · machines · rules · sessions · records · status |
+| The page's heading and its tabs | administration · machines · rules · farms · sessions · records · status |
+| The farms | A farm says itself what it publishes: Away asks its feed every few minutes. · farm · feed · groups · publishes · last read · file · 1 desktop, 23 programs · The files name no farms. |
+| A feed that could not be read | The feed of Work Resources could not be read. The farm's feed answered with the status 503. What it published before stays. |
+| A name a farm may not take | Left out of what Work Resources publishes, because a machine of the files has the name: fin-app-02. |
 | The sentence over the list | In force since 13 November 2026, 09:02, when the files were last applied. To change a machine, change its file. |
 | The filter | filter machines… · kind · every kind · group · every group · 6 machines |
 | The table's heads | machine · what it is · groups · people get in · file · last test |

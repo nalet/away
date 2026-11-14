@@ -21,7 +21,7 @@ export function viewAt(path: string): View | null {
   if (path === ABOUT) return 'settings';
   // a machine's page is a page of the machines, and the rules are a page of the administration
   if (/^\/machines\/[^/]+$/.test(path)) return 'machines';
-  if (path === '/administration/rules') return 'administration';
+  if (path === '/administration/rules' || path === '/administration/farms') return 'administration';
   const found = (Object.keys(addressOf) as View[]).find((view) => addressOf[view] === path);
   return found ?? null;
 }

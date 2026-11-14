@@ -172,11 +172,12 @@ impl GettingIn {
             let given: Vec<Json> = in_force
                 .rules
                 .iter()
-                .filter(|rule| rule.reaches.iter().any(|reached| *reached == machine.name || machine.groups.contains(reached)))
+                .filter(|rule| rule.reaches.iter().any(|reached| machine.is_reached_as(reached)))
                 .map(|rule| Json::object([("rule", rule.name.as_str().into()), ("who", texts(&rule.who))]))
                 .collect();
             says.push(("given_by".to_string(), Json::List(given)));
             says.push(("served_by".to_string(), texts(&machine.served_by)));
+            says.push(("farm".to_string(), machine.farm.as_deref().map_or(Json::Null, Json::from)));
             Json::Object(says)
         });
         let rules = in_force.rules.iter().map(|rule| {
@@ -191,11 +192,28 @@ impl GettingIn {
                 ("why", refusal.why.why.as_str().into()),
             ])
         });
+        // the farms, each with how its feed was last read
+        let farms = self.register.farms().into_iter().map(|state| {
+            let [file, line] = written_in(&state.farm.written_in);
+            Json::object([
+                ("name", state.farm.name.as_str().into()),
+                ("feed", state.farm.feed.as_str().into()),
+                ("groups", texts(&state.farm.groups)),
+                ("read_at", state.read_at.map_or(Json::Null, Json::from)),
+                ("failed", state.failed.as_deref().map_or(Json::Null, Json::from)),
+                ("desktops", (state.desktops as u64).into()),
+                ("programs", (state.programs as u64).into()),
+                ("left_out", texts(&state.left_out)),
+                file,
+                line,
+            ])
+        });
         let says = Json::object([
             ("has_files", self.register.has_files().into()),
             ("since", since.into()),
             ("machines", Json::List(machines.collect())),
             ("rules", Json::List(rules.collect())),
+            ("farms", Json::List(farms.collect())),
             ("refused", refused),
         ]);
         answer(StatusCode::OK, "application/json", says.write())

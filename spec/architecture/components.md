@@ -16,7 +16,7 @@ What a person's browser runs.
 
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
-| `web` | the web app: Away's pages around the sessions | web | first release | 43 |
+| `web` | the web app: Away's pages around the sessions | web | first release | 44 |
 | `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | first release | 38 |
 
 - `web`: Built from the design system's components; the frame is Away's own until the design system has it. Keeps: in the browser's own storage, which sessions this browser has open and how wide the list of windows was left. Code: `web/`. Runs: served by the server. Governed by [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](./decisions/0011-the-web-app.md).
@@ -28,12 +28,12 @@ What the chart runs from Away's one image.
 
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
-| `server` | the server: the pages, the requests, people's sign-ins, the rules, the records | service | there | 54 |
+| `server` | the server: the pages, the requests, people's sign-ins, the rules, the records | service | there | 55 |
 | `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | there | 47 |
 | `issuer` | the issuer: makes the sign-ins on machines | service | there | 15 |
 | `relay` | a relay placed in a network Away is not in | relay | later | — |
 
-- `server`: The only part that reaches the database and the sign-in service; it reaches no machine. Keeps: nothing itself; what it holds is in the database. Code: `crates/away-server/`. Runs: run by the chart, as server. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0009](./decisions/0009-one-database-and-files.md).
+- `server`: The only part that reaches the database and the sign-in service; it reaches no machine. Keeps: nothing itself; what it holds is in the database. Code: `crates/away-server/`. Runs: run by the chart, as server. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0009](./decisions/0009-one-database-and-files.md), [ADR‑0014](./decisions/0014-a-farm-says-what-it-publishes.md).
 - `gateway`: The only part that reaches machines; the first release runs one. Keeps: in memory and for as long as a session lasts, its picture, a shell's last bytes and what signed it in. Code: `crates/away-gateway/`. Runs: run by the chart, as gateway. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0007](./decisions/0007-short-lived-certificates.md).
 - `issuer`: It checks a person's sign-in itself before it signs anything; the status page calls it signing in on machines. Keeps: nothing itself; its authority's keys and the kept accounts are the cluster's. Code: `crates/away-issuer/`. Runs: run by the chart, as issuer. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0007](./decisions/0007-short-lived-certificates.md), [ADR‑0008](./decisions/0008-the-authority-for-windows-sign-ins.md), [ADR‑0010](./decisions/0010-secrets-live-in-the-cluster.md).
 - `relay`: For machines the gateway can't reach itself.
@@ -72,8 +72,8 @@ What the cluster gives it, and the database.
 | `way-in` | the way in: the cluster's router or ingress, as it is there | proxy | first release | — |
 
 - `database`: PostgreSQL. Keeps: the sign-ins, each person's settings, favourites and last used, the machines' identities, the sessions as they run, the records. Runs: run by the chart, or brought by the operator. Governed by [ADR‑0009](./decisions/0009-one-database-and-files.md).
-- `files`: Written by the operator and kept where they keep their configuration. Keeps: what is in force. Runs: mounted into the server, from a ConfigMap. Governed by [ADR‑0009](./decisions/0009-one-database-and-files.md).
-- `cluster-secrets`: Each part has its own mounted; the issuer alone reads the kept accounts. Keeps: the kept accounts, the issuer's authority keys, each part's own keys. Governed by [ADR‑0010](./decisions/0010-secrets-live-in-the-cluster.md).
+- `files`: Written by the operator and kept where they keep their configuration. Keeps: what is in force. Runs: mounted into the server, from a ConfigMap. Governed by [ADR‑0009](./decisions/0009-one-database-and-files.md), [ADR‑0014](./decisions/0014-a-farm-says-what-it-publishes.md).
+- `cluster-secrets`: Each part has its own mounted; the issuer alone reads the kept accounts. Keeps: the kept accounts, the issuer's authority keys, each part's own keys. Governed by [ADR‑0010](./decisions/0010-secrets-live-in-the-cluster.md), [ADR‑0014](./decisions/0014-a-farm-says-what-it-publishes.md).
 - `way-in`: It passes the pages on to the server and a session's connection on to the gateway. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md).
 
 ## Outside Away
@@ -84,6 +84,7 @@ What Away reaches and does not run.
 |---|---|---|---|---|
 | `sign-in-service` | the sign-in service: the organisation's identity provider | identity | first release | — |
 | `machines` | the machines | machine | first release | — |
+| `farm-feed` | a farm's feed: where a farm of Windows machines says what it publishes | machine | first release | — |
 | `domain` | the Windows domain: its domain controllers | directory | first release | — |
 | `authority` | the organisation's authority: its own certificate authority | authority | first release | — |
 | `log-system` | the log system: the one that is there | logs | first release | — |
@@ -91,6 +92,7 @@ What Away reaches and does not run.
 
 - `sign-in-service`: Any provider that speaks OpenID Connect. Keeps: the people and their groups. Governed by [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md).
 - `machines`: Reached the way each already offers: RDP, VNC or SSH; nothing of Away's runs on them.
+- `farm-feed`: Only where the files name a farm: the farm's own web access, which the server asks and opens nothing on. Keeps: the desktops and the programs the farm publishes. Governed by [ADR‑0014](./decisions/0014-a-farm-says-what-it-publishes.md).
 - `domain`: For signing in on its machines as oneself; an installation without one leaves it out and lacks nothing else. Keeps: the accounts. Governed by [ADR‑0008](./decisions/0008-the-authority-for-windows-sign-ins.md).
 - `authority`: Where the configuration says that the organisation's own authority issues the Windows sign-ins. Governed by [ADR‑0008](./decisions/0008-the-authority-for-windows-sign-ins.md).
 - `log-system`: It collects the lines every part puts out.

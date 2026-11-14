@@ -17,6 +17,7 @@ cluster-secrets,the cluster's secrets,rests,store,v1,,,"the kept accounts, the i
 way-in,"the way in: the cluster's router or ingress, as it is there",rests,proxy,v1,,,,It passes the pages on to the server and a session's connection on to the gateway
 sign-in-service,the sign-in service: the organisation's identity provider,outside,identity,v1,,,the people and their groups,Any provider that speaks OpenID Connect
 machines,the machines,outside,machine,v1,,,,"Reached the way each already offers: RDP, VNC or SSH; nothing of Away's runs on them"
+farm-feed,a farm's feed: where a farm of Windows machines says what it publishes,outside,machine,v1,,,the desktops and the programs the farm publishes,"Only where the files name a farm: the farm's own web access, which the server asks and opens nothing on"
 domain,the Windows domain: its domain controllers,outside,directory,v1,,,the accounts,For signing in on its machines as oneself; an installation without one leaves it out and lacks nothing else
 authority,the organisation's authority: its own certificate authority,outside,authority,v1,,,,Where the configuration says that the organisation's own authority issues the Windows sign-ins
 log-system,the log system: the one that is there,outside,logs,v1,,,,It collects the lines every part puts out

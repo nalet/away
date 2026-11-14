@@ -30,6 +30,21 @@ export interface Written extends Machine {
   line: number;
   given_by: { rule: string; who: string[] }[];
   served_by: string[];
+  farm: string | null;
+}
+
+// A farm as the files have it, and how its feed was last read.
+export interface FarmState {
+  name: string;
+  feed: string;
+  groups: string[];
+  read_at: number | null;
+  failed: string | null;
+  desktops: number;
+  programs: number;
+  left_out: string[];
+  file: string;
+  line: number;
 }
 
 export interface Rule {
@@ -45,6 +60,7 @@ export interface InForce {
   since: number;
   machines: Written[];
   rules: Rule[];
+  farms: FarmState[];
   refused: { at: number; file: string; line: number; why: string } | null;
 }
 

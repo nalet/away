@@ -103,6 +103,7 @@ const SECTIONS = [
       ['spec/architecture/decisions/0011-the-web-app.md', '0011 the web app'],
       ['spec/architecture/decisions/0012-one-chart-no-special-rights.md', '0012 one chart'],
       ['spec/architecture/decisions/0013-built-tested-signed-by-the-pipelines.md', '0013 the pipelines'],
+      ['spec/architecture/decisions/0014-a-farm-says-what-it-publishes.md', '0014 a farm says what it publishes'],
     ],
   },
   {

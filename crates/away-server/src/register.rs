@@ -23,7 +23,14 @@
 //!   - name: finance-desktops
 //!     who: [finance]
 //!     reaches: [finance]
+//! farms:
+//!   - name: Work Resources
+//!     feed: https://broker.corp.example/RDWeb/Feed/webfeed.aspx
+//!     groups: [finance]
 //! ```
+//!
+//! A farm is a set of Windows machines that publishes desktops and programs through a
+//! broker. Its entry names the farm's own feed, and Away asks the feed what there is.
 //!
 //! A set of files is taken whole or not at all: one thing wrong anywhere, and the set is
 //! refused with the file, the line and the reason, while what was in force stays.
@@ -34,6 +41,7 @@ pub mod yaml;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use away_part::address::Address;
 use away_part::json::Json;
 use sha2::{Digest, Sha256};
 
@@ -115,8 +123,35 @@ pub struct Machine {
     pub collection: Option<String>,
     /// The machines that serve the collection.
     pub served_by: Vec<String>,
+    /// The farm that publishes it, where it is not written in a file itself but read
+    /// from a farm's feed.
+    pub farm: Option<String>,
+    /// The file it is written in, and the line. For what a farm publishes: the farm's.
+    pub written_in: (String, usize),
+}
+
+/// A farm of Windows machines: what it publishes is read from its own feed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Farm {
+    /// The name administrators know it by, and people know its programs' machine by.
+    pub name: String,
+    /// Where its feed is.
+    pub feed: String,
+    /// The groups of machines that what it publishes is in.
+    pub groups: Vec<String>,
     /// The file it is written in, and the line.
     pub written_in: (String, usize),
+}
+
+/// The name a picture is asked for by: made from the picture itself, so that a browser
+/// may keep it for as long as it likes.
+pub fn picture_name(picture: &[u8]) -> String {
+    Sha256::digest(picture).iter().take(16).map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Whether bytes are a PNG picture of a size the register takes.
+pub fn is_a_picture(bytes: &[u8]) -> bool {
+    bytes.starts_with(PNG) && bytes.len() <= LARGEST_PICTURE
 }
 
 /// One rule: groups of people, and what they reach.
@@ -165,6 +200,8 @@ pub struct InForce {
     /// The pictures the machines' programs name as their icons, each by the name it is
     /// asked for by.
     pub pictures: BTreeMap<String, Arc<Vec<u8>>>,
+    /// The farms whose feeds say what they publish.
+    pub farms: Vec<Farm>,
 }
 
 /// The longest a name, an address or a group may be.
@@ -175,7 +212,7 @@ fn refused(file: &str, line: usize, why: impl Into<String>) -> Refused {
 }
 
 /// The same name, however its letters are written.
-fn same(one: &str, other: &str) -> bool {
+pub(crate) fn same(one: &str, other: &str) -> bool {
     one.to_lowercase() == other.to_lowercase()
 }
 
@@ -304,16 +341,17 @@ impl InForce {
         let mut machines: Vec<Machine> = Vec::new();
         let mut rules: Vec<Rule> = Vec::new();
         let mut named: BTreeMap<String, Arc<Vec<u8>>> = BTreeMap::new();
+        let mut farms: Vec<Farm> = Vec::new();
         for (file, text) in files {
             let Some(whole) = yaml::read(text).map_err(|(line, why)| refused(file, line, why))? else { continue };
             let holds = Parts::of(
                 file,
                 &whole,
-                &["machines", "rules"],
+                &["machines", "rules", "farms"],
                 "a file",
-                "a file holds machines, rules, or both, under “machines:” and “rules:”",
+                "a file holds machines, rules and farms, under “machines:”, “rules:” and “farms:”",
             )?;
-            for (name, read) in [("machines", 0), ("rules", 1)] {
+            for (name, read) in [("machines", 0), ("rules", 1), ("farms", 2)] {
                 let Some(node) = holds.get(name) else { continue };
                 let listed = match &node.value {
                     Value::List(listed) => listed.as_slice(),
@@ -333,6 +371,17 @@ impl InForce {
                             ));
                         }
                         machines.push(machine);
+                    } else if read == 2 {
+                        let farm = farm(file, node)?;
+                        if let Some(other) = farms.iter().find(|other| same(&other.name, &farm.name)) {
+                            let (in_file, line) = &other.written_in;
+                            return Err(refused(
+                                file,
+                                node.line,
+                                format!("the farm {} is also written in {in_file}, line {line}", farm.name),
+                            ));
+                        }
+                        farms.push(farm);
                     } else {
                         let rule = rule(file, node)?;
                         if let Some(other) = rules.iter().find(|other| same(&other.name, &rule.name)) {
@@ -348,12 +397,25 @@ impl InForce {
                 }
             }
         }
-        // what a rule reaches is a machine or a group of machines, and it is clear which
+        // a farm's programs are known as a machine of the farm's name: no machine has it too
+        for farm in &farms {
+            if let Some(machine) = machines.iter().find(|machine| same(&machine.name, &farm.name)) {
+                let (file, line) = &farm.written_in;
+                let (in_file, at) = &machine.written_in;
+                return Err(refused(
+                    file,
+                    *line,
+                    format!("the farm {} has the name of a machine, which is written in {in_file}, line {at}", farm.name),
+                ));
+            }
+        }
+        // what a rule reaches is a machine, a farm or a group of machines, and it is clear which
         for rule in &rules {
             let (file, line) = &rule.written_in;
             for reached in &rule.reaches {
-                let is_machine = machines.iter().any(|machine| machine.name == *reached);
-                let is_group = machines.iter().any(|machine| machine.groups.contains(reached));
+                let is_machine = machines.iter().any(|machine| machine.name == *reached) || farms.iter().any(|farm| farm.name == *reached);
+                let is_group = machines.iter().any(|machine| machine.groups.contains(reached))
+                    || farms.iter().any(|farm| farm.groups.contains(reached));
                 match (is_machine, is_group) {
                     (true, true) => {
                         return Err(refused(
@@ -376,7 +438,7 @@ impl InForce {
                 }
             }
         }
-        Ok(InForce { machines, rules, pictures: named })
+        Ok(InForce { machines, rules, pictures: named, farms })
     }
 
     /// The machines that someone of these groups reaches, each with the rules that give
@@ -385,7 +447,7 @@ impl InForce {
         let mut reached: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
         for rule in self.rules.iter().filter(|rule| rule.who.iter().any(|who| groups.contains(who))) {
             for (nth, machine) in self.machines.iter().enumerate() {
-                if rule.reaches.iter().any(|reached| *reached == machine.name || machine.groups.contains(reached)) {
+                if rule.reaches.iter().any(|reached| machine.is_reached_as(reached)) {
                     reached.entry(nth).or_default().push(&rule.name);
                 }
             }
@@ -439,7 +501,7 @@ fn programs(
                 }
                 // a picture is asked for by a name made from the picture itself, so that a
                 // browser may keep it for as long as it likes
-                let sum: String = Sha256::digest(picture).iter().take(16).map(|byte| format!("{byte:02x}")).collect();
+                let sum = picture_name(picture);
                 named.entry(sum.clone()).or_insert_with(|| Arc::new(picture.clone()));
                 Some(sum)
             }
@@ -539,8 +601,35 @@ fn machine(
         shell,
         collection: collection.map(|(collection, _)| collection),
         served_by: served_by.into_iter().map(|(address, _)| address).collect(),
+        farm: None,
         written_in: (file.to_string(), node.line),
     })
+}
+
+/// Reads one farm.
+fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
+    let shape = "a farm is written as its name, its feed and its groups, beginning with “- name:”";
+    let parts = Parts::of(file, node, &["name", "feed", "groups"], "a farm", shape)?;
+    let Some((name, _)) = parts.text("name", "a farm")? else { return Err(refused(file, node.line, "the farm has no name")) };
+    if !name.chars().all(|character| character.is_alphanumeric() || " -_.()+&".contains(character)) {
+        return Err(refused(
+            file,
+            node.line,
+            format!(
+                "the name “{name}” holds a character that names don't take: letters, digits, spaces and - _ . ( ) + & are what they take"
+            ),
+        ));
+    }
+    let Some((feed, line)) = parts.text("feed", &format!("the farm {name}"))? else {
+        return Err(refused(file, node.line, format!("the farm {name} has no feed: the address where the farm says what it publishes")));
+    };
+    // a feed is asked over a secured connection, as everything is that Away signs in at
+    if let Err(why) = Address::read(&feed) {
+        return Err(refused(file, line, format!("the feed of the farm {name} is no address Away can use: {why}")));
+    }
+    let mut groups: Vec<String> = parts.texts("groups", &name)?.into_iter().map(|(group, _)| group).collect();
+    groups.sort_by_key(|group| group.to_lowercase());
+    Ok(Farm { name, feed, groups, written_in: (file.to_string(), node.line) })
 }
 
 /// Reads one rule.
@@ -580,6 +669,12 @@ fn is_an_address(text: &str) -> bool {
 }
 
 impl Machine {
+    /// Whether a rule that reaches this name reaches the machine: its own name, one of
+    /// its groups, or the farm that publishes it.
+    pub fn is_reached_as(&self, reached: &str) -> bool {
+        self.name == reached || self.groups.iter().any(|group| group == reached) || self.farm.as_deref() == Some(reached)
+    }
+
     /// The machine as a person who reaches it is told of it.
     pub fn for_a_person(&self) -> Json {
         let way = |over: Option<Over>, port: u16| {
@@ -838,7 +933,7 @@ rules:
             ),
             ("machines: nothing\n", 1, "the machines are a list, each beginning with “- name:”"),
             ("settings:\n  colour: blue\n", 1, "“settings” is not something a file has"),
-            ("- name: a\n", 1, "a file holds machines, rules, or both, under “machines:” and “rules:”"),
+            ("- name: a\n", 1, "a file holds machines, rules and farms, under “machines:”, “rules:” and “farms:”"),
             (
                 "rules:\n  - name: r\n    who: [finance]\n    reaches: [nothing-there]\n",
                 2,
@@ -910,6 +1005,49 @@ rules:
             wrong("machines:\n  - name: a\n    kind: windows\n    address: a.example\n    programs: Ledger\n", &[]).why,
             "the programs of a are a list: of names, or of names with their icons"
         );
+    }
+
+    #[test]
+    fn a_farm_names_its_feed_and_rules_reach_it_by_its_name_or_its_groups() {
+        let farm = "farms:\n  - name: Work Resources\n    feed: https://broker.corp.example/RDWeb/Feed/webfeed.aspx\n    groups: [published]\nrules:\n  - name: staff-published\n    who: [staff]\n    reaches: [published]\n  - name: admins-farm\n    who: [away-admins]\n    reaches: [Work Resources]\n";
+        let in_force = InForce::read(&files(&[("farm.yaml", farm)])).unwrap();
+        assert_eq!(in_force.farms.len(), 1);
+        let read = &in_force.farms[0];
+        assert_eq!(
+            (read.name.as_str(), read.feed.as_str(), &read.groups[..]),
+            ("Work Resources", "https://broker.corp.example/RDWeb/Feed/webfeed.aspx", &["published".to_string()][..])
+        );
+        assert_eq!(read.written_in, ("farm.yaml".to_string(), 2));
+        // what a farm publishes is not in the files: nobody reaches anything until its feed is read
+        assert!(in_force.machines.is_empty() && in_force.reached_by(&["staff".to_string()]).is_empty());
+
+        let wrong = |file: &str| InForce::read(&files(&[("machines/finance.yaml", MACHINES), ("farm.yaml", file)])).unwrap_err();
+        let reasons: [(&str, usize, &str); 7] = [
+            ("farms:\n  - feed: https://a.example/feed\n", 2, "the farm has no name"),
+            ("farms:\n  - name: A\n", 2, "the farm A has no feed: the address where the farm says what it publishes"),
+            ("farms:\n  - name: A\n    feed: http://a.example/feed\n", 3, "the feed of the farm A is no address Away can use: "),
+            ("farms:\n  - name: A\n    feed: https://a.example/feed\n    account: svc\n", 4, "“account” is not something a farm has"),
+            (
+                "farms:\n  - name: A\n    feed: https://a.example/feed\n  - name: a\n    feed: https://b.example/feed\n",
+                4,
+                "the farm a is also written in farm.yaml, line 2",
+            ),
+            (
+                "farms:\n  - name: FIN-APP-02\n    feed: https://a.example/feed\n",
+                2,
+                "the farm FIN-APP-02 has the name of a machine, which is written in machines/finance.yaml, line 3",
+            ),
+            (
+                "farms:\n  - name: finance\n    feed: https://a.example/feed\nrules:\n  - name: r\n    who: x\n    reaches: finance\n",
+                5,
+                "the rule r reaches “finance”, which is the name of a machine and of a group of machines",
+            ),
+        ];
+        for (file, line, reason) in reasons {
+            let refused = wrong(file);
+            assert_eq!(refused.line, line, "{file}");
+            assert!(refused.why.starts_with(reason), "{}: {file}", refused.why);
+        }
     }
 
     #[test]

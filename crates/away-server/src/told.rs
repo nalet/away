@@ -14,6 +14,10 @@
 //! | `AWAY_ADMINISTRATORS` | the groups whose people administer Away, with commas between |
 //! | `AWAY_RECORD_READERS` | the groups whose people read its records |
 //! | `AWAY_CONTACT` | whom people turn to when something fails |
+//! | `AWAY_FILES` | the folder of the files: the machines, the rules and the farms |
+//! | `AWAY_FARMS_ACCOUNT` | the account the farms' feeds are read with: `CORP\svc-away` |
+//! | `AWAY_FARMS_PASSWORD_FILE` | the file that holds that account's password |
+//! | `AWAY_FARMS_AUTHORITIES_FILE` | certificates of authorities to trust for the farms' web access, as PEM |
 
 use std::time::Duration;
 
@@ -51,6 +55,22 @@ pub struct Told {
     /// The folder that holds the files of machines and rules. Without it Away knows no
     /// machines.
     pub files: Option<std::path::PathBuf>,
+    /// The account Away reads the feeds of farms with. Without it no farm's feed is read.
+    pub farms: Option<Farms>,
+}
+
+/// What Away is told about reading the feeds of farms.
+#[derive(Clone, Debug)]
+pub struct Farms {
+    /// The account it signs in with at a farm's web access: `CORP\svc-away`.
+    pub account: String,
+    /// The account's password.
+    pub password: Secret,
+    /// Certificates of authorities to trust besides the public ones, as PEM: for a farm
+    /// whose web access has a certificate of the organisation's own authority.
+    pub authorities: Option<Vec<u8>>,
+    /// How often each farm's feed is read.
+    pub every: Duration,
 }
 
 impl Told {
@@ -58,10 +78,35 @@ impl Told {
     pub fn read(variable: impl Fn(&str) -> Option<String>, file: impl Fn(&str) -> std::io::Result<Vec<u8>>) -> Result<Told, String> {
         let contact = variable("AWAY_CONTACT");
         let files = variable("AWAY_FILES").filter(|folder| !folder.is_empty()).map(std::path::PathBuf::from);
+        let farms = match (variable("AWAY_FARMS_ACCOUNT"), variable("AWAY_FARMS_PASSWORD_FILE")) {
+            (None, None) => None,
+            (Some(account), Some(path)) => {
+                let password =
+                    file(&path).map_err(|error| format!("AWAY_FARMS_PASSWORD_FILE names {path}, which can't be read: {error}."))?;
+                let password =
+                    String::from_utf8(password).map_err(|_| "AWAY_FARMS_PASSWORD_FILE names a file that holds no text.".to_string())?;
+                let password = password.trim_end_matches(['\r', '\n']);
+                if account.trim().is_empty() || password.is_empty() {
+                    return Err("AWAY_FARMS_ACCOUNT or the file AWAY_FARMS_PASSWORD_FILE names is empty.".to_string());
+                }
+                let authorities = variable("AWAY_FARMS_AUTHORITIES_FILE")
+                    .map(|path| {
+                        file(&path).map_err(|error| format!("AWAY_FARMS_AUTHORITIES_FILE names {path}, which can't be read: {error}."))
+                    })
+                    .transpose()?;
+                Some(Farms {
+                    account: account.trim().to_string(),
+                    password: Secret::new(password),
+                    authorities,
+                    every: Duration::from_secs(300),
+                })
+            }
+            _ => return Err("AWAY_FARMS_ACCOUNT and AWAY_FARMS_PASSWORD_FILE go together: one of them is not set.".to_string()),
+        };
         let needed = ["AWAY_PUBLIC_ADDRESS", "AWAY_SIGN_IN_SERVICE", "AWAY_SIGN_IN_CLIENT", "AWAY_SIGN_IN_SECRET_FILE"];
         let said: Vec<Option<String>> = needed.iter().map(|name| variable(name)).collect();
         if said.iter().all(Option::is_none) {
-            return Ok(Told { sign_in: None, contact, files });
+            return Ok(Told { sign_in: None, contact, files, farms });
         }
         if let Some(missing) = needed.iter().zip(&said).find(|(_, said)| said.is_none()).map(|(name, _)| name) {
             return Err(format!("{missing} is not set, and signing in needs it."));
@@ -102,6 +147,7 @@ impl Told {
             }),
             contact,
             files,
+            farms,
         })
     }
 }

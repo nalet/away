@@ -1,13 +1,16 @@
 //! The folder of files, and what is in force: the files are read when the server starts
 //! and whenever they change, and a set that is refused changes nothing.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
+use away_part::address::Address;
 use away_part::lines::Lines;
 use sha2::{Digest, Sha256};
 
-use super::{InForce, Refused, LARGEST_PICTURE};
+use super::{same, Farm, InForce, Refused, LARGEST_PICTURE};
+use crate::farm::{self, Item};
 
 /// How many files a folder may hold, how large one may be, and how deep its folders go.
 const MOST_FILES: usize = 1000;
@@ -92,12 +95,75 @@ pub struct Refusal {
     pub why: Refused,
 }
 
+/// What was read from a farm's feed, and when.
+#[derive(Clone, Debug, Default)]
+struct Read {
+    /// The feed it was read from: a farm whose feed is changed is read anew.
+    feed: String,
+    /// What the farm publishes, as it was last read.
+    items: Vec<Item>,
+    /// When it was last read, and when it was last asked.
+    at: Option<u64>,
+    asked_at: u64,
+    /// Why the last asking gave nothing.
+    failed: Option<String>,
+    /// What it publishes that is left out, because a machine of the files has its name.
+    left_out: Vec<String>,
+}
+
+/// A farm as those who administer see it: what the files say of it, and how its feed
+/// was last read.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FarmState {
+    /// The farm, as the files have it.
+    pub farm: Farm,
+    /// When its feed was last read, in seconds since 1970.
+    pub read_at: Option<u64>,
+    /// Why the last asking gave nothing, where it gave nothing.
+    pub failed: Option<String>,
+    /// How many desktops and how many programs it publishes.
+    pub desktops: usize,
+    /// How many programs.
+    pub programs: usize,
+    /// What it publishes that is left out, because a machine of the files has its name.
+    pub left_out: Vec<String>,
+}
+
 struct State {
+    /// What the files say.
+    from_files: Arc<InForce>,
+    /// What is in force: what the files say, with what their farms publish.
     in_force: Arc<InForce>,
     since: u64,
     refused: Option<Refusal>,
     /// What the files held when they were last looked at, as a sum.
     seen: Option<[u8; 32]>,
+    /// What was read from the farms' feeds, by the farms' names.
+    farms: BTreeMap<String, Read>,
+}
+
+impl State {
+    /// Puts together what is in force: what the files say, and what each of their farms
+    /// was last read to publish. A machine of the files keeps its name: what a farm
+    /// publishes under the same name is left out.
+    fn put_together(&mut self) {
+        let mut in_force = (*self.from_files).clone();
+        for farm in &self.from_files.farms {
+            let Some(read) = self.farms.get_mut(&farm.name).filter(|read| read.feed == farm.feed) else { continue };
+            let host = Address::read(&farm.feed).map(|address| address.host).unwrap_or_default();
+            let published = farm::publish(farm, &host, &read.items);
+            read.left_out.clear();
+            for machine in published.machines {
+                if in_force.machines.iter().any(|other| same(&other.name, &machine.name)) {
+                    read.left_out.push(machine.name);
+                } else {
+                    in_force.machines.push(machine);
+                }
+            }
+            in_force.pictures.extend(published.pictures);
+        }
+        self.in_force = Arc::new(in_force);
+    }
 }
 
 /// The register as the server holds it.
@@ -113,7 +179,14 @@ impl Register {
         let register = Register {
             folder,
             lines,
-            state: RwLock::new(State { in_force: Arc::new(InForce::default()), since: now, refused: None, seen: None }),
+            state: RwLock::new(State {
+                from_files: Arc::new(InForce::default()),
+                in_force: Arc::new(InForce::default()),
+                since: now,
+                refused: None,
+                seen: None,
+                farms: BTreeMap::new(),
+            }),
         };
         register.look(now);
         register
@@ -133,6 +206,81 @@ impl Register {
     /// The last change that was refused, where the files as they are now are refused.
     pub fn refused(&self) -> Option<Refusal> {
         self.state.read().unwrap_or_else(|poisoned| poisoned.into_inner()).refused.clone()
+    }
+
+    /// The farms whose feeds are to be read now: those that were never read, those whose
+    /// feed the files changed, and those last asked longer ago than this many seconds.
+    /// With each comes what was read from it before.
+    pub fn farms_to_read(&self, now: u64, every: u64) -> Vec<(Farm, Vec<Item>)> {
+        let state = self.state.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut due = Vec::new();
+        for farm in &state.from_files.farms {
+            match state.farms.get(&farm.name).filter(|read| read.feed == farm.feed) {
+                Some(read) if now.saturating_sub(read.asked_at) < every => {}
+                Some(read) => due.push((farm.clone(), read.items.clone())),
+                None => due.push((farm.clone(), Vec::new())),
+            }
+        }
+        due
+    }
+
+    /// Takes what a farm's feed gave: what the farm publishes, or why it could not be
+    /// read. What was read before stays where the feed could not be read now.
+    pub fn farm_was_read(&self, farm: &Farm, outcome: Result<Vec<Item>, String>, now: u64) {
+        let mut state = self.state.write().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if !state.from_files.farms.iter().any(|named| named.name == farm.name && named.feed == farm.feed) {
+            return;
+        }
+        let before = state.farms.remove(&farm.name).filter(|read| read.feed == farm.feed).unwrap_or_default();
+        let read = match outcome {
+            Ok(items) => {
+                if before.at.is_none() || before.failed.is_some() || before.items != items {
+                    let desktops = items.iter().filter(|item| item.resource.desktop).count();
+                    self.lines.info(
+                        "a farm's feed was read",
+                        &[
+                            ("farm", farm.name.as_str().into()),
+                            ("desktops", (desktops as u64).into()),
+                            ("programs", ((items.len() - desktops) as u64).into()),
+                        ],
+                    );
+                }
+                Read { feed: farm.feed.clone(), items, at: Some(now), asked_at: now, failed: None, left_out: Vec::new() }
+            }
+            Err(why) => {
+                if before.failed.as_deref() != Some(why.as_str()) {
+                    self.lines.warn(
+                        "a farm's feed could not be read, and what it published before stays",
+                        &[("farm", farm.name.as_str().into()), ("why", why.as_str().into())],
+                    );
+                }
+                Read { asked_at: now, failed: Some(why), feed: farm.feed.clone(), ..before }
+            }
+        };
+        state.farms.insert(farm.name.clone(), read);
+        state.put_together();
+    }
+
+    /// The farms, as those who administer see them.
+    pub fn farms(&self) -> Vec<FarmState> {
+        let state = self.state.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        state
+            .from_files
+            .farms
+            .iter()
+            .map(|farm| {
+                let read = state.farms.get(&farm.name).filter(|read| read.feed == farm.feed).cloned().unwrap_or_default();
+                let desktops = read.items.iter().filter(|item| item.resource.desktop).count();
+                FarmState {
+                    farm: farm.clone(),
+                    read_at: read.at,
+                    failed: read.failed,
+                    desktops,
+                    programs: read.items.len() - desktops,
+                    left_out: read.left_out,
+                }
+            })
+            .collect()
     }
 
     /// Looks at the files, and applies them where they changed: whole, or not at all.
@@ -171,9 +319,13 @@ impl Register {
                         ("rules", (in_force.rules.len() as u64).into()),
                     ],
                 );
-                state.in_force = Arc::new(in_force);
+                state.from_files = Arc::new(in_force);
                 state.since = now;
                 state.refused = None;
+                // a farm the files no longer name is forgotten
+                let named: Vec<String> = state.from_files.farms.iter().map(|farm| farm.name.clone()).collect();
+                state.farms.retain(|name, _| named.contains(name));
+                state.put_together();
             }
             Err(why) => {
                 self.lines.warn(

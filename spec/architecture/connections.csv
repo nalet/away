@@ -11,7 +11,8 @@ way-in,gateway,passes on,/session,v1,The chart sets the way in's time limits for
 server,sign-in-service,signs in,OpenID Connect,v1,"A code for tokens, their renewal, the sign-out"
 server,database,writes,the database away,v1,
 server,files,reads,the mounted files,v1,At its start and on every change
-server,cluster-secrets,reads,"its own: the client's secret, the key for what the database holds encrypted, its signing key",v1,Mounted
+server,cluster-secrets,reads,"its own: the client's secret, the key for what the database holds encrypted, its signing key, the password of the account that reads the farms' feeds",v1,Mounted
+server,farm-feed,fetches,HTTPS,v1,"Only where the files name a farm: what the farm publishes, each thing's icon and how it is reached, every five minutes, as an account that opens nothing"
 server,gateway,calls,internal,v1,"End a session, test a machine, announce an update"
 gateway,server,calls,internal,v1,"Take over a session with its ticket; report its steps, its use and its end"
 gateway,issuer,asks,internal,v1,"For one session: a certificate for its key, a kept password, or a signature with a kept key"

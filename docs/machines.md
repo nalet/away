@@ -10,8 +10,9 @@ machine yet.
 
 ## The files
 
-The files are YAML. A file holds machines, rules, or both, and an installation
-has as many files as suit it: one for everything, or one for each department.
+The files are YAML. A file holds machines, rules and farms, any of them, and
+an installation has as many files as suit it: one for everything, or one for
+each department.
 
 ```yaml
 machines:
@@ -100,6 +101,63 @@ A group of people is the whole name the sign-in service gives it, such as
 group of machines; one that is both is refused, since the rule could mean
 either.
 
+### A farm
+
+A farm of Windows machines publishes desktops and programs through a broker,
+and its web access says what there is, in a feed. Name the feed, and Away asks
+it: a program the farm publishes tomorrow shows tomorrow, and no file changes.
+
+```yaml
+farms:
+  - name: Work Resources
+    feed: https://broker.corp.example/RDWeb/Feed/webfeed.aspx
+    groups: [published]
+
+rules:
+  - name: staff-published
+    who: [staff]
+    reaches: [published]
+```
+
+| Part | Means | |
+|---|---|---|
+| `name` | what the farm is called. Its programs show as the programs of a machine of this name, so no machine and no other farm shares it | needed |
+| `feed` | the address of the farm's feed, over HTTPS | needed |
+| `groups` | the groups of machines that everything the farm publishes is in | none |
+
+- **A desktop the farm publishes is a machine**, by the name the farm gives
+  it.
+- **The farm's programs are the programs of one machine**, which has the
+  farm's name. Each keeps the icon the farm gives it.
+- **The rules give them like everything else.** A rule reaches the farm by
+  its name, or by a group the farm names.
+- **Away asks every five minutes.** What the farm changed shows the next time
+  a page asks, and the server writes a line: `a farm's feed was read`, with
+  how many desktops and programs.
+- **A feed that can't be read changes nothing.** What the farm published
+  before stays, the administration says why the feed could not be read, and
+  the server writes a line:
+  `a farm's feed could not be read, and what it published before stays`.
+  What a farm publishes is held in memory: after the server starts, a farm
+  shows nothing until its feed was read once.
+- **A machine of the files keeps its name.** A desktop that the farm
+  publishes under the name of a machine in the files is left out, and the
+  administration names it.
+
+Away reads the feeds as an account of its own, which the installation names
+([installing Away](./install.md#the-farms-feeds)). A farm shows that account
+what it would show it in a browser, so:
+
+- the account is in the groups the farm publishes to;
+- what the account sees is what Away offers, to the people its rules name.
+  Whom the farm lets open a program stays the farm's to say;
+- the account signs in at the farm's web access, with NTLM inside the secured
+  connection, and nowhere else. Away opens nothing with it.
+
+Without the account, a farm in the files shows nothing, and the administration
+says so. A web access that sends its readers to another address to sign in is
+not followed: name the feed where the farm itself signs its readers in.
+
 ### What the files don't take
 
 One document a file, and plain YAML: no references (`&`, `*`), no tags (`!`).
@@ -178,4 +236,5 @@ are put right.
 - **The administration**, for the groups in `administrators`, lists the
   machines and the rules that are in force, each with its file and its line,
   who reaches each machine and by which rule, and since when the set is in
-  force.
+  force. It lists the farms as well: each with its feed, what it publishes,
+  when its feed was last read, and what kept it from being read.

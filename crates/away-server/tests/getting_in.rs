@@ -13,8 +13,9 @@ use away_part::{stop, Lines, Part, Settings, Stopper};
 use away_secret::Secret;
 use away_server::getting_in::{FROM_AWAYS_PAGE, NOT_SIGNED_IN, SIGNED_IN, SIGNING_IN};
 use away_server::service;
+use away_server::stand_in::farm::Farm;
 use away_server::stand_in::SignInService;
-use away_server::told::{SignIn, Told};
+use away_server::told::{Farms, SignIn, Told};
 use away_server::Server;
 
 /// The server, the sign-in service beside it, and what the server wrote.
@@ -35,14 +36,19 @@ fn world() -> World {
     world_told(|_| {})
 }
 
-/// A world in which the server is told something else than usual.
+/// A world in which the server is told something else than usual about signing in.
 fn world_told(change: impl FnOnce(&mut SignIn)) -> World {
+    world_with(|told| change(told.sign_in.as_mut().expect("a sign-in service")))
+}
+
+/// A world in which the server is told something else than usual.
+fn world_with(change: impl FnOnce(&mut Told)) -> World {
     let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().expect("a runtime");
     let port = free_port();
     let away = format!("http://127.0.0.1:{port}");
     let back = format!("{away}/sign-in/back");
     let service = runtime.block_on(SignInService::start("away", "s3cr:t", &back));
-    let mut sign_in = SignIn {
+    let sign_in = SignIn {
         public: Address::read(&away).expect("Away's address"),
         service: service::Settings {
             service: service.address(),
@@ -57,9 +63,9 @@ fn world_told(change: impl FnOnce(&mut SignIn)) -> World {
         record_readers: vec!["auditors".to_string()],
         looks_every: Duration::from_millis(100),
     };
-    change(&mut sign_in);
     let files = Some(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/files").into());
-    let told = Told { sign_in: Some(sign_in), contact: Some("it-help@example.com".to_string()), files };
+    let mut told = Told { sign_in: Some(sign_in), contact: Some("it-help@example.com".to_string()), files, farms: None };
+    change(&mut told);
     let (away, lines, stopper) = serve(&runtime, port, told);
     World { _runtime: runtime, service, away, lines, _stopper: stopper }
 }
@@ -259,6 +265,193 @@ fn those_who_administer_see_what_is_in_force_and_where_it_is_written() {
     other.sign_in(&world, "/");
     let refused = other.get(&register);
     assert_eq!((refused.status, refused.body.as_str()), (403, "This is for those who administer Away.\n"));
+}
+
+/// A folder of files for one test, removed when the test ends.
+struct Folder(std::path::PathBuf);
+
+impl Folder {
+    fn with(name: &str, files: &[(&str, &str)]) -> Folder {
+        let path = std::env::temp_dir().join(format!("away-farms-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).expect("a folder");
+        for (file, text) in files {
+            std::fs::write(path.join(file), text).expect("a file");
+        }
+        Folder(path)
+    }
+}
+
+impl Drop for Folder {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// A PNG picture for the tests, told apart by its last byte.
+fn picture(last: u8) -> Vec<u8> {
+    [&b"\x89PNG\r\n\x1a\nthe rest of a picture "[..], &[last]].concat()
+}
+
+/// A farm's web access beside the server: it takes one account, and publishes two
+/// programs and a desktop.
+fn farm() -> (tokio::runtime::Runtime, Farm) {
+    let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(1).enable_all().build().expect("a runtime");
+    let farm = runtime.block_on(Farm::start("CORP\\svc-away", "the password of the account that reads the feed"));
+    farm.publishes("Ledger", false, "Finance", Some(&picture(1)));
+    farm.publishes("Pay & Benefits", false, "Finance", None);
+    farm.publishes("Desktop", true, "Desktops", Some(&picture(2)));
+    (runtime, farm)
+}
+
+/// What the server is told to read the farms' feeds with.
+fn reads_farms(password: &str) -> Option<Farms> {
+    Some(Farms {
+        account: "CORP\\svc-away".to_string(),
+        password: Secret::new(password),
+        authorities: None,
+        every: Duration::from_millis(200),
+    })
+}
+
+/// The files of a farm, and of a rule that gives it to everyone of staff.
+fn farm_files(feed: &str) -> String {
+    format!("farms:\n  - name: Work Resources\n    feed: {feed}\n    groups: [published]\nrules:\n  - name: staff-published\n    who: [staff]\n    reaches: [published]\n")
+}
+
+/// What the administration is told of the first farm.
+fn first_farm(browser: &mut Browser, world: &World) -> Json {
+    let says = browser.get(&format!("{}/api/register", world.away)).says();
+    let Some(Json::List(farms)) = says.get("farms") else { panic!("no farms in {}", says.write()) };
+    farms.first().expect("a farm").clone()
+}
+
+/// The programs of a machine, by their names, in what a person is told.
+fn programs_of(told: &Json, machine: &str) -> Vec<String> {
+    let Some(Json::List(machines)) = told.get("machines") else { panic!("no machines") };
+    let Some(Json::List(programs)) = machines.iter().find(|one| one.text_of("name") == Some(machine)).and_then(|one| one.get("programs"))
+    else {
+        return Vec::new();
+    };
+    programs.iter().map(|program| program.text_of("name").expect("a name").to_string()).collect()
+}
+
+#[test]
+fn a_farm_says_what_it_publishes_and_away_shows_it_as_it_changes() {
+    let (_runtime, farm) = farm();
+    let folder = Folder::with("changes", &[("farm.yaml", &farm_files(&farm.feed()))]);
+    let world = world_with(|told| {
+        told.files = Some(folder.0.clone());
+        told.farms = reads_farms("the password of the account that reads the feed");
+    });
+    let machines = format!("{}/api/machines", world.away);
+    let mut browser = Browser::default();
+    browser.sign_in(&world, "/");
+
+    // the farm's desktop is a machine, and its programs are those of one machine with the farm's name
+    until("the farm's feed is read", || names(&browser.get(&machines).says(), "machines") == ["Desktop", "Work Resources"]);
+    let told = browser.get(&machines).says();
+    assert_eq!(programs_of(&told, "Work Resources"), ["Ledger", "Pay & Benefits"]);
+    let Some(Json::List(listed)) = told.get("machines") else { panic!() };
+    assert_eq!(
+        listed[0].write(),
+        r#"{"name":"Desktop","kind":"windows","address":"broker.corp.example","groups":["published"],"desktop":{"port":3389,"over":"rdp"},"programs":[],"shell":null,"collection":"Desktops"}"#
+    );
+    assert_eq!(listed[1].text_of("collection"), Some("Finance"));
+    // a program's icon is the farm's own, served by Away
+    let Some(Json::List(programs)) = listed[1].get("programs") else { panic!() };
+    let icon = programs[0].text_of("icon").expect("Ledger has an icon").to_string();
+    assert_eq!(programs[1].get("icon"), Some(&Json::Null));
+    let head = browser.ask("HEAD", &format!("{}{icon}", world.away), &[]);
+    assert_eq!((head.status, head.header("content-type"), head.header("content-length")), (200, Some("image/png"), Some("31")));
+
+    // those who administer see the farm, and how its feed was read
+    let state = first_farm(&mut browser, &world);
+    assert_eq!(
+        (state.text_of("name"), state.text_of("file"), state.get("line").and_then(Json::count)),
+        (Some("Work Resources"), Some("farm.yaml"), Some(2))
+    );
+    assert_eq!((state.get("desktops").and_then(Json::count), state.get("programs").and_then(Json::count)), (Some(1), Some(2)));
+    assert_eq!((state.get("failed"), state.get("left_out").map(Json::write).as_deref()), (Some(&Json::Null), Some("[]")));
+    assert!(state.get("read_at").and_then(Json::count).is_some_and(|at| at > 1_700_000_000));
+
+    // the farm publishes a program more: it is there without anybody touching a file
+    farm.publishes("Reports", false, "Finance", Some(&picture(3)));
+    until("the new program shows", || {
+        programs_of(&browser.get(&machines).says(), "Work Resources") == ["Ledger", "Pay & Benefits", "Reports"]
+    });
+    // and one it publishes no longer is gone
+    farm.withdraws("Pay & Benefits");
+    until("the withdrawn program is gone", || programs_of(&browser.get(&machines).says(), "Work Resources") == ["Ledger", "Reports"]);
+    // what did not change was not asked for again: three things were taken at first, and one more since
+    let (feeds, pieces) = farm.gave();
+    assert!(feeds >= 3, "{feeds} feeds");
+    assert_eq!(pieces, 5 + 2, "two files and two icons for the programs, a file and an icon for the desktop less the icon it has none of; then the new program's two");
+
+    // the farm doesn't answer: what it published stays, and the administration says why
+    farm.answers(false);
+    until("the failure shows", || first_farm(&mut browser, &world).get("failed") != Some(&Json::Null));
+    assert_eq!(first_farm(&mut browser, &world).text_of("failed"), Some("The farm's feed answered with the status 503."));
+    assert_eq!(programs_of(&browser.get(&machines).says(), "Work Resources"), ["Ledger", "Reports"]);
+    farm.answers(true);
+    until("the feed is read again", || first_farm(&mut browser, &world).get("failed") == Some(&Json::Null));
+
+    // each outcome is a line of the server's
+    let said = world.lines.kept().join("\n");
+    assert!(said.contains(r#""event":"a farm's feed was read","farm":"Work Resources","desktops":1,"programs":2"#), "{said}");
+    assert!(said.contains(r#""event":"a farm's feed could not be read, and what it published before stays","farm":"Work Resources","why":"The farm's feed answered with the status 503.""#), "{said}");
+    assert!(!said.contains("the password of the account"), "the account's password is in no line");
+}
+
+#[test]
+fn a_farm_that_does_not_take_the_account_or_is_given_none_shows_nothing_and_says_why() {
+    let (_runtime, farm) = farm();
+    let folder = Folder::with("refused", &[("farm.yaml", &farm_files(&farm.feed()))]);
+    // a wrong password
+    let world = world_with(|told| {
+        told.files = Some(folder.0.clone());
+        told.farms = reads_farms("another password");
+    });
+    let mut browser = Browser::default();
+    browser.sign_in(&world, "/");
+    until("the refusal shows", || first_farm(&mut browser, &world).get("failed") != Some(&Json::Null));
+    assert_eq!(
+        first_farm(&mut browser, &world).text_of("failed"),
+        Some("The farm doesn't take the account Away reads its feed with: its name or its password is wrong, or it may not read the feed.")
+    );
+    assert_eq!(names(&browser.get(&format!("{}/api/machines", world.away)).says(), "machines"), Vec::<String>::new());
+
+    // no account at all
+    let world = world_with(|told| told.files = Some(folder.0.clone()));
+    let mut browser = Browser::default();
+    browser.sign_in(&world, "/");
+    until("the lack of an account shows", || first_farm(&mut browser, &world).get("failed") != Some(&Json::Null));
+    assert_eq!(
+        first_farm(&mut browser, &world).text_of("failed"),
+        Some("Away is given no account to read a farm's feed with: the installation guide says how to give it one.")
+    );
+}
+
+#[test]
+fn a_machine_of_the_files_keeps_its_name_against_what_a_farm_publishes() {
+    let (_runtime, farm) = farm();
+    let files = format!(
+        "{}machines:\n  - name: Desktop\n    kind: linux\n    address: desk.corp.example\n    groups: [published]\n    shell: true\n",
+        farm_files(&farm.feed())
+    );
+    let folder = Folder::with("names", &[("farm.yaml", &files)]);
+    let world = world_with(|told| {
+        told.files = Some(folder.0.clone());
+        told.farms = reads_farms("the password of the account that reads the feed");
+    });
+    let mut browser = Browser::default();
+    browser.sign_in(&world, "/");
+    let machines = format!("{}/api/machines", world.away);
+    until("the farm's feed is read", || names(&browser.get(&machines).says(), "machines") == ["Desktop", "Work Resources"]);
+    let told = browser.get(&machines).says();
+    let Some(Json::List(listed)) = told.get("machines") else { panic!() };
+    assert_eq!((listed[0].text_of("kind"), listed[0].text_of("address")), (Some("linux"), Some("desk.corp.example")));
+    assert_eq!(first_farm(&mut browser, &world).get("left_out").map(Json::write).as_deref(), Some(r#"["Desktop"]"#));
 }
 
 #[test]

@@ -150,6 +150,7 @@ says which.
 | Keep a name and password or a key for a machine, never shown again | `issuer` `chart` | [6](../plan/README.md#6-a-shell) | `keep-secret` |
 | Say which programs of a Windows machine people may open | `server` | [13](../plan/README.md#13-programs) | `offer-programs` |
 | Give a program an icon of its own, which people know it by | `server` `web` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `give-program-icons` |
+| Read the desktops and programs a farm of Windows machines publishes from the farm itself, as it changes | `server` `web` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `read-programs-from-host` |
 | Set how a machine is reached: its port, its screen, what may pass | `server` `gateway` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `set-connection-options` |
 | Test a machine: is it reached, does signing in work, and if not, which step fails | `web` `server` `gateway` | [6](../plan/README.md#6-a-shell) | `test-machine` |
 | Say how a machine proves who it is, and accept a changed identity on purpose | `web` `server` `gateway` | [6](../plan/README.md#6-a-shell) | `know-machine-identity` |

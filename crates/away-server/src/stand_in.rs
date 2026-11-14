@@ -4,6 +4,8 @@
 //!
 //! It is built only for tests: nothing of it is in a release.
 
+pub mod farm;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -154,7 +156,8 @@ impl SignInService {
     /// Tests that run in a browser tell it how to behave by sending it a form:
     /// `POST /stand-in?refuses_renewals=true`. The names are `refuses_renewals` (true or
     /// false), `sends_back_with` (an error, or nothing), `signs_for` (seconds), `person`
-    /// (`administrator` or `person`) and `reset`, which makes it as it was when it started.
+    /// (`administrator`, `person` or `of the farm`) and `reset`, which makes it as it was
+    /// when it started.
     pub async fn start_at(at: &str, client: &str, secret: &str, back: &str) -> SignInService {
         let listener = Listener::bind("sign-in service", at).await.expect("an address");
         let address = format!("http://127.0.0.1:{}", listener.address().port());
@@ -289,6 +292,16 @@ pub fn person() -> Json {
     ])
 }
 
+/// A person whom a rule gives what a farm publishes.
+pub fn of_the_farm() -> Json {
+    Json::object([
+        ("sub", "4b7a".into()),
+        ("name", "Dana Kim".into()),
+        ("email", "dana.kim@example.com".into()),
+        ("groups", Json::List(vec!["staff".into(), "farm-users".into()])),
+    ])
+}
+
 fn json(status: StatusCode, says: Json) -> Answer {
     answer(status, "application/json", says.write())
 }
@@ -311,7 +324,13 @@ impl Inner {
                 "refuses_renewals" => self.refuses_renewals = value == "true",
                 "sends_back_with" => self.sends_back_with = Some(value.clone()).filter(|error| !error.is_empty()),
                 "signs_for" => self.good_for = value.parse().unwrap_or(300),
-                "person" => self.says = if value == "person" { person() } else { administrator() },
+                "person" => {
+                    self.says = match value.as_str() {
+                        "person" => person(),
+                        "of the farm" => of_the_farm(),
+                        _ => administrator(),
+                    }
+                }
                 _ => {}
             }
         }

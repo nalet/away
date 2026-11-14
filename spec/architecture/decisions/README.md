@@ -23,6 +23,7 @@ capabilities it governs and the work packages that rest on it.
 | [ADR‑0011](./0011-the-web-app.md) | The web app is built from the design system, and loads nothing from outside | Accepted | [4](../../plan/README.md#4-getting-in-and-the-frame), [14](../../plan/README.md#14-by-touch) |
 | [ADR‑0012](./0012-one-chart-no-special-rights.md) | Installed by one chart, with no rights beyond its own namespace | Accepted | [1](../../plan/README.md#1-the-ground), [15](../../plan/README.md#15-status-and-the-check-of-the-setup) |
 | [ADR‑0013](./0013-built-tested-signed-by-the-pipelines.md) | Built, tested, signed and listed by the project's own pipelines | Accepted | [1](../../plan/README.md#1-the-ground), [16](../../plan/README.md#16-ready-to-release) |
+| [ADR‑0014](./0014-a-farm-says-what-it-publishes.md) | A farm says itself what it publishes, and the server asks it | Accepted | — |
 
 ## What each governs
 
@@ -43,6 +44,7 @@ The components a record is about, and the capabilities it decides most. A compon
 | [ADR‑0011](./0011-the-web-app.md) | `web`, `session-view` | `move-between-views`, `use-on-phone`, `use-without-mouse`, `call-nobody-else` |
 | [ADR‑0012](./0012-one-chart-no-special-rights.md) | `chart` | `install-with-chart`, `run-without-special-rights`, `set-address`, `use-own-certificates`, `check-setup`, `see-health`, `give-measures` |
 | [ADR‑0013](./0013-built-tested-signed-by-the-pipelines.md) | `pipelines`, `site-pipeline`, `test-servers`, `registry`, `docs` | `verify-image`, `see-image-contents`, `build-from-source`, `run-its-tests`, `report-in-private` |
+| [ADR‑0014](./0014-a-farm-says-what-it-publishes.md) | `server`, `files`, `farm-feed`, `cluster-secrets` | `read-programs-from-host`, `see-all-programs`, `give-program-icons` |
 <!-- end: decisions -->
 
 ## How a record is written

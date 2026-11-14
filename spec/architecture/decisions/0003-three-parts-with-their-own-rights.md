@@ -20,7 +20,7 @@ Away runs as three parts. Each reaches only what its task needs.
 
 | Part | Its task | It reaches | It never reaches |
 |---|---|---|---|
-| the server | answers the browser's pages and requests; holds people's sign-ins; reads the files; decides who reaches what; writes the records | the database, the sign-in service, the gateway | a machine; the issuer; a kept account; the authority's keys |
+| the server | answers the browser's pages and requests; holds people's sign-ins; reads the files; decides who reaches what; writes the records | the database, the sign-in service, the gateway, the feed of a farm the files name ([ADR-0014](./0014-a-farm-says-what-it-publishes.md)) | a machine, beyond that feed; the issuer; a kept account; the authority's keys |
 | the gateway | holds the sessions: one connection to the browser and one to the machine each | the machines, a domain's controllers, the issuer, the server | the database; the sign-in service; the cluster's secrets, beyond a key of its own |
 | the issuer | answers one question: sign this person in on this machine | the kept accounts and its authority's keys, the sign-in service's public keys, the organisation's authority where it issues, the server | a machine; the database; the browser |
 
@@ -43,6 +43,6 @@ Away runs as three parts. Each reaches only what its task needs.
 ### What this rules out
 
 - **No part that reaches both the machines and the database.**
-- **No way to a machine from the server.** Testing a machine is done by the gateway, when the server asks.
+- **No way to a machine from the server**, except to the feed in which a farm says what it publishes ([ADR-0014](./0014-a-farm-says-what-it-publishes.md)). Testing a machine is done by the gateway, when the server asks.
 - **No session through an update of the gateway in the first release**, beyond desktops coming back by themselves.
 - **No separation where Away runs as one container** (`install-as-one-container`, later): the three parts are then one process, and its guide will say so.

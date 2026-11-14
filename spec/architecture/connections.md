@@ -29,7 +29,8 @@ first release unless its note begins with *There* or *Later*.
 | `server` | signs in | `sign-in-service` | OpenID Connect | A code for tokens, their renewal, the sign-out. |
 | `server` | writes | `database` | the database away | — |
 | `server` | reads | `files` | the mounted files | At its start and on every change. |
-| `server` | reads | `cluster-secrets` | its own: the client's secret, the key for what the database holds encrypted, its signing key | Mounted. |
+| `server` | reads | `cluster-secrets` | its own: the client's secret, the key for what the database holds encrypted, its signing key, the password of the account that reads the farms' feeds | Mounted. |
+| `server` | fetches | `farm-feed` | HTTPS | Only where the files name a farm: what the farm publishes, each thing's icon and how it is reached, every five minutes, as an account that opens nothing. |
 | `server` | calls | `gateway` | internal | End a session, test a machine, announce an update. |
 | `gateway` | calls | `server` | internal | Take over a session with its ticket; report its steps, its use and its end. |
 | `gateway` | asks | `issuer` | internal | For one session: a certificate for its key, a kept password, or a signature with a kept key. |
