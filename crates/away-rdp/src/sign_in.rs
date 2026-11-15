@@ -225,7 +225,7 @@ impl SignIn {
 }
 
 /// The account's name and password, as the machine takes them to sign the person in.
-fn credentials(account: &Account) -> Vec<u8> {
+pub fn credentials(account: &Account) -> Vec<u8> {
     let mut fields = Vec::new();
     for (number, text) in [(0, account.domain.as_str()), (1, account.name.as_str()), (2, account.password.expose())] {
         fields.extend(der::write(der::of_its_own(number), &der::write(der::OCTET_STRING, &ntlm::wide(text))));

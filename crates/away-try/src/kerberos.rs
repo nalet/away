@@ -101,12 +101,12 @@ fn read(file: &str, what: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-fn now() -> (u64, u32) {
+pub(crate) fn now() -> (u64, u32) {
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
     (now.as_secs(), now.subsec_micros())
 }
 
-fn random<const N: usize>() -> Result<[u8; N], String> {
+pub(crate) fn random<const N: usize>() -> Result<[u8; N], String> {
     let mut bytes = [0u8; N];
     getrandom::fill(&mut bytes).map_err(|error| format!("The system gave no random bytes: {error}."))?;
     Ok(bytes)
@@ -149,6 +149,42 @@ fn says(ticket: &Ticket) {
     println!("   It is sealed with {:?}, and good for {} minutes more.", ticket.key.kind(), good_for / 60);
 }
 
+/// A first ticket for an account, with its password: the two requests, and what the
+/// domain controller answers.
+fn first_with_a_password(host: &str, port: u16, realm: &str, account: &str, password: &str, nonce: u32) -> Result<Ticket, String> {
+    println!("Asking {host}, on port {port}, how the key of {account}@{realm} is made");
+    let (mut asking, request) = WithAPassword::begin(account, realm, now(), nonce);
+    let reply = ask(host, port, &request)?;
+    let proof = asking.prove(&reply, password, now(), random()?).map_err(|error| error.to_string())?;
+    println!("   It asks for a proof, and says how the key is made from the password.");
+    println!("Asking for a first ticket, with the time sealed with that key");
+    asking.receive(&ask(host, port, &proof)?).map_err(|error| error.to_string())
+}
+
+/// A ticket for a service, for an account with its password: a first ticket, and with
+/// it the one that is asked for.
+pub(crate) fn ticket_with_a_password(
+    controller: &str,
+    realm: &str,
+    account: &str,
+    password: &str,
+    service: &str,
+) -> Result<Ticket, String> {
+    let (host, port) = match controller.rsplit_once(':') {
+        Some((host, port)) if !host.contains(':') => (host, port.parse::<u16>().map_err(|_| format!("{port} is no port."))?),
+        _ => (controller, 88),
+    };
+    let nonce = u32::from_be_bytes(random()?) & 0x7fff_ffff;
+    let first = first_with_a_password(host, port, realm, account, password, nonce)?;
+    says(&first);
+    println!("Asking for a ticket for {service}, with the first ticket");
+    let parts: Vec<&str> = service.split('/').collect();
+    let (later, request) = Later::begin(&first, Name::new(NameKind::Service, &parts), now(), nonce ^ 0x5555_5555, random()?);
+    let ticket = later.receive(&ask(host, port, &request)?).map_err(|error| error.to_string())?;
+    says(&ticket);
+    Ok(ticket)
+}
+
 /// The steps of the exchange. Gives the exit code where the words made no sense.
 pub fn run(words: &[String]) -> Option<Result<(), String>> {
     let asked = asked(words)?;
@@ -166,14 +202,7 @@ fn tried(asked: &Asked) -> Result<(), String> {
     let first = match &asked.password_file {
         Some(file) => {
             let password = std::fs::read_to_string(file).map_err(|error| format!("The password's file can't be read: {error}."))?;
-            println!("Asking {host}, on port {port}, how the key of {account}@{realm} is made");
-            let (mut asking, request) = WithAPassword::begin(account, realm, now(), nonce);
-            let reply = ask(host, port, &request)?;
-            let proof =
-                asking.prove(&reply, password.trim_end_matches(['\r', '\n']), now(), random()?).map_err(|error| error.to_string())?;
-            println!("   It asks for a proof, and says how the key is made from the password.");
-            println!("Asking for a first ticket, with the time sealed with that key");
-            asking.receive(&ask(host, port, &proof)?).map_err(|error| error.to_string())?
+            first_with_a_password(host, port, realm, account, password.trim_end_matches(['\r', '\n']), nonce)?
         }
         None => {
             let held = Held::new(

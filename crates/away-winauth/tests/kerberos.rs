@@ -1,12 +1,15 @@
 //! Away's own Kerberos against a real Kerberos server: with a certificate, a first
-//! ticket; with that ticket, one for a machine. `AWAY_TEST_KERBEROS` names the server
-//! (`tests/machines/kerberos/real.sh` starts one). Without it these tests say so and pass.
+//! ticket; with that ticket, one for a machine; and that ticket shown to a machine that
+//! takes it with the Kerberos library's own code. `AWAY_TEST_KERBEROS` names the server
+//! and `AWAY_TEST_KERBEROS_MACHINE` the machine (`tests/machines/kerberos/real.sh` starts
+//! both). Without them these tests say so and pass.
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 
 use away_winauth::kerberos::exchange::{framed, unframed, First, Later, Ticket, WithAPassword};
+use away_winauth::kerberos::gss;
 use away_winauth::kerberos::messages::{Name, NameKind};
 use away_winauth::kerberos::pkinit::{Fresh, Held, Trusts};
 use away_winauth::Error;
@@ -27,6 +30,49 @@ fn server() -> Option<String> {
         eprintln!("no Kerberos server to test against: AWAY_TEST_KERBEROS is not set");
     }
     at
+}
+
+/// Where the machine is that takes the tickets the server gives.
+fn machine() -> Option<String> {
+    let at = std::env::var("AWAY_TEST_KERBEROS_MACHINE").ok().filter(|at| !at.is_empty());
+    if at.is_none() {
+        assert!(
+            std::env::var_os("CI").is_none(),
+            "the pipeline's tests need a machine that takes tickets: AWAY_TEST_KERBEROS_MACHINE is not set"
+        );
+        eprintln!("no machine to show a ticket to: AWAY_TEST_KERBEROS_MACHINE is not set");
+    }
+    at
+}
+
+/// A connection to the machine, over which whole messages go back and forth.
+struct Line(TcpStream);
+
+impl Line {
+    fn to(at: &str) -> Line {
+        let connection = TcpStream::connect(at).expect("the machine takes connections");
+        connection.set_read_timeout(Some(Duration::from_secs(10))).expect("a time limit");
+        Line(connection)
+    }
+
+    fn send(&mut self, message: &[u8]) {
+        self.0.write_all(&framed(message)).expect("the message goes out");
+    }
+
+    /// The machine's next message, or nothing where it ended the connection.
+    fn take(&mut self) -> Option<Vec<u8>> {
+        let mut arrived = Vec::new();
+        loop {
+            if let Some(message) = unframed(&arrived).expect("a whole message") {
+                return Some(message.to_vec());
+            }
+            let mut bytes = [0u8; 4096];
+            match self.0.read(&mut bytes) {
+                Ok(0) | Err(_) => return None,
+                Ok(count) => arrived.extend_from_slice(&bytes[..count]),
+            }
+        }
+    }
 }
 
 /// Sends a request, and gives what came back.
@@ -127,4 +173,52 @@ fn a_real_server_refuses_who_is_not_the_certificates_account_and_is_itself_not_b
     let disbelieved = first_ticket(&at, "alex.urban", ACCOUNT, ACCOUNT_KEY, STRANGER).expect_err("an authority that is not the server's");
     assert_eq!(disbelieved, Error::NotTrusted("its certificate leads to no authority that is trusted, or is good no longer"));
     let _ = CONTROLLER;
+}
+
+#[test]
+fn a_real_machine_takes_the_ticket_proves_itself_and_both_seal_for_each_other() {
+    let (Some(at), Some(machine_at)) = (server(), machine()) else { return };
+    let first = first_ticket(&at, "alex.urban", ACCOUNT, ACCOUNT_KEY, AUTHORITY).expect("a first ticket");
+    let service = Name::new(NameKind::Service, &["TERMSRV", "desk-01.corp.example"]);
+    let (later, request) = Later::begin(&first, service, now(), 0x1122_3344, [7; 16]);
+    let ticket = later.receive(&ask(&at, &request)).expect("a ticket for the machine");
+    let fresh = || gss::Fresh { key: [0x21; 32], begins_with: [0x22; 16], counts_from: 0x1234_5678 };
+
+    // the ticket is shown, and the machine answers with its own proof
+    let (shown, token) = gss::show(&ticket, now(), fresh());
+    let mut line = Line::to(&machine_at);
+    line.send(&token);
+    let answer = line.take().expect("the machine answers the ticket");
+    let (mut sealing, last) = shown.receive(&answer).expect("the machine proves itself");
+    if let Some(last) = last {
+        line.send(&last);
+        line.take().expect("the machine takes the client's check on what was offered");
+    }
+    // what the client seals, the machine opens, and what the machine seals, the client
+    // opens: it says who the ticket is for, as it read it in the ticket
+    for (number, says) in [&b"what the client says"[..], b"and what it says next", b""].into_iter().enumerate() {
+        line.send(&sealing.seal(says, [0x30 + number as u8; 16]));
+        let sealed = line.take().expect("the machine answers what it could open");
+        assert_eq!(sealing.open(&sealed).expect("what the machine sealed"), [b"alex.urban@CORP.EXAMPLE heard: ", says].concat());
+    }
+    // a message that was changed on the way is one the machine ends the connection at
+    let mut changed = sealing.seal(b"changed on the way", [0x40; 16]);
+    let at_its_end = changed.len() - 1;
+    changed[at_its_end] ^= 1;
+    line.send(&changed);
+    assert_eq!(line.take(), None, "the machine opens nothing that was changed");
+
+    // a ticket that was changed, and one shown by who doesn't have the key that goes
+    // with it: the machine says that it refuses, and the client reads that as a refusal
+    let mut changed = ticket.clone();
+    let in_the_ticket = changed.bytes.len() - 1;
+    changed.bytes[in_the_ticket] ^= 1;
+    let stolen = Ticket { key: first.key.clone(), ..ticket.clone() };
+    for (other, what) in [(changed, "a ticket that was changed"), (stolen, "a ticket without the key that goes with it")] {
+        let (shown, token) = gss::show(&other, now(), fresh());
+        let mut line = Line::to(&machine_at);
+        line.send(&token);
+        let refusal = line.take().expect("the machine says that it refuses");
+        assert_eq!(shown.receive(&refusal).unwrap_err(), Error::NotTrusted("the machine refused the ticket"), "{what}");
+    }
 }

@@ -248,8 +248,9 @@ The machine is `desk-01`, for the account `CORP\alex.urban` with the password
 Signing in on a Windows machine as oneself begins with Kerberos, and Away
 speaks it with code of its own. That code is tried against a real Kerberos
 server. A script starts one in a container, for the domain of the tests'
-certificates, with signing in by certificate switched on, and runs the tests
-that need it:
+certificates, with signing in by certificate switched on, and beside it a
+machine that takes the server's tickets with the Kerberos library's own code.
+It then runs the tests that need them:
 
 ```sh
 tests/machines/kerberos/real.sh
@@ -262,15 +263,22 @@ certificate's, and with a certificate nobody the server trusts has issued, and
 each is refused; and they check that the client believes the server only when
 the server's own certificate leads to the authority the client trusts.
 
-`KEEP=1` before it leaves the server running at `localhost:1088`:
+The ticket for the machine is then shown to that machine. It has to answer
+with its own proof, both sides seal messages for each other, and the machine
+says whose ticket it read. A message that was changed on the way, a ticket
+that was changed, and a ticket shown without the key that goes with it are
+each refused.
+
+`KEEP=1` before it leaves both running, the server at `localhost:1088` and
+the machine at `localhost:1089`:
 
 ```sh
 KEEP=1 tests/machines/kerberos/real.sh
-AWAY_TEST_KERBEROS=localhost:1088 cargo test --package away-winauth
+AWAY_TEST_KERBEROS=localhost:1088 AWAY_TEST_KERBEROS_MACHINE=localhost:1089 cargo test --package away-winauth --package away-try
 ```
 
-Without the variable those tests say that they found no Kerberos server, and
-pass. The pipeline always has one, and fails where a test finds none. The
+Without the variables those tests say what they did not find, and pass. The
+pipeline always has both, and fails where a test finds none. The
 certificates are made by `crates/away-winauth/tests/fixtures/make.sh`, for a
 domain that doesn't exist.
 
@@ -289,6 +297,21 @@ certificate's key and nothing else, and the domain controller has to prove
 itself in turn with a certificate of the authority that is named. `--for` asks
 for a ticket for a service with the first ticket; a machine's desktop is
 `TERMSRV/` and its name. The realm is the domain's name in capitals.
+
+`away-try rdp` signs in with such a ticket where a domain controller is named:
+
+```sh
+cargo run --package away-try -- rdp fin-app-02.example.com --as alex.urban@corp.example --password-file ~/.config/away/password \
+  --kerberos dc-01.example.com
+```
+
+It asks the domain controller for a ticket for the machine's desktop, with the
+account's password, and shows the machine the ticket in the sign-in before the
+desktop, in place of a proof of the password. The machine has to answer the
+ticket, which only the machine the ticket is for can. The realm is read in an
+account written with its domain after an `@`, or named with `--realm`. The
+tests run this against the real Kerberos server too, with a stand-in for the
+machine that holds the key of its service as a machine of a domain does.
 
 This is the first part of signing in as oneself. No page and no session uses
 it yet.

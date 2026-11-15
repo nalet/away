@@ -162,6 +162,7 @@ name = "away-winauth"
 version = "0.1.0"
 dependencies = [
  "aes",
+ "away-rdp",
  "hmac",
  "num-bigint",
  "ring",

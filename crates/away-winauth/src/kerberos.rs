@@ -4,5 +4,6 @@
 
 pub mod crypto;
 pub mod exchange;
+pub mod gss;
 pub mod messages;
 pub mod pkinit;

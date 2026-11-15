@@ -16,6 +16,8 @@ use away_rdp::secret::Secret;
 use away_rdp::stand_in::desktop::{Desktop, Seen};
 use away_rdp::stand_in::StandIn;
 use away_rdp::tpkt::Frames;
+use away_winauth::kerberos::crypto::{Key, Kind};
+use away_winauth::sign_in::stand_in::Machine;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::{ServerConfig, ServerConnection};
 
@@ -64,6 +66,21 @@ fn desktop() -> Picture {
 struct Ended {
     request: Vec<u8>,
     seen: Option<Seen>,
+    told: Told,
+}
+
+/// What a stand-in that takes tickets was told in the sign-in before the desktop: who
+/// the ticket is for, and what the client handed over.
+#[derive(Default)]
+struct Told {
+    account: Option<(String, String)>,
+    handed_over: Option<Vec<u8>>,
+}
+
+/// The key of the service the tests' Kerberos server knows the stand-in by, made from
+/// the service's password as that server makes it (`tests/machines/kerberos/real.sh`).
+fn of_the_service() -> Key {
+    Key::from_password(Kind::Aes256, "the password of a machine that exists for these tests alone", b"CORP.EXAMPLETERMSRV127.0.0.1", 4096)
 }
 
 /// How a stand-in goes on after its first answer.
@@ -83,6 +100,10 @@ enum Then {
     /// It secures the connection, takes the sign-in before the desktop, and publishes
     /// one program: a client that asks for it is shown the program's window.
     PublishesAProgram,
+    /// It secures the connection, takes the sign-in before the desktop with a ticket,
+    /// as a machine of a domain does, and draws its desktop. It holds the key of its
+    /// service, or another machine's.
+    TakesATicket { holds_the_services_key: bool },
 }
 
 /// A stand-in for a machine: it takes one connection, reads the first request, answers
@@ -99,6 +120,7 @@ fn machine_then(answer: &'static [u8], then: Then) -> (String, JoinHandle<Ended>
         let mut request = [0u8; 19];
         connection.read_exact(&mut request).expect("the first request");
         connection.write_all(answer).expect("the answer goes out");
+        let mut told = Told::default();
         let seen = match then {
             Then::Ends => None,
             Then::SignsInFirst(verdict) => secure(&mut connection, Some(verdict), Desktop::new(desktop())),
@@ -107,20 +129,35 @@ fn machine_then(answer: &'static [u8], then: Then) -> (String, JoinHandle<Ended>
                 secure(&mut connection, Some(MAY_COME_IN), Desktop::new(desktop()).at_16_bits().that_hands_out_licences())
             }
             Then::PublishesAProgram => secure(&mut connection, Some(MAY_COME_IN), Desktop::new(desktop()).that_publishes(&["||ledger"])),
+            Then::TakesATicket { holds_the_services_key } => {
+                let key = if holds_the_services_key { of_the_service() } else { Key::new(Kind::Aes256, &[0x17; 32]).expect("a key") };
+                secure_with(&mut connection, Some(MAY_COME_IN), Desktop::new(desktop()), Some((key, &mut told)))
+            }
             Then::AsAServerForMany { hands_a_licence_over: false } => secure(
                 &mut connection,
                 Some(MAY_COME_IN),
                 Desktop::new(desktop()).at_16_bits().that_asks_for_a_licence_and_hands_none_over(),
             ),
         };
-        Ended { request: request.to_vec(), seen }
+        Ended { request: request.to_vec(), seen, told }
     });
     (address, running)
 }
 
 /// Secures the connection, takes the sign-in before the desktop where a verdict is given
 /// to end it with, and lets this desktop answer for as long as the client stays.
-fn secure(connection: &mut TcpStream, verdict: Option<[u8; 4]>, mut desktop: Desktop) -> Option<Seen> {
+fn secure(connection: &mut TcpStream, verdict: Option<[u8; 4]>, desktop: Desktop) -> Option<Seen> {
+    secure_with(connection, verdict, desktop, None)
+}
+
+/// The same, and with a key the sign-in before the desktop is one with a ticket: the
+/// stand-in holds that key as the key of its service, and says what it was told.
+fn secure_with(
+    connection: &mut TcpStream,
+    verdict: Option<[u8; 4]>,
+    mut desktop: Desktop,
+    takes_tickets: Option<(Key, &mut Told)>,
+) -> Option<Seen> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let config = ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
@@ -139,6 +176,7 @@ fn secure(connection: &mut TcpStream, verdict: Option<[u8; 4]>, mut desktop: Des
     let mut secured = rustls::Stream::new(&mut secured, connection);
     let holds = Identity::read(CERTIFICATE).expect("the stand-in's certificate").public_key;
     let mut stand_in = StandIn::new(Account::named(KNOWN, Secret::new(PASSWORD)), &holds);
+    let mut takes_tickets = takes_tickets.map(|(key, told)| (Machine::new(key, &holds), told));
     while verdict.is_some() {
         let mut message = Vec::new();
         loop {
@@ -154,14 +192,22 @@ fn secure(connection: &mut TcpStream, verdict: Option<[u8; 4]>, mut desktop: Des
                 _ => return None,
             }
         }
-        match stand_in.answer(&message) {
-            Ok(answer) if answer.is_empty() => break,
-            Ok(answer) => {
+        let answered = match &mut takes_tickets {
+            Some((machine, told)) => {
+                let answered = machine.answer(&message).ok();
+                (told.account, told.handed_over) = (machine.account.clone(), machine.handed_over.clone());
+                answered
+            }
+            None => stand_in.answer(&message).ok(),
+        };
+        match answered {
+            Some(answer) if answer.is_empty() => break,
+            Some(answer) => {
                 if secured.write_all(&answer).is_err() {
                     return None;
                 }
             }
-            Err(_) => return None,
+            None => return None,
         }
     }
     // the name and the password have arrived: say whether the account may come in
@@ -568,6 +614,110 @@ fn a_port_nothing_listens_on_is_said_to_take_no_connection() {
     assert!(said.ends_with("   It takes no connection on this port.\n"), "{said}");
 }
 
+/// Where the tests' Kerberos server is (`tests/machines/kerberos/real.sh` starts one).
+fn kerberos_server() -> Option<String> {
+    let at = std::env::var("AWAY_TEST_KERBEROS").ok().filter(|at| !at.is_empty());
+    if at.is_none() {
+        assert!(std::env::var_os("CI").is_none(), "the pipeline's tests need a Kerberos server: AWAY_TEST_KERBEROS is not set");
+        eprintln!("no Kerberos server to test against: AWAY_TEST_KERBEROS is not set");
+    }
+    at
+}
+
+fn try_rdp_with_a_ticket(address: &str, account: &str, more: &[&str]) -> Output {
+    let file = password_file(PASSWORD);
+    let tried = Command::new(env!("CARGO_BIN_EXE_away-try"))
+        .args(["rdp", address, "--as", account, "--password-file"])
+        .arg(&file)
+        .args(more)
+        .output()
+        .expect("the test program runs");
+    let _ = std::fs::remove_file(file);
+    tried
+}
+
+#[test]
+fn it_signs_in_with_a_ticket_of_a_real_kerberos_server_in_place_of_a_proof_of_the_password() {
+    let Some(server) = kerberos_server() else { return };
+    // the account is one the server knows, with this password, and the stand-in is the
+    // machine the server knows a service of: the realm is read in the account's name
+    let (address, running) = machine_then(&CHOSEN, Then::TakesATicket { holds_the_services_key: true });
+    let tried = try_rdp_with_a_ticket(&address, "pat.typed@corp.example", &["--kerberos", &server]);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    let ended = running.join().expect("the stand-in ends");
+    assert!(tried.status.success(), "{said}");
+    let lines: Vec<&str> = said.lines().skip(11).collect();
+    assert!(lines[0].ends_with(", how the key of pat.typed@CORP.EXAMPLE is made"), "{said}");
+    assert_eq!(
+        (lines[1], lines[2], lines[3]),
+        (
+            "   It asks for a proof, and says how the key is made from the password.",
+            "Asking for a first ticket, with the time sealed with that key",
+            "   It gave a ticket for krbtgt/CORP.EXAMPLE, to pat.typed@CORP.EXAMPLE.",
+        ),
+        "{said}"
+    );
+    assert_eq!(
+        lines[5..7],
+        [
+            "Asking for a ticket for TERMSRV/127.0.0.1, with the first ticket",
+            "   It gave a ticket for TERMSRV/127.0.0.1, to pat.typed@CORP.EXAMPLE."
+        ],
+        "{said}"
+    );
+    assert_eq!(
+        lines[8..13],
+        [
+            "Signing in, before the desktop, with the ticket",
+            "   It answered the ticket, and proved that it holds the certificate it showed.",
+            "   The name and the password were handed over, sealed.",
+            "   It says the account may come in.",
+            "Saying what Away is, and taking the channels",
+        ],
+        "{said}"
+    );
+    assert!(said.contains("\nThe desktop's picture\n   200 by 120 pixels. Their SHA-256: "), "{said}");
+    assert!(!said.contains(PASSWORD), "the password is never said");
+    // the machine read in the ticket who it is for, and was handed what it signs the person in with
+    assert!(ended.seen.is_some(), "the connection went on to the desktop");
+    assert_eq!(ended.told.account, Some(("pat.typed".to_string(), "CORP.EXAMPLE".to_string())));
+    let account = Account::named("pat.typed@corp.example", Secret::new(PASSWORD));
+    assert_eq!(ended.told.handed_over, Some(away_rdp::sign_in::credentials(&account)));
+
+    // a machine that is not the one the ticket is for can't open it, and nothing is handed over to it
+    let (address, running) = machine_then(&CHOSEN, Then::TakesATicket { holds_the_services_key: false });
+    let tried = try_rdp_with_a_ticket(&address, "CORP\\pat.typed", &["--kerberos", &server, "--realm", "CORP.EXAMPLE"]);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    let ended = running.join().expect("the stand-in ends");
+    assert_eq!(tried.status.code(), Some(1), "{said}");
+    assert!(said.contains("Signing in, before the desktop, with the ticket\n") && !said.contains("handed over"), "{said}");
+    assert!(ended.told.handed_over.is_none() && ended.seen.is_none());
+
+    // a wrong password gets no ticket, and the machine is shown none
+    let (address, running) = machine_then(&CHOSEN, Then::TakesATicket { holds_the_services_key: true });
+    let file = password_file("another password");
+    let tried = Command::new(env!("CARGO_BIN_EXE_away-try"))
+        .args(["rdp", &address, "--as", "pat.typed@corp.example", "--kerberos", &server, "--password-file"])
+        .arg(&file)
+        .output()
+        .expect("the test program runs");
+    let _ = std::fs::remove_file(file);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    assert_eq!(tried.status.code(), Some(1), "{said}");
+    assert!(said.contains("The domain controller refused: ") && !said.contains("Signing in, before the desktop"), "{said}");
+    assert!(running.join().expect("the stand-in ends").told.account.is_none());
+}
+
+#[test]
+fn a_ticket_needs_a_realm_which_is_named_or_read_in_the_accounts_name() {
+    let (address, running) = machine(&CHOSEN, true);
+    let tried = try_rdp_with_a_ticket(&address, KNOWN, &["--kerberos", "127.0.0.1:1"]);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    let _ = running.join();
+    assert_eq!(tried.status.code(), Some(1), "{said}");
+    assert!(said.ends_with("Name the realm, the domain's name in capitals: --realm <realm>.\n"), "{said}");
+}
+
 #[test]
 fn it_says_what_it_takes() {
     let none = Command::new(env!("CARGO_BIN_EXE_away-try")).output().expect("the test program runs");
@@ -575,10 +725,13 @@ fn it_says_what_it_takes() {
     assert!(
         String::from_utf8_lossy(&none.stderr).contains("away-try rdp <address> [--as <account> --password-file <file> [--save <file>]]")
     );
-    // a picture and a program need an account, an account its password, and nothing is said twice
+    // a picture, a program and a ticket need an account, a realm a ticket, an account its
+    // password, and nothing is said twice
     for words in [
         &["rdp", "fin-app-02", "--save", "desktop.bmp"][..],
         &["rdp", "fin-app-02", "--program", "||ledger"],
+        &["rdp", "fin-app-02", "--kerberos", "dc-01.corp.example"],
+        &["rdp", "fin-app-02", "--realm", "CORP.EXAMPLE"],
         &["rdp", "fin-app-02", "--as", KNOWN],
         &["rdp", "fin-app-02", "--as", KNOWN, "--as", KNOWN],
         &["rdp", "fin-app-02", "--anything", "else"],

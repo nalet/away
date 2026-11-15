@@ -39,6 +39,7 @@ use sha2::{Digest, Sha256};
 
 const USAGE: &str = "\
 away-try rdp <address> [--as <account> --password-file <file> [--save <file>]] [--collection <name>] [--program <name>]
+                       [--kerberos <domain controller> [--realm <realm>]]
 
   Reaches a machine over RDP with Away's own code and says what it shows, step by step.
   The address is a name or a number, with a port after a colon where it is not 3389.
@@ -52,6 +53,11 @@ away-try rdp <address> [--as <account> --password-file <file> [--save <file>]] [
 
   With --collection the address is a farm's broker, which is asked for that collection
   and says which machine serves it.
+
+  With --kerberos the account signs in before the desktop with a ticket: the domain
+  controller is asked for one for this machine, with the account's password, and the
+  machine is shown the ticket in place of a proof of the password. The realm is the
+  domain's name in capitals; it is taken from an account written as name@domain.
 
   With --program it opens no desktop: it asks the machine to start that program, and
   says whether it started and which windows it opens. A program that a farm publishes
@@ -84,6 +90,8 @@ struct Asked {
     save: Option<String>,
     collection: Option<String>,
     program: Option<String>,
+    kerberos: Option<String>,
+    realm: Option<String>,
 }
 
 /// Reads the words the program was started with. Gives nothing where they make no sense.
@@ -93,7 +101,16 @@ fn asked(words: &[String]) -> Option<Asked> {
     if kind != "rdp" || address.starts_with('-') {
         return None;
     }
-    let mut asked = Asked { address: address.clone(), account: None, password_file: None, save: None, collection: None, program: None };
+    let mut asked = Asked {
+        address: address.clone(),
+        account: None,
+        password_file: None,
+        save: None,
+        collection: None,
+        program: None,
+        kerberos: None,
+        realm: None,
+    };
     while let [option, value, after @ ..] = rest {
         let into = match option.as_str() {
             "--as" => &mut asked.account,
@@ -101,6 +118,8 @@ fn asked(words: &[String]) -> Option<Asked> {
             "--save" => &mut asked.save,
             "--collection" => &mut asked.collection,
             "--program" => &mut asked.program,
+            "--kerberos" => &mut asked.kerberos,
+            "--realm" => &mut asked.realm,
             _ => return None,
         };
         if into.replace(value.clone()).is_some() {
@@ -108,9 +127,11 @@ fn asked(words: &[String]) -> Option<Asked> {
         }
         rest = after;
     }
-    // an account has a password, and a picture and a program need an account
+    // an account has a password; a picture, a program and a ticket need an account, and
+    // a realm is that of a ticket
     let whole = rest.is_empty() && asked.account.is_some() == asked.password_file.is_some();
-    (whole && ((asked.save.is_none() && asked.program.is_none()) || asked.account.is_some())).then_some(asked)
+    let needs_an_account = asked.save.is_some() || asked.program.is_some() || asked.kerberos.is_some();
+    (whole && (!needs_an_account || asked.account.is_some()) && (asked.realm.is_none() || asked.kerberos.is_some())).then_some(asked)
 }
 
 fn main() -> ExitCode {
@@ -143,11 +164,19 @@ fn main() -> ExitCode {
         (Some(name), Some(file)) => match std::fs::read_to_string(file) {
             Ok(password) => {
                 let account = Account::named(name, Secret::new(password.trim_end_matches(['\r', '\n'])));
-                rdp(&asked.address, Some(account), asked.save.as_deref(), asked.collection.as_deref(), asked.program.as_deref())
+                let with_a_ticket = asked.kerberos.as_deref().map(|controller| (controller, asked.realm.as_deref()));
+                rdp(
+                    &asked.address,
+                    Some(account),
+                    asked.save.as_deref(),
+                    asked.collection.as_deref(),
+                    asked.program.as_deref(),
+                    with_a_ticket,
+                )
             }
             Err(error) => Err(format!("The password's file can't be read: {error}.")),
         },
-        _ => rdp(&asked.address, None, None, asked.collection.as_deref(), None),
+        _ => rdp(&asked.address, None, None, asked.collection.as_deref(), None, None),
     };
     match tried {
         Ok(()) => ExitCode::SUCCESS,
@@ -159,7 +188,14 @@ fn main() -> ExitCode {
 }
 
 /// The steps of a connection over RDP, as far as Away's code goes.
-fn rdp(address: &str, account: Option<Account>, save: Option<&str>, collection: Option<&str>, program: Option<&str>) -> Result<(), String> {
+fn rdp(
+    address: &str,
+    account: Option<Account>,
+    save: Option<&str>,
+    collection: Option<&str>,
+    program: Option<&str>,
+    with_a_ticket: Option<(&str, Option<&str>)>,
+) -> Result<(), String> {
     let (host, port) = match address.rsplit_once(':') {
         Some((host, port)) if !host.contains(':') => (host, port.parse::<u16>().map_err(|_| format!("{port} is no port."))?),
         _ => (address, 3389),
@@ -285,32 +321,75 @@ fn rdp(address: &str, account: Option<Account>, save: Option<&str>, collection: 
         };
 
         let (domain, name) = (account.domain.clone(), account.name.clone());
-        println!("Signing in, before the desktop, as {}", written(&account));
-        let mut random = [0u8; 56];
-        getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
-        let new = New {
-            for_the_proof: Fresh { challenge: random[..8].try_into().expect("8 bytes"), key: random[8..24].try_into().expect("16 bytes") },
-            number: random[24..].try_into().expect("32 bytes"),
-        };
-        let (mut signing_in, first) = SignIn::begin(account, host, &identity.public_key, new, clock());
-        secured.write_all(&first).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
-        let mut said_who = false;
-        loop {
-            let next = signing_in.receive(&message(&mut secured)?).map_err(|error| error.to_string())?;
-            if let (false, Some(challenge)) = (said_who, signing_in.machine()) {
-                who_it_is(challenge);
-                said_who = true;
-            }
-            match next {
-                Next::Send(bytes) => secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't go on: {error}."))?,
-                Next::SendLast(bytes) => {
-                    secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't be ended: {error}."))?;
-                    break;
+        if let Some((controller, realm)) = with_a_ticket {
+            // who the ticket is for: the name without its domain, and the realm, which is
+            // the domain's name in capitals: said, or the one the account is written with
+            let (name, written_with) = match account.name.split_once('@') {
+                Some((name, domain)) => (name, Some(domain)),
+                None => (account.name.as_str(), Some(account.domain.as_str()).filter(|domain| domain.contains('.'))),
+            };
+            let realm = match (realm, written_with) {
+                (Some(realm), _) => realm.to_string(),
+                (None, Some(domain)) => domain.to_uppercase(),
+                (None, None) => return Err("Name the realm, the domain's name in capitals: --realm <realm>.".to_string()),
+            };
+            let service = format!("TERMSRV/{host}");
+            let ticket = kerberos::ticket_with_a_password(controller, &realm, name, account.password.expose(), &service)?;
+            println!("Signing in, before the desktop, with the ticket");
+            let new = away_winauth::sign_in::New {
+                for_the_ticket: away_winauth::kerberos::gss::Fresh {
+                    key: kerberos::random()?,
+                    begins_with: kerberos::random()?,
+                    counts_from: u32::from_be_bytes(kerberos::random()?) & 0x3fff_ffff,
+                },
+                number: kerberos::random()?,
+                begin_with: [kerberos::random()?, kerberos::random()?],
+            };
+            let (mut signing_in, first) =
+                away_winauth::sign_in::SignIn::begin(&ticket, &identity.public_key, &account, kerberos::now(), new);
+            secured.write_all(&first).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
+            loop {
+                match signing_in.receive(&message(&mut secured)?).map_err(|error| error.to_string())? {
+                    Next::Send(bytes) => secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't go on: {error}."))?,
+                    Next::SendLast(bytes) => {
+                        secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't be ended: {error}."))?;
+                        break;
+                    }
                 }
             }
+            println!("   It answered the ticket, and proved that it holds the certificate it showed.");
+            println!("   The name and the password were handed over, sealed.");
+        } else {
+            println!("Signing in, before the desktop, as {}", written(&account));
+            let mut random = [0u8; 56];
+            getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
+            let new = New {
+                for_the_proof: Fresh {
+                    challenge: random[..8].try_into().expect("8 bytes"),
+                    key: random[8..24].try_into().expect("16 bytes"),
+                },
+                number: random[24..].try_into().expect("32 bytes"),
+            };
+            let (mut signing_in, first) = SignIn::begin(account, host, &identity.public_key, new, clock());
+            secured.write_all(&first).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
+            let mut said_who = false;
+            loop {
+                let next = signing_in.receive(&message(&mut secured)?).map_err(|error| error.to_string())?;
+                if let (false, Some(challenge)) = (said_who, signing_in.machine()) {
+                    who_it_is(challenge);
+                    said_who = true;
+                }
+                match next {
+                    Next::Send(bytes) => secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't go on: {error}."))?,
+                    Next::SendLast(bytes) => {
+                        secured.write_all(&bytes).map_err(|error| format!("The sign-in couldn't be ended: {error}."))?;
+                        break;
+                    }
+                }
+            }
+            println!("   It took the proof of the password, and proved that it holds the certificate it showed.");
+            println!("   The name and the password were handed over, sealed.");
         }
-        println!("   It took the proof of the password, and proved that it holds the certificate it showed.");
-        println!("   The name and the password were handed over, sealed.");
 
         if answer.security == (Security::SignInFirst { tells_result: true }) {
             let mut verdict = [0u8; 4];

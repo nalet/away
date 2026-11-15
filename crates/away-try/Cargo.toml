@@ -17,6 +17,7 @@ sha2.workspace = true
 
 [dev-dependencies]
 away-rdp = { workspace = true, features = ["stand-in"] }
+away-winauth = { workspace = true, features = ["stand-in"] }
 
 [lints]
 workspace = true

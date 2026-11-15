@@ -14,6 +14,9 @@ pub enum Error {
     NotACertificate(&'static str),
     /// The other side did not prove that it is who it has to be.
     NotTrusted(&'static str),
+    /// The machine refused, or what it sent in the sign-in before the desktop is not
+    /// what that sign-in is.
+    Machine(away_rdp::Error),
     /// The domain controller refused, with this reason as Kerberos numbers them, and in
     /// its own words where it gave some.
     Refused {
@@ -62,6 +65,7 @@ impl fmt::Display for Error {
             Error::NotOpened(what) => write!(out, "What it sealed could not be opened: {what}."),
             Error::NotACertificate(what) => write!(out, "The certificate can't be read: {what}."),
             Error::NotTrusted(what) => write!(out, "It did not prove who it is: {what}."),
+            Error::Machine(why) => write!(out, "{why}"),
             Error::Refused { code, text } => {
                 match refusal(*code) {
                     Some(why) => write!(out, "The domain controller refused: {why} (its own code {code})")?,
