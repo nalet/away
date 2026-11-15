@@ -3,6 +3,19 @@
 {{- $told := list (dict "name" "AWAY_SERVER" "value" (printf "https://%s-server:8082" (include "away.name" .))) (dict "name" "AWAY_SERVER_AUTHORITIES_FILE" "value" "/run/away/between-parts/authority.pem") -}}
 {{- $trusts := dict "secretName" (printf "%s-between-parts" (include "away.name" .)) "items" (list (dict "key" "authority.pem" "path" "authority.pem")) -}}
 {{- $mounts := list (dict "at" "/run/away/between-parts" "volume" (dict "name" "between-parts" "secret" $trusts)) -}}
+{{- with .Values.domain }}
+{{- if .name }}
+{{- /* a domain: its controllers, the authorities their certificates lead to, and the issuer, which the gateway asks at an address of the issuer's own */ -}}
+{{- $told = append $told (dict "name" "AWAY_DOMAIN" "value" .name) -}}
+{{- $told = append $told (dict "name" "AWAY_DOMAIN_CONTROLLERS" "value" (join "," (required "domain.controllers is not set" .controllers))) -}}
+{{- $told = append $told (dict "name" "AWAY_DOMAIN_AUTHORITIES_FILE" "value" "/run/away/domain-authorities/authorities.pem") -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/domain-authorities" "volume" (dict "name" "domain-authorities" "configMap" (dict "name" (required "domain.authoritiesConfigMap is not set" .authoritiesConfigMap)))) -}}
+{{- $told = append $told (dict "name" "AWAY_ISSUER" "value" (printf "https://%s-issuer:8083" (include "away.name" $))) -}}
+{{- $told = append $told (dict "name" "AWAY_ISSUER_AUTHORITIES_FILE" "value" "/run/away/to-the-issuer/authority.pem") -}}
+{{- $issuer := dict "secretName" (printf "%s-to-the-issuer" (include "away.name" $)) "items" (list (dict "key" "authority.pem" "path" "authority.pem")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/to-the-issuer" "volume" (dict "name" "to-the-issuer" "secret" $issuer)) -}}
+{{- end }}
+{{- end }}
 {{ include "away.part" (dict "root" . "part" "gateway" "port" 8081 "named" "sessions" "told" $told "mounts" $mounts) }}
 ---
 apiVersion: v1

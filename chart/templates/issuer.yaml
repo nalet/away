@@ -1,2 +1,62 @@
 {{- /* The issuer: the sign-ins on machines. Nothing leads to it from outside the cluster. */ -}}
-{{ include "away.part" (dict "root" . "part" "issuer") }}
+{{- $told := list -}}
+{{- $mounts := list -}}
+{{- $more := list -}}
+{{- with .Values.domain }}
+{{- if or .name .shortName .controllers .authority.pages .authority.account .authority.secretName }}
+{{- /* a domain is named whole or not at all: its name, its controllers, its authority, and the account Away asks the authority as */ -}}
+{{- $told = append $told (dict "name" "AWAY_DOMAIN" "value" (required "domain.name is not set" .name)) -}}
+{{- $told = append $told (dict "name" "AWAY_DOMAIN_SHORT_NAME" "value" (required "domain.shortName is not set" .shortName)) -}}
+{{- $told = append $told (dict "name" "AWAY_DOMAIN_CONTROLLERS" "value" (join "," (required "domain.controllers is not set" .controllers))) -}}
+{{- $told = append $told (dict "name" "AWAY_AUTHORITY" "value" (required "domain.authority.pages is not set" .authority.pages)) -}}
+{{- $told = append $told (dict "name" "AWAY_AUTHORITY_ACCOUNT" "value" (required "domain.authority.account is not set" .authority.account)) -}}
+{{- $told = append $told (dict "name" "AWAY_AUTHORITY_PASSWORD_FILE" "value" "/run/away/authority/password") -}}
+{{- $told = append $told (dict "name" "AWAY_AUTHORITY_AGENT_KIND" "value" (required "domain.authority.agentKind is not set" .authority.agentKind)) -}}
+{{- $told = append $told (dict "name" "AWAY_AUTHORITY_SIGN_IN_KIND" "value" (required "domain.authority.signInKind is not set" .authority.signInKind)) -}}
+{{- $told = append $told (dict "name" "AWAY_ACCOUNT_ENTRY" "value" .accountEntry) -}}
+{{- $told = append $told (dict "name" "AWAY_NEVER_AS" "value" (join "," .neverAs)) -}}
+{{- $told = append $told (dict "name" "AWAY_NEVER_OF" "value" (join "," .neverOf)) -}}
+{{- $secret := dict "secretName" (required "domain.authority.secretName is not set" .authority.secretName) "items" (list (dict "key" "password" "path" "password")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/authority" "volume" (dict "name" "authority" "secret" $secret)) -}}
+{{- if .authority.authoritiesConfigMap }}
+{{- $told = append $told (dict "name" "AWAY_AUTHORITY_AUTHORITIES_FILE" "value" "/run/away/authority-authorities/authorities.pem") -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/authority-authorities" "volume" (dict "name" "authority-authorities" "configMap" (dict "name" .authority.authoritiesConfigMap))) -}}
+{{- end }}
+{{- /* the issuer checks a person's sign-in itself: with the sign-in service the server signs people in at */ -}}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_SERVICE" "value" (required "a domain needs the sign-in service: signIn.service is not set" $.Values.signIn.service)) -}}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_CLIENT" "value" (required "a domain needs the sign-in service: signIn.client is not set" $.Values.signIn.client)) -}}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_GROUPS" "value" $.Values.signIn.groupsEntry) -}}
+{{- if $.Values.signIn.authoritiesConfigMap }}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_AUTHORITIES_FILE" "value" "/run/away/authorities/authorities.pem") -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/authorities" "volume" (dict "name" "authorities" "configMap" (dict "name" $.Values.signIn.authoritiesConfigMap))) -}}
+{{- end }}
+{{- /* it asks the server whose a session is, and is asked by the gateway at an address of its own */ -}}
+{{- $told = append $told (dict "name" "AWAY_SERVER" "value" (printf "https://%s-server:8082" (include "away.name" $))) -}}
+{{- $told = append $told (dict "name" "AWAY_SERVER_AUTHORITIES_FILE" "value" "/run/away/between-parts/authority.pem") -}}
+{{- $trusts := dict "secretName" (printf "%s-between-parts" (include "away.name" $)) "items" (list (dict "key" "authority.pem" "path" "authority.pem")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/between-parts" "volume" (dict "name" "between-parts" "secret" $trusts)) -}}
+{{- $told = append $told (dict "name" "AWAY_INTERNAL_ADDRESS" "value" "0.0.0.0:8083") -}}
+{{- $told = append $told (dict "name" "AWAY_INTERNAL_CERTIFICATE_FILE" "value" "/run/away/to-the-issuer/issuer.pem") -}}
+{{- $told = append $told (dict "name" "AWAY_INTERNAL_KEY_FILE" "value" "/run/away/to-the-issuer/issuer-key.pem") -}}
+{{- $own := dict "secretName" (printf "%s-to-the-issuer" (include "away.name" $)) "items" (list (dict "key" "issuer.pem" "path" "issuer.pem") (dict "key" "issuer-key.pem" "path" "issuer-key.pem")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/to-the-issuer" "volume" (dict "name" "to-the-issuer" "secret" $own)) -}}
+{{- $more = list (dict "name" "internal" "port" 8083) -}}
+{{- end }}
+{{- end }}
+{{ include "away.part" (dict "root" . "part" "issuer" "more" $more "told" $told "mounts" $mounts) }}
+{{- if .Values.domain.name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "away.name" . }}-issuer
+  labels:
+    {{- include "away.labels" (dict "root" . "part" "issuer") | nindent 4 }}
+spec:
+  selector:
+    {{- include "away.picks" (dict "root" . "part" "issuer") | nindent 4 }}
+  ports:
+    - name: internal
+      port: 8083
+      targetPort: internal
+{{- end }}

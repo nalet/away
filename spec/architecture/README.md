@@ -49,6 +49,7 @@ flowchart TB
   c_gateway -- "calls" --> c_domain
   c_issuer -- "fetches" --> c_sign_in_service
   c_issuer -- "asks" --> c_authority
+  c_issuer -- "calls" --> c_domain
   c_issuer -- "calls" --> c_server
   c_domain -- "fetches" --> c_server
   c_server <-- "calls" --> c_gateway
@@ -161,7 +162,7 @@ decided, why, what follows from it, and what it rules out.
 | Connections | Rows | Means |
 |---|---|---|
 | loads | 1 | the browser gets the pages' files from the other |
-| calls | 5 | it sends requests to the other |
+| calls | 6 | it sends requests to the other |
 | streams | 1 | it keeps a connection to the other open for as long as a session lasts, with messages both ways |
 | sends to | 1 | it sends the browser to the other's page |
 | signs in | 1 | it takes people's sign-ins from the other |
@@ -176,7 +177,7 @@ decided, why, what follows from it, and what it rules out.
 | uses | 10 | it is built from the other's code |
 | publishes | 2 | it puts what it built where the other holds or shows it |
 | tests | 1 | it runs its tests against the other |
-| all | 45 |  |
+| all | 46 |  |
 
 | Decision records | Proposed | Accepted | Superseded | Rejected |
 |---|---|---|---|---|

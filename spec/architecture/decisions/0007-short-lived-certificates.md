@@ -1,6 +1,6 @@
 # ADR-0007: On a machine as oneself, by a certificate that lasts minutes
 
-**Status:** Accepted · 2026-11-14. Nothing of it is built. The Windows half is proven on a real domain before anything is built around it (see [Validation](#validation)).
+**Status:** Accepted · 2026-11-14. The Windows half is built for a domain whose organisation has an authority of its own ([ADR-0008](./0008-the-authority-for-windows-sign-ins.md)); the shell's half is not built. The Windows half was tried on a real domain on 2026-11-15 before anything was built around it (see [Validation](#validation)).
 
 ## Context
 
@@ -43,12 +43,14 @@ A shell has a way of the same kind: a certificate for one key, signed by an auth
 
 3. **A desktop that locked, or one that is opened again, gets a new certificate.** The gateway asks the issuer again and presents the card again (`unlock-without-password`).
 4. **On a shell, the issuer signs a certificate for the session's key**, in the format OpenSSH reads, naming the person's account. Where the operator names the gateway's addresses, the certificate is good from those alone. A machine trusts the issuer's public key with one line of its configuration (`make-shells-trust`).
-5. **The issuer refuses** a person whose sign-in the sign-in service didn't sign, or signed too long ago; an account that isn't the person's own, as their sign-in names it; a session the server didn't sign; and an account, or a group of one, on the list of those it never signs in as. The directory's administrators are on that list unless an administrator of Away takes one off by name. Every certificate is a line of the issuer's own and a record: who, as whom, which machine, its number, until when.
+5. **The issuer refuses** a person whose sign-in the sign-in service didn't sign, or signed too long ago; an account that isn't the person's own, as their sign-in names it; a session the server doesn't answer for; and an account, or a group of one, on the list of those it never signs in as. The issuer asks the server whose a session is at the moment it is asked for a certificate, and is handed what the sign-in service signed about that person a moment before, which it checks itself: a session that ended gets nothing from then on, and the server holds no key to sign with. The directory's administrators are on that list unless an administrator of Away takes one off by name. Every certificate is a line of the issuer's own and a record: who, as whom, which machine, its number, until when.
 6. **Where there is no identity to be, there is none.** A machine outside a domain and a desktop over VNC are opened with a kept account or with what the person types ([ADR-0010](./0010-secrets-live-in-the-cluster.md)).
 
 ### Validation
 
 [Package 3](../../plan/README.md) proves the Windows half with Away's own code and no browser: on a real domain, with a certificate of the domain's own authority, an ordinary account is signed in on a Windows machine with a certificate of five minutes and nothing typed, reads a file share as itself, and an administrator's account is refused. That a domain accepts such a certificate for an ordinary account, from a device outside it, has been seen with other software; that Away's own code does it is what the package shows.
+
+Tried on 2026-11-15, on a real domain and with its own authority: an ordinary account was signed in on a Windows machine with a certificate of five minutes and nothing typed, from a device outside the domain, and read a file share as itself. That an administrator's account is refused there is still to be shown.
 
 ## Consequences
 

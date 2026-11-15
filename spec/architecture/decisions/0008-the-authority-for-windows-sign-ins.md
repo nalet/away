@@ -1,6 +1,6 @@
 # ADR-0008: Who issues Windows sign-ins is a setting, and without a domain nobody has to
 
-**Status:** Accepted · 2026-11-14. Revised on the owner's word before it was accepted: who issues has to be a setting, and Away has to work where there is no Active Directory. Nothing of it is built. Each way is proven on a real domain before it is built on (see [Validation](#validation)). On the owner's word of 2026-11-15 the organisation's own authority is proven and built first, and Away's own after it.
+**Status:** Accepted · 2026-11-14. Revised on the owner's word before it was accepted: who issues has to be a setting, and Away has to work where there is no Active Directory. Each way is proven on a real domain before it is built on (see [Validation](#validation)). On the owner's word of 2026-11-15 the organisation's own authority is proven and built first, and Away's own after it: the organisation's own is built, Away's own is not.
 
 ## Context
 
@@ -56,7 +56,7 @@ With Away's own authority, the key in the issuer can make a certificate for any 
 ### Validation
 
 - **Without a domain.** Every test that needs no domain runs on an installation that names none, from the first work package on.
-- **The organisation's own authority** comes first. [Package 3](../../plan/README.md) proves that a domain signs an ordinary account in with a certificate of that authority, and the start of [package 12](../../plan/README.md) proves how the authority is asked: Away asks it for a certificate in another person's name over one of its published interfaces, with nothing of Away's installed there. Which interface is not settled. If none serves, the owner chooses between a small helper beside the authority, which point 8 rules out today, and offering Away's own authority alone.
+- **The organisation's own authority** comes first. [Package 3](../../plan/README.md) proves that a domain signs an ordinary account in with a certificate of that authority, and the start of [package 12](../../plan/README.md) proves how the authority is asked: Away asks it for a certificate in another person's name over one of its published interfaces, with nothing of Away's installed there. Tried on a real domain on 2026-11-15, the interface is settled: the pages a Windows authority publishes for asking it, over TLS, where Away is signed in with Kerberos as the account the organisation gave it, with a proof that is bound to the connection. The authority takes the account a certificate is for by the domain's short name and the account's name, and in no other form.
 - **Away's own authority**, with the domain controllers' certificates from it too, is proven in [package 13](../../plan/README.md), on a domain that exists for testing and has no authority of its own. A domain in use should not be asked to trust a test.
 
 ## Consequences

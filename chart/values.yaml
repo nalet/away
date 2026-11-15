@@ -83,6 +83,46 @@ database:
   # organisation's own authority.
   authoritiesConfigMap: ""
 
+# Signing people in on the machines of a Windows domain as themselves, with nothing
+# typed, where a machine's file says "signs-in: themselves". Without a domain named
+# here nobody is, and Away reaches no domain controller and no authority.
+domain:
+  # The domain, as it is named in full, such as corp.example
+  name: ""
+  # Its short name, which accounts are written with before a backslash, such as CORP
+  shortName: ""
+  # The domain controllers that give tickets, by their names: [dc-01.corp.example]
+  controllers: []
+  # A ConfigMap with the certificates of the authorities the domain controllers' own
+  # certificates lead to, as PEM under the key "authorities.pem". A domain controller
+  # that proves itself with a certificate of no such authority is not believed.
+  authoritiesConfigMap: ""
+  # Which entry of a person's sign-in holds the name of their account in the domain,
+  # as the domain knows it: alex.urban, or CORP\alex.urban. A name with an @ is not
+  # taken for one.
+  accountEntry: preferred_username
+  # The accounts nobody is signed in as, and the groups whose people are signed in as
+  # themselves on no machine, as the sign-in service names them: the directory's
+  # administrators, unless one is taken off here.
+  neverAs: [administrator, krbtgt, guest]
+  neverOf: [Domain Admins, Enterprise Admins, Schema Admins, Administrators]
+  # The organisation's own certificate authority, which issues what signs a person in.
+  authority:
+    # The pages it publishes for asking it, such as https://authority.corp.example/certsrv/
+    pages: ""
+    # A ConfigMap with the certificates of authorities to trust for those pages besides
+    # the public ones, as PEM under the key "authorities.pem".
+    authoritiesConfigMap: ""
+    # The account the organisation gave Away to ask the authority as, without its domain.
+    account: ""
+    # The secret that holds the account's password, under the key "password". It is made
+    # beside the chart, so that it is in no file of values.
+    secretName: ""
+    # The authority's names for two kinds of certificate: the one that allows the account
+    # to ask for others, and the one that signs a person in and lasts five minutes.
+    agentKind: ""
+    signInKind: ""
+
 image:
   repository: ghcr.io/nalet/away
   # The image's tag. Empty takes the version of Away this chart was published with.
@@ -139,6 +179,14 @@ networkRules:
   # Where the database is, as the peers of a NetworkPolicy. Empty takes any address: the
   # server reaches database.port and nothing else. It is used once database.host is set.
   databaseAt: []
+  # Where the domain controllers are, as the peers of a NetworkPolicy. Empty takes any
+  # address: the gateway and the issuer reach Kerberos' port there and nothing else. It
+  # is used once domain.name is set.
+  domainControllersAt: []
+  # Where the organisation's authority is, as the peers of a NetworkPolicy, and its
+  # port. Empty takes any address: the issuer reaches that port and nothing else.
+  authorityAt: []
+  authorityPort: 443
 
 monitoring:
   # Make a ServiceMonitor, so the Prometheus operator finds the measures by itself.

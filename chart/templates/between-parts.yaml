@@ -28,3 +28,34 @@ data:
   authority.pem: {{ index $held "authority.pem" }}
   server.pem: {{ index $held "server.pem" }}
   server-key.pem: {{ index $held "server-key.pem" }}
+{{- if .Values.domain.name }}
+{{- /*
+And what secures what the gateway asks the issuer, where the installation names a
+domain: an authority of its own, and a certificate of it for the issuer's address. They
+are made and kept as the ones above are.
+*/ -}}
+{{- $name := printf "%s-to-the-issuer" (include "away.name" .) -}}
+{{- $issuer := printf "%s-issuer" (include "away.name" .) -}}
+{{- $held := dict -}}
+{{- with lookup "v1" "Secret" .Release.Namespace $name }}
+{{- $held = .data | default dict -}}
+{{- end }}
+{{- if not (and (index $held "authority.pem") (index $held "issuer.pem") (index $held "issuer-key.pem")) }}
+{{- $authority := genCA "away, to its issuer" 3650 -}}
+{{- $names := list $issuer (printf "%s.%s" $issuer .Release.Namespace) (printf "%s.%s.svc" $issuer .Release.Namespace) -}}
+{{- $certificate := genSignedCert $issuer nil $names 3650 $authority -}}
+{{- $held = dict "authority.pem" ($authority.Cert | b64enc) "issuer.pem" ($certificate.Cert | b64enc) "issuer-key.pem" ($certificate.Key | b64enc) -}}
+{{- end }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+type: Opaque
+data:
+  authority.pem: {{ index $held "authority.pem" }}
+  issuer.pem: {{ index $held "issuer.pem" }}
+  issuer-key.pem: {{ index $held "issuer-key.pem" }}
+{{- end }}

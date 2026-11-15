@@ -262,8 +262,8 @@ machine that offers more is opened from its own page, where each way in is.
   by no number, and so are the machines that serve a farm. An account that
   Away signs nobody in as, such as one of the directory's administrators, is
   told so at the sign-in. It needs the installation to name the domain, its
-  authority and the account Away asks the authority as; the chart has no
-  values for that yet.
+  authority and the account Away asks the authority as
+  ([signing in as oneself](./install.md#signing-in-as-oneself-on-a-windows-domain)).
 - **A farm's desktop is opened through its broker.** Away tells the broker
   which collection is wanted and signs the person in there. The broker says
   which machine serves the session, and Away goes on to that machine, where

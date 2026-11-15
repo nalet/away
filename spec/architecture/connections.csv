@@ -29,8 +29,9 @@ gateway,wire,uses,,v1,
 rdp,windows-sign-in,uses,,v1,
 issuer,sign-in-service,fetches,the provider's public keys,v1,To check a person's sign-in itself
 issuer,cluster-secrets,reads,its authority's keys and the kept accounts,v1,The one part that may read the kept accounts
-issuer,authority,asks,one of the authority's published interfaces,v1,Only where the configuration says that the organisation's own authority issues; a proof settles which interface
-issuer,server,calls,internal,v1,"What is public of it: its state, the names of the kept accounts that exist, its authority's certificate and the list of those it withdrew"
+issuer,authority,asks,"the pages the authority publishes for asking it, over TLS",v1,"Only where the configuration says that the organisation's own authority issues. The issuer is signed in there with a ticket of the domain's, bound to the connection"
+issuer,domain,calls,Kerberos,v1,Only where the organisation's own authority issues: it gets the ticket it is signed in at the authority's pages with
+issuer,server,calls,internal,v1,"Whose a session is, before it signs anybody in, and the record of that sign-in. What is public of it: its state, the kept accounts' names, its authority's certificate and the list it withdrew"
 domain,server,fetches,/authority,v1,"Only where the configuration says that Away's own authority issues: the list of certificates it withdrew, which a domain asks for before it accepts one"
 server,log-system,puts out,lines on its output,v1,"What happens, and every record as it is written"
 gateway,log-system,puts out,lines on its output,v1,

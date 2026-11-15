@@ -243,6 +243,152 @@ spec:
           protocol: TCP
         {{- end }}
 {{- end }}
+{{- if .Values.domain.name }}
+---
+# the gateway asks the issuer for what signs the person of a session in as themselves
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-gateway-to-issuer
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "away.picks" (dict "root" . "part" "issuer") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "away.picks" (dict "root" . "part" "gateway") | nindent 14 }}
+      ports:
+        - port: internal
+---
+# the issuer asks the server whose a session is, and has it keep the record of a sign-in
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-issuer-to-server
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "away.picks" (dict "root" . "part" "server") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "away.picks" (dict "root" . "part" "issuer") | nindent 14 }}
+      ports:
+        - port: internal
+---
+# the gateway reaches the issuer's own address for it, and the domain controllers, where
+# it proves the person with their certificate and gets the ticket for the machine: on
+# Kerberos' port, and nothing else
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-gateway-to-issuer-and-domain
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "away.picks" (dict "root" . "part" "gateway") | nindent 6 }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "away.picks" (dict "root" . "part" "issuer") | nindent 14 }}
+      ports:
+        - port: 8083
+          protocol: TCP
+    - to:
+        {{- with .Values.networkRules.domainControllersAt }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - ipBlock:
+            cidr: 0.0.0.0/0
+        - ipBlock:
+            cidr: ::/0
+        {{- end }}
+      ports:
+        - port: 88
+          protocol: TCP
+---
+# the issuer reaches the server's own address for it; the sign-in service, whose keys it
+# reads to check a person's sign-in itself; the organisation's authority, which it asks
+# for what signs a person in; and the domain controllers, for the ticket it signs in at
+# the authority with. It finds them by their names, so it asks the cluster's name service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-issuer-to-what-it-asks
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "away.picks" (dict "root" . "part" "issuer") | nindent 6 }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "away.picks" (dict "root" . "part" "server") | nindent 14 }}
+      ports:
+        - port: 8082
+          protocol: TCP
+    - to:
+        {{- with .Values.networkRules.signInServiceAt }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - ipBlock:
+            cidr: 0.0.0.0/0
+        - ipBlock:
+            cidr: ::/0
+        {{- end }}
+      ports:
+        - port: {{ .Values.networkRules.signInServicePort }}
+          protocol: TCP
+    - to:
+        {{- with .Values.networkRules.authorityAt }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - ipBlock:
+            cidr: 0.0.0.0/0
+        - ipBlock:
+            cidr: ::/0
+        {{- end }}
+      ports:
+        - port: {{ .Values.networkRules.authorityPort }}
+          protocol: TCP
+    - to:
+        {{- with .Values.networkRules.domainControllersAt }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - ipBlock:
+            cidr: 0.0.0.0/0
+        - ipBlock:
+            cidr: ::/0
+        {{- end }}
+      ports:
+        - port: 88
+          protocol: TCP
+    - to:
+        - namespaceSelector: {}
+      ports:
+        {{- range $port := list 53 5353 }}
+        - port: {{ $port }}
+          protocol: UDP
+        - port: {{ $port }}
+          protocol: TCP
+        {{- end }}
+{{- end }}
 {{- with .Values.networkRules.measuresFrom }}
 ---
 # the monitoring reads every part's measures

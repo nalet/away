@@ -128,6 +128,25 @@ jobs:
           ! helm template away chart --namespace away --set database.host=postgres.example.com 2> /dev/null
           ! helm template away chart --namespace away --set database.host=postgres.example.com --set database.secretName=away-database \
             --set database.connection=unsecured 2> /dev/null
+          # a domain: what the issuer and the gateway are told, what secures what the gateway asks the
+          # issuer, and the ways to the issuer, the authority and the domain controllers
+          helm template away chart --namespace away --set address=away.example.com --set ingress.enabled=true \
+            --set signIn.service=https://sign-in.example.com/realms/staff --set signIn.client=away --set signIn.secretName=away-sign-in \
+            --set domain.name=corp.example --set domain.shortName=CORP --set 'domain.controllers={dc-01.corp.example,dc-02.corp.example}' \
+            --set domain.authoritiesConfigMap=away-domain-authorities --set domain.authority.pages=https://authority.corp.example/certsrv/ \
+            --set domain.authority.account=svc-away --set domain.authority.secretName=away-authority \
+            --set domain.authority.agentKind=AwayAgent --set domain.authority.signInKind=AwaySignIn > "$RUNNER_TEMP/domain.yaml"
+          grep -A1 'name: AWAY_ISSUER$' "$RUNNER_TEMP/domain.yaml" | grep -q 'value: https://away-issuer:8083'
+          grep -A1 'name: AWAY_DOMAIN_CONTROLLERS' "$RUNNER_TEMP/domain.yaml" | grep -q 'value: dc-01.corp.example,dc-02.corp.example'
+          grep -q 'name: AWAY_AUTHORITY_PASSWORD_FILE' "$RUNNER_TEMP/domain.yaml"
+          grep -A1 'name: AWAY_NEVER_OF' "$RUNNER_TEMP/domain.yaml" | grep -q 'value: Domain Admins,Enterprise Admins,Schema Admins,Administrators'
+          grep -q 'name: away-to-the-issuer' "$RUNNER_TEMP/domain.yaml"
+          grep -q 'name: away-gateway-to-issuer-and-domain' "$RUNNER_TEMP/domain.yaml"
+          grep -q 'name: away-issuer-to-what-it-asks' "$RUNNER_TEMP/domain.yaml"
+          # without a domain none of it is there, and a domain that is named in part is refused
+          ! helm template away chart --namespace away | grep -q 'AWAY_DOMAIN\|to-the-issuer\|issuer-to'
+          ! helm template away chart --namespace away --set domain.name=corp.example 2> /dev/null
+          ! helm template away chart --namespace away --set domain.authority.account=svc-away 2> /dev/null
           # a sign-in service that is named in part is refused, and says what is missing
           ! helm template away chart --namespace away --set signIn.service=https://sign-in.example.com 2> /dev/null
 

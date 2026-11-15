@@ -46,8 +46,9 @@ first release unless its note begins with *There* or *Later*.
 | `gateway` | uses | `wire` | — | — |
 | `issuer` | fetches | `sign-in-service` | the provider's public keys | To check a person's sign-in itself. |
 | `issuer` | reads | `cluster-secrets` | its authority's keys and the kept accounts | The one part that may read the kept accounts. |
-| `issuer` | asks | `authority` | one of the authority's published interfaces | Only where the configuration says that the organisation's own authority issues; a proof settles which interface. |
-| `issuer` | calls | `server` | internal | What is public of it: its state, the names of the kept accounts that exist, its authority's certificate and the list of those it withdrew. |
+| `issuer` | asks | `authority` | the pages the authority publishes for asking it, over TLS | Only where the configuration says that the organisation's own authority issues. The issuer is signed in there with a ticket of the domain's, bound to the connection. |
+| `issuer` | calls | `domain` | Kerberos | Only where the organisation's own authority issues: it gets the ticket it is signed in at the authority's pages with. |
+| `issuer` | calls | `server` | internal | Whose a session is, before it signs anybody in, and the record of that sign-in. What is public of it: its state, the kept accounts' names, its authority's certificate and the list it withdrew. |
 | `server` | puts out | `log-system` | lines on its output | What happens, and every record as it is written. |
 | `gateway` | puts out | `log-system` | lines on its output | — |
 | `issuer` | puts out | `log-system` | lines on its output | A line of its own for every sign-in it makes. |

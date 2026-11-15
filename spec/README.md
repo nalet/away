@@ -39,7 +39,7 @@ every product shares. The specification doesn't repeat them.
 | Capabilities | 202 | in 19 areas: 47 built, 10 partly built, 61 first release, 71 later, 13 not planned |
 | Figures | 85 | in 15 chapters; they show 62 of the 68 capabilities the first release holds for a person or an administrator |
 | Components | 31 | in 6 layers: 11 there, 19 first release, 1 later |
-| Connections | 45 | of 16 kinds |
+| Connections | 46 | of 16 kinds |
 | Decision records | 15 | 15 accepted |
 | Work packages | 16 | 2 proofs and 14 builds: 10 agreed, 2 begun, 4 done |
 <!-- end: state -->

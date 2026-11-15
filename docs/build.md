@@ -402,8 +402,7 @@ makes the key and keeps it, the issuer checks who the person is and asks the
 authority, and the gateway gets the ticket and hands the machine the card. The
 tests go through it with Away's three parts, a real Kerberos server, an
 authority that stands in and a machine of a domain that stands in; they need
-the Kerberos server and the database of the tests. The chart has no values for
-a domain yet.
+the Kerberos server and the database of the tests.
 
 ## Trying a farm's feed
 

@@ -220,6 +220,100 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
   `networkRules.farmsPort` says otherwise, and the cluster's name service.
   `networkRules.farmsAt` narrows that to the addresses it names.
 
+## Signing in as oneself on a Windows domain
+
+On a machine whose file says `signs-in: themselves`
+([a machine](./machines.md#a-machine)), a person is signed in as themselves
+with nothing typed. Away asks the organisation's own certificate authority for
+a certificate that lasts five minutes, proves the person to the domain with
+it, and hands the machine a smart card that exists in Away's memory alone.
+Nothing of Away's is installed on a Windows machine. An installation that
+names no domain has none of this, and reaches no domain controller and no
+authority.
+
+What the organisation prepares, once:
+
+- **An account for Away to ask the authority as**, an ordinary one that is in
+  no group of administrators.
+- **Two kinds of certificate at the authority**, which a Windows authority
+  calls templates. One is the account's own and allows it to ask in other
+  people's names (*Certificate Request Agent*); that account alone may ask
+  for it. The other signs a person in (*Smart Card Logon* and *Client
+  Authentication*): it takes the person's name and identifier from the
+  directory, needs the signature of an agent, is for an RSA key of 2048 bits,
+  and lasts five minutes. A Windows authority begins every certificate ten
+  minutes in the past, so its template says fifteen. Away hands out nothing
+  that lasts longer than five minutes from the moment it is issued.
+- **The authority's own limit on whom the account may ask for**, which a
+  Windows authority calls restricted enrollment agents: the people who are
+  signed in this way, and never the directory's administrators. This limit is
+  the directory's own, and holds whatever Away is told.
+- **The authority's pages for asking it** (its web enrolment), over HTTPS.
+  They may ask for a sign-in that is bound to its connection (extended
+  protection), which Away's is.
+- **The domain takes sign-ins with that authority's certificates**, and its
+  domain controllers have certificates of their own, as a domain has that
+  signs people in with smart cards.
+- **The sign-in service says each person's account in the domain**, in an
+  entry of the sign-in: the name the domain knows the account by, such as
+  `alex.urban`. `preferred_username` is asked unless `domain.accountEntry`
+  names another. A name with an `@` is not taken for one, since what stands
+  before the `@` need not be the account's name.
+
+What the installation is told:
+
+```sh
+kubectl --namespace away create secret generic away-authority --from-file=password=./password
+kubectl --namespace away create configmap away-domain-authorities --from-file=authorities.pem=./authority.pem
+helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
+  --namespace away --reuse-values \
+  --set domain.name=corp.example --set domain.shortName=CORP \
+  --set 'domain.controllers={dc-01.corp.example,dc-02.corp.example}' \
+  --set domain.authoritiesConfigMap=away-domain-authorities \
+  --set domain.authority.pages=https://authority.corp.example/certsrv/ \
+  --set domain.authority.authoritiesConfigMap=away-domain-authorities \
+  --set domain.authority.account=svc-away --set domain.authority.secretName=away-authority \
+  --set domain.authority.agentKind=AwayAgent --set domain.authority.signInKind=AwaySignIn
+```
+
+- **The domain is named whole or not at all**: its name, its short name, its
+  domain controllers, the authorities their certificates lead to, and the
+  authority with its account and its two kinds.
+- **The account's password is a secret of the cluster**, under the key
+  `password`, and the one secret of this. The issuer reads it as it starts.
+  The certificate that allows the account to ask for others is asked for by
+  the issuer itself, with a key that stays in its memory, and asked for anew
+  from two thirds of its time on.
+- **The key a person is signed in with is made by the gateway for one session
+  and stays in its memory.** The issuer sees the request for a certificate
+  and never the key.
+- **Before the issuer signs anybody in, it checks for itself**: that the
+  session runs, which it asks the server; that the sign-in service signed who
+  the person is, no longer than two minutes ago, with keys it reads from the
+  service itself; that their sign-in names an account of the domain; and that
+  the account is none of `domain.neverAs` and the person in none of the groups
+  of `domain.neverOf`. Unless the installation says otherwise, those are
+  `administrator`, `krbtgt` and `guest`, and the groups of a directory's
+  administrators, as the sign-in service names them.
+- **Every sign-in is a record and a line of the issuer's**: who, as which
+  account, on which machine, the certificate's number, until when. The record
+  is kept before the certificate is handed out, and without it none is. What
+  the issuer or the authority refuses is a line too, and shows behind
+  *details* where the person's desktop did not open.
+- **A machine is named by the name its domain knows it by**, and so are the
+  machines that serve a farm: the gateway asks the domain for a ticket for
+  that name.
+- With the network rules on, the gateway reaches the domain controllers on
+  Kerberos' port, 88, and the issuer. The issuer reaches the server, the
+  sign-in service, the authority's pages on `networkRules.authorityPort`, the
+  domain controllers on port 88, and the cluster's name service.
+  `networkRules.domainControllersAt` and `networkRules.authorityAt` narrow
+  those to the addresses they name.
+
+The gateway asks the issuer on an address of the issuer's own. The chart makes
+an authority and a certificate for it as it does between the gateway and the
+server, in the secret `<name>-to-the-issuer`.
+
 ## What it makes
 
 | What | For |
@@ -228,6 +322,7 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
 | an ingress, or two routes | the way in: on Away's address, a session's connection goes to the gateway and everything else to the server |
 | network rules | nothing reaches a part and a part reaches nothing, except the connections [the architecture lists](../spec/architecture/connections.md) |
 | a secret, `<name>-between-parts` | an authority of this installation's own and a certificate of it, which secure what the gateway asks the server ([opening machines](#opening-machines)) |
+| a secret, `<name>-to-the-issuer`, where a domain is named | the same for what the gateway asks the issuer ([signing in as oneself](#signing-in-as-oneself-on-a-windows-domain)) |
 | a ServiceMonitor and alert rules, if asked | for a cluster that runs the Prometheus operator |
 
 Every container runs as an ordinary user and never as root, can't write to its
@@ -262,6 +357,15 @@ Everything an installation is told is one of these. The chart's
 | `farms.account` | the account Away reads the farms' feeds with, such as `CORP\svc-away` ([the farms' feeds](#the-farms-feeds)) | none: a farm in the files shows nothing |
 | `farms.secretName` | the secret that holds the account's password, under the key `password` | none |
 | `farms.authoritiesConfigMap` | a ConfigMap with certificates of authorities to trust for the farms' web access besides the public ones, under the key `authorities.pem` | none |
+| `domain.name`, `domain.shortName` | the Windows domain whose machines people are signed in on as themselves, as it is named in full and in short ([signing in as oneself](#signing-in-as-oneself-on-a-windows-domain)) | none: nobody is signed in as themselves |
+| `domain.controllers` | the domain controllers that give tickets, by their names | none |
+| `domain.authoritiesConfigMap` | a ConfigMap with the certificates of the authorities the domain controllers' certificates lead to, under the key `authorities.pem` | none |
+| `domain.accountEntry` | the entry of a sign-in that holds the name of the person's account in the domain | `preferred_username` |
+| `domain.neverAs`, `domain.neverOf` | the accounts nobody is signed in as, and the groups whose people are signed in as themselves on no machine | `administrator`, `krbtgt`, `guest`; the groups of a directory's administrators |
+| `domain.authority.pages` | the pages the organisation's authority publishes for asking it | none |
+| `domain.authority.authoritiesConfigMap` | a ConfigMap with certificates of authorities to trust for those pages besides the public ones, under the key `authorities.pem` | none |
+| `domain.authority.account`, `domain.authority.secretName` | the account Away asks the authority as, without its domain, and the secret that holds its password, under the key `password` | none |
+| `domain.authority.agentKind`, `domain.authority.signInKind` | the authority's names for the kind of certificate that allows asking for others, and for the kind that signs a person in | none |
 | `image.repository`, `image.tag`, `image.digest` | the image; a digest goes before a tag | the project's image, in the chart's version |
 | `image.pullSecrets` | secrets to pull the image with | none |
 | `ingress.enabled` | make an ingress | no |
@@ -277,6 +381,8 @@ Everything an installation is told is one of these. The chart's
 | `networkRules.machinesAt`, `networkRules.machinePorts` | where the machines are, as the peers of a NetworkPolicy, and the ports their desktops are opened on ([opening machines](#opening-machines)) | any address, port 3389 |
 | `networkRules.databaseAt` | where the database is, as the peers of a NetworkPolicy; used once `database.host` is set | any address, at `database.port` |
 | `networkRules.farmsAt`, `networkRules.farmsPort` | where the farms' web access is, as the peers of a NetworkPolicy, and its port; used once `farms.account` is set | any address, port 443 |
+| `networkRules.domainControllersAt` | where the domain controllers are, as the peers of a NetworkPolicy; used once `domain.name` is set | any address, on port 88 |
+| `networkRules.authorityAt`, `networkRules.authorityPort` | where the organisation's authority is, as the peers of a NetworkPolicy, and its port; used once `domain.name` is set | any address, port 443 |
 | `monitoring.serviceMonitor`, `monitoring.alerts` | make a ServiceMonitor, and alert rules | no |
 | `server.resources`, `gateway.resources`, `issuer.resources` | what each part may use | small requests, and a limit on memory |
 | `nodeSelector`, `tolerations` | where the parts run | anywhere |
