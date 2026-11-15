@@ -66,7 +66,6 @@ flowchart TD
   p09 --> p11
   p03 --> p12
   p06 --> p12
-  p10 --> p12
   p12 --> p13
   p06 --> p14
   p08 --> p14
@@ -103,7 +102,7 @@ Package 2 met its gate, and the owner said that the RDP code stays Away's own
 |---|---|---|---|---|---|---|
 | 1 | [The ground](#1-the-ground) | build | done | — | [ADR‑0002](../architecture/decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md), [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 11 capabilities |
 | 2 | [RDP, proven without a browser](#2-rdp-proven-without-a-browser) | proof | done | 1 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md) | — |
-| 3 | [The Windows sign-in, proven without a browser](#3-the-windows-sign-in-proven-without-a-browser) | proof | begun | 2 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | — |
+| 3 | [The Windows sign-in, proven without a browser](#3-the-windows-sign-in-proven-without-a-browser) | proof | done | 2 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | — |
 | 4 | [Getting in, and the frame](#4-getting-in-and-the-frame) | build | done | 1 | [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 17 capabilities |
 | 5 | [The register, the rules, and home](#5-the-register-the-rules-and-home) | build | done | 4 | [ADR‑0009](../architecture/decisions/0009-one-database-and-files.md) | 16 capabilities |
 | 6 | [A desktop over RDP](#6-a-desktop-over-rdp) | build | begun | 2, 5 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0010](../architecture/decisions/0010-secrets-live-in-the-cluster.md) | 40 capabilities |
@@ -112,7 +111,7 @@ Package 2 met its gate, and the owner said that the RDP code stays Away's own
 | 9 | [Sessions as they run](#9-sessions-as-they-run) | build | agreed | 8 | [ADR‑0003](../architecture/decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md), [ADR‑0006](../architecture/decisions/0006-the-sign-in-is-held-by-the-server.md) | 14 capabilities |
 | 10 | [A shell as oneself](#10-a-shell-as-oneself) | build | agreed | 8 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md) | 4 capabilities |
 | 11 | [A desktop over VNC](#11-a-desktop-over-vnc) | build | agreed | 9 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 24 capabilities |
-| 12 | [Windows as oneself](#12-windows-as-oneself) | build | agreed | 3, 6, 10 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 5 capabilities |
+| 12 | [Windows as oneself](#12-windows-as-oneself) | build | agreed | 3, 6 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 5 capabilities |
 | 13 | [Away's own authority](#13-aways-own-authority) | build | agreed | 12 | [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 2 capabilities |
 | 14 | [By touch](#14-by-touch) | build | agreed | 6, 8 | [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 3 capabilities |
 | 15 | [Status, and the check of the setup](#15-status-and-the-check-of-the-setup) | build | agreed | 12 | [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md) | 2 capabilities |
@@ -160,7 +159,7 @@ A proof, after package 1. It rests on [ADR‑0001](../architecture/decisions/000
 
 ### 3 The Windows sign-in, proven without a browser
 
-A proof, after package 2. It rests on [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md). The proof the first release rests on. On the owner's word of 2026-11-15 it is made with the organisation's own authority.
+A proof, after package 2. It rests on [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md). The proof the first release rests on. Met on 2026-11-15 with the organisation's own authority, which refused an administrator's account, as Away itself did.
 
 **Its gate.** On a real domain, with a certificate of five minutes that the domain's own authority issued, the test program signs an ordinary account in on a Windows machine with nothing typed, from outside the domain. It reads a file share as that account. An account of the directory's administrators is refused.
 
@@ -284,7 +283,7 @@ A build, after package 9. It rests on [ADR‑0001](../architecture/decisions/000
 
 ### 12 Windows as oneself
 
-A build, after package 3 and package 6 and package 10. It rests on [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md). With the organisation's own authority. It begins with a proof of how the authority is asked; if no way holds, the owner chooses what follows.
+A build, after package 3 and package 6. It rests on [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md). With the organisation's own authority. Built on 2026-11-15 ahead of its place, with the issuer the shell as oneself shares; its gate is tried after package 6.
 
 **Its gate.** On a real domain, from a device that is not in it, a person with an ordinary account opens a Windows desktop with nothing typed, reaches a file share as themselves, and opens the desktop again after it locked. The certificate lasts five minutes and is the organisation's own authority's, which itself refuses one for an account outside the group it allows. An account of the directory's administrators is refused. Nothing of Away's is installed on a Windows machine. With no domain named in the configuration, Away runs as before and shows no authority.
 

@@ -50,7 +50,7 @@ A shell has a way of the same kind: a certificate for one key, signed by an auth
 
 [Package 3](../../plan/README.md) proves the Windows half with Away's own code and no browser: on a real domain, with a certificate of the domain's own authority, an ordinary account is signed in on a Windows machine with a certificate of five minutes and nothing typed, reads a file share as itself, and an administrator's account is refused. That a domain accepts such a certificate for an ordinary account, from a device outside it, has been seen with other software; that Away's own code does it is what the package shows.
 
-Tried on 2026-11-15, on a real domain and with its own authority: an ordinary account was signed in on a Windows machine with a certificate of five minutes and nothing typed, from a device outside the domain, and read a file share as itself. That an administrator's account is refused there is still to be shown.
+Tried on 2026-11-15, on a real domain and with its own authority: an ordinary account was signed in on a Windows machine with a certificate of five minutes and nothing typed, from a device outside the domain, and read a file share as itself. An administrator's account was refused the same day: by the domain's authority, which is told whom Away's account may ask for, and, once the sign-in service named the directory's groups of administrators, by Away itself before the authority was asked.
 
 ## Consequences
 
