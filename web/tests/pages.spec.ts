@@ -875,6 +875,7 @@ test.describe('a session', () => {
     await expect(bar).toContainText('desk-01');
     expect(await bar.getByRole('button').evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))).toEqual([
       'keys',
+      'clipboard',
       'fill the screen',
       'end',
       'close the bar',
@@ -916,6 +917,29 @@ test.describe('a session', () => {
     await expect(bar).toHaveCount(0);
     await expect(screen).toBeFocused();
 
+    // the clipboard: this browser lets no page read it, so the bar's panel has a field
+    // for text to the machine and one for text from it
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await bar.getByRole('button', { name: 'clipboard' }).click();
+    const panel = page.getByRole('group', { name: 'clipboard' });
+    await expect(panel).toContainText("This browser doesn't pass its clipboard on by itself. Paste here what desk-01 should have in its clipboard.");
+    await expect(panel.getByRole('button', { name: 'send' })).toBeDisabled();
+    await expect(panel.getByRole('button', { name: 'copy' })).toBeDisabled();
+    await accessible(page);
+    await panel.getByLabel('To the machine').fill('from the page');
+    await panel.getByRole('button', { name: 'send' }).click();
+    await page.keyboard.press('Escape');
+    await expect(bar).toHaveCount(0);
+    // the stand-in copies what it was handed, in capitals, when the key C goes down:
+    // that is what the panel then holds from the machine
+    await page.keyboard.press('c');
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await bar.getByRole('button', { name: 'clipboard' }).click();
+    await expect(panel.getByLabel('From the machine')).toHaveValue('FROM THE PAGE');
+    await expect(panel.getByRole('button', { name: 'copy' })).toBeEnabled();
+    await page.keyboard.press('Escape');
+    await expect(bar).toHaveCount(0);
+
     // the desktop follows the window: at another size the machine offers its desktop
     // anew, and draws all of it; a key reaches it as before
     await page.setViewportSize({ width: 700, height: 500 });
@@ -941,6 +965,41 @@ test.describe('a session', () => {
     const elsewhere = seen.asked.map((request) => request.url()).filter((url) => !url.startsWith(AWAY_THAT_KEEPS) && !url.startsWith('http://127.0.0.1:18085'));
     expect(elsewhere).toEqual([]);
     expect(seen.complaints).toEqual([]);
+  });
+
+  test('a browser that lets the page read its clipboard passes it on by itself, both ways', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/desk-01/desktop`);
+    await page.getByLabel('Name').fill('CORP\\alex.urban');
+    await page.getByLabel('Password').fill('a password that exists for these tests alone');
+    await page.getByRole('button', { name: 'sign in' }).click();
+    const screen = page.getByRole('application', { name: 'the desktop of desk-01' });
+    await expect(screen).toBeFocused();
+    await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
+
+    // what is copied on the machine, on the key C, is in the person's clipboard
+    await page.keyboard.press('c');
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('copied on the machine\nin two lines');
+    // what the person copies is told to the machine when its screen gets the focus
+    // again: the stand-in copies it back in capitals
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    const bar = page.getByRole('toolbar', { name: "the session's bar" });
+    await bar.getByRole('button', { name: 'clipboard' }).click();
+    await expect(page.getByRole('group', { name: 'clipboard' })).toHaveText('Text you copy on one side can be pasted on the other.');
+    await accessible(page);
+    await page.evaluate(() => navigator.clipboard.writeText('copied by the person'));
+    await page.keyboard.press('Escape');
+    await expect(screen).toBeFocused();
+    await expect
+      .poll(async () => {
+        await page.keyboard.press('c');
+        return page.evaluate(() => navigator.clipboard.readText());
+      })
+      .toBe('COPIED BY THE PERSON');
+
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await bar.getByRole('button', { name: 'end' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/desk-01`);
   });
 
   test("a farm's desktop opens on the machine its broker names, and a broker that names another machine is not followed", async ({ page }) => {
@@ -1091,7 +1150,7 @@ test('without a database no machine is opened, and the page says why', async ({ 
 });
 
 test("the session's messages are written and read as the examples say that the gateway is tried against too", async () => {
-  const { begins, credentials, did, leaves, readRectangle, readSaid, seen, sized, windowDoes } = await import('../src/session/wire');
+  const { begins, copied, credentials, did, leaves, readRectangle, readSaid, seen, sized, windowDoes } = await import('../src/session/wire');
   const examples = JSON.parse(readFileSync('../crates/away-wire/fixtures/messages.json', 'utf8')) as Record<string, { text?: string; bytes?: string }[]>;
   const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   const bytes = (written: string) => new Uint8Array((written.match(/../g) ?? []).map((pair) => parseInt(pair, 16)));
@@ -1104,6 +1163,8 @@ test("the session's messages are written and read as the examples say that the g
   expect(said.slice(9)).toEqual([
     { windows: [{ id: 65537, title: 'Ledger', shown: 'as-it-is', listed: true, seen: [[20, 10, 180, 110]] }], in_front: 65537 },
     { asks: { again: false, instead: true } },
+    { clipboard: { to: true, from: false } },
+    { copied: 'two\nlines' },
   ]);
   expect([readSaid('no JSON'), readSaid('7'), readRectangle(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0, 1]).buffer)]).toEqual([null, null, null]);
 
@@ -1128,6 +1189,7 @@ test("the session's messages are written and read as the examples say that the g
     ),
     windowDoes(65537, 'close'),
     sized(1440, 900, 200),
+    copied('a text\nof two lines'),
   ];
   expect(written).toEqual((examples.from_browser ?? []).map((example) => example.text ?? example.bytes));
 });

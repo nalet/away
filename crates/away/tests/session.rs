@@ -613,6 +613,16 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
     assert_eq!(last.screens, [(640, 480, 100)]);
     assert_eq!(last.took_later, [3]);
 
+    // the clipboard: what the machine copies, on the key C, comes to the person; what
+    // the person copied is pasted on the machine, which copies it back in capitals
+    session.did(&[4, 0x2e, 0, 1, 4, 0x2e, 0, 0]).await;
+    assert_eq!(session.until("copied").await.write(), r#"{"copied":"copied on the machine\nin two lines"}"#);
+    session.say(Json::object([("copied", "from the person's device".into())])).await;
+    session.did(&[4, 0x2e, 0, 1, 4, 0x2e, 0, 0]).await;
+    assert_eq!(session.until("copied").await.write(), r#"{"copied":"FROM THE PERSON'S DEVICE"}"#);
+    let seen = world.machine.seen();
+    assert_eq!(seen.last().expect("the client").pasted, ["from the person's device"]);
+
     // the person leaves: the session says so and ends, and the machine was told
     session.say(Json::object([("leaves", true.into())])).await;
     assert_eq!(session.until("ended").await.write(), r#"{"ended":"left"}"#);
@@ -906,6 +916,8 @@ async fn a_program_opens_in_a_window_of_its_own_and_closing_it_ends_the_session(
     let (steps, desktop) = session.steps().await;
     assert_eq!(steps, ["first-picture"]);
     assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120}}"#);
+    // which ways the clipboard passes is said first: both, where the files say nothing
+    assert_eq!(session.next().await.map(|says| says.write()).as_deref(), Some(r#"{"clipboard":{"to":true,"from":true}}"#));
     // where the window is comes before what is drawn in it
     let windows = session.next().await.expect("the windows");
     assert_eq!(

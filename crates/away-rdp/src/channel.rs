@@ -30,6 +30,12 @@ pub fn asked_for(name: &str, shows_its_heads: bool) -> [u8; 12] {
     asked
 }
 
+/// Whether what reads a channel on the machine is shown the heads of its pieces: the
+/// channel of programs and the one of the clipboard are, the others are not.
+pub fn shows_its_heads(name: &str) -> bool {
+    name == crate::rail::CHANNEL || name == crate::clipboard::CHANNEL
+}
+
 /// A message in the pieces it travels in, each with its head, on a channel that was
 /// asked for this way.
 pub fn pieces(message: &[u8], shows_its_heads: bool) -> Vec<Vec<u8>> {

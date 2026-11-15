@@ -549,6 +549,7 @@ impl GettingIn {
                 ("address", machine.address.as_str().into()),
                 ("port", u64::from(port).into()),
                 ("signs_in", if machine.themselves { "themselves" } else { "typed" }.into()),
+                ("clipboard", machine.clipboard.word().into()),
             ]),
         };
         // no connection is made without its record
@@ -570,6 +571,7 @@ impl GettingIn {
             collection: machine.collection.clone(),
             served_by: machine.served_by.clone(),
             themselves: machine.themselves,
+            clipboard: machine.clipboard,
             program,
             at: time::now().as_secs(),
         };
@@ -619,6 +621,7 @@ impl GettingIn {
                             ("collection", asked.collection.as_deref().map_or(Json::Null, Json::from)),
                             ("served_by", Json::List(asked.served_by.iter().map(|served| served.as_str().into()).collect())),
                             ("signs_in", if asked.themselves { "themselves" } else { "typed" }.into()),
+                            ("clipboard", asked.clipboard.word().into()),
                             (
                                 "program",
                                 asked.program.as_ref().map_or(Json::Null, |(name, run)| {

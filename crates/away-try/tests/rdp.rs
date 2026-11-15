@@ -388,6 +388,7 @@ fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
             channels: vec!["drdynvc".to_string()],
             devices: Vec::new(),
             card: None,
+            pasted: Vec::new(),
             took_later: Vec::new(),
             screens: Vec::new(),
         }

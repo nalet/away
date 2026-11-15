@@ -47,6 +47,7 @@ async fn main() -> std::process::ExitCode {
             groups: Vec::new(),
             served_by: Vec::new(),
             themselves: false,
+            clipboard: away_server::register::Clipboard::BOTH,
             after: 0,
             written_in: (String::new(), 0),
         };

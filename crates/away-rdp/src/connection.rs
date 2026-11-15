@@ -6,6 +6,7 @@
 //! happened. It holds no connection itself.
 
 use crate::channel::{self, Pieces};
+use crate::clipboard::{self, Clipboard};
 use crate::devices;
 use crate::dynamic::{self, Later};
 use crate::gcc::{self, Client, Machine};
@@ -80,6 +81,8 @@ pub enum Happened {
     },
     /// The machine asked the reader for something.
     AskedTheReader(smartcard::Asked),
+    /// Text was copied on the machine, and is for the person's clipboard.
+    Copied(String),
 }
 
 /// The client's smart card reader, and how far the machine and the client are with it.
@@ -128,6 +131,9 @@ pub struct Connection {
     /// The channels the machine opens later, and the pieces of a message about them
     /// that is not whole yet: where the client asked for the channel they travel on.
     later: Option<(Pieces, Later)>,
+    /// The clipboard, and the pieces of a message about it that is not whole yet: where
+    /// it passes at all.
+    clipboard: Option<(Pieces, Clipboard)>,
 }
 
 impl Connection {
@@ -148,6 +154,7 @@ impl Connection {
         let first = tpkt::data_frame(&mcs::connect(&gcc::request(&client, reader.is_some())));
         let asked_for = gcc::channels(&client, reader.is_some());
         let later = asked_for.contains(&dynamic::CHANNEL).then(|| (Pieces::default(), Later::default()));
+        let passes = asked_for.contains(&clipboard::CHANNEL).then(|| (Pieces::default(), Clipboard::new(client.clipboard)));
         let connection = Connection {
             state: State::AwaitsMachine,
             client,
@@ -166,6 +173,7 @@ impl Connection {
             asked_for,
             devices: reader.map(|reader| Devices { reader, pieces: Pieces::default(), can_do: false, confirmed: false, named: false }),
             later,
+            clipboard: passes,
         };
         (connection, first)
     }
@@ -230,6 +238,9 @@ impl Connection {
                 Arrived::On(channel, arrived) if Some(channel) == self.channel(rail::CHANNEL) => self.on_the_programs_channel(arrived),
                 Arrived::On(channel, arrived) if Some(channel) == self.channel(devices::CHANNEL) => self.on_the_devices_channel(arrived),
                 Arrived::On(channel, arrived) if Some(channel) == self.channel(dynamic::CHANNEL) => self.on_the_later_channels(arrived),
+                Arrived::On(channel, arrived) if Some(channel) == self.channel(clipboard::CHANNEL) => {
+                    self.on_the_clipboards_channel(arrived)
+                }
                 Arrived::On(..) => Ok((Vec::new(), Vec::new())),
             },
         }
@@ -244,7 +255,7 @@ impl Connection {
     /// A message on a further channel, in the pieces and the frames it travels in.
     fn on(&self, name: &str, message: &[u8]) -> Vec<u8> {
         let Some(on) = self.channel(name) else { return Vec::new() };
-        channel::pieces(message, name == rail::CHANNEL)
+        channel::pieces(message, channel::shows_its_heads(name))
             .iter()
             .flat_map(|piece| tpkt::data_frame(&mcs::send(self.user, on, piece)))
             .collect()
@@ -264,6 +275,27 @@ impl Connection {
             None => devices::did_not_work(devices::READER, answered.request),
         };
         answered.into_iter().map(answer).collect()
+    }
+
+    /// What the machine says about the clipboard: the client answers it, and what was
+    /// copied on the machine is for the person.
+    fn on_the_clipboards_channel(&mut self, piece: &[u8]) -> Result<(Vec<u8>, Vec<Happened>), Error> {
+        let Some((pieces, clipboard)) = self.clipboard.as_mut() else { return Ok((Vec::new(), Vec::new())) };
+        let Some(message) = pieces.take(piece)? else { return Ok((Vec::new(), Vec::new())) };
+        let (answers, copied) = clipboard.receive(&message)?;
+        let send = answers.iter().flat_map(|answer| self.on(clipboard::CHANNEL, answer)).collect();
+        Ok((send, copied.map(Happened::Copied).into_iter().collect()))
+    }
+
+    /// The person copied this text. Gives what to send to tell the machine so: nothing
+    /// where the clipboard doesn't pass to the machine, and nothing before the machine
+    /// is ready for it, which it is told then.
+    pub fn copied(&mut self, text: &str) -> Vec<u8> {
+        let told = match self.clipboard.as_mut() {
+            Some((_, clipboard)) => clipboard.copied(text),
+            None => Vec::new(),
+        };
+        told.iter().flat_map(|message| self.on(clipboard::CHANNEL, message)).collect()
     }
 
     /// What the machine says of the channels it opens later: the client answers it.
@@ -515,6 +547,7 @@ mod tests {
             layout: gcc::LAYOUT_US,
             sent_on_to: None,
             program,
+            clipboard: clipboard::Passes::NEITHER,
         };
         let for_a_licence = licence::New { random: [1; 32], secret: [2; 48], known_by: [3; 16] };
         let (mut connection, first) = Connection::begin(client, "CORP", "alex.urban", None, for_a_licence, None);
@@ -536,6 +569,7 @@ mod tests {
             layout: gcc::LAYOUT_US,
             sent_on_to: None,
             program: None,
+            clipboard: clipboard::Passes::NEITHER,
         };
         let for_a_licence = licence::New { random: [1; 32], secret: [2; 48], known_by: [3; 16] };
         let reader = Reader::new("Away 0", Box::new(Echo));
@@ -581,6 +615,59 @@ mod tests {
         let (happened, _, machine) = run(None, Desktop::new(picture()));
         assert!(machine.seen().channels == ["drdynvc"] && machine.seen().devices.is_empty());
         assert!(!happened.expect("the connection opens").iter().any(|happened| matches!(happened, Happened::Reader { .. })));
+    }
+
+    #[test]
+    fn text_passes_between_the_persons_clipboard_and_the_machines() {
+        use crate::stand_in::desktop::COPIED;
+        let client = Client {
+            width: 1280,
+            height: 800,
+            scale: 100,
+            security: 2,
+            name: "away".to_string(),
+            layout: gcc::LAYOUT_US,
+            sent_on_to: None,
+            program: None,
+            clipboard: clipboard::Passes::BOTH,
+        };
+        let for_a_licence = licence::New { random: [1; 32], secret: [2; 48], known_by: [3; 16] };
+        let (mut connection, first) = Connection::begin(client, "CORP", "alex.urban", None, for_a_licence, None);
+        let mut machine = Desktop::new(picture());
+        // the key C copies on the machine: the client asks for the text at once, and it is for the person
+        let key_c = [Input::Key { code: 0x2e, extended: false, down: true }];
+        let happened = talk(&mut connection, &mut machine, first).expect("the connection opens");
+        assert_eq!(machine.seen().channels, ["drdynvc", "cliprdr"]);
+        assert!(machine.seen().pasted.is_empty() && !happened.iter().any(|happened| matches!(happened, Happened::Copied(_))));
+        let pressed = connection.input(&key_c);
+        let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies");
+        assert!(happened.contains(&Happened::Copied(COPIED.to_string())));
+
+        // the person copies: the machine is told, pastes, and is handed the text
+        let told = connection.copied("from the person's device\nin two lines");
+        assert!(!told.is_empty());
+        let happened = talk(&mut connection, &mut machine, told).expect("the machine pastes");
+        assert_eq!(machine.seen().pasted.last().map(String::as_str), Some("from the person's device\nin two lines"));
+        assert!(!happened.iter().any(|happened| matches!(happened, Happened::Copied(_))));
+
+        // the stand-in copies what it was handed, in capitals: that comes back to the person
+        let pressed = connection.input(&key_c);
+        let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies");
+        assert!(happened.contains(&Happened::Copied("FROM THE PERSON'S DEVICE\nIN TWO LINES".to_string())));
+
+        // what the person copied before the machine was ready is told once it is
+        let client = Client { clipboard: clipboard::Passes::BOTH, ..connection.client().clone() };
+        let for_a_licence = licence::New { random: [1; 32], secret: [2; 48], known_by: [3; 16] };
+        let (mut early, first) = Connection::begin(client, "CORP", "alex.urban", None, for_a_licence, None);
+        assert!(early.copied("copied before the desktop opened").is_empty());
+        let mut machine = Desktop::new(picture());
+        talk(&mut early, &mut machine, first).expect("the connection opens");
+        assert_eq!(machine.seen().pasted, ["copied before the desktop opened"]);
+
+        // where the clipboard passes neither way, no channel is asked for and nothing is said
+        let (_, mut without, machine) = run(None, Desktop::new(picture()));
+        assert_eq!(machine.seen().channels, ["drdynvc"]);
+        assert!(without.copied("nothing passes").is_empty());
     }
 
     #[test]

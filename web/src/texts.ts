@@ -162,6 +162,22 @@ export const texts = {
     keys: 'keys',
     // the key combinations a browser or a device keeps for itself
     kept: { ctrlAltDel: 'ctrl + alt + del', altTab: 'alt + tab', altF4: 'alt + f4', windows: 'windows key', ctrlW: 'ctrl + w' },
+    // the clipboard: the bar's button, and the panel under it
+    clipboard: {
+      name: 'clipboard',
+      passes: 'Text you copy on one side can be pasted on the other.',
+      passesTo: (machine: string) => `Text you copy here can be pasted on ${machine}.`,
+      passesFrom: (machine: string) => `Text you copy on ${machine} can be pasted here.`,
+      notByItself: "This browser doesn't pass its clipboard on by itself.",
+      pasteHere: (machine: string) => `Paste here what ${machine} should have in its clipboard.`,
+      toMachine: 'To the machine',
+      send: 'send',
+      fromMachine: 'From the machine',
+      copy: 'copy',
+      copiedHere: 'It is in your clipboard now.',
+      noCopying: (machine: string) => `Copying from ${machine} is switched off.`,
+      noPasting: (machine: string) => `Pasting to ${machine} is switched off.`,
+    },
     fill: 'fill the screen',
     unfill: 'leave the full screen',
     end: 'end',

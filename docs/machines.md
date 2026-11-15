@@ -61,6 +61,7 @@ rules:
 | `collection` | for a farm of Windows machines that people see as one: the collection this entry stands for. Its address is then the farm's broker | none |
 | `served-by` | the machines that serve the collection, by their addresses. One that opens its desktop on another port than the broker names it after a colon, as `rdsh-02.corp.example:3390`. Away goes on to no other machine for the collection | none |
 | `signs-in` | how people are signed in on a Windows machine: `typed`, with a name and a password they type, or `themselves`, with nothing typed | `typed` |
+| `clipboard` | which ways text passes between the person's clipboard and the machine's, on a Windows machine: `both`, `to-the-machine`, `from-the-machine` or `none` | `both` |
 
 A machine offers at least one way in: a desktop, programs, or a shell.
 
@@ -133,6 +134,7 @@ publishes.
 | `feed` | the address of the farm's feed, over HTTPS | needed |
 | `groups` | the groups of machines that everything the farm publishes is in | none |
 | `served-by` | the machines that serve what the farm publishes, by their addresses. Away goes on to no other machine for it, so a farm names them unless its broker serves everything itself | none |
+| `clipboard` | which ways text passes between the person's clipboard and the machines', for everything the farm publishes: `both`, `to-the-machine`, `from-the-machine` or `none` | `both` |
 
 - **A desktop the farm publishes is a machine**, by the name the farm gives
   it. It is opened through the farm's broker
@@ -281,14 +283,22 @@ machine that offers more is opened from its own page, where each way in is.
   to it. A small handle at the top edge opens the session's bar, and so does
   Ctrl + Alt + Shift, pressed and let go with no other key. The bar sends the
   key combinations a browser keeps for itself (Ctrl + Alt + Del, Alt + Tab,
-  Alt + F4, the Windows key and Ctrl + W), fills the screen and ends the
-  session. While a session fills the screen, a browser that allows it gives
+  Alt + F4, the Windows key and Ctrl + W), holds the clipboard's panel, fills
+  the screen and ends the session. While a session fills the screen, a browser that allows it gives
   every key to the machine.
 - **A Windows desktop opens at the window's size, in the screen's own dots.**
   On a screen with more dots than a page counts, the machine is asked for
   that many and draws larger by as much, so text has the size it has at the
   machine and is sharp. A very large window on such a screen gets a desktop of
   3840 by 2160 dots at most, drawn a little less large.
+- **Text copied on one side is pasted on the other**, on a Windows machine,
+  each way where the machine's entry lets it. In a browser that lets a page
+  read its clipboard, which it asks once, this needs nothing more: what the
+  person copied is told to the machine when its screen gets the focus, and
+  what is copied on the machine is in the person's clipboard. In a browser
+  that doesn't, the bar's clipboard panel has a field for text to the machine
+  and one for text from it. Text passes, up to about a quarter of a million
+  characters; pictures and files don't.
 - **A Windows desktop follows its window.** Once the window has rested at
   another size, the machine is told and offers its desktop anew at that size,
   so nothing is scaled and text keeps its size. A machine that doesn't take a

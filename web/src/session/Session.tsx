@@ -4,7 +4,7 @@
 // its own but a handle. A program's windows show on Away's ground, where the machine
 // has them on its desktop.
 import { Button, Chevron, EmptyState, Field, IconButton, Input, Spinner } from '@nalet/design-system';
-import { AppWindow, Check, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
+import { AppWindow, Check, ClipboardList, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent as KeyOfReact } from 'react';
 
@@ -12,6 +12,8 @@ import { pageOf, useMachines } from '../machines';
 import type { Machine } from '../machines';
 import { addressOf } from '../place';
 import { texts } from '../texts';
+import { ClipboardPanel, useClipboard } from './Clipboard';
+import type { Passes } from './Clipboard';
 import { layoutOf, placeOf } from './keys';
 import { begins, credentials, did, leaves, readRectangle, readSaid, seen, sized, windowDoes } from './wire';
 import type { Did, Step, WindowOf } from './wire';
@@ -33,6 +35,9 @@ function useSession(machine: string, program: string | null) {
   // the windows of the programs, from the front one back
   const [windows, setWindows] = useState<WindowOf[]>([]);
   const [attempt, setAttempt] = useState(0);
+  // which ways the clipboard passes, and the text that was last copied on the machine
+  const [passes, setPasses] = useState<Passes | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
   // the picture is drawn on a canvas of the session's own, which a page shows once it is open
   const [canvas] = useState(() => document.createElement('canvas'));
   const socket = useRef<WebSocket | null>(null);
@@ -44,6 +49,8 @@ function useSession(machine: string, program: string | null) {
     let drawing: Promise<void> = Promise.resolve();
     setState({ is: 'opening', step: null, asks: null });
     setWindows([]);
+    setPasses(null);
+    setCopied(null);
     const begin = async () => {
       const [asked, layout] = await Promise.all([
         fetch(`/api/sessions?${new URLSearchParams(program === null ? { machine } : { machine, program })}`, { method: 'POST', headers: { 'x-away': '1' } }),
@@ -93,6 +100,8 @@ function useSession(machine: string, program: string | null) {
         } else if ('failed' in said) setState({ is: 'failed', ...said.failed });
         else if ('ended' in said) setState({ is: 'ended', why: said.ended });
         else if ('windows' in said) setWindows(said.windows);
+        else if ('clipboard' in said) setPasses(said.clipboard);
+        else if ('copied' in said) setCopied(said.copied);
       };
       opened.onclose = () => {
         if (over) return;
@@ -114,13 +123,13 @@ function useSession(machine: string, program: string | null) {
   const say = useCallback((message: string | Uint8Array<ArrayBuffer>) => {
     if (socket.current?.readyState === WebSocket.OPEN) socket.current.send(message);
   }, []);
-  return { state, windows, canvas, say, again: () => setAttempt((before) => before + 1) };
+  return { state, windows, passes, copied, canvas, say, again: () => setAttempt((before) => before + 1) };
 }
 
 // The page of a session with a machine's desktop, or with one of its programs.
 export function Session({ name, program, go, contact }: { name: string; program: string | null; go: (to: string) => void; contact: string | null }) {
   const [machines] = useMachines();
-  const { state, windows, canvas, say, again } = useSession(name, program);
+  const { state, windows, passes, copied, canvas, say, again } = useSession(name, program);
   const machine = typeof machines === 'string' ? null : (machines.find((one) => one.name === name) ?? null);
   const toMachines = () => go(machine ? pageOf(name) : addressOf.machines);
 
@@ -132,7 +141,9 @@ export function Session({ name, program, go, contact }: { name: string; program:
     if (state.is === 'ended' && (state.why === 'left' || state.why === 'closed')) go(pageOf(name));
   }, [state, go, name]);
 
-  if (state.is === 'open') return <Desktop name={name} program={program} windows={windows} canvas={canvas} say={say} />;
+  if (state.is === 'open') {
+    return <Desktop name={name} program={program} windows={windows} passes={passes} copied={copied} canvas={canvas} say={say} />;
+  }
   const t = texts.session;
   if (state.is === 'refused' || state.is === 'ended') {
     const says = state.is === 'refused' ? t.refused(state.status, name) : t.ended(state.why, name);
@@ -322,12 +333,16 @@ function Desktop({
   name,
   program,
   windows,
+  passes,
+  copied,
   canvas,
   say,
 }: {
   name: string;
   program: string | null;
   windows: WindowOf[];
+  passes: Passes | null;
+  copied: string | null;
   canvas: HTMLCanvasElement;
   say: (message: string | Uint8Array<ArrayBuffer>) => void;
 }) {
@@ -337,6 +352,9 @@ function Desktop({
   // whether the menu of the keys is open, and what holds its button and the menu
   const [keys, setKeys] = useState(false);
   const keysOf = useRef<HTMLSpanElement | null>(null);
+  // whether the panel of the clipboard is open
+  const [clip, setClip] = useState(false);
+  const clipboard = useClipboard(canvas, passes, copied, say);
   const screen = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -500,6 +518,7 @@ function Desktop({
   };
   const close = () => {
     setKeys(false);
+    setClip(false);
     setBar(false);
     canvas.focus();
   };
@@ -590,7 +609,10 @@ function Desktop({
               className={keys ? 'is-open' : undefined}
               aria-haspopup="menu"
               aria-expanded={keys}
-              onClick={() => setKeys(!keys)}
+              onClick={() => {
+                setClip(false);
+                setKeys(!keys);
+              }}
               autoFocus
             >
               <Keyboard size={16} aria-hidden="true" />
@@ -605,6 +627,26 @@ function Desktop({
               </div>
             )}
           </span>
+          {passes !== null && (
+            <span className="menuof">
+              <IconButton
+                variant="ghost"
+                label={t.clipboard.name}
+                title={t.clipboard.name}
+                className={clip ? 'is-open' : undefined}
+                aria-expanded={clip}
+                onClick={() => {
+                  setKeys(false);
+                  setClip(!clip);
+                }}
+              >
+                <ClipboardList size={16} aria-hidden="true" />
+              </IconButton>
+              {clip && (
+                <ClipboardPanel machine={program ?? name} passes={passes} byItself={clipboard.byItself} fromMachine={copied} send={clipboard.send} />
+              )}
+            </span>
+          )}
           <IconButton variant="ghost" label={filled ? t.unfill : t.fill} title={filled ? t.unfill : t.fill} onClick={fill}>
             {filled ? <Minimize size={16} aria-hidden="true" /> : <Maximize size={16} aria-hidden="true" />}
           </IconButton>

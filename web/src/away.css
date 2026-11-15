@@ -234,6 +234,14 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .sess .sessmenu { position: absolute; z-index: 3; top: 44px; right: 0; min-width: 200px; display: flex; flex-direction: column; padding: 4px 0;
                   background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
 .sess .sessmenu .nc-actionmenu__item { display: flex; min-height: 40px; font-family: var(--ff-mono); }
+/* the panel of the clipboard: under its button, with what it says and its two fields */
+.sess .sesspanel { position: absolute; z-index: 3; top: 44px; right: 0; width: min(360px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 12px;
+                   padding: 16px; background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; color: var(--fg); }
+.sess .sesspanel p { margin: 0; font-size: 14px; line-height: 1.45; }
+.sess .sesspanel p.off { color: var(--fg-muted); }
+.sess .sesspanel form, .sess .sesspanel > div { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.sess .sesspanel textarea { width: 100%; min-width: 0; }
+.sess .sesspanel .said { font-size: 13px; color: var(--fg-muted); min-height: 1em; }
 /* the windows of the programs, in the session's bar: each is brought to the front, or closed */
 .sess .sbar .wins { display: flex; align-items: center; gap: 4px; margin: 0 0 0 16px; padding: 0; list-style: none; min-width: 0; overflow: hidden; }
 .sess .sbar .wins li { display: inline-flex; align-items: center; min-width: 0; border: 1px solid var(--border-2); }

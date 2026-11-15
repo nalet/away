@@ -32,6 +32,8 @@ pub struct Client {
     /// The program to start in windows of its own, where the connection is for a program
     /// and not for the desktop.
     pub program: Option<crate::rail::Program>,
+    /// Which ways the clipboard passes between the person's device and the machine.
+    pub clipboard: crate::clipboard::Passes,
 }
 
 /// The keyboard layout of the United States, which a client has where nothing says otherwise.
@@ -62,8 +64,8 @@ pub(crate) fn millimetres(dots: u16, scale: u32) -> u32 {
 /// The further channels a client asks for, beside the desktop's, in the order it asks
 /// for them: the one programs are started over, where a program is asked for; for a
 /// desktop, the one that carries the channels a machine opens later, over which the
-/// client says how its screen is now; and the one its devices are reached over, where
-/// it has a smart card reader. With that one goes the channel of sound, without which
+/// client says how its screen is now; the one of the clipboard, where that passes; and
+/// the one its devices are reached over, where it has a smart card reader. With that one goes the channel of sound, without which
 /// a Windows machine says nothing about devices.
 pub fn channels(client: &Client, with_a_reader: bool) -> Vec<&'static str> {
     let mut channels = Vec::new();
@@ -71,6 +73,9 @@ pub fn channels(client: &Client, with_a_reader: bool) -> Vec<&'static str> {
         channels.push(crate::rail::CHANNEL);
     } else {
         channels.push(crate::dynamic::CHANNEL);
+    }
+    if client.clipboard.at_all() {
+        channels.push(crate::clipboard::CHANNEL);
     }
     if with_a_reader {
         channels.extend([crate::devices::CHANNEL, crate::devices::SOUND]);
@@ -124,7 +129,7 @@ pub fn request(client: &Client, with_a_reader: bool) -> Vec<u8> {
     // the further channels; what reads the one of programs on the machine is shown the
     // heads of its pieces, what reads the others is not
     let channels: Vec<[u8; 12]> =
-        channels(client, with_a_reader).iter().map(|name| crate::channel::asked_for(name, *name == crate::rail::CHANNEL)).collect();
+        channels(client, with_a_reader).iter().map(|name| crate::channel::asked_for(name, crate::channel::shows_its_heads(name))).collect();
     let mut further = (channels.len() as u32).to_le_bytes().to_vec();
     further.extend(channels.concat());
     blocks.extend(block(0xc003, &further));
@@ -213,6 +218,7 @@ mod tests {
             layout: LAYOUT_US,
             sent_on_to: None,
             program: None,
+            clipboard: crate::clipboard::Passes::NEITHER,
         }
     }
 
@@ -252,6 +258,11 @@ mod tests {
         assert_eq!(&core[8..12], &[0x00, 0x0a, 0x40, 0x06], "2560 by 1600");
         assert_eq!(&core[216..226], &[0x52, 0x01, 0, 0, 0xd3, 0, 0, 0, 0, 0]);
         assert_eq!(&core[226..234], &[200, 0, 0, 0, 100, 0, 0, 0]);
+        // where the clipboard passes, the channel of it is asked for after that one, with
+        // the heads of its pieces shown to what reads it
+        let passes = super::request(&Client { clipboard: crate::clipboard::Passes::BOTH, ..client() }, false);
+        assert_eq!(&passes[269..277], &[0x03, 0xc0, 0x20, 0x00, 2, 0, 0, 0]);
+        assert_eq!(&passes[289..301], &[b'c', b'l', b'i', b'p', b'r', b'd', b'r', 0, 0x00, 0x00, 0x20, 0xc0]);
         // a scale no machine takes is brought to one it does
         let beyond = super::request(&Client { scale: 900, ..client() }, false);
         assert_eq!(&beyond[23 + 226..23 + 230], &[0xf4, 0x01, 0, 0]);

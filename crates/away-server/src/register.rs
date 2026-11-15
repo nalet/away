@@ -105,6 +105,30 @@ pub const LARGEST_PICTURE: usize = 256 * 1024;
 /// What a PNG picture begins with.
 const PNG: &[u8] = b"\x89PNG\r\n\x1a\n";
 
+/// Which ways the clipboard passes between a person's device and a machine.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Clipboard {
+    /// What the person copied can be pasted on the machine.
+    pub to_the_machine: bool,
+    /// What is copied on the machine reaches the person's device.
+    pub from_the_machine: bool,
+}
+
+impl Clipboard {
+    /// Both ways, as it passes unless an entry says otherwise.
+    pub const BOTH: Clipboard = Clipboard { to_the_machine: true, from_the_machine: true };
+
+    /// The word an entry says it with.
+    pub fn word(self) -> &'static str {
+        match (self.to_the_machine, self.from_the_machine) {
+            (true, true) => "both",
+            (true, false) => "to-the-machine",
+            (false, true) => "from-the-machine",
+            (false, false) => "none",
+        }
+    }
+}
+
 /// One machine.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Machine {
@@ -128,6 +152,8 @@ pub struct Machine {
     pub served_by: Vec<String>,
     /// Whether people are signed in on it as themselves, with nothing typed.
     pub themselves: bool,
+    /// Which ways the clipboard passes.
+    pub clipboard: Clipboard,
     /// The farm that publishes it, where it is not written in a file itself but read
     /// from a farm's feed.
     pub farm: Option<String>,
@@ -149,6 +175,8 @@ pub struct Farm {
     pub served_by: Vec<String>,
     /// Whether people are signed in as themselves on what it publishes, with nothing typed.
     pub themselves: bool,
+    /// Which ways the clipboard passes on what it publishes.
+    pub clipboard: Clipboard,
     /// How many machines of the files are written before it, in the files' order: what
     /// it publishes shows after them, where the farm itself is written.
     pub after: usize,
@@ -540,7 +568,8 @@ fn machine(
     pictures: &[(String, Vec<u8>)],
     named: &mut BTreeMap<String, Arc<Vec<u8>>>,
 ) -> Result<Machine, Refused> {
-    let may_hold = ["name", "kind", "address", "groups", "desktop", "programs", "shell", "collection", "served-by", "signs-in"];
+    let may_hold =
+        ["name", "kind", "address", "groups", "desktop", "programs", "shell", "collection", "served-by", "signs-in", "clipboard"];
     let shape = "a machine is written as its name, its kind, its address and its ways in, beginning with “- name:”";
     let parts = Parts::of(file, node, &may_hold, "a machine", shape)?;
     let Some((name, _)) = parts.text("name", "a machine")? else { return Err(refused(file, node.line, "the machine has no name")) };
@@ -635,6 +664,7 @@ fn machine(
         }
         _ => false,
     };
+    let clipboard = clipboard(&parts, file, of)?;
     Ok(Machine {
         name,
         kind,
@@ -646,6 +676,7 @@ fn machine(
         collection: collection.map(|(collection, _)| collection),
         served_by: served_by.into_iter().map(|(address, _)| address).collect(),
         themselves,
+        clipboard,
         farm: None,
         written_in: (file.to_string(), node.line),
     })
@@ -664,6 +695,22 @@ fn signs_in(parts: &Parts, file: &str, of: &str) -> Result<Option<(bool, usize)>
     }
 }
 
+/// Which ways the clipboard passes, where an entry says so: both ways where it doesn't.
+fn clipboard(parts: &Parts, file: &str, of: &str) -> Result<Clipboard, Refused> {
+    match parts.text("clipboard", of)? {
+        None => Ok(Clipboard::BOTH),
+        Some((ways, line)) => match ways.as_str() {
+            "both" => Ok(Clipboard::BOTH),
+            "to-the-machine" => Ok(Clipboard { to_the_machine: true, from_the_machine: false }),
+            "from-the-machine" => Ok(Clipboard { to_the_machine: false, from_the_machine: true }),
+            "none" => Ok(Clipboard { to_the_machine: false, from_the_machine: false }),
+            _ => {
+                Err(refused(file, line, format!("“{ways}” is no way a clipboard passes: both, to-the-machine, from-the-machine, or none")))
+            }
+        },
+    }
+}
+
 /// Whether an address is a number and no name, with or without a port after it.
 fn is_a_number(address: &str) -> bool {
     let bare = |address: &str| address.trim_start_matches('[').trim_end_matches(']').parse::<std::net::IpAddr>().is_ok();
@@ -673,7 +720,7 @@ fn is_a_number(address: &str) -> bool {
 /// Reads one farm.
 fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
     let shape = "a farm is written as its name, its feed and its groups, beginning with “- name:”";
-    let parts = Parts::of(file, node, &["name", "feed", "groups", "served-by", "signs-in"], "a farm", shape)?;
+    let parts = Parts::of(file, node, &["name", "feed", "groups", "served-by", "signs-in", "clipboard"], "a farm", shape)?;
     let Some((name, _)) = parts.text("name", "a farm")? else { return Err(refused(file, node.line, "the farm has no name")) };
     if !name.chars().all(|character| character.is_alphanumeric() || " -_.()+&".contains(character)) {
         return Err(refused(
@@ -711,7 +758,8 @@ fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
         _ => false,
     };
     let served_by = served_by.into_iter().map(|(address, _)| address).collect();
-    Ok(Farm { name, feed, groups, served_by, themselves, after: 0, written_in: (file.to_string(), node.line) })
+    let clipboard = clipboard(&parts, file, &name)?;
+    Ok(Farm { name, feed, groups, served_by, themselves, clipboard, after: 0, written_in: (file.to_string(), node.line) })
 }
 
 /// Reads one rule.
@@ -1096,6 +1144,43 @@ rules:
             wrong("machines:\n  - name: a\n    kind: windows\n    address: a.example\n    programs: Ledger\n", &[]).why,
             "the programs of a are a list: of names, or of names with their icons"
         );
+    }
+
+    #[test]
+    fn an_entry_says_which_ways_the_clipboard_passes_and_left_out_it_passes_both() {
+        let machine = |name: &str, more: &str| {
+            format!("  - name: {name}\n    kind: windows\n    address: {name}.corp.example\n    desktop: true\n{more}")
+        };
+        let written = format!(
+            "machines:\n{}{}{}{}{}farms:\n  - name: Work Resources\n    feed: https://broker.corp.example/feed\n    clipboard: from-the-machine\n  - name: Others\n    feed: https://other.corp.example/feed\n",
+            machine("unsaid", ""),
+            machine("both", "    clipboard: both\n"),
+            machine("to-it", "    clipboard: to-the-machine\n"),
+            machine("from-it", "    clipboard: from-the-machine\n"),
+            machine("neither", "    clipboard: none\n"),
+        );
+        let in_force = InForce::read(&files(&[("ways.yaml", &written)])).unwrap();
+        let ways: Vec<(&str, &str)> = in_force.machines.iter().map(|machine| (machine.name.as_str(), machine.clipboard.word())).collect();
+        assert_eq!(
+            ways,
+            [("unsaid", "both"), ("both", "both"), ("to-it", "to-the-machine"), ("from-it", "from-the-machine"), ("neither", "none")]
+        );
+        let neither = in_force.machines.last().expect("a machine").clipboard;
+        assert!(!neither.to_the_machine && !neither.from_the_machine);
+        let ways: Vec<(&str, &str)> = in_force.farms.iter().map(|farm| (farm.name.as_str(), farm.clipboard.word())).collect();
+        assert_eq!(ways, [("Work Resources", "from-the-machine"), ("Others", "both")]);
+        // what a farm publishes passes the clipboard as the farm says
+        let farm = &in_force.farms[0];
+        assert_eq!(farm.clipboard, Clipboard { to_the_machine: false, from_the_machine: true });
+
+        let refused =
+            why("machines:\n  - name: a\n    kind: windows\n    address: a.example\n    desktop: true\n    clipboard: sometimes\n");
+        assert_eq!(
+            (refused.line, refused.why.as_str()),
+            (6, "“sometimes” is no way a clipboard passes: both, to-the-machine, from-the-machine, or none")
+        );
+        let refused = why("farms:\n  - name: A\n    feed: https://a.example/feed\n    clipboard: [both]\n");
+        assert_eq!(refused.line, 4);
     }
 
     #[test]

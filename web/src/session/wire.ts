@@ -12,7 +12,9 @@ export type Said =
   | { drawn: number }
   | { failed: { step: Step; why: string; details: string } }
   | { ended: string }
-  | { windows: WindowOf[]; in_front: number | null };
+  | { windows: WindowOf[]; in_front: number | null }
+  | { clipboard: { to: boolean; from: boolean } }
+  | { copied: string };
 
 // A window of a program: what names it, its title, how it shows, whether it is a window
 // of its own that a list names, and the parts of it that can be seen, each by its left,
@@ -60,6 +62,11 @@ export function begins(ticket: string, width: number, height: number, layout: nu
 // and how many dots the device shows for a hundred of the page's.
 export function sized(width: number, height: number, scale: number): string {
   return JSON.stringify({ sized: { width, height, scale } });
+}
+
+// The person copied this text on their own device.
+export function copied(text: string): string {
+  return JSON.stringify({ copied: text });
 }
 
 export function credentials(name: string, password: string): string {

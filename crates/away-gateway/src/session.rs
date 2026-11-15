@@ -26,7 +26,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 
-use crate::machine::{self, Area, Desktop, Failure, Opened, Screen, Step, Who, Why};
+use crate::machine::{self, Area, Desktop, Failure, Opened, Passes, Screen, Step, Who, Why};
 use crate::themselves::Domain;
 
 /// How long a browser gets to say which session it is, once its connection is open.
@@ -69,6 +69,8 @@ pub struct Taken {
     pub program: Option<Program>,
     /// Whether the person is signed in on the machine as themselves, with nothing typed.
     pub themselves: bool,
+    /// Which ways the clipboard passes on the machine.
+    pub clipboard: Passes,
 }
 
 impl Server {
@@ -108,7 +110,14 @@ impl Server {
                     .and_then(|program| program.text_of("run"))
                     .map(|run| Program { run: run.to_string(), arguments: String::new() });
                 let themselves = machine.and_then(|machine| machine.text_of("signs_in")) == Some("themselves");
-                Ok(Some(Taken { session, machine: name, address, port, collection, served_by, program, themselves }))
+                // the clipboard passes the ways the server says, and neither way where it says nothing
+                let clipboard = match machine.and_then(|machine| machine.text_of("clipboard")) {
+                    Some("both") => Passes::BOTH,
+                    Some("to-the-machine") => Passes { to_the_machine: true, from_the_machine: false },
+                    Some("from-the-machine") => Passes { to_the_machine: false, from_the_machine: true },
+                    _ => Passes::NEITHER,
+                };
+                Ok(Some(Taken { session, machine: name, address, port, collection, served_by, program, themselves, clipboard }))
             }
             _ => Err(format!("the server answered the ticket with the status {status}, and with nothing a session can begin with")),
         }
@@ -190,7 +199,7 @@ where
             says.extend(served_by.as_deref().map(|served_by| ("served_by", served_by)));
             let recorded = server.told(&taken.session, "opened", &says).await;
             let ended = match recorded {
-                Ok(200) => show(&mut browser, &mut desktop, screen).await,
+                Ok(200) => show(&mut browser, &mut desktop, screen, taken.clipboard).await,
                 Ok(status) => Ended::Machine(format!("the server did not take the record that the desktop is open: status {status}")),
                 Err(why) => Ended::Machine(why),
             };
@@ -262,7 +271,7 @@ where
 
     // what the machine shows of itself, against what Away knows of it: kept the first time
     tell(browser, ToBrowser::Step("checking")).await.map_err(|()| gone(Step::Checking))?;
-    let secured = reached.secure().await?;
+    let secured = reached.secure().await?.passing(taken.clipboard);
     let shows = secured.identity().fingerprint_text();
     known(server, taken, &taken.address, taken.port, &shows).await?;
     tell(browser, ToBrowser::Step("signing-in")).await.map_err(|()| gone(Step::SigningIn))?;
@@ -287,7 +296,7 @@ where
                 // a farm's broker says which machine serves the collection: the person is
                 // signed in there with a ticket for that machine, and a card of its own
                 let (host, port) = served_by(&sent_on, taken).await?;
-                let secured = machine::reach(&host, port, sent_on.token.as_deref()).await?.secure().await?;
+                let secured = machine::reach(&host, port, sent_on.token.as_deref()).await?.secure().await?.passing(taken.clipboard);
                 known(server, taken, &host, port, &secured.identity().fingerprint_text()).await?;
                 let theirs = domain.on(&who, &host).await?;
                 let program = taken.program.clone();
@@ -318,7 +327,7 @@ where
             })
             .await;
             let Ok(Some((name, password))) = typed else { return Ok(None) };
-            let secured = machine::reach(&taken.address, taken.port, wanted).await?.secure().await?;
+            let secured = machine::reach(&taken.address, taken.port, wanted).await?.secure().await?.passing(taken.clipboard);
             if secured.identity().fingerprint_text() != shows {
                 let details = "it showed another identity than a moment before".to_string();
                 return Err(Failure { step: Step::Checking, why: Why::AnotherIdentity, details });
@@ -337,7 +346,7 @@ where
             // the machine is a farm's broker, and says which machine serves the collection:
             // Away goes there where the files name that machine, and nowhere otherwise
             let (host, port) = served_by(&sent_on, taken).await?;
-            let secured = machine::reach(&host, port, sent_on.token.as_deref()).await?.secure().await?;
+            let secured = machine::reach(&host, port, sent_on.token.as_deref()).await?.secure().await?.passing(taken.clipboard);
             known(server, taken, &host, port, &secured.identity().fingerprint_text()).await?;
             let program = taken.program.clone();
             let typed = Who::Account(Account::named(&name, password));
@@ -440,12 +449,17 @@ async fn served_by(sent_on: &away_rdp::redirection::Redirection, taken: &Taken) 
 
 /// Shows an open desktop to the browser, and passes keys and the pointer on, until one
 /// of the two sides ends it.
-async fn show<Connection>(browser: &mut WebSocketStream<Connection>, desktop: &mut Desktop, mut screen: Screen) -> Ended
+async fn show<Connection>(browser: &mut WebSocketStream<Connection>, desktop: &mut Desktop, mut screen: Screen, clipboard: Passes) -> Ended
 where
     Connection: AsyncRead + AsyncWrite + Unpin,
 {
     let (mut wide, mut high) = (desktop.picture().width, desktop.picture().height);
     if tell(browser, ToBrowser::Desktop { width: wide as u16, height: high as u16 }).await.is_err() {
+        return Ended::BrowserGone;
+    }
+    // which ways the clipboard passes, for the page to say and to act on
+    let passes = ToBrowser::Passes { to_the_machine: clipboard.to_the_machine, from_the_machine: clipboard.from_the_machine };
+    if tell(browser, passes).await.is_err() {
         return Ended::BrowserGone;
     }
     // everything is new to a browser that has seen nothing yet
@@ -521,6 +535,12 @@ where
                     changed.add(Area { left: 0, top: 0, width: wide, height: high });
                 }
                 areas.into_iter().for_each(|area| changed.add(area));
+                // what was copied on the machine is for the person's clipboard
+                if let Some(text) = desktop.copied() {
+                    if tell(browser, ToBrowser::Copied(&text)).await.is_err() {
+                        return Ended::BrowserGone;
+                    }
+                }
             }
             told = said(browser) => match told {
                 Some(FromBrowser::Did(did)) => {
@@ -536,6 +556,12 @@ where
                     }
                 }
                 Some(FromBrowser::Leaves) => return Ended::Left,
+                // what the person copied on their own device can be pasted on the machine
+                Some(FromBrowser::Copied(text)) => {
+                    if let Err(failed) = desktop.offer(&text).await {
+                        return Ended::Machine(failed.details);
+                    }
+                }
                 // the window has another size, or is on another screen: a machine that
                 // follows it is told, and offers its desktop anew
                 Some(FromBrowser::Sized { width, height, scale }) => {

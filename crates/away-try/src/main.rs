@@ -508,6 +508,8 @@ fn rdp(asked: &Asked, account: Option<Account>, on_the_card: Option<OnTheCard>) 
         layout: away_rdp::gcc::LAYOUT_US,
         sent_on_to: None,
         program: program.map(|run| away_rdp::rail::Program { run: run.to_string(), arguments: String::new() }),
+        // the test program takes pictures: it passes no clipboard
+        clipboard: away_rdp::clipboard::Passes::NEITHER,
     };
     let mut random = [0u8; 80];
     getrandom::fill(&mut random).map_err(|error| format!("The system gave no random bytes: {error}."))?;
@@ -586,6 +588,8 @@ fn rdp(asked: &Asked, account: Option<Account>, on_the_card: Option<OnTheCard>) 
                     Happened::NotStarted { result, raw } => {
                         return Err(format!("The program did not start: {} (its own code {raw:#010x}).", away_rdp::rail::why(result)));
                     }
+                    // the test program passes no clipboard
+                    Happened::Copied(_) => {}
                     Happened::Windows(changes) => {
                         for change in changes {
                             match change {

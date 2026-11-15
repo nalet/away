@@ -35,6 +35,8 @@ pub struct Asked {
     pub served_by: Vec<String>,
     /// Whether the person is signed in on the machine as themselves, with nothing typed.
     pub themselves: bool,
+    /// Which ways the clipboard passes on the machine.
+    pub clipboard: crate::register::Clipboard,
     /// The program the session is for, where it is for one and not for the desktop: its
     /// name, and what the machine is asked to start.
     pub program: Option<(String, String)>,
@@ -124,6 +126,7 @@ mod tests {
             collection: None,
             served_by: Vec::new(),
             themselves: false,
+            clipboard: crate::register::Clipboard::BOTH,
             program: None,
             at,
         }

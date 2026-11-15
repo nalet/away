@@ -8,6 +8,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+pub use away_rdp::clipboard::Passes;
 use away_rdp::connection::{Connection, Happened};
 use away_rdp::gcc::Client;
 use away_rdp::identity::Identity;
@@ -205,6 +206,8 @@ pub struct Secured {
     secured: TlsStream<TcpStream>,
     security: Security,
     identity: Identity,
+    /// Which ways the clipboard passes on the desktop that is opened over it.
+    clipboard: Passes,
 }
 
 impl Reached {
@@ -230,7 +233,7 @@ impl Reached {
             .and_then(|all| all.first())
             .ok_or_else(|| broken("it showed no certificate".to_string()))?;
         let identity = Identity::read(shown.as_ref()).map_err(|error| broken(error.to_string()))?;
-        Ok(Secured { host: self.host, secured, security: self.security, identity })
+        Ok(Secured { host: self.host, secured, security: self.security, identity, clipboard: Passes::NEITHER })
     }
 }
 
@@ -238,6 +241,12 @@ impl Secured {
     /// What the machine shows of itself.
     pub fn identity(&self) -> &Identity {
         &self.identity
+    }
+
+    /// The same, with the clipboard passing these ways on the desktop that is opened
+    /// over it. It passes neither way unless this says so.
+    pub fn passing(self, clipboard: Passes) -> Secured {
+        Secured { clipboard, ..self }
     }
 
     /// Whether the machine signs people in itself, on its own screen, once the desktop
@@ -363,6 +372,7 @@ impl Secured {
                 layout,
                 sent_on_to,
                 program,
+                clipboard: self.clipboard,
             };
             let mut fresh = [0u8; 80];
             getrandom::fill(&mut fresh).map_err(random(Step::SigningIn))?;
@@ -391,6 +401,7 @@ impl Secured {
                 reads_a_card,
                 ticked: tokio::time::Instant::now(),
                 resized: false,
+                copied: None,
             };
             while !desktop.is_open {
                 // a machine that reads a card waits for the reader's word as time passes
@@ -464,6 +475,8 @@ pub struct Desktop {
     ticked: tokio::time::Instant,
     /// Whether the machine offered its desktop anew, at another size, since that was last asked.
     resized: bool,
+    /// The text that was last copied on the machine, until it is taken.
+    copied: Option<String>,
 }
 
 impl Desktop {
@@ -555,6 +568,8 @@ impl Desktop {
                         }
                     }
                     Happened::SentOn(to) => self.sent_on = Some(to),
+                    // of what was copied on the machine, the newest is for the person
+                    Happened::Copied(text) => self.copied = Some(text),
                     Happened::Windows(changes) => {
                         self.windows.take(changes);
                         self.windows_changed = true;
@@ -629,6 +644,25 @@ impl Desktop {
             .write_all(&told)
             .await
             .map(|()| true)
+            .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
+    }
+
+    /// The text that was copied on the machine since this was last asked, where the
+    /// clipboard passes from the machine.
+    pub fn copied(&mut self) -> Option<String> {
+        self.copied.take()
+    }
+
+    /// Tells the machine that the person copied this text, so that it can be pasted
+    /// there: where the clipboard passes to the machine.
+    pub async fn offer(&mut self, text: &str) -> Result<(), Failure> {
+        let told = self.open.copied(text);
+        if told.is_empty() {
+            return Ok(());
+        }
+        self.writer
+            .write_all(&told)
+            .await
             .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
     }
 

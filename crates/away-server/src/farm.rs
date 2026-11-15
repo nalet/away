@@ -65,6 +65,7 @@ pub fn publish(farm: &Farm, host: &str, items: &[Item]) -> Published {
                 collection: item.reached.collection.clone(),
                 served_by: farm.served_by.clone(),
                 themselves: farm.themselves,
+                clipboard: farm.clipboard,
                 farm: Some(farm.name.clone()),
                 written_in: farm.written_in.clone(),
             });
@@ -94,6 +95,7 @@ pub fn publish(farm: &Farm, host: &str, items: &[Item]) -> Published {
             collection,
             served_by: farm.served_by.clone(),
             themselves: farm.themselves,
+            clipboard: farm.clipboard,
             farm: Some(farm.name.clone()),
             written_in: farm.written_in.clone(),
         });
@@ -132,6 +134,7 @@ mod tests {
             groups: vec!["finance".to_string()],
             served_by: vec!["rdsh-01.corp.example".to_string()],
             themselves: true,
+            clipboard: crate::register::Clipboard::BOTH,
             after: 0,
             written_in: ("farms.yaml".to_string(), 2),
         };

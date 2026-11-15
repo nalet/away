@@ -10,7 +10,7 @@ use crate::licence::stand_in::HandsOut;
 use crate::picture::Picture;
 use crate::rail::stand_in::Asked;
 use crate::redirection::{self, Redirection};
-use crate::{der, devices, dynamic, interleaved, mcs, ntlm, pdu, rail, smartcard, tpkt, window, Error};
+use crate::{clipboard, der, devices, dynamic, interleaved, mcs, ntlm, pdu, rail, smartcard, tpkt, window, Error};
 
 const WRONG: Error = Error::NotRdp("the client's message is not built as one");
 
@@ -24,6 +24,12 @@ const SHARING: u32 = 0x0001_03ea;
 const PROGRAMS: u16 = 1005;
 /// The number it gives a client for what it says about devices.
 const CLIENT: u32 = 0x0000_0d0c;
+/// The text the stand-in copies when the key C goes down, where the clipboard passes
+/// and it was handed none: what it was last handed it copies in capitals.
+pub const COPIED: &str = "copied on the machine\nin two lines";
+/// The key C, by its place.
+const KEY_C: u8 = 0x2e;
+
 /// The numbers it gives the channels it opens later: the one of the screen, and one
 /// that is not Away's.
 const SCREEN: u32 = 3;
@@ -80,6 +86,9 @@ pub struct Seen {
     pub devices: Vec<(u32, u32, String)>,
     /// What the stand-in saw of the card in the client's reader, where it reads cards.
     pub card: Option<Card>,
+    /// The texts the client handed over when the stand-in pasted: it pastes as soon as
+    /// the client says that it holds text.
+    pub pasted: Vec<String>,
     /// The channels it opened later that the client took, by their numbers.
     pub took_later: Vec<u32>,
     /// What the client said its screen is, each time it said so: how wide, how high,
@@ -178,6 +187,10 @@ pub struct Desktop {
     later_pieces: Pieces,
     /// Whether it began to speak of those channels.
     speaks_of_later: bool,
+    /// The pieces of a message about the clipboard that is not whole yet.
+    clipboard_pieces: Pieces,
+    /// Whether it said that it is ready for the clipboard.
+    speaks_of_the_clipboard: bool,
 }
 
 /// The picture a stand-in draws on a desktop whose size the client asked for: every
@@ -209,6 +222,8 @@ impl Desktop {
             reads: None,
             later_pieces: Pieces::default(),
             speaks_of_later: false,
+            clipboard_pieces: Pieces::default(),
+            speaks_of_the_clipboard: false,
         }
     }
 
@@ -326,6 +341,7 @@ impl Desktop {
                     (PROGRAMS, State::Open) if self.programs => return self.about_programs(arrived),
                     (on, State::Open) if Some(on) == self.channel(devices::CHANNEL) => return self.about_devices(arrived),
                     (on, State::Open) if Some(on) == self.channel(dynamic::CHANNEL) => return self.about_later_channels(arrived),
+                    (on, State::Open) if Some(on) == self.channel(clipboard::CHANNEL) => return self.about_the_clipboard(arrived),
                     _ => return Ok(Vec::new()),
                 }
                 match self.state {
@@ -454,6 +470,14 @@ impl Desktop {
                             self.speaks_of_later = true;
                             send.extend(on_a_channel(on, &dynamic::stand_in::can_do(3), false));
                         }
+                        // to a client that asked for the channel of the clipboard, it says
+                        // once what it can do and that it is ready
+                        if let (Some(on), false) = (self.channel(clipboard::CHANNEL), self.speaks_of_the_clipboard) {
+                            self.speaks_of_the_clipboard = true;
+                            for message in clipboard::stand_in::ready(true) {
+                                send.extend(on_a_channel(on, &message, true));
+                            }
+                        }
                         // and to a client that asked for the channel of devices and the one
                         // of sound, it begins to speak about devices
                         if let (Some(on), Some(_)) = (self.channel(devices::CHANNEL), self.channel(devices::SOUND)) {
@@ -466,6 +490,31 @@ impl Desktop {
             }
         }
         Ok(send)
+    }
+
+    /// What the client says about the clipboard. A client that says it holds text is
+    /// confirmed, and asked for the text at once, as when somebody pastes on the machine;
+    /// what it hands over is kept. A client that asks for the machine's text is given
+    /// what the stand-in copies: the text it was last handed, in capitals, or its own.
+    fn about_the_clipboard(&mut self, piece: &[u8]) -> Result<Vec<u8>, Error> {
+        use clipboard::stand_in::Said;
+        let Some(message) = self.clipboard_pieces.take(piece)? else { return Ok(Vec::new()) };
+        let Some(on) = self.channel(clipboard::CHANNEL) else { return Ok(Vec::new()) };
+        let says = |message: &[u8]| on_a_channel(on, message, true);
+        Ok(match clipboard::stand_in::read(&message) {
+            Said::Holds { text: true } => [says(&clipboard::stand_in::took()), says(&clipboard::stand_in::asks())].concat(),
+            Said::Holds { text: false } => says(&clipboard::stand_in::took()),
+            Said::Gives(Some(text)) => {
+                self.seen.pasted.push(text);
+                Vec::new()
+            }
+            // what it copies: the text it was last handed, in capitals, or its own
+            Said::Asks => {
+                let copies = self.seen.pasted.last().map(|handed| handed.to_uppercase());
+                says(&clipboard::stand_in::gives(copies.as_deref().unwrap_or(COPIED)))
+            }
+            _ => Vec::new(),
+        })
     }
 
     /// What the client says of the channels the machine opens later. Once it said which
@@ -630,6 +679,10 @@ impl Desktop {
         let mut send = Vec::new();
         for event in input::read(head, carried)? {
             self.seen.input.push(event);
+            // the key C copies: the machine's clipboard holds text, which the client is told
+            if let (Input::Key { code: KEY_C, down: true, .. }, Some(on)) = (event, self.channel(clipboard::CHANNEL)) {
+                send.extend(on_a_channel(on, &clipboard::stand_in::holds_text(true), true));
+            }
             let (left, top, colour) = match event {
                 Input::Button { button: Button::Left, down: true, x, y } => (usize::from(x), usize::from(y), CLICKED),
                 Input::Key { code, down: true, .. } => (0, 0, typed(code)),

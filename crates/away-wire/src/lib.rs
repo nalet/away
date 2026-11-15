@@ -73,6 +73,15 @@ pub enum ToBrowser<'a> {
     },
     /// The session ended: why, as one word.
     Ended(&'a str),
+    /// Which ways the clipboard passes between the person's device and the machine.
+    Passes {
+        /// What the person copied can be pasted on the machine.
+        to_the_machine: bool,
+        /// What is copied on the machine reaches the person's device.
+        from_the_machine: bool,
+    },
+    /// This text was copied on the machine.
+    Copied(&'a str),
     /// The windows of the programs that are open, from the front one back, and which of
     /// them is the one the person works in.
     Windows {
@@ -149,6 +158,10 @@ impl ToBrowser<'_> {
                 object(Json::object([("failed", Json::object([("step", step.into()), ("why", why.into()), ("details", details.into())]))]))
             }
             ToBrowser::Ended(why) => object(Json::object([("ended", why.into())])),
+            ToBrowser::Passes { to_the_machine, from_the_machine } => {
+                object(Json::object([("clipboard", Json::object([("to", to_the_machine.into()), ("from", from_the_machine.into())]))]))
+            }
+            ToBrowser::Copied(text) => object(Json::object([("copied", text.into())])),
             ToBrowser::Windows { windows, in_front } => {
                 let window = |window: &Window| {
                     let part = |part: &[i32; 4]| Json::List(part.iter().map(|edge| Json::Number(f64::from(*edge))).collect());
@@ -276,6 +289,8 @@ pub enum FromBrowser {
     Did(Vec<Did>),
     /// The person leaves.
     Leaves,
+    /// The person copied this text on their own device.
+    Copied(String),
     /// The window has another size now, or is on another screen.
     Sized {
         /// How wide the window is, as a page measures it.
@@ -318,6 +333,9 @@ impl FromBrowser {
                 }
                 if said.get("leaves").and_then(Json::flag) == Some(true) {
                     return Ok(FromBrowser::Leaves);
+                }
+                if let Some(text) = said.text_of("copied") {
+                    return Ok(FromBrowser::Copied(text.to_string()));
                 }
                 if let Some(sized) = said.get("sized") {
                     let size = |name: &str| sized.get(name).and_then(Json::count).and_then(|size| u16::try_from(size).ok());
@@ -451,6 +469,8 @@ mod tests {
             }
             .write(),
             ToBrowser::Asks { again: false, instead: true }.write(),
+            ToBrowser::Passes { to_the_machine: true, from_the_machine: false }.write(),
+            ToBrowser::Copied("two\nlines").write(),
         ];
         assert_eq!(written.len(), to_browser.len());
         for (written, example) in written.iter().zip(to_browser) {
@@ -476,7 +496,8 @@ mod tests {
                 FromBrowser::read(&carried).unwrap_or_else(|NotThis(why)| panic!("{}: {why}", example.write()))
             })
             .collect();
-        assert_eq!(read.len(), 8);
+        assert_eq!(read.len(), 9);
+        assert!(matches!(&read[8], FromBrowser::Copied(text) if text == "a text\nof two lines"));
         assert!(matches!(read[7], FromBrowser::Sized { width: 1440, height: 900, scale: Some(200) }));
         assert!(matches!(read[6], FromBrowser::Window { id: 65537, does: Does::Close }));
         assert!(
