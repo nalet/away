@@ -20,6 +20,13 @@ import type { Did, Step, WindowOf } from './wire';
 
 const STEPS: Step[] = ['reaching', 'checking', 'signing-in', 'first-picture'];
 
+// A desktop whose connection dropped: how often Away has tried again, and whether Away
+// itself is being updated.
+interface Lost {
+  tries: number;
+  updating: boolean;
+}
+
 // How far a session has come.
 type State =
   | { is: 'opening'; step: Step | null; asks: { again: boolean; instead?: boolean } | null }
@@ -42,22 +49,50 @@ function useSession(machine: string, program: string | null) {
   const [canvas] = useState(() => document.createElement('canvas'));
   const socket = useRef<WebSocket | null>(null);
 
+  // a desktop that was open and whose connection dropped: how often Away has tried
+  // again since, and whether Away itself is being updated
+  const [lost, setLost] = useState<Lost | null>(null);
+  const comingBack = useRef<{ now: () => void; leave: () => void } | null>(null);
+
   useEffect(() => {
     let over = false;
     let connection: WebSocket | null = null;
     // what arrives is drawn in the order it arrived, and confirmed once it is drawn
     let drawing: Promise<void> = Promise.resolve();
+    // whether the desktop has been open, how often it was tried again since it last
+    // was, and the wait before the next try, while one is waited for
+    let wasOpen = false;
+    let tries = 0;
+    let waits: number | undefined;
     setState({ is: 'opening', step: null, asks: null });
     setWindows([]);
     setPasses(null);
     setCopied(null);
-    const begin = async () => {
+    setLost(null);
+
+    // The desktop goes on at the machine: Away tries again, at once and then at longer
+    // intervals, until it is back or the person leaves.
+    const again = (updating: boolean) => {
+      if (over) return;
+      connection?.close();
+      tries += 1;
+      setLost({ tries, updating });
+      const after = [0, 1000, 2000, 4000, 8000, 15000][tries - 1] ?? 30000;
+      waits = window.setTimeout(() => {
+        waits = undefined;
+        begin(true).catch(() => again(updating));
+      }, after);
+    };
+    const begin = async (anew: boolean) => {
       const [asked, layout] = await Promise.all([
         fetch(`/api/sessions?${new URLSearchParams(program === null ? { machine } : { machine, program })}`, { method: 'POST', headers: { 'x-away': '1' } }),
         layoutOf(),
       ]);
       if (over) return;
       if (!asked.ok) {
+        // while Away itself is not there, as when it is being updated, it is tried again
+        if (anew && asked.status >= 500) throw new Error('Away is not there');
+        setLost(null);
         setState({ is: 'refused', status: asked.status });
         return;
       }
@@ -67,6 +102,8 @@ function useSession(machine: string, program: string | null) {
       opened.binaryType = 'arraybuffer';
       connection = opened;
       socket.current = opened;
+      // whether this connection said how it ends: one that closes without a word is lost
+      let told = false;
       opened.onopen = () => opened.send(begins(ticket, window.innerWidth, window.innerHeight, layout, Math.round(window.devicePixelRatio * 100)));
       opened.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
         if (typeof event.data !== 'string') {
@@ -83,37 +120,81 @@ function useSession(machine: string, program: string | null) {
         }
         const said = readSaid(event.data);
         if (!said) return;
-        if ('step' in said) setState({ is: 'opening', step: said.step, asks: null });
-        else if ('asks' in said) setState({ is: 'opening', step: 'signing-in', asks: said.asks });
-        else if ('desktop' in said) {
+        if ('step' in said) {
+          // a desktop that comes back says nothing of its steps: the card over it does
+          if (!anew) setState({ is: 'opening', step: said.step, asks: null });
+        } else if ('asks' in said) {
+          // a machine where people type asks again when the desktop comes back
+          setLost(null);
+          setState({ is: 'opening', step: 'signing-in', asks: said.asks });
+        } else if ('desktop' in said) {
           const { width, height } = said.desktop;
           drawing = drawing.then(() => {
             canvas.width = width;
             canvas.height = height;
-            if (!over) setState({ is: 'open' });
+            if (over) return;
+            wasOpen = true;
+            tries = 0;
+            setLost(null);
+            setState({ is: 'open' });
           });
         } else if ('drawn' in said) {
           const number = said.drawn;
           drawing = drawing.then(() => {
             if (opened.readyState === WebSocket.OPEN) opened.send(seen(number));
           });
-        } else if ('failed' in said) setState({ is: 'failed', ...said.failed });
-        else if ('ended' in said) setState({ is: 'ended', why: said.ended });
-        else if ('windows' in said) setWindows(said.windows);
+        } else if ('failed' in said) {
+          told = true;
+          // a machine that can't be reached at this moment is tried again
+          if (anew && said.failed.step === 'reaching') again(false);
+          else {
+            setLost(null);
+            setState({ is: 'failed', ...said.failed });
+          }
+        } else if ('ended' in said) {
+          told = true;
+          // Away is being updated: the desktop goes on at the machine, and is opened again
+          if (said.ended === 'updating' && wasOpen) again(true);
+          else {
+            setLost(null);
+            setState({ is: 'ended', why: said.ended });
+          }
+        } else if ('windows' in said) setWindows(said.windows);
         else if ('clipboard' in said) setPasses(said.clipboard);
         else if ('copied' in said) setCopied(said.copied);
       };
       opened.onclose = () => {
-        if (over) return;
-        // a connection that ends without a word: lost, or never a session
-        setState((before) => (before.is === 'failed' || before.is === 'ended' ? before : { is: 'ended', why: before.is === 'open' ? 'lost' : 'no-session' }));
+        if (over || told || connection !== opened) return;
+        // a connection that ends without a word: a desktop that was open is opened
+        // again, and one that never was open was never a session
+        if (wasOpen) again(false);
+        else setState((before) => (before.is === 'failed' || before.is === 'ended' ? before : { is: 'ended', why: 'no-session' }));
       };
     };
-    begin().catch(() => {
+    comingBack.current = {
+      // the next try doesn't wait: where one is under way already, that one goes on
+      now: () => {
+        if (over || waits === undefined) return;
+        window.clearTimeout(waits);
+        waits = undefined;
+        begin(true).catch(() => again(false));
+      },
+      // the person gives up, and is back where the machine is
+      leave: () => {
+        over = true;
+        window.clearTimeout(waits);
+        connection?.close();
+        setLost(null);
+        setState({ is: 'ended', why: 'left' });
+      },
+    };
+    begin(false).catch(() => {
       if (!over) setState({ is: 'refused', status: 0 });
     });
     return () => {
       over = true;
+      window.clearTimeout(waits);
+      comingBack.current = null;
       if (connection?.readyState === WebSocket.OPEN) connection.send(leaves());
       connection?.close();
       socket.current = null;
@@ -123,13 +204,24 @@ function useSession(machine: string, program: string | null) {
   const say = useCallback((message: string | Uint8Array<ArrayBuffer>) => {
     if (socket.current?.readyState === WebSocket.OPEN) socket.current.send(message);
   }, []);
-  return { state, windows, passes, copied, canvas, say, again: () => setAttempt((before) => before + 1) };
+  return {
+    state,
+    windows,
+    passes,
+    copied,
+    canvas,
+    say,
+    lost,
+    tryNow: () => comingBack.current?.now(),
+    leave: () => comingBack.current?.leave(),
+    again: () => setAttempt((before) => before + 1),
+  };
 }
 
 // The page of a session with a machine's desktop, or with one of its programs.
 export function Session({ name, program, go, contact }: { name: string; program: string | null; go: (to: string) => void; contact: string | null }) {
   const [machines] = useMachines();
-  const { state, windows, passes, copied, canvas, say, again } = useSession(name, program);
+  const { state, windows, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program);
   const machine = typeof machines === 'string' ? null : (machines.find((one) => one.name === name) ?? null);
   const toMachines = () => go(machine ? pageOf(name) : addressOf.machines);
 
@@ -142,7 +234,20 @@ export function Session({ name, program, go, contact }: { name: string; program:
   }, [state, go, name]);
 
   if (state.is === 'open') {
-    return <Desktop name={name} program={program} windows={windows} passes={passes} copied={copied} canvas={canvas} say={say} />;
+    return (
+      <Desktop
+        name={name}
+        program={program}
+        windows={windows}
+        passes={passes}
+        copied={copied}
+        canvas={canvas}
+        say={say}
+        lost={lost}
+        tryNow={tryNow}
+        leave={leave}
+      />
+    );
   }
   const t = texts.session;
   if (state.is === 'refused' || state.is === 'ended') {
@@ -337,6 +442,9 @@ function Desktop({
   copied,
   canvas,
   say,
+  lost,
+  tryNow,
+  leave,
 }: {
   name: string;
   program: string | null;
@@ -345,6 +453,9 @@ function Desktop({
   copied: string | null;
   canvas: HTMLCanvasElement;
   say: (message: string | Uint8Array<ArrayBuffer>) => void;
+  lost: Lost | null;
+  tryNow: () => void;
+  leave: () => void;
 }) {
   const t = texts.session;
   const [bar, setBar] = useState(false);
@@ -355,6 +466,18 @@ function Desktop({
   // whether the panel of the clipboard is open
   const [clip, setClip] = useState(false);
   const clipboard = useClipboard(canvas, passes, copied, say);
+  // the card that says the connection is lost shows after two seconds without the
+  // machine: a short gap shows nothing
+  const isLost = lost !== null;
+  const [gone, setGone] = useState(false);
+  useEffect(() => {
+    if (!isLost) {
+      setGone(false);
+      return undefined;
+    }
+    const shows = window.setTimeout(() => setGone(true), 2000);
+    return () => window.clearTimeout(shows);
+  }, [isLost]);
   const screen = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -550,8 +673,22 @@ function Desktop({
   const parts = windows.flatMap((window) => window.seen.map((part) => ({ of: window.id, part })));
   const listed = windows.filter((window) => window.listed);
   return (
-    <div className={program === null ? 'sess' : 'sess prog'}>
+    <div className={`${program === null ? 'sess' : 'sess prog'}${gone ? ' is-lost' : ''}`}>
       <h1 className="unseen asis">{program ?? name}</h1>
+      {gone && lost !== null && (
+        <div className="lostcard" role="alert">
+          <h2>{t.lost.title}</h2>
+          <p>
+            {lost.updating ? `${t.lost.updating} ${t.lost.comesBack(program !== null)}` : `${t.lost.tryingAgain(lost.tries)} ${t.lost.running(name, program !== null)}`}
+          </p>
+          <div className="acts">
+            <Button onClick={leave}>{t.lost.leave}</Button>
+            <Button variant="primary" onClick={tryNow}>
+              {t.lost.tryNow}
+            </Button>
+          </div>
+        </div>
+      )}
       {program !== null && (
         <svg className="unseen" width="0" height="0" aria-hidden="true">
           <clipPath id="seen-parts" clipPathUnits="objectBoundingBox">

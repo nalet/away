@@ -149,7 +149,6 @@ export const texts = {
     // a session that ended: what the page says, and whether it can be opened again
     ended: (why: string, machine: string): { title: string; why: string; again: boolean } => {
       if (why === 'machine') return { title: `${machine} closed this session`, why: 'It was shut down or restarted, or you were signed out there.', again: true };
-      if (why === 'lost') return { title: 'this session ended', why: `The connection to it was lost. What you had open on ${machine} is as you left it.`, again: true };
       return { title: `couldn't open ${machine}`, why: 'Away did not begin the session.', again: true };
     },
     screenOf: (machine: string) => `the desktop of ${machine}`,
@@ -162,6 +161,20 @@ export const texts = {
     keys: 'keys',
     // the key combinations a browser or a device keeps for itself
     kept: { ctrlAltDel: 'ctrl + alt + del', altTab: 'alt + tab', altF4: 'alt + f4', windows: 'windows key', ctrlW: 'ctrl + w' },
+    // a desktop whose connection dropped: the card over it while Away tries again
+    lost: {
+      title: 'connection lost',
+      tryingAgain: (tries: number) => {
+        const times = ['second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
+        if (tries <= 1) return 'Trying again.';
+        return times[tries - 2] ? `Trying again, for the ${times[tries - 2]} time.` : 'Trying again, once more.';
+      },
+      running: (machine: string, program: boolean) => (program ? `Your programs are still running on ${machine}.` : `Your desktop is still running on ${machine}.`),
+      updating: 'Away is being updated.',
+      comesBack: (program: boolean) => (program ? 'Your programs come back by themselves.' : 'Your desktop comes back by itself.'),
+      leave: 'leave',
+      tryNow: 'try now',
+    },
     // the clipboard: the bar's button, and the panel under it
     clipboard: {
       name: 'clipboard',

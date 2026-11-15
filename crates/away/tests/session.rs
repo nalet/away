@@ -1103,6 +1103,32 @@ async fn a_person_opens_a_desktop_of_their_domain_as_themselves_and_nothing_is_a
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_gateway_that_stops_tells_the_desktops_that_are_open_so_that_their_pages_open_them_again() {
+    let Some(world) = world("stops").await else { return };
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+    let ticket = browser.ticket(&world, "desk-01");
+    let mut session = Session::begin(&world, &sign_in, &ticket).await;
+    session.steps().await;
+    session.say(credentials(KNOWN, PASSWORD)).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!((steps, desktop.write().as_str()), (vec!["first-picture".to_string()], r#"{"desktop":{"width":200,"height":120}}"#));
+
+    // the gateway is told to stop, as the cluster tells it when Away is updated
+    world._stoppers.1.stop();
+    assert_eq!(session.until("ended").await.write(), r#"{"ended":"updating"}"#);
+    while session.next().await.is_some() {}
+    // the machine was left as by a person who leaves: the desktop goes on there
+    let left = async {
+        while !world.machine.seen().last().is_some_and(|seen| seen.left) {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    };
+    tokio::time::timeout(Duration::from_secs(10), left).await.expect("the machine is told that the client leaves");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_person_away_signs_in_as_themselves_on_no_machine_types_there_and_it_is_a_line() {
     let Some(kerberos) = kerberos() else { return };
     let Some(world) = world_with("never-themselves", Some(&kerberos)).await else { return };

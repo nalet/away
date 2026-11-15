@@ -8,6 +8,7 @@
 //! and the pointer go the other way.
 
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -15,6 +16,7 @@ use away_part::address::Address;
 use away_part::client::Client;
 use away_part::json::Json;
 use away_part::lines::Lines;
+use away_part::Stop;
 use away_rdp::input::{Button, Input};
 use away_rdp::ntlm::Account;
 use away_rdp::picture::Picture;
@@ -140,10 +142,33 @@ pub struct Around {
     pub domain: Option<Domain>,
     /// Where the gateway writes what happens.
     pub lines: Lines,
+    /// Learns that the gateway is stopping: a desktop that is open then is told so.
+    pub stop: Stop,
+    /// How many sessions run: a gateway that stops gives them a moment to say so.
+    pub running: Arc<AtomicUsize>,
+}
+
+/// One session that runs, counted for as long as it does.
+struct Counted(Arc<AtomicUsize>);
+
+impl Counted {
+    fn one_more(running: &Arc<AtomicUsize>) -> Counted {
+        running.fetch_add(1, Ordering::SeqCst);
+        Counted(running.clone())
+    }
+}
+
+impl Drop for Counted {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 
 /// Why a session ended, as the browser and the record are told it.
 enum Ended {
+    /// The gateway stops, as when Away is updated: the desktop goes on at the machine,
+    /// and the page opens it again by itself.
+    Updating,
     /// The person left.
     Left,
     /// The browser's connection ended.
@@ -159,6 +184,7 @@ pub async fn run<Connection>(mut browser: WebSocketStream<Connection>, sign_in: 
 where
     Connection: AsyncRead + AsyncWrite + Unpin,
 {
+    let _counted = Counted::one_more(&around.running);
     // which session this is: the ticket the server gave for it
     let begun = tokio::time::timeout(BEGINS_WITHIN, said(&mut browser)).await;
     let (ticket, screen, layout) = match begun {
@@ -199,12 +225,13 @@ where
             says.extend(served_by.as_deref().map(|served_by| ("served_by", served_by)));
             let recorded = server.told(&taken.session, "opened", &says).await;
             let ended = match recorded {
-                Ok(200) => show(&mut browser, &mut desktop, screen, taken.clipboard).await,
+                Ok(200) => show(&mut browser, &mut desktop, screen, taken.clipboard, around.stop.clone()).await,
                 Ok(status) => Ended::Machine(format!("the server did not take the record that the desktop is open: status {status}")),
                 Err(why) => Ended::Machine(why),
             };
             desktop.leave().await;
             match ended {
+                Ended::Updating => ("updating", String::new()),
                 Ended::Left => ("left", String::new()),
                 Ended::BrowserGone => ("browser-gone", String::new()),
                 Ended::Machine(details) => ("machine", details),
@@ -449,7 +476,13 @@ async fn served_by(sent_on: &away_rdp::redirection::Redirection, taken: &Taken) 
 
 /// Shows an open desktop to the browser, and passes keys and the pointer on, until one
 /// of the two sides ends it.
-async fn show<Connection>(browser: &mut WebSocketStream<Connection>, desktop: &mut Desktop, mut screen: Screen, clipboard: Passes) -> Ended
+async fn show<Connection>(
+    browser: &mut WebSocketStream<Connection>,
+    desktop: &mut Desktop,
+    mut screen: Screen,
+    clipboard: Passes,
+    mut stop: Stop,
+) -> Ended
 where
     Connection: AsyncRead + AsyncWrite + Unpin,
 {
@@ -578,6 +611,8 @@ where
                 None => return Ended::BrowserGone,
             },
             () = closed => return Ended::Closed,
+            // the gateway stops: the browser is told, so that it comes back by itself
+            () = stop.wait() => return Ended::Updating,
         }
     }
 }

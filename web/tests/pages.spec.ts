@@ -1002,6 +1002,59 @@ test.describe('a session', () => {
     await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/desk-01`);
   });
 
+  test('a desktop whose connection drops is opened again by itself, and a card says so after two seconds', async ({ page }) => {
+    // the session's connection goes through the test, so that the test can cut it and
+    // say what a gateway says when it stops
+    const connections: { cut: () => void; says: (text: string) => void }[] = [];
+    await page.routeWebSocket(/\/session$/, (browser) => {
+      const gateway = browser.connectToServer();
+      connections.push({
+        cut: () => {
+          browser.close();
+          gateway.close();
+        },
+        says: (text) => browser.send(text),
+      });
+    });
+    const signIn = async () => {
+      await page.getByLabel('Name').fill('CORP\\alex.urban');
+      await page.getByLabel('Password').fill('a password that exists for these tests alone');
+      await page.getByRole('button', { name: 'sign in' }).click();
+    };
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/desk-01/desktop`);
+    await signIn();
+    const screen = page.getByRole('application', { name: 'the desktop of desk-01' });
+    await expect(screen).toBeFocused();
+    await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
+    const card = page.getByRole('alert');
+    await expect(card).toHaveCount(0);
+
+    // the connection drops while Away is not there: the page tries again and again, and
+    // after two seconds a card over the last picture says so
+    await page.route('**/api/sessions?*', (route) => route.fulfill({ status: 503, body: 'not now' }));
+    connections[0]!.cut();
+    await expect(card.getByRole('heading', { name: 'connection lost' })).toBeVisible();
+    await expect(card).toContainText(/Trying again, for the (second|third|fourth) time\. Your desktop is still running on desk-01\./);
+    await expect(screen).toBeVisible();
+    await accessible(page);
+    // once Away is there again the desktop comes back: a machine where people type asks again
+    await page.unroute('**/api/sessions?*');
+    await card.getByRole('button', { name: 'try now' }).click();
+    await expect(page.getByText('desk-01 asks for a name and a password')).toBeVisible({ timeout: 20000 });
+    await signIn();
+    await expect(screen).toBeFocused();
+    await expect(card).toHaveCount(0);
+    await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
+
+    // a gateway that stops, as when Away is updated, says so: the card says it too, and
+    // leave gives up and shows the machine's page
+    await page.route('**/api/sessions?*', (route) => route.fulfill({ status: 503, body: 'not now' }));
+    connections[connections.length - 1]!.says('{"ended":"updating"}');
+    await expect(card).toContainText('Away is being updated. Your desktop comes back by itself.');
+    await card.getByRole('button', { name: 'leave' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/desk-01`);
+  });
+
   test("a farm's desktop opens on the machine its broker names, and a broker that names another machine is not followed", async ({ page }) => {
     const seen = watch(page);
     // a farm's desktop is opened by a click on its tile, as a machine's is

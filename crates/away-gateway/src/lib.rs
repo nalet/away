@@ -151,7 +151,7 @@ impl Gateway {
         };
         let sessions = part.listen("sessions", &settings.address).await?;
         let health = part.listen("health", &settings.health_address).await?;
-        let around = Arc::new(Around { server, domain, lines: part.lines.clone() });
+        let around = Arc::new(Around { server, domain, lines: part.lines.clone(), stop: part.stop.clone(), running: Arc::default() });
         Ok(Gateway { part, sessions, health, around })
     }
 
@@ -160,11 +160,21 @@ impl Gateway {
         Bound { address: Some(self.sessions.address()), health_address: self.health.address() }
     }
 
-    /// Answers until the part is told to stop.
+    /// Answers until the part is told to stop. The sessions that run then are told that
+    /// the gateway stops, and are given a moment to say so to their browsers, which
+    /// open them again by themselves.
     pub async fn run(self) {
+        let running = self.around.running.clone();
         self.part.run(self.health, vec![(self.sessions, sessions(self.around))]).await;
+        let until = tokio::time::Instant::now() + SESSIONS_END_WITHIN;
+        while running.load(std::sync::atomic::Ordering::SeqCst) > 0 && tokio::time::Instant::now() < until {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
     }
 }
+
+/// How long the sessions that run get to say that the gateway stops.
+const SESSIONS_END_WITHIN: std::time::Duration = std::time::Duration::from_secs(3);
 
 /// What answers where a session's connection arrives.
 fn sessions(around: Arc<Around>) -> Answers {

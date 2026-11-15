@@ -242,6 +242,13 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .sess .sesspanel form, .sess .sesspanel > div { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .sess .sesspanel textarea { width: 100%; min-width: 0; }
 .sess .sesspanel .said { font-size: 13px; color: var(--fg-muted); min-height: 1em; }
+/* a desktop whose connection dropped: its last picture, dimmed, and a card over it */
+.sess.is-lost .screen { opacity: 0.35; }
+.sess .lostcard { position: absolute; z-index: 4; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 32px)); display: flex;
+                  flex-direction: column; gap: 12px; padding: 24px; background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; color: var(--fg); }
+.sess .lostcard h2 { margin: 0; font: 600 16px/1.3 var(--ff-sans); }
+.sess .lostcard p { margin: 0; font-size: 14px; line-height: 1.45; }
+.sess .lostcard .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 /* the windows of the programs, in the session's bar: each is brought to the front, or closed */
 .sess .sbar .wins { display: flex; align-items: center; gap: 4px; margin: 0 0 0 16px; padding: 0; list-style: none; min-width: 0; overflow: hidden; }
 .sess .sbar .wins li { display: inline-flex; align-items: center; min-width: 0; border: 1px solid var(--border-2); }

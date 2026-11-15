@@ -308,6 +308,13 @@ machine that offers more is opened from its own page, where each way in is.
   elsewhere by the language the browser is set to.
 - **Ending a session leaves the desktop running** on the machine, for the
   account to come back to.
+- **A desktop whose connection drops is opened again by itself**: at once,
+  and then at longer intervals. After two seconds without the machine a card
+  over the last picture says so, with a button to try now and one to leave.
+  Where the person is signed in as themselves, the desktop is back as it was
+  left with nothing typed; where people type, the machine asks again. When
+  Away itself is updated, the gateway tells every open session before it
+  stops, and the card says that the desktop comes back by itself.
 - **No machine is opened without a record.** That a desktop was asked for,
   that it is open, and how it ended or failed is each kept as a record, with
   who it was and which machine. A sign-in that Away made for a person is a
