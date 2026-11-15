@@ -18,6 +18,7 @@
     {"says": "the person leaves", "text": "{\"leaves\":true}"},
     {"says": "the pointer moved to 640, 400", "bytes": "0102800190"},
     {"says": "the main button down at 640, 400; the second button up at 1, 2; the wheel one notch towards the person, and one to the right, at 3, 4; the key A down; the arrow to the right up; the character for the euro; the number lock and the capitals lock on", "bytes": "020001028001900202000001000203ff8800000300040300780100030004041e0001044d01000520ac010606"},
-    {"says": "the person closes the window 65537", "text": "{\"window\":65537,\"does\":\"close\"}"}
+    {"says": "the person closes the window 65537", "text": "{\"window\":65537,\"does\":\"close\"}"},
+    {"says": "the window is 1440 by 900 now, on a screen with twice the dots each way", "text": "{\"sized\":{\"width\":1440,\"height\":900,\"scale\":200}}"}
   ]
 }

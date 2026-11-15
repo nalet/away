@@ -56,6 +56,12 @@ export function begins(ticket: string, width: number, height: number, layout: nu
   return JSON.stringify({ ticket, width, height, layout, scale });
 }
 
+// The window has another size now, or is on another screen: as the page measures it,
+// and how many dots the device shows for a hundred of the page's.
+export function sized(width: number, height: number, scale: number): string {
+  return JSON.stringify({ sized: { width, height, scale } });
+}
+
 export function credentials(name: string, password: string): string {
   return JSON.stringify({ name, password });
 }

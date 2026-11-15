@@ -270,6 +270,15 @@ pub enum FromBrowser {
     Did(Vec<Did>),
     /// The person leaves.
     Leaves,
+    /// The window has another size now, or is on another screen.
+    Sized {
+        /// How wide the window is, as a page measures it.
+        width: u16,
+        /// How high.
+        height: u16,
+        /// How many dots the device shows for a hundred of the page's, where the browser says.
+        scale: Option<u32>,
+    },
     /// What the person does with a window of a program as a whole.
     Window {
         /// The window.
@@ -303,6 +312,14 @@ impl FromBrowser {
                 }
                 if said.get("leaves").and_then(Json::flag) == Some(true) {
                     return Ok(FromBrowser::Leaves);
+                }
+                if let Some(sized) = said.get("sized") {
+                    let size = |name: &str| sized.get(name).and_then(Json::count).and_then(|size| u16::try_from(size).ok());
+                    let (Some(width), Some(height)) = (size("width"), size("height")) else {
+                        return Err(NotThis("a window that has another size says how wide and how high it is"));
+                    };
+                    let scale = sized.get("scale").and_then(Json::count).and_then(|scale| u32::try_from(scale).ok());
+                    return Ok(FromBrowser::Sized { width, height, scale });
                 }
                 if let Some(id) = said.get("window").and_then(Json::count).and_then(|id| u32::try_from(id).ok()) {
                     let does = match said.text_of("does") {
@@ -452,7 +469,8 @@ mod tests {
                 FromBrowser::read(&carried).unwrap_or_else(|NotThis(why)| panic!("{}: {why}", example.write()))
             })
             .collect();
-        assert_eq!(read.len(), 7);
+        assert_eq!(read.len(), 8);
+        assert!(matches!(read[7], FromBrowser::Sized { width: 1440, height: 900, scale: Some(200) }));
         assert!(matches!(read[6], FromBrowser::Window { id: 65537, does: Does::Close }));
         assert!(
             matches!(&read[0], FromBrowser::Begins { ticket, width: 1280, height: 800, layout: Some(0x0807), scale: Some(200) } if ticket.expose() == "7f3a")

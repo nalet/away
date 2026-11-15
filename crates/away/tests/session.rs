@@ -589,6 +589,27 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
     assert_eq!(last.account, ("CORP".to_string(), "alex.urban".to_string()));
     assert_eq!(last.input.len(), 5);
 
+    // the window gets another size, on a screen that shows a dot for a dot: the machine
+    // is told, offers its desktop anew at that size, and all of it is drawn anew
+    let sized = Json::object([("width", 640u64.into()), ("height", 480u64.into()), ("scale", 100u64.into())]);
+    session.say(Json::object([("sized", sized.clone())])).await;
+    assert_eq!(session.until("desktop").await.write(), r#"{"desktop":{"width":640,"height":480}}"#);
+    while session.picture != world.machine.picture() {
+        drawn = session.until("drawn").await.get("drawn").and_then(Json::count).expect("a number");
+        session.say(Json::object([("seen", drawn.into())])).await;
+    }
+    // a window that says its size once more, unchanged, is not told to the machine again
+    session.say(Json::object([("sized", sized)])).await;
+    session.did(&[4, 0x1f, 0, 1, 4, 0x1f, 0, 0]).await;
+    while session.pixel(5, 5) != typed(0x1f) {
+        drawn = session.until("drawn").await.get("drawn").and_then(Json::count).expect("a number");
+        session.say(Json::object([("seen", drawn.into())])).await;
+    }
+    let seen = world.machine.seen();
+    let last = seen.last().expect("a client came as far as the desktop");
+    assert_eq!(last.screens, [(640, 480, 100)]);
+    assert_eq!(last.took_later, [3]);
+
     // the person leaves: the session says so and ends, and the machine was told
     session.say(Json::object([("leaves", true.into())])).await;
     assert_eq!(session.until("ended").await.write(), r#"{"ended":"left"}"#);

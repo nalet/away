@@ -10,7 +10,7 @@ use crate::licence::stand_in::HandsOut;
 use crate::picture::Picture;
 use crate::rail::stand_in::Asked;
 use crate::redirection::{self, Redirection};
-use crate::{der, devices, interleaved, mcs, ntlm, pdu, rail, smartcard, tpkt, window, Error};
+use crate::{der, devices, dynamic, interleaved, mcs, ntlm, pdu, rail, smartcard, tpkt, window, Error};
 
 const WRONG: Error = Error::NotRdp("the client's message is not built as one");
 
@@ -24,6 +24,10 @@ const SHARING: u32 = 0x0001_03ea;
 const PROGRAMS: u16 = 1005;
 /// The number it gives a client for what it says about devices.
 const CLIENT: u32 = 0x0000_0d0c;
+/// The numbers it gives the channels it opens later: the one of the screen, and one
+/// that is not Away's.
+const SCREEN: u32 = 3;
+const NOT_AWAYS: u32 = 4;
 
 /// The window a program opens in on the stand-in: what names it, where it is on the
 /// desktop, and how large it is.
@@ -32,6 +36,9 @@ pub const WINDOW: u32 = 0x0001_0001;
 pub const WINDOW_AT: (usize, usize) = (20, 10);
 /// How wide and how high the window is.
 pub const WINDOW_SIZE: (usize, usize) = (160, 100);
+
+/// The most a piece of an update carries, so that its frame can say how long it is.
+const MOST_IN_A_PIECE: usize = 30_000;
 
 /// How wide and how high the rectangles are that the picture is cut into, at most.
 const TILE: usize = 64;
@@ -73,6 +80,11 @@ pub struct Seen {
     pub devices: Vec<(u32, u32, String)>,
     /// What the stand-in saw of the card in the client's reader, where it reads cards.
     pub card: Option<Card>,
+    /// The channels it opened later that the client took, by their numbers.
+    pub took_later: Vec<u32>,
+    /// What the client said its screen is, each time it said so: how wide, how high,
+    /// and how much larger than usual the machine is to draw.
+    pub screens: Vec<(u16, u16, u32)>,
 }
 
 /// What a stand-in that reads the card in the client's reader saw of it.
@@ -162,6 +174,21 @@ pub struct Desktop {
     device_pieces: Pieces,
     /// What it does with the card in the client's reader, where it reads cards.
     reads: Option<Reads>,
+    /// The pieces of a message about the channels it opens later that is not whole yet.
+    later_pieces: Pieces,
+    /// Whether it began to speak of those channels.
+    speaks_of_later: bool,
+}
+
+/// The picture a stand-in draws on a desktop whose size the client asked for: every
+/// pixel says where it is.
+pub fn at_a_size(width: usize, height: usize) -> Picture {
+    let mut picture = Picture::new(width, height);
+    for (at, pixel) in picture.pixels.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+        let (x, y) = (at % width, at / width);
+        pixel[..3].copy_from_slice(&[(x * 7) as u8, (y * 5) as u8, (x + y) as u8]);
+    }
+    picture
 }
 
 impl Desktop {
@@ -180,6 +207,8 @@ impl Desktop {
             pieces: Pieces::default(),
             device_pieces: Pieces::default(),
             reads: None,
+            later_pieces: Pieces::default(),
+            speaks_of_later: false,
         }
     }
 
@@ -296,6 +325,7 @@ impl Desktop {
                     (DESKTOP, _) => {}
                     (PROGRAMS, State::Open) if self.programs => return self.about_programs(arrived),
                     (on, State::Open) if Some(on) == self.channel(devices::CHANNEL) => return self.about_devices(arrived),
+                    (on, State::Open) if Some(on) == self.channel(dynamic::CHANNEL) => return self.about_later_channels(arrived),
                     _ => return Ok(Vec::new()),
                 }
                 match self.state {
@@ -418,6 +448,12 @@ impl Desktop {
                             true => send.extend(on_the_programs_channel(&rail::stand_in::ready())),
                             false => send.extend(self.draw()),
                         }
+                        // to a client that asked for the channel of the ones that are
+                        // opened later, it says once which version of them it speaks
+                        if let (Some(on), false) = (self.channel(dynamic::CHANNEL), self.speaks_of_later) {
+                            self.speaks_of_later = true;
+                            send.extend(on_a_channel(on, &dynamic::stand_in::can_do(3), false));
+                        }
                         // and to a client that asked for the channel of devices and the one
                         // of sound, it begins to speak about devices
                         if let (Some(on), Some(_)) = (self.channel(devices::CHANNEL), self.channel(devices::SOUND)) {
@@ -428,6 +464,36 @@ impl Desktop {
                 },
                 _ => {}
             }
+        }
+        Ok(send)
+    }
+
+    /// What the client says of the channels the machine opens later. Once it said which
+    /// version it speaks, the stand-in opens two: the one of the screen, and one that is
+    /// not Away's. On the one of the screen it says what it takes, and a client that
+    /// says how its screen is now is offered the desktop anew, at that size.
+    fn about_later_channels(&mut self, piece: &[u8]) -> Result<Vec<u8>, Error> {
+        let Some(message) = self.later_pieces.take(piece)? else { return Ok(Vec::new()) };
+        let Some(on) = self.channel(dynamic::CHANNEL) else { return Ok(Vec::new()) };
+        let says = |message: &[u8]| on_a_channel(on, message, false);
+        let mut send = Vec::new();
+        if message.first().is_some_and(|head| head >> 4 == 5) {
+            send.extend(says(&dynamic::stand_in::opens(NOT_AWAYS, "Microsoft::Windows::RDS::Geometry::v08.01")));
+            send.extend(says(&dynamic::stand_in::opens(SCREEN, dynamic::SCREEN)));
+        } else if let Some((id, taken)) = dynamic::stand_in::read_answer(&message) {
+            if taken {
+                self.seen.took_later.push(id);
+            }
+            if (id, taken) == (SCREEN, true) {
+                send.extend(says(&dynamic::stand_in::takes(SCREEN, 8192, 8192)));
+            }
+        } else if let Some((SCREEN, width, height, scale)) = dynamic::stand_in::read_screen(&message) {
+            self.seen.screens.push((width, height, scale));
+            // what it could do is void, and it says it again for a desktop of that size:
+            // the client answers as it did when the connection opened, and is drawn for anew
+            self.picture = at_a_size(usize::from(width), usize::from(height));
+            send.extend(to_the_client(&pdu::share(6, mcs::MACHINE, &[0; 8])));
+            send.extend(self.can_do());
         }
         Ok(send)
     }
@@ -613,17 +679,28 @@ impl Desktop {
         for rectangle in &rectangles[..half] {
             send.extend(short_frame(0x01, &update(std::slice::from_ref(rectangle))));
         }
-        // the rest as one update that travels in three pieces: the first, one in between, the last
-        let together = update(&rectangles[half..]);
-        let pieces: Vec<&[u8]> = together.chunks(together.len() / 3 + 1).collect();
-        for (nth, piece) in pieces.iter().enumerate() {
-            let which = match nth {
-                _ if pieces.len() == 1 => 0x0,
-                0 => 0x2,
-                _ if nth + 1 == pieces.len() => 0x1,
-                _ => 0x3,
-            };
-            send.extend(short_frame(0x01 | (which << 4), piece));
+        // the rest as one update that travels in three pieces: the first, one in between,
+        // the last. Of a large picture it is several such updates, each of as many
+        // rectangles as three pieces carry
+        let mut rest = &rectangles[half..];
+        while !rest.is_empty() {
+            let (mut count, mut bytes) = (0, 0);
+            while count < rest.len() && (count == 0 || bytes + rest[count].len() <= 3 * MOST_IN_A_PIECE) {
+                bytes += rest[count].len();
+                count += 1;
+            }
+            let together = update(&rest[..count]);
+            rest = &rest[count..];
+            let pieces: Vec<&[u8]> = together.chunks(together.len() / 3 + 1).collect();
+            for (nth, piece) in pieces.iter().enumerate() {
+                let which = match nth {
+                    _ if pieces.len() == 1 => 0x0,
+                    0 => 0x2,
+                    _ if nth + 1 == pieces.len() => 0x1,
+                    _ => 0x3,
+                };
+                send.extend(short_frame(0x01 | (which << 4), piece));
+            }
         }
         if let Some(last) = last {
             send.extend(to_the_client(&pdu::share_data(mcs::MACHINE, SHARING, 0x02, &update(&[last]))));

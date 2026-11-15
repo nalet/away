@@ -363,7 +363,9 @@ fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
     let drawn: Vec<u8> = drew.pixels.as_chunks::<4>().0.iter().flat_map(|pixel| &pixel[..3]).copied().collect();
     assert!(rows == drawn, "the picture in the file is not the one the stand-in drew");
 
-    // what the stand-in saw of the client
+    // what the stand-in saw of the client. How far it came with the channels it opens
+    // later depends on when the client left, and is not looked at here
+    let seen = Seen { took_later: Vec::new(), ..seen };
     assert_eq!(
         seen,
         Seen {
@@ -381,10 +383,13 @@ fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
             sent_on_to: None,
             for_a_program: false,
             about_programs: Vec::new(),
-            // without a card, the client asks for no further channel and names no device
-            channels: Vec::new(),
+            // without a card, the client asks for the channel of the ones a machine opens
+            // later and for no other, and names no device
+            channels: vec!["drdynvc".to_string()],
             devices: Vec::new(),
             card: None,
+            took_later: Vec::new(),
+            screens: Vec::new(),
         }
     );
 }
@@ -752,7 +757,7 @@ fn the_machine_read_the_card(ended: &Ended, said: &str, name: &str, certificate:
     assert!(pin.len() == 32 && pin.chars().all(|digit| digit.is_ascii_hexdigit()), "a PIN of 32 digits");
     assert!(handed.container.starts_with("away-") && !said.contains(pin));
     let seen = ended.seen.as_ref().expect("the connection went on to the desktop");
-    assert_eq!(seen.channels, ["rdpdr", "rdpsnd"]);
+    assert_eq!(seen.channels, ["drdynvc", "rdpdr", "rdpsnd"]);
     let card = seen.card.as_ref().expect("the machine read the card");
     assert!(card.closed && card.reader == "Away 0", "the machine went through all of it, with the reader it was told of");
     let read = away_winauth::card::stand_in::read(&card.answers).expect("the answers of a card of this kind");

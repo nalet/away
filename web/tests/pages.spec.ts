@@ -915,6 +915,17 @@ test.describe('a session', () => {
     await page.keyboard.press('Escape');
     await expect(bar).toHaveCount(0);
     await expect(screen).toBeFocused();
+
+    // the desktop follows the window: at another size the machine offers its desktop
+    // anew, and draws all of it; a key reaches it as before
+    await page.setViewportSize({ width: 900, height: 700 });
+    await expect.poll(() => screen.evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height])).toEqual([900, 700]);
+    await expect.poll(() => pixel(page, 10, 20)).toEqual([30, 100, 70]);
+    await expect.poll(() => pixel(page, 890, 690)).toEqual([44, 122, 86]);
+    await page.keyboard.press('b');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 207, 48]);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect.poll(() => screen.evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height])).toEqual([1280, 800]);
     for (const key of ['Control', 'Alt', 'Shift']) await page.keyboard.down(key);
     for (const key of ['Shift', 'Alt', 'Control']) await page.keyboard.up(key);
     await expect(bar).toBeVisible();
@@ -1077,7 +1088,7 @@ test('without a database no machine is opened, and the page says why', async ({ 
 });
 
 test("the session's messages are written and read as the examples say that the gateway is tried against too", async () => {
-  const { begins, credentials, did, leaves, readRectangle, readSaid, seen, windowDoes } = await import('../src/session/wire');
+  const { begins, credentials, did, leaves, readRectangle, readSaid, seen, sized, windowDoes } = await import('../src/session/wire');
   const examples = JSON.parse(readFileSync('../crates/away-wire/fixtures/messages.json', 'utf8')) as Record<string, { text?: string; bytes?: string }[]>;
   const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   const bytes = (written: string) => new Uint8Array((written.match(/../g) ?? []).map((pair) => parseInt(pair, 16)));
@@ -1110,6 +1121,7 @@ test("the session's messages are written and read as the examples say that the g
       ]),
     ),
     windowDoes(65537, 'close'),
+    sized(1440, 900, 200),
   ];
   expect(written).toEqual((examples.from_browser ?? []).map((example) => example.text ?? example.bytes));
 });

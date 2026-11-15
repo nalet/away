@@ -154,7 +154,7 @@ async fn a_person_is_signed_in_as_themselves_with_a_ticket_and_a_card_and_nothin
     };
     tokio::time::timeout(Duration::from_secs(10), read_the_card).await.expect("the machine reads the card to its end");
     let seen = machine.seen().last().cloned().expect("the client came as far as the desktop");
-    assert_eq!(seen.channels, ["rdpdr", "rdpsnd"]);
+    assert_eq!(seen.channels, ["drdynvc", "rdpdr", "rdpsnd"]);
     let card = seen.card.expect("the machine read the card");
     assert_eq!(card.reader, "Away 0");
     let read = away_winauth::card::stand_in::read(&card.answers).expect("the answers of a card of this kind");

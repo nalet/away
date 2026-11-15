@@ -7,6 +7,7 @@
 
 use crate::channel::{self, Pieces};
 use crate::devices;
+use crate::dynamic::{self, Later};
 use crate::gcc::{self, Client, Machine};
 use crate::input::{self, Input};
 use crate::licence::{self, Said, Taking};
@@ -124,6 +125,9 @@ pub struct Connection {
     /// The further channels the client asked for, in the order it asked for them.
     asked_for: Vec<&'static str>,
     devices: Option<Devices>,
+    /// The channels the machine opens later, and the pieces of a message about them
+    /// that is not whole yet: where the client asked for the channel they travel on.
+    later: Option<(Pieces, Later)>,
 }
 
 impl Connection {
@@ -143,6 +147,7 @@ impl Connection {
     ) -> (Connection, Vec<u8>) {
         let first = tpkt::data_frame(&mcs::connect(&gcc::request(&client, reader.is_some())));
         let asked_for = gcc::channels(&client, reader.is_some());
+        let later = asked_for.contains(&dynamic::CHANNEL).then(|| (Pieces::default(), Later::default()));
         let connection = Connection {
             state: State::AwaitsMachine,
             client,
@@ -160,6 +165,7 @@ impl Connection {
             size: (0, 0),
             asked_for,
             devices: reader.map(|reader| Devices { reader, pieces: Pieces::default(), can_do: false, confirmed: false, named: false }),
+            later,
         };
         (connection, first)
     }
@@ -223,6 +229,7 @@ impl Connection {
                 Arrived::On(channel, arrived) if channel == self.machine.io_channel => self.on_the_desktops_channel(arrived),
                 Arrived::On(channel, arrived) if Some(channel) == self.channel(rail::CHANNEL) => self.on_the_programs_channel(arrived),
                 Arrived::On(channel, arrived) if Some(channel) == self.channel(devices::CHANNEL) => self.on_the_devices_channel(arrived),
+                Arrived::On(channel, arrived) if Some(channel) == self.channel(dynamic::CHANNEL) => self.on_the_later_channels(arrived),
                 Arrived::On(..) => Ok((Vec::new(), Vec::new())),
             },
         }
@@ -257,6 +264,32 @@ impl Connection {
             None => devices::did_not_work(devices::READER, answered.request),
         };
         answered.into_iter().map(answer).collect()
+    }
+
+    /// What the machine says of the channels it opens later: the client answers it.
+    fn on_the_later_channels(&mut self, piece: &[u8]) -> Result<(Vec<u8>, Vec<Happened>), Error> {
+        let Some((pieces, later)) = self.later.as_mut() else { return Ok((Vec::new(), Vec::new())) };
+        let Some(message) = pieces.take(piece)? else { return Ok((Vec::new(), Vec::new())) };
+        let answers = later.receive(&message)?;
+        Ok((answers.iter().flat_map(|answer| self.on(dynamic::CHANNEL, answer)).collect(), Vec::new()))
+    }
+
+    /// Whether the machine follows the client's screen as it changes.
+    pub fn follows(&self) -> bool {
+        self.later.as_ref().is_some_and(|(_, later)| later.follows())
+    }
+
+    /// What to send to tell the machine that the client's screen is now this: so wide
+    /// and so high, in dots, with the machine drawing this much larger than usual, in
+    /// percent. The machine then offers its desktop anew, at that size. Nothing where
+    /// the machine doesn't follow the screen, where it takes no screen like this one,
+    /// and before the connection is open.
+    pub fn screen(&self, width: u16, height: u16, scale: u32) -> Vec<u8> {
+        let said = match (&self.state, &self.later) {
+            (State::Open, Some((_, later))) => later.screen(width, height, scale),
+            _ => None,
+        };
+        said.map(|said| self.on(dynamic::CHANNEL, &said)).unwrap_or_default()
     }
 
     fn on_the_devices_channel(&mut self, piece: &[u8]) -> Result<(Vec<u8>, Vec<Happened>), Error> {
@@ -514,7 +547,7 @@ mod tests {
 
         // the client asked for the channel of devices and for the one of sound, named one reader, and the machine took it
         let seen = machine.seen();
-        assert_eq!(seen.channels, ["rdpdr", "rdpsnd"]);
+        assert_eq!(seen.channels, ["drdynvc", "rdpdr", "rdpsnd"]);
         assert_eq!(seen.devices, [(0x20, devices::READER, "SCARD".to_string())]);
         assert!(happened.contains(&Happened::Reader { taken: true }));
         // the machine found the reader by its name, read what the card says of itself, and got an answer to each command
@@ -542,11 +575,45 @@ mod tests {
     }
 
     #[test]
-    fn without_a_reader_the_client_asks_for_no_further_channel_and_names_no_device() {
-        // without a reader, the client asks for no further channel, and the machine says nothing about devices
+    fn without_a_reader_the_client_asks_for_no_channel_of_devices_and_names_no_device() {
+        // without a reader, the client asks for the channel of the ones that are opened
+        // later and for no other, and the machine says nothing about devices
         let (happened, _, machine) = run(None, Desktop::new(picture()));
-        assert!(machine.seen().channels.is_empty() && machine.seen().devices.is_empty());
+        assert!(machine.seen().channels == ["drdynvc"] && machine.seen().devices.is_empty());
         assert!(!happened.expect("the connection opens").iter().any(|happened| matches!(happened, Happened::Reader { .. })));
+    }
+
+    #[test]
+    fn the_machine_offers_its_desktop_anew_at_the_size_the_clients_screen_has_now() {
+        let (happened, mut connection, mut machine) = run(None, Desktop::new(picture()));
+        let happened = happened.expect("the connection opens");
+        assert_eq!(happened.iter().filter(|happened| matches!(happened, Happened::Open)).count(), 1);
+        // the machine opened the channel of the screen and one that is not Away's: the
+        // client took the first, and the machine said what it takes
+        assert_eq!(machine.seen().took_later, [3]);
+        assert!(connection.follows());
+
+        // a screen no machine takes is not said; one it takes is, and the machine offers
+        // its desktop at that size, as it did when the connection opened
+        assert!(connection.screen(100, 100, 100).is_empty());
+        let said = connection.screen(640, 480, 150);
+        assert!(!said.is_empty());
+        let happened = talk(&mut connection, &mut machine, said).expect("the desktop is offered anew");
+        assert_eq!(machine.seen().screens, [(640, 480, 150)]);
+        assert!(happened.contains(&Happened::Desktop { width: 640, height: 480, bits: 32 }));
+        assert_eq!(happened.iter().filter(|happened| matches!(happened, Happened::Open)).count(), 1);
+        // and draws it anew: every pixel of the new picture arrives
+        let mut drawn = Picture::new(640, 480);
+        for happened in &happened {
+            if let Happened::Drawn(rectangles) = happened {
+                rectangles.iter().for_each(|rectangle| drawn.draw(rectangle).expect("a rectangle of the picture"));
+            }
+        }
+        assert!(drawn == *machine.picture(), "the picture is the machine's new one");
+
+        // a connection for a program asks for no such channel, and says nothing of a screen
+        let (_, program, _) = run(Some("||ledger"), Desktop::new(picture()).that_publishes(&["||ledger"]));
+        assert!(!program.follows() && program.screen(640, 480, 100).is_empty());
     }
 
     /// Passes what one side says to the other, and back, until both are silent.

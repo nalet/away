@@ -390,6 +390,7 @@ impl Secured {
                 scratch: vec![0u8; 32 * 1024],
                 reads_a_card,
                 ticked: tokio::time::Instant::now(),
+                resized: false,
             };
             while !desktop.is_open {
                 // a machine that reads a card waits for the reader's word as time passes
@@ -461,6 +462,8 @@ pub struct Desktop {
     reads_a_card: bool,
     /// When the connection was last told how much time passed.
     ticked: tokio::time::Instant,
+    /// Whether the machine offered its desktop anew, at another size, since that was last asked.
+    resized: bool,
 }
 
 impl Desktop {
@@ -526,7 +529,15 @@ impl Desktop {
             }
             for happened in happened {
                 match happened {
-                    Happened::Desktop { width, height, .. } => self.picture = Some(Picture::new(usize::from(width), usize::from(height))),
+                    Happened::Desktop { width, height, .. } => {
+                        // a machine that offers its desktop anew draws all of it anew:
+                        // what was drawn on the one before is of no use
+                        if self.is_open {
+                            self.resized = true;
+                            self.drawn.clear();
+                        }
+                        self.picture = Some(Picture::new(usize::from(width), usize::from(height)));
+                    }
                     Happened::Open => self.is_open = true,
                     Happened::Drawn(rectangles) => {
                         let picture = self
@@ -604,6 +615,27 @@ impl Desktop {
             .write_all(&told)
             .await
             .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
+    }
+
+    /// Tells the machine that the person's screen is now this, so that it offers its
+    /// desktop anew at that size. Whether it was told: a machine that doesn't follow a
+    /// screen that changes, or takes no screen like this one, is not.
+    pub async fn resize(&mut self, screen: Screen) -> Result<bool, Failure> {
+        let told = self.open.screen(screen.width, screen.height, screen.scale);
+        if told.is_empty() {
+            return Ok(false);
+        }
+        self.writer
+            .write_all(&told)
+            .await
+            .map(|()| true)
+            .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
+    }
+
+    /// Whether the machine offered its desktop anew, at another size, since this was
+    /// last asked: the picture is then a new one, of that size.
+    pub fn resized(&mut self) -> bool {
+        std::mem::take(&mut self.resized)
     }
 
     /// Leaves. The machine keeps what runs on the desktop, for the account to come back to.

@@ -190,7 +190,7 @@ where
             says.extend(served_by.as_deref().map(|served_by| ("served_by", served_by)));
             let recorded = server.told(&taken.session, "opened", &says).await;
             let ended = match recorded {
-                Ok(200) => show(&mut browser, &mut desktop).await,
+                Ok(200) => show(&mut browser, &mut desktop, screen).await,
                 Ok(status) => Ended::Machine(format!("the server did not take the record that the desktop is open: status {status}")),
                 Err(why) => Ended::Machine(why),
             };
@@ -434,11 +434,11 @@ async fn served_by(sent_on: &away_rdp::redirection::Redirection, taken: &Taken) 
 
 /// Shows an open desktop to the browser, and passes keys and the pointer on, until one
 /// of the two sides ends it.
-async fn show<Connection>(browser: &mut WebSocketStream<Connection>, desktop: &mut Desktop) -> Ended
+async fn show<Connection>(browser: &mut WebSocketStream<Connection>, desktop: &mut Desktop, mut screen: Screen) -> Ended
 where
     Connection: AsyncRead + AsyncWrite + Unpin,
 {
-    let (wide, high) = (desktop.picture().width, desktop.picture().height);
+    let (mut wide, mut high) = (desktop.picture().width, desktop.picture().height);
     if tell(browser, ToBrowser::Desktop { width: wide as u16, height: high as u16 }).await.is_err() {
         return Ended::BrowserGone;
     }
@@ -500,10 +500,21 @@ where
                     Ok(()) => desktop.take().await,
                     Err(failed) => Err(failed),
                 };
-                match drawn {
-                    Ok(areas) => areas.into_iter().for_each(|area| changed.add(area)),
+                let areas = match drawn {
+                    Ok(areas) => areas,
                     Err(failed) => return Ended::Machine(failed.details),
+                };
+                // the machine offers its desktop anew, at another size: the browser is
+                // told the size, and everything of the new picture is new to it
+                if desktop.resized() {
+                    (wide, high) = (desktop.picture().width, desktop.picture().height);
+                    if tell(browser, ToBrowser::Desktop { width: wide as u16, height: high as u16 }).await.is_err() {
+                        return Ended::BrowserGone;
+                    }
+                    changed = Changed::default();
+                    changed.add(Area { left: 0, top: 0, width: wide, height: high });
                 }
+                areas.into_iter().for_each(|area| changed.add(area));
             }
             told = said(browser) => match told {
                 Some(FromBrowser::Did(did)) => {
@@ -519,6 +530,18 @@ where
                     }
                 }
                 Some(FromBrowser::Leaves) => return Ended::Left,
+                // the window has another size, or is on another screen: a machine that
+                // follows it is told, and offers its desktop anew
+                Some(FromBrowser::Sized { width, height, scale }) => {
+                    let now = Screen::for_a_window(width, height, scale.unwrap_or(100));
+                    if now != screen {
+                        match desktop.resize(now).await {
+                            Ok(true) => screen = now,
+                            Ok(false) => {}
+                            Err(failed) => return Ended::Machine(failed.details),
+                        }
+                    }
+                }
                 Some(_) => {}
                 None => return Ended::BrowserGone,
             },

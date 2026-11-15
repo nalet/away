@@ -19,6 +19,7 @@
 //! | [`planar`] | unpacks the rectangles a machine draws at 32 bits a pixel |
 //! | [`interleaved`] | unpacks the rectangles a machine draws at 16 bits a pixel |
 //! | [`picture`] | puts the rectangles together as the desktop's picture |
+//! | [`dynamic`] | tells a machine how the client's screen is now, over a channel the machine opens later |
 //!
 //! The cryptography is never this crate's own: TLS is done by whoever holds the
 //! connection, and a hash, a cipher and the arithmetic of large numbers come from
@@ -28,6 +29,7 @@ pub mod channel;
 pub mod connection;
 pub mod der;
 pub mod devices;
+pub mod dynamic;
 pub mod gcc;
 pub mod identity;
 pub mod input;

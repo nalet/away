@@ -13,7 +13,7 @@ import type { Machine } from '../machines';
 import { addressOf } from '../place';
 import { texts } from '../texts';
 import { layoutOf, placeOf } from './keys';
-import { begins, credentials, did, leaves, readRectangle, readSaid, seen, windowDoes } from './wire';
+import { begins, credentials, did, leaves, readRectangle, readSaid, seen, sized, windowDoes } from './wire';
 import type { Did, Step, WindowOf } from './wire';
 
 const STEPS: Step[] = ['reaching', 'checking', 'signing-in', 'first-picture'];
@@ -355,6 +355,22 @@ function Desktop({
       keyboard?.unlock?.();
     };
   }, []);
+
+  // the desktop follows the window: once the window has rested at another size, the
+  // gateway is told, and a machine that follows its client's screen offers its desktop
+  // anew at that size
+  useEffect(() => {
+    let rests: number | undefined;
+    const changed = () => {
+      window.clearTimeout(rests);
+      rests = window.setTimeout(() => say(sized(window.innerWidth, window.innerHeight, Math.round(window.devicePixelRatio * 100))), 300);
+    };
+    window.addEventListener('resize', changed);
+    return () => {
+      window.clearTimeout(rests);
+      window.removeEventListener('resize', changed);
+    };
+  }, [say]);
 
   // the menu's first key combination has the focus when it opens
   useEffect(() => {

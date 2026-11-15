@@ -54,14 +54,23 @@ fn block(kind: u16, holds: &[u8]) -> Vec<u8> {
     block
 }
 
+/// A side of a screen in millimetres, taken from a screen of 96 dots an inch at no scale.
+pub(crate) fn millimetres(dots: u16, scale: u32) -> u32 {
+    (u32::from(dots) * 100 / scale.clamp(100, 500) * 254 / 960).clamp(10, 10_000)
+}
+
 /// The further channels a client asks for, beside the desktop's, in the order it asks
-/// for them: the one programs are started over, where a program is asked for, and the
-/// one its devices are reached over, where it has a smart card reader. With that one
-/// goes the channel of sound, without which a Windows machine says nothing about devices.
+/// for them: the one programs are started over, where a program is asked for; for a
+/// desktop, the one that carries the channels a machine opens later, over which the
+/// client says how its screen is now; and the one its devices are reached over, where
+/// it has a smart card reader. With that one goes the channel of sound, without which
+/// a Windows machine says nothing about devices.
 pub fn channels(client: &Client, with_a_reader: bool) -> Vec<&'static str> {
     let mut channels = Vec::new();
     if client.program.is_some() {
         channels.push(crate::rail::CHANNEL);
+    } else {
+        channels.push(crate::dynamic::CHANNEL);
     }
     if with_a_reader {
         channels.extend([crate::devices::CHANNEL, crate::devices::SOUND]);
@@ -103,9 +112,8 @@ pub fn request(client: &Client, with_a_reader: bool) -> Vec<u8> {
     // of 96 dots an inch at no scale, that it lies on its long side, and how much larger
     // than usual the machine is to draw. A machine takes a scale from 100 to 500
     let scale = client.scale.clamp(100, 500);
-    let millimetres = |dots: u16| (u32::from(dots) * 100 / scale * 254 / 960).clamp(10, 10_000);
-    core.extend(millimetres(client.width).to_le_bytes());
-    core.extend(millimetres(client.height).to_le_bytes());
+    core.extend(millimetres(client.width, scale).to_le_bytes());
+    core.extend(millimetres(client.height, scale).to_le_bytes());
     core.extend(0u16.to_le_bytes());
     core.extend(scale.to_le_bytes());
     core.extend(100u32.to_le_bytes()); // of a device's own scales, the usual one
@@ -212,10 +220,10 @@ mod tests {
     fn the_client_says_its_screen_its_name_and_the_security_that_was_chosen() {
         let request = request(&client(), false);
         assert_eq!(&request[..7], &[0x00, 0x05, 0x00, 0x14, 0x7c, 0x00, 0x01]);
-        // four blocks: 234, 12, 8 and 12 bytes
-        assert_eq!(&request[7..9], &(0x8000u16 | (266 + 14)).to_be_bytes());
+        // four blocks: 234, 12, 20 and 12 bytes
+        assert_eq!(&request[7..9], &(0x8000u16 | (278 + 14)).to_be_bytes());
         assert_eq!(&request[9..21], &[0x00, 0x08, 0x00, 0x10, 0x00, 0x01, 0xc0, 0x00, 0x44, 0x75, 0x63, 0x61]);
-        assert_eq!(&request[21..23], &(0x8000u16 | 266).to_be_bytes());
+        assert_eq!(&request[21..23], &(0x8000u16 | 278).to_be_bytes());
         let core = &request[23..23 + 234];
         assert_eq!(&core[..4], &[0x01, 0xc0, 0xea, 0x00]);
         assert_eq!(&core[8..12], &[0x00, 0x05, 0x20, 0x03], "1280 by 800");
@@ -225,10 +233,12 @@ mod tests {
         assert_eq!(&core[216..226], &[0x52, 0x01, 0, 0, 0xd3, 0, 0, 0, 0, 0]);
         assert_eq!(&core[226..234], &[100, 0, 0, 0, 100, 0, 0, 0]);
         assert_eq!(&request[257..269], &[0x02, 0xc0, 0x0c, 0x00, 0, 0, 0, 0, 0, 0, 0, 0]);
-        assert_eq!(&request[269..277], &[0x03, 0xc0, 0x08, 0x00, 0, 0, 0, 0]);
-        assert_eq!(&request[277..], &[0x04, 0xc0, 0x0c, 0x00, 0x0d, 0, 0, 0, 0, 0, 0, 0]);
+        // for a desktop it asks for the channel that carries the ones a machine opens later
+        assert_eq!(&request[269..277], &[0x03, 0xc0, 0x14, 0x00, 1, 0, 0, 0]);
+        assert_eq!(&request[277..289], &[b'd', b'r', b'd', b'y', b'n', b'v', b'c', 0, 0x00, 0x00, 0x00, 0xc0]);
+        assert_eq!(&request[289..], &[0x04, 0xc0, 0x0c, 0x00, 0x0d, 0, 0, 0, 0, 0, 0, 0]);
 
-        // for a program it asks for the channel programs are started over
+        // for a program it asks for the channel programs are started over, in its place
         let program = crate::rail::Program { run: "||ledger".to_string(), arguments: String::new() };
         let request = super::request(&Client { program: Some(program), ..client() }, false);
         assert_eq!(&request[269..277], &[0x03, 0xc0, 0x14, 0x00, 1, 0, 0, 0]);
