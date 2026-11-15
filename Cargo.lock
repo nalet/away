@@ -91,10 +91,13 @@ dependencies = [
 name = "away-issuer"
 version = "0.1.0"
 dependencies = [
+ "away-issuer",
  "away-part",
+ "away-rdp",
  "away-secret",
  "away-winauth",
  "getrandom 0.4.3",
+ "hyper",
  "tokio",
 ]
 

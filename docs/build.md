@@ -384,7 +384,17 @@ The tests run this against the real Kerberos server too, with pages of their
 own that stand in for an authority's. Those pages open the ticket with the key
 of their service, check that its proof is bound to the certificate they
 showed, read the request as an authority reads one, and answer with pages
-built as a real authority's are.
+built as a real authority's are. They issue with an authority that exists for
+the tests alone, which the test Kerberos server trusts for signing in, and
+like a real authority they decide themselves what they issue: one account may
+ask, a request in another's name needs an agent's certificate that they
+issued, and there are accounts they issue nothing for.
+
+One test goes the whole way. The account Away asks as gets its agent's
+certificate, asks with it for a certificate in a person's name, and the person
+is signed in at a stand-in machine with that certificate and nothing else: the
+Kerberos server takes the certificate, and the machine reads it from the card
+and has the card sign with its key.
 
 This is the first part of signing in as oneself. No page and no session uses
 it yet.

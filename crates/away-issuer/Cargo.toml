@@ -14,6 +14,16 @@ away-secret.workspace = true
 away-winauth.workspace = true
 tokio = { workspace = true, features = ["io-util"] }
 getrandom.workspace = true
+hyper.workspace = true
+
+[dev-dependencies]
+away-issuer = { workspace = true, features = ["stand-in"] }
+away-rdp.workspace = true
+tokio = { workspace = true, features = ["io-util"] }
+
+[features]
+# an organisation's authority that stands in for a real one, for tests
+stand-in = ["away-winauth/stand-in"]
 
 [lints]
 workspace = true

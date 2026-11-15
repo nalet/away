@@ -1,7 +1,7 @@
 #!/bin/sh
 # Makes the certificates the tests of the Windows sign-in use, with OpenSSL: an authority,
-# a domain controller's certificate, an account's with its key, and one that belongs to
-# nothing. They are for a domain that doesn't exist, CORP.EXAMPLE, and are good for a
+# a domain controller's certificate, an account's with its key, one that belongs to
+# nothing, and a second authority with its key, which issues certificates in the tests. They are for a domain that doesn't exist, CORP.EXAMPLE, and are good for a
 # hundred years, so that no test fails for the date.
 #
 #   crates/away-winauth/tests/fixtures/make.sh
@@ -56,11 +56,16 @@ for one in controller account; do
 done
 key stranger
 openssl req -x509 -new -key "$work/stranger.key" -sha256 -days 36500 -subj "/CN=somebody else" -out "$work/stranger.pem"
+# a second authority, whose key is kept: what stands in for an organisation's authority
+# in the tests issues certificates with it
+key issuing
+openssl req -x509 -new -key "$work/issuing.key" -sha256 -days 36500 -subj "/DC=example/DC=corp/CN=corp-issuing" \
+  -config "$work/extensions" -extensions authority -out "$work/issuing.pem"
 
-for one in authority controller account stranger; do
+for one in authority controller account stranger issuing; do
   openssl x509 -in "$work/$one.pem" -outform der -out "$one.der"
 done
-for one in controller account; do
+for one in controller account issuing; do
   openssl pkcs8 -topk8 -nocrypt -in "$work/$one.key" -outform der -out "$one.key.der"
 done
 ls -l ./*.der

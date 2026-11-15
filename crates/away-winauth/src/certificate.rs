@@ -11,6 +11,9 @@ const WRONG: Error = Error::NotACertificate("it is not built as a certificate is
 pub const FOR_SIGNING_IN: &[u32] = &[1, 3, 6, 1, 4, 1, 311, 20, 2, 2];
 /// Being the domain controller that answers a sign-in with a certificate.
 pub const FOR_A_DOMAIN_CONTROLLER: &[u32] = &[1, 3, 6, 1, 5, 2, 3, 5];
+/// Asking an authority for certificates in other accounts' names: what an agent's
+/// certificate has to be good for.
+pub const FOR_ASKING_FOR_OTHERS: &[u32] = &[1, 3, 6, 1, 4, 1, 311, 20, 2, 1];
 
 /// The name of an account in a certificate, as Windows writes it there.
 const ACCOUNT_NAME: &[u32] = &[1, 3, 6, 1, 4, 1, 311, 20, 2, 3];

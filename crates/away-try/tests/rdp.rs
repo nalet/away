@@ -738,7 +738,7 @@ const WITH_THE_CARD: [&str; 5] = [
 
 /// Checks what a stand-in that took a ticket and read the card saw: the card that was
 /// handed over, and on it the account's certificate and a signature of its key.
-fn the_machine_read_the_card(ended: &Ended, said: &str, name: &str) {
+fn the_machine_read_the_card(ended: &Ended, said: &str, name: &str, certificate: &[u8]) {
     let handed = away_winauth::sign_in::stand_in::on_a_card(ended.told.handed_over.as_deref().expect("something was handed over"))
         .expect("a smart card");
     assert_eq!(
@@ -755,12 +755,9 @@ fn the_machine_read_the_card(ended: &Ended, said: &str, name: &str) {
     let card = seen.card.as_ref().expect("the machine read the card");
     assert!(card.closed && card.reader == "Away 0", "the machine went through all of it, with the reader it was told of");
     let read = away_winauth::card::stand_in::read(&card.answers).expect("the answers of a card of this kind");
-    assert!(read.certificate == ACCOUNTS_CERTIFICATE, "the certificate on the card is the account's");
+    assert!(read.certificate == certificate, "the certificate on the card is the account's");
     assert_eq!((read.container.as_str(), read.took_the_pin), (handed.container.as_str(), true));
-    assert!(
-        away_winauth::card::stand_in::is_signed_by(ACCOUNTS_CERTIFICATE, TO_SIGN, &read.signed),
-        "the card signed with the certificate's key"
-    );
+    assert!(away_winauth::card::stand_in::is_signed_by(certificate, TO_SIGN, &read.signed), "the card signed with the certificate's key");
 }
 
 #[test]
@@ -798,7 +795,107 @@ fn it_signs_in_with_a_smart_card_and_a_certificate_and_no_password_is_in_it() {
     assert!(said.contains("\nThe desktop's picture\n   200 by 120 pixels. Their SHA-256: "), "{said}");
     // the machine read in the ticket who it is for, and on the card the account's certificate
     assert_eq!(ended.told.account, Some(("alex.urban".to_string(), "CORP.EXAMPLE".to_string())));
-    the_machine_read_the_card(&ended, &said, "alex.urban");
+    the_machine_read_the_card(&ended, &said, "alex.urban", ACCOUNTS_CERTIFICATE);
+}
+
+/// Pages that stand in for an organisation's authority, as the tests' Kerberos server
+/// knows them: the service `HTTP/localhost`, whose key is made from a password, and one
+/// account that may ask. They run for as long as what is given back is kept.
+fn an_authoritys_pages() -> (tokio::runtime::Runtime, away_issuer::authority::stand_in::Pages) {
+    use away_issuer::authority::stand_in::{Pages, With};
+    let fixture = |name: &str| std::fs::read(format!("{FIXTURES}/{name}")).expect("a fixture");
+    let runs = tokio::runtime::Builder::new_multi_thread().worker_threads(1).enable_all().build().expect("a runtime");
+    let pages = runs.block_on(Pages::open(With {
+        shows: (fixture("controller.der"), fixture("controller.key.der")),
+        of_the_service: Key::from_password(
+            Kind::Aes256,
+            "the password of pages that exist for these tests alone",
+            b"CORP.EXAMPLEHTTPlocalhost",
+            4096,
+        ),
+        issues_with: (fixture("issuing.der"), fixture("issuing.key.der")),
+        asked_as: "pat.typed".to_string(),
+        domain: "CORP".to_string(),
+        realm: "CORP.EXAMPLE".to_string(),
+        for_signing_in: "CorpSignIn".to_string(),
+        for_an_agent: "CorpAgent".to_string(),
+        never_for: Vec::new(),
+        good_for: 300,
+    }));
+    (runs, pages)
+}
+
+/// The whole of it, as on a real domain: the account Away asks an authority as gets
+/// its agent's certificate, asks with it for a certificate in a person's name, and the
+/// person is signed in with that certificate and with nothing else. The Kerberos
+/// server takes the certificate because the authority that issued it is one it trusts.
+#[test]
+fn it_signs_in_with_a_certificate_that_an_authority_issued_a_moment_before() {
+    let Some(server) = kerberos_server() else { return };
+    let (_runs, pages) = an_authoritys_pages();
+    let folder = std::env::temp_dir().join(format!("away-try-the-whole-of-it-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&folder);
+    std::fs::create_dir_all(&folder).expect("a folder");
+    let file = |name: &str| folder.join(name).display().to_string();
+    std::fs::write(file("password"), format!("{PASSWORD}\n")).expect("the password's file");
+    let trusted = std::fs::read(format!("{FIXTURES}/authority.der")).expect("the authority");
+    std::fs::write(file("authority.pem"), away_issuer::authority::stand_in::between_dashes("CERTIFICATE", &trusted)).expect("its file");
+    let ask = |more: &[&str]| {
+        let tried = Command::new(env!("CARGO_BIN_EXE_away-try"))
+            .args(["certificate", &pages.address, "--kerberos", &server, "--realm", "CORP.EXAMPLE", "--as", "pat.typed"])
+            .args(["--password-file", &file("password"), "--trusts", &file("authority.pem")])
+            .args(more)
+            .output()
+            .expect("the test program runs");
+        let said = String::from_utf8_lossy(&tried.stdout).to_string();
+        assert!(tried.status.success(), "{said}");
+        said
+    };
+    let said = ask(&["--kind", "CorpAgent", "--save", &file("agent.pem"), "--save-key", &file("agent.key.pem")]);
+    assert!(said.contains("   It issued a certificate for pat.typed@CORP.EXAMPLE, as corp-issuing."), "{said}");
+    let said = ask(&[
+        "--kind",
+        "CorpSignIn",
+        "--for",
+        "CORP\\alex.urban",
+        "--agent",
+        &file("agent.pem"),
+        "--agent-key",
+        &file("agent.key.pem"),
+        "--save",
+        &file("alex.pem"),
+        "--save-key",
+        &file("alex.key.pem"),
+    ]);
+    assert!(said.contains("   It issued a certificate for alex.urban@CORP.EXAMPLE, as corp-issuing."), "{said}");
+    // it lasts five minutes from the moment it was issued
+    assert!(
+        said.contains("   It is good for 4 minutes and ") || said.contains("   It is good for 5 minutes and 0 seconds more."),
+        "{said}"
+    );
+    assert!(said.contains("   It is one for signing in."), "{said}");
+    assert_eq!(pages.seen().issued.len(), 2);
+
+    // the sign-in, with the certificate and its key and no password
+    let (address, running) = machine_then(&CHOSEN, Then::TakesATicket { holds_the_services_key: true });
+    let tried = Command::new(env!("CARGO_BIN_EXE_away-try"))
+        .args(["rdp", &address, "--as", "alex.urban@corp.example", "--kerberos", &server])
+        .args(["--certificate", &file("alex.pem"), "--key", &file("alex.key.pem"), "--authority", &format!("{FIXTURES}/authority.der")])
+        .output()
+        .expect("the test program runs");
+    let said = String::from_utf8(tried.stdout).expect("text");
+    let ended = running.join().expect("the stand-in ends");
+    assert!(tried.status.success(), "{said}");
+    assert!(said.contains("   It gave a ticket for krbtgt/CORP.EXAMPLE, to alex.urban@CORP.EXAMPLE."), "{said}");
+    assert!(said.contains("   It says the account may come in."), "{said}");
+    assert_eq!(ended.told.account, Some(("alex.urban".to_string(), "CORP.EXAMPLE".to_string())));
+    // the machine read the certificate the authority issued, and the card signed with its key
+    let kept = std::fs::read_to_string(file("alex.pem")).expect("the certificate's file");
+    let letters: String = kept.lines().filter(|line| !line.starts_with("-----")).collect();
+    let issued =
+        away_part::base64::read_for_addresses(&letters.replace('+', "-").replace('/', "_").replace('=', "")).expect("a certificate");
+    the_machine_read_the_card(&ended, &said, "alex.urban", &issued);
+    let _ = std::fs::remove_dir_all(folder);
 }
 
 #[test]
@@ -818,7 +915,7 @@ fn it_hands_a_smart_card_over_where_the_ticket_is_asked_for_with_the_password() 
     );
     assert!(said.contains(&WITH_THE_CARD[1..].join("\n")), "{said}");
     assert!(!said.contains(PASSWORD), "the password is never said");
-    the_machine_read_the_card(&ended, &said, "pat.typed");
+    the_machine_read_the_card(&ended, &said, "pat.typed", ACCOUNTS_CERTIFICATE);
 
     // a key that is not the certificate's makes no card
     let (address, running) = machine_then(&CHOSEN, Then::TakesATicket { holds_the_services_key: true });

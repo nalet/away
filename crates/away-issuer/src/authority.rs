@@ -10,6 +10,8 @@
 //! worth nothing. The pages are asked over TLS alone.
 
 pub mod pages;
+#[cfg(feature = "stand-in")]
+pub mod stand_in;
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 

@@ -170,6 +170,79 @@ pub mod stand_in {
         Ok(Read { name, key: key.whole.to_vec() })
     }
 
+    /// What a certificate is issued for.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum For {
+        /// Signing in on a machine.
+        SigningIn,
+        /// Asking the authority for certificates in other accounts' names.
+        AskingForOthers,
+    }
+
+    /// A certificate for the key of a request, as an authority issues one: for this
+    /// account, written as the organisation writes it (`alex.urban@CORP.EXAMPLE`),
+    /// under this number, and good between these two times in seconds since the
+    /// beginning of 1970. The authority is its certificate with its key. The request
+    /// has to prove that its key is held.
+    pub fn issue(
+        asked: &[u8],
+        account: &str,
+        good_for: For,
+        authority: &dyn Signs,
+        number: u64,
+        (from, until): (u64, u64),
+    ) -> Result<Vec<u8>, Error> {
+        const USE_OF_THE_KEY: &[u32] = &[2, 5, 29, 15];
+        const USES: &[u32] = &[2, 5, 29, 37];
+        const OTHER_NAMES: &[u32] = &[2, 5, 29, 17];
+        const AS_A_CLIENT: &[u32] = &[1, 3, 6, 1, 5, 5, 7, 3, 2];
+        const ACCOUNT_NAME: &[u32] = &[1, 3, 6, 1, 4, 1, 311, 20, 2, 3];
+        let request = read(asked)?;
+        let issuer = Certificate::read(authority.certificate())?;
+        // a time as a certificate writes one before the year 2050: with two digits for the year
+        let time = |seconds: u64| der::write(0x17, &der::time(seconds)[4..]);
+        let further = |kind: &[u32], critical: bool, holds: &[u8]| {
+            let mut fields = vec![der::name(kind)];
+            if critical {
+                fields.push(der::write(der::BOOLEAN, &[0xff]));
+            }
+            fields.push(der::bytes(holds));
+            der::sequence(&fields)
+        };
+        let name = account.split('@').next().unwrap_or(account);
+        let subject = der::sequence(&[der::write(
+            der::SET,
+            &der::sequence(&[der::name(COMMON_NAME), der::write(der::UTF8_STRING, name.as_bytes())]),
+        )]);
+        let named = der::write(
+            der::numbered(0),
+            &[der::name(ACCOUNT_NAME), der::under(0, &der::write(der::UTF8_STRING, account.as_bytes()))].concat(),
+        );
+        let more = [
+            // the key signs, and seals keys
+            further(USE_OF_THE_KEY, true, &[0x03, 0x02, 0x05, 0xa0]),
+            match good_for {
+                For::SigningIn => {
+                    further(USES, false, &der::sequence(&[der::name(crate::certificate::FOR_SIGNING_IN), der::name(AS_A_CLIENT)]))
+                }
+                For::AskingForOthers => further(USES, false, &der::sequence(&[der::name(crate::certificate::FOR_ASKING_FOR_OTHERS)])),
+            },
+            further(OTHER_NAMES, false, &der::sequence(&[named])),
+        ];
+        let what = der::sequence(&[
+            der::under(0, &der::number(2)),
+            der::large_number(&number.to_be_bytes()),
+            kind_of(RSA_WITH_SHA256),
+            issuer.subject.to_vec(),
+            der::sequence(&[time(from), time(until)]),
+            subject,
+            request.key,
+            der::under(3, &der::sequence(&more)),
+        ]);
+        let signature = authority.sign(&what)?;
+        Ok(der::sequence(&[what, kind_of(RSA_WITH_SHA256), der::bits(&signature)]))
+    }
+
     /// What a request in another account's name says.
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct InTheNameOf {
@@ -287,6 +360,35 @@ mod tests {
         let mut changed = signed.clone();
         changed[at..at + now.len()].copy_from_slice(&now);
         assert_eq!(stand_in::read_in_the_name_of(&changed).err(), Some(Error::NotTrusted("the agent did not sign the request")));
+    }
+
+    #[test]
+    fn what_stands_in_for_an_authority_issues_a_certificate_for_the_requests_key() {
+        use crate::certificate::{signed_with, FOR_SIGNING_IN};
+        let issuing = Held::new(include_bytes!("../tests/fixtures/issuing.der"), include_bytes!("../tests/fixtures/issuing.key.der"))
+            .expect("the authority that issues in the tests");
+        let asked = asked(key(), "alex.urban").expect("a request");
+        let (from, until) = (1_794_787_200 - 600, 1_794_787_200 + 300);
+        let issued = stand_in::issue(&asked, "alex.urban@CORP.EXAMPLE", stand_in::For::SigningIn, &issuing, 0x1c1, (from, until))
+            .expect("a certificate");
+        let read = Certificate::read(&issued).expect("the certificate, read");
+        assert_eq!(read.account.as_deref(), Some("alex.urban@CORP.EXAMPLE"));
+        assert_eq!((read.from, read.until), (from, until));
+        assert!(read.is_for(FOR_SIGNING_IN) && read.is_good_at(1_794_787_200) && !read.is_good_at(until + 1));
+        assert!(read.is_signed_by(&Certificate::read(issuing.certificate()).unwrap()), "the authority signed it");
+        // it is for the key the request was made for: what that key signs holds with it
+        let signed = key().sign(b"what proves the person").unwrap();
+        assert!(signed_with(read.key.expect("its key"), &der::name(RSA_WITH_SHA256)[2..], b"what proves the person", &signed));
+        // a card takes the certificate with the key
+        assert!(crate::card::Card::new(&issued, &key().written().unwrap(), away_rdp::secret::Secret::new("1234"), "a key", [1; 16]).is_ok());
+        // a request that proves nothing gets none
+        let mut changed = asked.clone();
+        changed[asked.len() - 1] ^= 1;
+        assert!(stand_in::issue(&changed, "alex.urban@CORP.EXAMPLE", stand_in::For::SigningIn, &issuing, 1, (from, until)).is_err());
+        // an agent's certificate is good for asking for others, and not for signing in
+        let agents = stand_in::issue(&asked, "svc-away@CORP.EXAMPLE", stand_in::For::AskingForOthers, &issuing, 2, (from, until)).unwrap();
+        let agents = Certificate::read(&agents).unwrap();
+        assert!(agents.is_for(crate::certificate::FOR_ASKING_FOR_OTHERS) && !agents.is_for(FOR_SIGNING_IN));
     }
 
     #[test]

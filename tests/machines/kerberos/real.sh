@@ -33,6 +33,8 @@ echo "The tests' authority and the domain controller's certificate, as the serve
 fixtures=$root/crates/away-winauth/tests/fixtures
 openssl x509 -inform der -in "$fixtures/authority.der" -out "$work/authority.pem"
 openssl x509 -inform der -in "$fixtures/controller.der" -out "$work/controller.pem"
+# the authority that issues certificates in the tests, a moment before they are used
+openssl x509 -inform der -in "$fixtures/issuing.der" -out "$work/issuing.pem"
 openssl pkey -inform der -in "$fixtures/controller.key.der" -out "$work/controller.key"
 
 cat > "$work/krb5.conf" <<'END'
@@ -59,6 +61,7 @@ cat > "$work/kdc.conf" <<'END'
     max_life = 10h
     pkinit_identity = FILE:/given/controller.pem,/given/controller.key
     pkinit_anchors = FILE:/given/authority.pem
+    pkinit_anchors = FILE:/given/issuing.pem
     pkinit_allow_upn = true
     pkinit_eku_checking = scLogin
   }
