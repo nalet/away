@@ -60,7 +60,7 @@ rules:
 | `shell` | its shell: `true`, or its port | none |
 | `collection` | for a farm of Windows machines that people see as one: the collection this entry stands for. Its address is then the farm's broker | none |
 | `served-by` | the machines that serve the collection, by their addresses. One that opens its desktop on another port than the broker names it after a colon, as `rdsh-02.corp.example:3390`. Away goes on to no other machine for the collection | none |
-| `signs-in` | how people are signed in on a Windows machine: `typed`, with a name and a password they type, or `themselves`, with nothing typed | `typed` |
+| `signs-in` | how people are signed in on a Windows machine: `typed` with a password, `themselves` with a certificate, or `restricted-admin` with the native Windows client | `typed` |
 | `clipboard` | which ways text passes between the person's clipboard and the machine's, on a Windows machine: `both`, `to-the-machine`, `from-the-machine` or `none` | `both` |
 
 A machine offers at least one way in: a desktop, programs, or a shell.
@@ -75,6 +75,20 @@ says so, and a way in that listens elsewhere names its port:
 ```
 
 A shell is reached over SSH, on port 22.
+
+Set `signs-in: restricted-admin` on a direct Windows management entry with
+an RDP desktop and a fully qualified DNS name. The existing machine tile
+provides a [Windows Remote Desktop command](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/mstsc)
+to run on the person's Windows device. The device needs direct access to
+the target. Windows checks that the target supports Restricted Admin and the
+account has administrator rights there. The connection and its credentials
+stay with the native client. Away does not open a browser session or collect
+a password for the entry. This setting is only for direct desktops. Published
+programs and brokered collections use their existing sign-in options.
+
+Windows client policy can override the command-line mode. To confirm the mode
+on a test connection, check Security event 4624 on the destination for logon
+type 10 and **Restricted Admin Mode: Yes**.
 
 A program is known by its name. With an icon it is known by its picture too:
 the icon names a PNG picture of the folder, by where it is in the folder. A

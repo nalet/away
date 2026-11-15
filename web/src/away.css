@@ -107,6 +107,10 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .pg > .nc-strip { margin: 0 0 24px; }
 .adm > .nc-strip { margin: 0 0 12px; }
 .ab .cols.rev { grid-template-columns: minmax(0, 1fr) minmax(280px, 380px); }
+.native-rdp { display: grid; gap: 12px; }
+.native-rdp p { margin: 0; }
+.native-rdp textarea { font-family: var(--ff-mono); }
+.native-rdp-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 
 /* ── the administration: what is in force, as tables ── */
 .adm .nc-tabs { margin: 0 0 16px; }

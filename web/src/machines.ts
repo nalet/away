@@ -22,6 +22,7 @@ export interface Machine {
   programs: Program[];
   shell: Way | null;
   collection: string | null;
+  native_rdp?: string;
 }
 
 // A machine as the files say it, for those who administer.

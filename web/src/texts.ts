@@ -81,6 +81,14 @@ export const texts = {
     inNone: 'none',
     // what a way in is reached over, said for people
     desktopOf: { windows: 'Windows desktop', linux: 'Linux desktop', mac: 'Mac desktop' },
+    nativeRdp: {
+      title: 'Restricted Admin in Remote Desktop Connection',
+      how: 'On your Windows admin workstation, press Windows+R, paste this command, then press Enter.',
+      command: 'Remote Desktop command',
+      copy: 'Copy command',
+      copied: 'Command copied.',
+      select: 'Command selected. Press Ctrl+C to copy it.',
+    },
     shellOf: 'A shell on the machine',
   },
   // what a machine is, in one line under its name

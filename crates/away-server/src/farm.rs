@@ -13,7 +13,7 @@ pub mod xml;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::register::{picture_name, Farm, Kind, Machine, Over, Program};
+use crate::register::{picture_name, Farm, Kind, Machine, Over, Program, SignsIn};
 
 /// One thing read from a farm: what the feed lists, how it is reached, and its icon.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -64,7 +64,7 @@ pub fn publish(farm: &Farm, host: &str, items: &[Item]) -> Published {
                 shell: None,
                 collection: item.reached.collection.clone(),
                 served_by: farm.served_by.clone(),
-                themselves: farm.themselves,
+                signs_in: if farm.themselves { SignsIn::Themselves } else { SignsIn::Typed },
                 clipboard: farm.clipboard,
                 farm: Some(farm.name.clone()),
                 written_in: farm.written_in.clone(),
@@ -94,7 +94,7 @@ pub fn publish(farm: &Farm, host: &str, items: &[Item]) -> Published {
             shell: None,
             collection,
             served_by: farm.served_by.clone(),
-            themselves: farm.themselves,
+            signs_in: if farm.themselves { SignsIn::Themselves } else { SignsIn::Typed },
             clipboard: farm.clipboard,
             farm: Some(farm.name.clone()),
             written_in: farm.written_in.clone(),

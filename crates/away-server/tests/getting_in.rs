@@ -295,6 +295,58 @@ impl Drop for Folder {
     }
 }
 
+#[test]
+fn a_restricted_admin_desktop_offers_a_native_command_only_to_those_who_reach_it() {
+    let files = Folder::with(
+        "restricted-admin",
+        &[(
+            "machines.yaml",
+            "machines:
+  - name: admin
+    kind: windows
+    address: admin.example
+    desktop: { port: 3390 }
+    signs-in: restricted-admin
+  - name: ordinary
+    kind: windows
+    address: ordinary.example
+    desktop: true
+rules:
+  - name: admins-admin
+    who: [away-admins]
+    reaches: [admin]
+  - name: staff-ordinary
+    who: [staff]
+    reaches: [ordinary]
+",
+        )],
+    );
+    let world = world_with(|told| told.files = Some(files.0.clone()));
+    let catalog = format!("{}/api/machines", world.away);
+    let open = |name: &str| format!("{}/api/sessions?machine={name}", world.away);
+    let headers = [(FROM_AWAYS_PAGE, "1")];
+
+    let mut admin = Browser::default();
+    admin.sign_in(&world, "/");
+    let told = admin.get(&catalog).says();
+    assert_eq!(names(&told, "machines"), ["admin", "ordinary"]);
+    let Some(Json::List(machines)) = told.get("machines") else { panic!("no machines") };
+    assert_eq!(machines[0].text_of("native_rdp"), Some("mstsc.exe /restrictedAdmin /v:admin.example:3390"));
+    assert_eq!(machines[1].text_of("native_rdp"), None);
+    assert_eq!(admin.ask("POST", &open("admin"), &headers).status, 403);
+    // The world has no database. An ordinary browser session still reaches that check.
+    assert_eq!(admin.ask("POST", &open("ordinary"), &headers).status, 503);
+
+    world.service.signs_in(away_server::stand_in::person());
+    let mut staff = Browser::default();
+    staff.sign_in(&world, "/");
+    assert_eq!(names(&staff.get(&catalog).says(), "machines"), ["ordinary"]);
+    let hidden = staff.ask("POST", &open("admin"), &headers);
+    let missing = staff.ask("POST", &open("missing"), &headers);
+    assert_eq!(hidden.status, 404);
+    assert_eq!(hidden.body, missing.body);
+}
+
 /// A PNG picture for the tests, told apart by its last byte.
 fn picture(last: u8) -> Vec<u8> {
     [&b"\x89PNG\r\n\x1a\nthe rest of a picture "[..], &[last]].concat()

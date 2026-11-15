@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { Frame } from './Frame';
 import { Failed, Gate, NotSetUp, Unreached } from './Gate';
+import { pageOf } from './machines';
 import { sessionAt, usePlace } from './place';
 import { Session } from './session/Session';
 import { askWho, signInAt, signOut } from './who';
@@ -54,10 +55,11 @@ export function App() {
       () => ask(),
     );
   };
+  const frame = (at: string) => <Frame who={who} path={at} go={go} signOut={leave} signInAgain={() => window.location.assign(signInAt(here))} />;
   // a session has the whole window: no bar and no rail of Away's around it
   const session = sessionAt(path);
   if (session !== null && !who.ran_out) {
-    return <Session key={path} name={session.machine} program={session.program} go={go} contact={who.contact} />;
+    return <Session key={path} name={session.machine} program={session.program} go={go} contact={who.contact} showMachine={() => frame(pageOf(session.machine))} />;
   }
-  return <Frame who={who} path={path} go={go} signOut={leave} signInAgain={() => window.location.assign(signInAt(here))} />;
+  return frame(path);
 }

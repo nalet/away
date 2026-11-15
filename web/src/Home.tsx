@@ -1,10 +1,10 @@
 // What one may open: on home everything, on a page of their own the programs, and on
 // another the machines in the groups an administrator made; and a page for each
 // machine. A click opens a Windows desktop or a program.
-import { Banner, Button, Card, Chevron, Code, EmptyState, Input } from '@nalet/design-system';
+import { Banner, Button, Card, Chevron, Code, EmptyState, Input, Textarea } from '@nalet/design-system';
 import { AppWindow, ArrowLeft, Monitor, Search, SquareTerminal, Star } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { entriesOf, found, opensDesktop, opensPrograms, pageOf, useFavourites, useMachines } from './machines';
 import type { Entry, Machine, Stars } from './machines';
@@ -169,7 +169,7 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
                 // offers its desktop and nothing else, where Away opens it, is opened by a
                 // click on it; one that offers more leads to its page, where each way in is
                 const Icon = program === null ? iconOf(machine) : AppWindow;
-                const only = program === null && opensDesktop(machine) && machine.programs.length === 0 && !machine.shell;
+                const only = program === null && !machine.native_rdp && opensDesktop(machine) && machine.programs.length === 0 && !machine.shell;
                 const opens = program !== null && opensPrograms(machine);
                 const to = only ? desktopOf(machine.name) : opens ? programOf(machine.name, program.name) : pageOf(machine.name);
                 return (
@@ -190,6 +190,38 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
         );
       })}
     </div>
+  );
+}
+
+function NativeRdp({ command }: { command: string }) {
+  const field = useRef<HTMLTextAreaElement>(null);
+  const [status, setStatus] = useState('');
+  const t = texts.machine.nativeRdp;
+  const copy = async () => {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(command);
+        setStatus(t.copied);
+        return;
+      }
+    } catch {
+      // Some browsers block clipboard writes. The command can still be selected.
+    }
+    field.current?.focus();
+    field.current?.select();
+    setStatus(t.select);
+  };
+  return (
+    <Card header={<strong>{t.title}</strong>}>
+      <div className="native-rdp">
+        <p>{t.how}</p>
+        <Textarea ref={field} rows={2} aria-label={t.command} readOnly value={command} />
+        <div className="native-rdp-actions">
+          <Button size="sm" onClick={copy}>{t.copy}</Button>
+          <span role="status">{status}</span>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -248,7 +280,9 @@ export function MachinePage({ name, go }: { name: string; go: (to: string) => vo
                 <Chevron size={14} aria-hidden="true" />
                 {texts.machine.desktop}
               </h2>
-              {opensDesktop(machine) ? (
+              {machine.native_rdp ? (
+                <NativeRdp key={machine.native_rdp} command={machine.native_rdp} />
+              ) : opensDesktop(machine) ? (
                 <a className="m still" href={desktopOf(machine.name)} onClick={inPlace(go, desktopOf(machine.name))}>
                   <Monitor size={22} aria-hidden="true" />
                   <span className="main">

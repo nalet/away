@@ -129,6 +129,17 @@ impl Clipboard {
     }
 }
 
+/// How a person signs in on a Windows machine.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SignsIn {
+    /// Away takes a name and a password from the browser.
+    Typed,
+    /// Away asks the issuer for a sign-in certificate for the person.
+    Themselves,
+    /// The person's Windows client opens the desktop in Restricted Admin mode.
+    RestrictedAdmin,
+}
+
 /// One machine.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Machine {
@@ -150,8 +161,8 @@ pub struct Machine {
     pub collection: Option<String>,
     /// The machines that serve the collection.
     pub served_by: Vec<String>,
-    /// Whether people are signed in on it as themselves, with nothing typed.
-    pub themselves: bool,
+    /// How people sign in on the machine.
+    pub signs_in: SignsIn,
     /// Which ways the clipboard passes.
     pub clipboard: Clipboard,
     /// The farm that publishes it, where it is not written in a file itself but read
@@ -642,8 +653,9 @@ fn machine(
     if let Some((other, line)) = served_by.iter().find(|(address, _)| !serves(address)) {
         return Err(refused(file, *line, format!("“{other}” is no address of a machine")));
     }
-    let themselves = match signs_in(&parts, file, of)? {
-        Some((true, line)) => {
+    let (signs_in, line) = signs_in(&parts, file, of)?.unwrap_or((SignsIn::Typed, node.line));
+    match signs_in {
+        SignsIn::Themselves => {
             let over_rdp = matches!(desktop, Some((Over::Rdp, _))) || !programs.is_empty();
             if kind != Kind::Windows || !over_rdp {
                 return Err(refused(
@@ -660,10 +672,22 @@ fn machine(
                     format!("{name} signs people in as themselves and is reached at {number}: a domain knows a machine by its name, and by no number"),
                 ));
             }
-            true
         }
-        _ => false,
-    };
+        SignsIn::RestrictedAdmin => {
+            if kind != Kind::Windows || !matches!(desktop, Some((Over::Rdp, _))) || collection.is_some() || !programs.is_empty() {
+                return Err(refused(file, line, format!("{name} needs a direct Windows desktop to use restricted-admin")));
+            }
+            // The destination is used in a Windows Run command. Only a DNS name already
+            // validated above and the parsed desktop port can be part of that command.
+            if !address.contains('.')
+                || is_a_number(&address)
+                || !address.bytes().all(|byte| byte.is_ascii_alphanumeric() || b".-".contains(&byte))
+            {
+                return Err(refused(file, address_line, format!("{name} needs a fully qualified DNS name to use restricted-admin")));
+            }
+        }
+        SignsIn::Typed => {}
+    }
     let clipboard = clipboard(&parts, file, of)?;
     Ok(Machine {
         name,
@@ -675,22 +699,22 @@ fn machine(
         shell,
         collection: collection.map(|(collection, _)| collection),
         served_by: served_by.into_iter().map(|(address, _)| address).collect(),
-        themselves,
+        signs_in,
         clipboard,
         farm: None,
         written_in: (file.to_string(), node.line),
     })
 }
 
-/// How people are signed in, where an entry says so: as themselves, or with what they
-/// type. Gives whether it is as themselves, and the line it is said in.
-fn signs_in(parts: &Parts, file: &str, of: &str) -> Result<Option<(bool, usize)>, Refused> {
+/// How people are signed in, and the line it is said in, where an entry says so.
+fn signs_in(parts: &Parts, file: &str, of: &str) -> Result<Option<(SignsIn, usize)>, Refused> {
     match parts.text("signs-in", of)? {
         None => Ok(None),
         Some((way, line)) => match way.as_str() {
-            "themselves" => Ok(Some((true, line))),
-            "typed" => Ok(Some((false, line))),
-            _ => Err(refused(file, line, format!("“{way}” is no way people are signed in: themselves, or typed"))),
+            "themselves" => Ok(Some((SignsIn::Themselves, line))),
+            "typed" => Ok(Some((SignsIn::Typed, line))),
+            "restricted-admin" => Ok(Some((SignsIn::RestrictedAdmin, line))),
+            _ => Err(refused(file, line, format!("“{way}” is no way people are signed in: themselves, typed, or restricted-admin"))),
         },
     }
 }
@@ -745,7 +769,7 @@ fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
         return Err(refused(file, *line, format!("“{other}” is no address of a machine")));
     }
     let themselves = match signs_in(&parts, file, &name)? {
-        Some((true, line)) => {
+        Some((SignsIn::Themselves, line)) => {
             if let Some((number, _)) = served_by.iter().find(|(address, _)| is_a_number(address)) {
                 return Err(refused(
                     file,
@@ -754,6 +778,9 @@ fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
                 ));
             }
             true
+        }
+        Some((SignsIn::RestrictedAdmin, line)) => {
+            return Err(refused(file, line, format!("the farm {name} cannot use restricted-admin: it is for a direct Windows desktop")));
         }
         _ => false,
     };
@@ -821,7 +848,7 @@ impl Machine {
             way.extend(over.map(|over| ("over".to_string(), over.written().into())));
             Json::Object(way)
         };
-        Json::object([
+        let mut machine = Json::object([
             ("name", self.name.as_str().into()),
             ("kind", self.kind.written().into()),
             ("address", self.address.as_str().into()),
@@ -841,7 +868,12 @@ impl Machine {
             ),
             ("shell", self.shell.map_or(Json::Null, |port| way(None, port))),
             ("collection", self.collection.as_deref().map_or(Json::Null, Json::from)),
-        ])
+        ]);
+        if let (SignsIn::RestrictedAdmin, Some((Over::Rdp, port)), Json::Object(fields)) = (self.signs_in, self.desktop, &mut machine) {
+            let command = format!("mstsc.exe /restrictedAdmin /v:{}:{port}", self.address);
+            fields.push(("native_rdp".to_string(), command.into()));
+        }
+        machine
     }
 }
 
@@ -1184,6 +1216,27 @@ rules:
     }
 
     #[test]
+    fn restricted_admin_only_offers_a_direct_windows_desktop_at_a_dns_name() {
+        let machine = |kind, address, more| {
+            format!(
+                "machines:\n  - name: admin\n    kind: {kind}\n    address: {address}\n    desktop: true\n    signs-in: restricted-admin\n{more}"
+            )
+        };
+        for written in [
+            machine("linux", "admin.corp.example", ""),
+            machine("windows", "admin.corp.example", "    collection: Desktops\n"),
+            machine("windows", "admin.corp.example", "    programs: [Ledger]\n"),
+        ] {
+            assert!(why(&written).why.contains("needs a direct Windows desktop"));
+        }
+        for address in ["10.20.0.1", "admin", "admin_host.corp.example"] {
+            assert!(why(&machine("windows", address, "")).why.contains("needs a fully qualified DNS name"));
+        }
+        let farm = "farms:\n  - name: Apps\n    feed: https://broker.corp.example/feed\n    signs-in: restricted-admin\n";
+        assert!(why(farm).why.contains("the farm Apps cannot use restricted-admin"));
+    }
+
+    #[test]
     fn an_entry_says_how_people_are_signed_in_and_left_out_they_type() {
         let machine = |name: &str, more: &str| {
             format!("  - name: {name}\n    kind: windows\n    address: {name}.corp.example\n    desktop: true\n{more}")
@@ -1195,8 +1248,8 @@ rules:
             machine("unsaid", ""),
         );
         let in_force = InForce::read(&files(&[("ways.yaml", &written)])).unwrap();
-        let ways: Vec<(&str, bool)> = in_force.machines.iter().map(|machine| (machine.name.as_str(), machine.themselves)).collect();
-        assert_eq!(ways, [("as-oneself", true), ("by-typing", false), ("unsaid", false)]);
+        let ways: Vec<(&str, SignsIn)> = in_force.machines.iter().map(|machine| (machine.name.as_str(), machine.signs_in)).collect();
+        assert_eq!(ways, [("as-oneself", SignsIn::Themselves), ("by-typing", SignsIn::Typed), ("unsaid", SignsIn::Typed)]);
         let ways: Vec<(&str, bool)> = in_force.farms.iter().map(|farm| (farm.name.as_str(), farm.themselves)).collect();
         assert_eq!(ways, [("Work Resources", true), ("Others", false)]);
 
@@ -1205,7 +1258,7 @@ rules:
             (
                 "machines:\n  - name: a\n    kind: windows\n    address: a.example\n    desktop: true\n    signs-in: somehow\n",
                 6,
-                "“somehow” is no way people are signed in: themselves, or typed",
+                "“somehow” is no way people are signed in: themselves, typed, or restricted-admin",
             ),
             (
                 "machines:\n  - name: a\n    kind: linux\n    address: a.example\n    shell: true\n    signs-in: themselves\n",

@@ -35,7 +35,7 @@ use hyper::{Method, Request, StatusCode};
 
 use crate::records::Records;
 use crate::register::files::Register;
-use crate::register::Over;
+use crate::register::{Over, SignsIn};
 use crate::service::{Failed, Service};
 use crate::sessions::{Asked, Sessions};
 use crate::sign_ins::{Failure, Person, SignIns, KEPT_FOR};
@@ -503,6 +503,10 @@ impl GettingIn {
         let Some((machine, _)) = reached.iter().find(|(machine, _)| machine.name == name) else {
             return plain(StatusCode::NOT_FOUND, "Nothing of that name is there for you.\n");
         };
+        if machine.signs_in == SignsIn::RestrictedAdmin {
+            return plain(StatusCode::FORBIDDEN, "This desktop opens in Windows Remote Desktop with Restricted Admin.\n");
+        }
+        let themselves = machine.signs_in == SignsIn::Themselves;
         // what Away opens so far: a Windows desktop and the programs of a Windows machine, of
         // one machine or of a farm's collection
         let asked_for = named.iter().find(|(its, value)| its == "program" && !value.is_empty()).map(|(_, value)| value.as_str());
@@ -548,7 +552,7 @@ impl GettingIn {
                 ("program", program.as_ref().map_or(Json::Null, |(name, _)| name.as_str().into())),
                 ("address", machine.address.as_str().into()),
                 ("port", u64::from(port).into()),
-                ("signs_in", if machine.themselves { "themselves" } else { "typed" }.into()),
+                ("signs_in", if themselves { "themselves" } else { "typed" }.into()),
                 ("clipboard", machine.clipboard.word().into()),
             ]),
         };
@@ -570,7 +574,7 @@ impl GettingIn {
             port,
             collection: machine.collection.clone(),
             served_by: machine.served_by.clone(),
-            themselves: machine.themselves,
+            themselves,
             clipboard: machine.clipboard,
             program,
             at: time::now().as_secs(),
@@ -605,6 +609,12 @@ impl GettingIn {
                     .zip(said("sign_in"))
                     .and_then(|(ticket, sign_in)| self.sessions.take(ticket, sign_in, time::now().as_secs()));
                 let Some(asked) = taken else { return plain(StatusCode::NOT_FOUND, "No session is asked for with this ticket.\n") };
+                // A machine may have switched to native sign-in while its ticket was pending.
+                let (in_force, _) = self.register.in_force();
+                if in_force.machines.iter().any(|machine| machine.name == asked.machine && machine.signs_in == SignsIn::RestrictedAdmin) {
+                    self.sessions.end(&asked.session);
+                    return plain(StatusCode::NOT_FOUND, "No session is asked for with this ticket.\n");
+                }
                 self.count_sessions();
                 let says = Json::object([
                     ("session", asked.session.as_str().into()),

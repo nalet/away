@@ -6,7 +6,7 @@
 import { Button, Chevron, EmptyState, Field, IconButton, Input, Spinner } from '@nalet/design-system';
 import { AppWindow, Check, ClipboardList, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FormEvent, KeyboardEvent as KeyOfReact } from 'react';
+import type { FormEvent, KeyboardEvent as KeyOfReact, ReactNode } from 'react';
 
 import { pageOf, useMachines } from '../machines';
 import type { Machine } from '../machines';
@@ -218,11 +218,25 @@ function useSession(machine: string, program: string | null) {
   };
 }
 
-// The page of a session with a machine's desktop, or with one of its programs.
-export function Session({ name, program, go, contact }: { name: string; program: string | null; go: (to: string) => void; contact: string | null }) {
+interface SessionProps {
+  name: string;
+  program: string | null;
+  go: (to: string) => void;
+  contact: string | null;
+}
+
+// A desktop bookmark follows the machine's current setting before opening a session.
+export function Session({ showMachine, ...session }: SessionProps & { showMachine: () => ReactNode }) {
   const [machines] = useMachines();
+  const machine = typeof machines === 'string' ? null : (machines.find((one) => one.name === session.name) ?? null);
+  if (session.program === null && machines === 'asking') return <div className="fill" aria-busy="true" />;
+  if (session.program === null && machine?.native_rdp) return showMachine();
+  return <BrowserSession {...session} machine={machine} />;
+}
+
+// The page of a session with a machine's desktop, or with one of its programs.
+function BrowserSession({ name, program, go, contact, machine }: SessionProps & { machine: Machine | null }) {
   const { state, windows, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program);
-  const machine = typeof machines === 'string' ? null : (machines.find((one) => one.name === name) ?? null);
   const toMachines = () => go(machine ? pageOf(name) : addressOf.machines);
 
   useEffect(() => {

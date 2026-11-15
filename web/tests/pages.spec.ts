@@ -235,6 +235,51 @@ test('a machine is found by its name, its address or its group, and a program by
   expect((await shown()).length).toBe(11);
 });
 
+test('a native desktop uses its existing tile and a bookmark opens the same instructions', async ({ page }) => {
+  const { asked } = watch(page);
+  const sockets: string[] = [];
+  page.on('websocket', (socket) => sockets.push(socket.url()));
+  // Keep the command out of the shared clipboard used by other browser tests.
+  await page.addInitScript(() => {
+    let copied = '';
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: async (text: string) => { copied = text; },
+        readText: async () => copied,
+      },
+    });
+  });
+  const command = 'mstsc.exe /restrictedAdmin /v:hr-app-01.corp.example:3390';
+  await page.route('**/api/machines', async (route) => {
+    const response = await route.fetch();
+    const catalog = (await response.json()) as { machines: { name: string; native_rdp?: string }[] };
+    const machine = catalog.machines.find((one) => one.name === 'hr-app-01');
+    expect(machine).toBeDefined();
+    if (machine) machine.native_rdp = command;
+    await route.fulfill({ response, json: catalog });
+  });
+
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: /^Desktops/ })).toHaveAttribute('href', '/machines/Desktops/desktop');
+  await expect(page.getByRole('link', { name: /^Ledger/ })).toHaveAttribute('href', '/machines/fin-app-02/programs/Ledger');
+  const tile = page.getByRole('link', { name: /^hr-app-01/ });
+  await expect(tile).toHaveCount(1);
+  await tile.click();
+  await expect(page).toHaveURL(`${AWAY}/machines/hr-app-01`);
+  const desktop = page.getByRole('region', { name: 'desktop' });
+  await expect(desktop).toContainText('Restricted Admin in Remote Desktop Connection');
+  await expect(desktop.getByRole('textbox', { name: 'Remote Desktop command' })).toHaveValue(command);
+  await desktop.getByRole('button', { name: 'Copy command' }).click();
+  await expect(desktop.getByRole('status')).toHaveText('Command copied.');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(command);
+  await accessible(page);
+
+  await page.goto('/machines/hr-app-01/desktop');
+  await expect(desktop.getByRole('textbox', { name: 'Remote Desktop command' })).toHaveValue(command);
+  expect(asked.filter((request) => request.url().includes('/api/sessions'))).toEqual([]);
+  expect(sockets).toEqual([]);
+});
+
 test('a machine has a page of its own, which says what it offers and what it is', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: /^fin-app-02/ }).click();
@@ -972,6 +1017,7 @@ test.describe('a session', () => {
     await page.goto(`${AWAY_THAT_KEEPS}/machines/desk-01/desktop`);
     await page.getByLabel('Name').fill('CORP\\alex.urban');
     await page.getByLabel('Password').fill('a password that exists for these tests alone');
+    await page.evaluate(() => navigator.clipboard.writeText(''));
     await page.getByRole('button', { name: 'sign in' }).click();
     const screen = page.getByRole('application', { name: 'the desktop of desk-01' });
     await expect(screen).toBeFocused();
