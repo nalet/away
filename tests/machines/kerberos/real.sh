@@ -1,0 +1,106 @@
+#!/bin/sh
+# Tries Away's own Kerberos against a real Kerberos server: starts one in a container,
+# for the domain of the tests' certificates, CORP.EXAMPLE, with certificate sign-in
+# switched on, an account, a second account and a machine's service, and runs the tests
+# that need it.
+#
+#   tests/machines/kerberos/real.sh
+#
+# It needs docker, openssl and cargo. KEEP=1 leaves the server running afterwards, at
+# localhost:1088, for running the tests by hand:
+#
+#   AWAY_TEST_KERBEROS=localhost:1088 cargo test --package away-winauth --test kerberos
+set -eu
+
+here=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$here/../../.." && pwd)
+image=alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
+name=away-test-kerberos
+port=1088
+work=$(mktemp -d)
+ended() {
+  [ -n "${KEEP:-}" ] || docker rm --force "$name" >/dev/null 2>&1 || true
+  rm -rf "$work"
+}
+trap ended EXIT
+
+echo "The tests' authority and the domain controller's certificate, as the server takes them"
+fixtures=$root/crates/away-winauth/tests/fixtures
+openssl x509 -inform der -in "$fixtures/authority.der" -out "$work/authority.pem"
+openssl x509 -inform der -in "$fixtures/controller.der" -out "$work/controller.pem"
+openssl pkey -inform der -in "$fixtures/controller.key.der" -out "$work/controller.key"
+
+cat > "$work/krb5.conf" <<'END'
+[libdefaults]
+  default_realm = CORP.EXAMPLE
+  dns_lookup_kdc = false
+  dns_lookup_realm = false
+[realms]
+  CORP.EXAMPLE = {
+    kdc = localhost
+  }
+END
+# a certificate names its account the way a Windows domain's does, and is good for
+# signing in with a smart card: the server is told to take both
+cat > "$work/kdc.conf" <<'END'
+[kdcdefaults]
+  kdc_listen = 88
+  kdc_tcp_listen = 88
+[realms]
+  CORP.EXAMPLE = {
+    database_name = /var/lib/krb5kdc/principal
+    key_stash_file = /var/lib/krb5kdc/stash
+    supported_enctypes = aes256-cts-hmac-sha1-96:normal aes128-cts-hmac-sha1-96:normal
+    max_life = 10h
+    pkinit_identity = FILE:/given/controller.pem,/given/controller.key
+    pkinit_anchors = FILE:/given/authority.pem
+    pkinit_allow_upn = true
+    pkinit_eku_checking = scLogin
+  }
+[logging]
+  kdc = STDERR
+END
+cat > "$work/start.sh" <<'END'
+set -eu
+apk add --no-cache --quiet krb5-server krb5 krb5-pkinit >/dev/null
+cp /given/krb5.conf /etc/krb5.conf
+mkdir -p /var/lib/krb5kdc
+cp /given/kdc.conf /var/lib/krb5kdc/kdc.conf
+export KRB5_KDC_PROFILE=/var/lib/krb5kdc/kdc.conf
+kdb5_util create -s -r CORP.EXAMPLE -P "a password for this machine alone" >/dev/null 2>&1
+# accounts that are signed in with a certificate alone: their keys are random
+for account in alex.urban sam.other; do
+  kadmin.local -q "addprinc -randkey +requires_preauth $account@CORP.EXAMPLE" >/dev/null 2>&1
+done
+kadmin.local -q "addprinc -randkey TERMSRV/desk-01.corp.example@CORP.EXAMPLE" >/dev/null 2>&1
+echo "the server is ready"
+exec krb5kdc -n
+END
+
+echo "Starting the Kerberos server"
+docker rm --force "$name" >/dev/null 2>&1 || true
+docker create --name "$name" --publish "127.0.0.1:$port:88" --entrypoint sh "$image" /given/start.sh >/dev/null
+docker cp "$work/." "$name:/given"
+docker start "$name" >/dev/null
+
+ready=
+for _ in $(seq 1 120); do
+  if docker logs "$name" 2>&1 | grep -q "the server is ready"; then
+    ready=1
+    break
+  fi
+  sleep 0.5
+done
+[ -n "$ready" ] || { echo "The Kerberos server did not start:" >&2; docker logs "$name" 2>&1 | tail -20 >&2; exit 1; }
+echo "   $(docker exec "$name" sh -c 'apk info -e -v krb5-server 2>/dev/null' | head -1)"
+
+echo "The tests"
+cd "$root"
+out=$work/tests.txt
+AWAY_TEST_KERBEROS=localhost:$port cargo test --locked --package away-winauth --test kerberos -- --nocapture 2>&1 | tee "$out"
+grep -q '^test result: ok' "$out" || { echo "The tests failed." >&2; docker logs "$name" 2>&1 | tail -30 >&2; exit 1; }
+# a test that found no server passes without testing anything: here that is a failure
+if grep -q 'no Kerberos server to test against' "$out"; then
+  echo "The tests did not see the server." >&2
+  exit 1
+fi

@@ -243,6 +243,40 @@ DATABASE=localhost:15432 MACHINE_PORT=18096 cargo run --package away-server --ex
 The machine is `desk-01`, for the account `CORP\alex.urban` with the password
 `a password that exists for these tests alone`.
 
+## Against a real Kerberos server
+
+Signing in on a Windows machine as oneself begins with Kerberos, and Away
+speaks it with code of its own. That code is tried against a real Kerberos
+server. A script starts one in a container, for the domain of the tests'
+certificates, with signing in by certificate switched on, and runs the tests
+that need it:
+
+```sh
+tests/machines/kerberos/real.sh
+```
+
+The tests ask it for a first ticket with the test account's certificate and
+nothing else, and with that ticket for one for a machine's desktop. They also
+ask as an account the server doesn't know, as another account than the
+certificate's, and with a certificate nobody the server trusts has issued, and
+each is refused; and they check that the client believes the server only when
+the server's own certificate leads to the authority the client trusts.
+
+`KEEP=1` before it leaves the server running at `localhost:1088`:
+
+```sh
+KEEP=1 tests/machines/kerberos/real.sh
+AWAY_TEST_KERBEROS=localhost:1088 cargo test --package away-winauth
+```
+
+Without the variable those tests say that they found no Kerberos server, and
+pass. The pipeline always has one, and fails where a test finds none. The
+certificates are made by `crates/away-winauth/tests/fixtures/make.sh`, for a
+domain that doesn't exist.
+
+This is the first part of signing in as oneself. No page and no session uses
+it yet.
+
 ## Trying a farm's feed
 
 The server reads what a farm of Windows machines publishes from the farm's own

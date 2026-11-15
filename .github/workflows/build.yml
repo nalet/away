@@ -66,6 +66,11 @@ jobs:
           KEEP=1 tests/machines/database/real.sh
           echo "AWAY_TEST_DATABASE=localhost:15432" >> "$GITHUB_ENV"
 
+      - name: A real Kerberos server for the tests, which are tried against it first
+        run: |
+          KEEP=1 tests/machines/kerberos/real.sh
+          echo "AWAY_TEST_KERBEROS=localhost:1088" >> "$GITHUB_ENV"
+
       - name: The tests
         run: cargo test --locked
 

@@ -3,4 +3,6 @@
 //! controller that ends with a ticket for a machine.
 
 pub mod crypto;
+pub mod exchange;
 pub mod messages;
+pub mod pkinit;

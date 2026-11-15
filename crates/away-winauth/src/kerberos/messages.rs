@@ -39,7 +39,7 @@ impl Name {
         Name { kind: kind as i64, parts: parts.iter().map(|part| part.to_string()).collect() }
     }
 
-    fn write(&self) -> Vec<u8> {
+    pub(crate) fn write(&self) -> Vec<u8> {
         let parts: Vec<Vec<u8>> = self.parts.iter().map(|part| der::text(part)).collect();
         der::sequence(&[der::under(0, &der::number(self.kind)), der::under(1, &der::sequence(&parts))])
     }
