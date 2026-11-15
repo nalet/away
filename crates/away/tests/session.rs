@@ -83,6 +83,8 @@ async fn records(database: &Database) -> Vec<(String, Option<String>, Option<Str
 struct World {
     away: String,
     gateway: String,
+    /// Where the server answers Away's other parts.
+    internal: std::net::SocketAddr,
     _service: SignInService,
     machine: Machine,
     /// A farm's broker, which sends whoever signs in on to the machine.
@@ -212,6 +214,7 @@ async fn world(name: &str) -> Option<World> {
     Some(World {
         away,
         gateway: at,
+        internal,
         _service: service,
         machine,
         broker,
@@ -486,6 +489,58 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
     // the password is in no line and in no record
     assert!(!lines.iter().any(|line| line.contains(PASSWORD)));
     assert!(!kept.iter().any(|(.., details)| details.write().contains(PASSWORD)));
+}
+
+/// What the server answers when it is asked to answer for a session.
+async fn vouched(world: &World, session: &str) -> (u16, String) {
+    let at = Address::read(&format!("http://127.0.0.1:{}/internal/vouch", world.internal.port())).expect("the server's own address");
+    let got =
+        away_part::client::Client::new(None).expect("a client").send_form(&at, &[("session", session)], None).await.expect("an answer");
+    (got.status, String::from_utf8_lossy(&got.body).to_string())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_server_answers_for_a_session_that_runs_with_what_the_sign_in_service_signs_at_that_moment() {
+    let Some(world) = world("answers-for").await else { return };
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+    let ticket = browser.ticket(&world, "desk-01");
+    // the session's name is the key of the record that it was asked for
+    let named: String = beside(&world.database)
+        .await
+        .query_one("select key from record where kind = 'session-asked'", &[])
+        .await
+        .expect("the record")
+        .get(0);
+    // a session nobody took over yet doesn't run
+    assert_eq!(vouched(&world, &named).await.0, 404);
+    let mut session = Session::begin(&world, &sign_in, &ticket).await;
+    session.steps().await;
+
+    // the server renews the person's sign-in for it, and hands over what the service signed just now
+    let renewed = world._service.renewed();
+    let (status, said) = vouched(&world, &named).await;
+    assert_eq!(status, 200, "{said}");
+    let said = Json::read(&said).expect("JSON");
+    assert_eq!(
+        (said.text_of("session"), said.text_of("subject"), said.text_of("machine")),
+        (Some(named.as_str()), Some("7c1f"), Some("desk-01"))
+    );
+    assert_eq!(world._service.renewed(), renewed + 1);
+    let token = said.text_of("token").expect("what the service signed");
+    let says = token.split('.').nth(1).and_then(away_part::base64::read_for_addresses).expect("a token of three parts");
+    let says = Json::read(std::str::from_utf8(&says).expect("text")).expect("JSON");
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+    assert_eq!(says.text_of("sub"), Some("7c1f"));
+    assert!(says.get("iat").and_then(Json::count).is_some_and(|signed_at| signed_at + 5 >= now), "{}", says.write());
+
+    // no session of another name, and nothing once the sign-in service takes the person's sign-in no more
+    assert_eq!(vouched(&world, "another").await.0, 404);
+    world._service.refuses_renewals(true);
+    assert_eq!(vouched(&world, &named).await, (403, "The person's sign-in has run out.\n".to_string()));
+    world._service.refuses_renewals(false);
+    assert_eq!(vouched(&world, &named).await.0, 403, "a sign-in that ran out stays run out");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

@@ -73,6 +73,9 @@ pub struct Signed {
     pub renewal: Option<Secret>,
     /// How long what was signed is good for, in seconds from now.
     pub good_for: u64,
+    /// What it signed about the person, as it signed it: for whoever checks the
+    /// signature for itself.
+    pub token: Option<Secret>,
 }
 
 /// Where the service's parts are, as it says itself.
@@ -249,7 +252,8 @@ impl Service {
             (None, Some(says)) => says.get("exp").and_then(Json::count).unwrap_or(now).saturating_sub(now),
             (None, None) => return Err(Failed::Unusable("The sign-in service's answer doesn't say how long it is good for.".to_string())),
         };
-        Ok(Signed { says, renewal: answer.text_of("refresh_token").map(Secret::new), good_for })
+        let token = answer.text_of("id_token").map(Secret::new);
+        Ok(Signed { says, renewal: answer.text_of("refresh_token").map(Secret::new), good_for, token })
     }
 
     async fn check(&self, token: &str, number: Option<&str>, now: u64) -> Result<Json, Failed> {

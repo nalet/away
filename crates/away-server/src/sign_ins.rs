@@ -312,6 +312,11 @@ impl SignIns {
         }
     }
 
+    /// What a sign-in is renewed with, where it has not run out and can be renewed.
+    pub fn renewal_of(&self, name: &str) -> Option<Secret> {
+        self.all().held.get(name).filter(|held| !held.ran_out).and_then(|held| held.renewal.clone())
+    }
+
     /// How many sign-ins are held.
     pub fn count(&self) -> usize {
         self.all().held.len()
@@ -332,7 +337,7 @@ mod tests {
     }
 
     fn signed(renewal: Option<&str>, good_for: u64) -> Signed {
-        Signed { says: None, renewal: renewal.map(Secret::new), good_for }
+        Signed { says: None, renewal: renewal.map(Secret::new), good_for, token: None }
     }
 
     #[test]
@@ -431,7 +436,12 @@ mod tests {
             held.retain(|(entry, _)| entry != "groups");
             held.push(("groups".to_string(), Json::List(vec!["staff".into()])));
         }
-        sign_ins.renewed(&name, &Signed { says: Some(said), renewal: Some(Secret::new("r2")), good_for: 300 }, "groups", 1_250);
+        sign_ins.renewed(
+            &name,
+            &Signed { says: Some(said), renewal: Some(Secret::new("r2")), good_for: 300, token: None },
+            "groups",
+            1_250,
+        );
         assert!(sign_ins.due(1_300).is_empty());
         assert_eq!(sign_ins.who(&name, 1_300).unwrap().0.groups, ["staff"]);
         assert_eq!(sign_ins.due(1_500)[0].1.expose(), "r2");
@@ -480,7 +490,12 @@ mod tests {
 
         // renewed as somebody else: that is no renewal
         let other = sign_ins.hold(person.clone(), &signed(Some("r1"), 300), 1_000);
-        sign_ins.renewed(&other, &Signed { says: Some(says("another")), renewal: Some(Secret::new("r2")), good_for: 300 }, "groups", 1_250);
+        sign_ins.renewed(
+            &other,
+            &Signed { says: Some(says("another")), renewal: Some(Secret::new("r2")), good_for: 300, token: None },
+            "groups",
+            1_250,
+        );
         assert_eq!(sign_ins.who(&other, 1_251), Some((person, true)));
     }
 

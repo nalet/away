@@ -66,6 +66,9 @@ struct Signing {
     told: SignIn,
     service: Service,
     sign_ins: SignIns,
+    /// Held while a sign-in is renewed: what a sign-in is renewed with is good once,
+    /// so no two renewals of one sign-in run at a time.
+    renewing: tokio::sync::Mutex<()>,
 }
 
 /// Everything that getting in needs.
@@ -91,7 +94,12 @@ impl GettingIn {
         let signing = match told.sign_in {
             Some(sign_in) => {
                 let client = Client::new(sign_in.authorities.as_deref())?;
-                Some(Signing { service: Service::new(sign_in.service.clone(), client), sign_ins: SignIns::new(), told: sign_in })
+                Some(Signing {
+                    service: Service::new(sign_in.service.clone(), client),
+                    sign_ins: SignIns::new(),
+                    told: sign_in,
+                    renewing: tokio::sync::Mutex::new(()),
+                })
             }
             None => None,
         };
@@ -620,8 +628,55 @@ impl GettingIn {
                 answer(StatusCode::OK, "application/json", says.write())
             }
             "/internal/told" => self.told(&said).await,
+            "/internal/vouch" => self.vouch(said("session")).await,
             _ => plain(StatusCode::NOT_FOUND, "Nothing is at this address.\n"),
         }
+    }
+
+    /// Answers for a session that runs, to the issuer: whose it is, on which machine,
+    /// and what the sign-in service signs about that person at this moment. The
+    /// person's sign-in is renewed for it, so that what is handed over is new, and the
+    /// issuer checks the signature for itself
+    /// ([ADR-0007](../../../spec/architecture/decisions/0007-short-lived-certificates.md)).
+    /// A session that doesn't run, and a person whose sign-in has run out, get nothing.
+    async fn vouch(&self, session: Option<&str>) -> Answer {
+        let Some(session) = session else { return plain(StatusCode::BAD_REQUEST, "A session is named, as session=.\n") };
+        let Some(running) = self.sessions.running(session) else { return plain(StatusCode::NOT_FOUND, "No session of that name runs.\n") };
+        let Some(signing) = &self.signing else { return plain(StatusCode::NOT_FOUND, "Nobody is signed in here.\n") };
+        let now = time::now().as_secs();
+        let renewing = signing.renewing.lock().await;
+        let Some(renewal) = signing.sign_ins.renewal_of(&running.sign_in) else {
+            return plain(StatusCode::FORBIDDEN, "The person's sign-in has run out.\n");
+        };
+        let signed = match signing.service.renew(&renewal, now).await {
+            Ok(signed) => signed,
+            Err(Failed::Refused(why)) => {
+                signing.sign_ins.refused(&running.sign_in);
+                self.part.lines.info("a sign-in ran out", &[("details", (&why).into())]);
+                return plain(StatusCode::FORBIDDEN, "The person's sign-in has run out.\n");
+            }
+            Err(Failed::NoAnswer(why) | Failed::Unusable(why)) => {
+                self.part.lines.warn("a sign-in could not be renewed", &[("details", (&why).into())]);
+                return plain(StatusCode::BAD_GATEWAY, "The sign-in service did not sign anew who this person is.\n");
+            }
+        };
+        signing.sign_ins.renewed(&running.sign_in, &signed, &signing.told.groups_entry, now);
+        drop(renewing);
+        // whoever the service now says this is has to be the person the session is of
+        let still_them = signing
+            .sign_ins
+            .who(&running.sign_in, now)
+            .is_some_and(|(person, ran_out)| !ran_out && person.subject == running.person.subject);
+        let (true, Some(token)) = (still_them, &signed.token) else {
+            return plain(StatusCode::FORBIDDEN, "The sign-in service did not sign anew who this person is.\n");
+        };
+        let says = Json::object([
+            ("session", session.into()),
+            ("subject", running.person.subject.as_str().into()),
+            ("machine", running.machine.as_str().into()),
+            ("token", token.expose().into()),
+        ]);
+        answer(StatusCode::OK, "application/json", says.write())
     }
 
     /// Takes what the gateway says became of a session.
@@ -762,7 +817,10 @@ impl GettingIn {
             signing.service.forget(&renewal).await;
         }
         self.count(signing);
-        for (name, renewal) in signing.sign_ins.due(now) {
+        for (name, _) in signing.sign_ins.due(now) {
+            // one renewal at a time, and with what the sign-in is renewed with at that moment
+            let _renewing = signing.renewing.lock().await;
+            let Some(renewal) = signing.sign_ins.renewal_of(&name) else { continue };
             match signing.service.renew(&renewal, now).await {
                 Ok(signed) => signing.sign_ins.renewed(&name, &signed, &signing.told.groups_entry, now),
                 Err(Failed::Refused(why)) => {

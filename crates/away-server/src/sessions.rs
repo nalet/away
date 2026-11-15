@@ -45,6 +45,8 @@ pub struct Asked {
 pub struct Running {
     /// Whose it is.
     pub person: Person,
+    /// The sign-in of the browser that asked for it.
+    pub sign_in: String,
     /// The machine, by its name.
     pub machine: String,
     /// Since when, in seconds since 1970.
@@ -84,7 +86,7 @@ impl Sessions {
         if asked.sign_in != sign_in || now.saturating_sub(asked.at) > TICKET_GOOD_FOR {
             return None;
         }
-        let running = Running { person: asked.person.clone(), machine: asked.machine.clone(), since: now };
+        let running = Running { person: asked.person.clone(), sign_in: asked.sign_in.clone(), machine: asked.machine.clone(), since: now };
         self.running.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(asked.session.clone(), running);
         Some(asked)
     }
