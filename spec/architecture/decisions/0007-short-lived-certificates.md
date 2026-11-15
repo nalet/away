@@ -48,7 +48,7 @@ A shell has a way of the same kind: a certificate for one key, signed by an auth
 
 ### Validation
 
-[Package 3](../../plan/README.md) proves the Windows half with Away's own code and no browser: on a real domain, an ordinary account is signed in on a Windows machine with a certificate of five minutes and nothing typed, reads a file share as itself, and an administrator's account is refused. That a domain accepts such a certificate for an ordinary account, from a device outside it, has been seen with other software; that Away's own code does it is what the package shows.
+[Package 3](../../plan/README.md) proves the Windows half with Away's own code and no browser: on a real domain, with a certificate of the domain's own authority, an ordinary account is signed in on a Windows machine with a certificate of five minutes and nothing typed, reads a file share as itself, and an administrator's account is refused. That a domain accepts such a certificate for an ordinary account, from a device outside it, has been seen with other software; that Away's own code does it is what the package shows.
 
 ## Consequences
 

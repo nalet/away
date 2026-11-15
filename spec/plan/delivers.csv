@@ -153,10 +153,10 @@ p11,update-in-one-step,,
 p12,be-oneself-on-machine,rdp,
 p12,reach-network-as-oneself,,
 p12,unlock-without-password,,
-p12,connect-domain-authority,,With Away's own authority
-p12,certify-domain-controllers,,
+p12,connect-domain-authority,,With the organisation's own authority
 p12,name-account-claim,,The name and the identifier a Windows domain knows a person's account by
-p13,connect-domain-authority,,With the organisation's own authority
+p13,connect-domain-authority,,With Away's own authority
+p13,certify-domain-controllers,,
 p14,work-by-touch,,
 p14,zoom-by-touch,,
 p14,use-extra-keys,,
