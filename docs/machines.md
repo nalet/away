@@ -277,8 +277,11 @@ machine that offers more is opened from its own page, where each way in is.
   desktop names the machine that served it.
 - **The machine has the whole window.** Every key, every click and the wheel go
   to it. A small handle at the top edge opens the session's bar, and so does
-  Ctrl + Alt + Shift, pressed and let go with no other key. The bar fills the
-  screen and ends the session.
+  Ctrl + Alt + Shift, pressed and let go with no other key. The bar sends the
+  key combinations a browser keeps for itself (Ctrl + Alt + Del, Alt + Tab,
+  Alt + F4, the Windows key and Ctrl + W), fills the screen and ends the
+  session. While a session fills the screen, a browser that allows it gives
+  every key to the machine.
 - **A Windows desktop opens at the window's size, in the screen's own dots.**
   On a screen with more dots than a page counts, the machine is asked for
   that many and draws larger by as much, so text has the size it has at the

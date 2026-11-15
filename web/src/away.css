@@ -228,6 +228,12 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .sess .sbar .on { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/1 var(--ff-mono); color: var(--fg); }
 .sess .sbar .on svg { color: var(--cloud-blue); }
 .sess .sbar .grow { flex: 1; }
+/* a button of the bar with its menu: the menu hangs under the button, over the machine's screen */
+.sess .sbar .menuof { position: relative; display: inline-flex; }
+.sess .sbar .is-open { background: var(--surface-2); color: var(--cloud-blue); }
+.sess .sessmenu { position: absolute; z-index: 3; top: 44px; right: 0; min-width: 200px; display: flex; flex-direction: column; padding: 4px 0;
+                  background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
+.sess .sessmenu .nc-actionmenu__item { display: flex; min-height: 40px; font-family: var(--ff-mono); }
 /* the windows of the programs, in the session's bar: each is brought to the front, or closed */
 .sess .sbar .wins { display: flex; align-items: center; gap: 4px; margin: 0 0 0 16px; padding: 0; list-style: none; min-width: 0; overflow: hidden; }
 .sess .sbar .wins li { display: inline-flex; align-items: center; min-width: 0; border: 1px solid var(--border-2); }

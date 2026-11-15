@@ -4,9 +4,9 @@
 // its own but a handle. A program's windows show on Away's ground, where the machine
 // has them on its desktop.
 import { Button, Chevron, EmptyState, Field, IconButton, Input, Spinner } from '@nalet/design-system';
-import { AppWindow, Check, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
+import { AppWindow, Check, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, KeyboardEvent as KeyOfReact } from 'react';
 
 import { pageOf, useMachines } from '../machines';
 import type { Machine } from '../machines';
@@ -303,6 +303,19 @@ function Opening({
 }
 
 // A desktop that is open: the machine's screen has the window, and every key, every
+// The key combinations a browser or a device keeps for itself, each as its keys in the
+// order they go down: the session's bar sends one with a click.
+const KEPT: { name: string; keys: string[] }[] = [
+  { name: texts.session.kept.ctrlAltDel, keys: ['ControlLeft', 'AltLeft', 'Delete'] },
+  { name: texts.session.kept.altTab, keys: ['AltLeft', 'Tab'] },
+  { name: texts.session.kept.altF4, keys: ['AltLeft', 'F4'] },
+  { name: texts.session.kept.windows, keys: ['MetaLeft'] },
+  { name: texts.session.kept.ctrlW, keys: ['ControlLeft', 'KeyW'] },
+];
+
+// What a browser that gives a page every key is asked through, where it has it.
+type KeysOfBrowser = { lock?: () => Promise<void>; unlock?: () => void };
+
 // click and the wheel go to the machine. Of a program, the windows show where the
 // machine has them on its desktop, and what is around them is Away's ground.
 function Desktop({
@@ -321,13 +334,32 @@ function Desktop({
   const t = texts.session;
   const [bar, setBar] = useState(false);
   const [filled, setFilled] = useState(Boolean(document.fullscreenElement));
+  // whether the menu of the keys is open, and what holds its button and the menu
+  const [keys, setKeys] = useState(false);
+  const keysOf = useRef<HTMLSpanElement | null>(null);
   const screen = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const changed = () => setFilled(Boolean(document.fullscreenElement));
+    // while the session fills the screen, a browser that allows it gives every key to
+    // the page, and so to the machine: the keys it keeps for itself otherwise, too
+    const keyboard = (navigator as { keyboard?: KeysOfBrowser }).keyboard;
+    const changed = () => {
+      const fills = Boolean(document.fullscreenElement);
+      setFilled(fills);
+      if (fills) keyboard?.lock?.().catch(() => undefined);
+      else keyboard?.unlock?.();
+    };
     document.addEventListener('fullscreenchange', changed);
-    return () => document.removeEventListener('fullscreenchange', changed);
+    return () => {
+      document.removeEventListener('fullscreenchange', changed);
+      keyboard?.unlock?.();
+    };
   }, []);
+
+  // the menu's first key combination has the focus when it opens
+  useEffect(() => {
+    if (keys) keysOf.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, [keys]);
 
   useEffect(() => {
     const holds = screen.current;
@@ -451,8 +483,33 @@ function Desktop({
     else document.documentElement.requestFullscreen().catch(() => undefined);
   };
   const close = () => {
+    setKeys(false);
     setBar(false);
     canvas.focus();
+  };
+  // the keys go down in their order and come up in the other, as under a hand; then
+  // the machine has the window again
+  const send = (codes: string[]) => {
+    const places = codes.map(placeOf).filter((place) => place !== null);
+    const goDown: Did[] = places.map((place) => ({ key: { ...place, down: true } }));
+    const comeUp: Did[] = [...places].reverse().map((place) => ({ key: { ...place, down: false } }));
+    say(did([...goDown, ...comeUp]));
+    close();
+  };
+  const inKeysMenu = (event: KeyOfReact<HTMLDivElement>) => {
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const to = { ArrowDown: (at + 1) % items.length, ArrowUp: (at + items.length - 1) % items.length, Home: 0, End: items.length - 1 }[event.key];
+    if (to !== undefined) {
+      event.preventDefault();
+      items[to]?.focus();
+    } else if (event.key === 'Escape') {
+      // the menu closes, and the bar stays
+      event.preventDefault();
+      event.stopPropagation();
+      setKeys(false);
+      keysOf.current?.querySelector('button')?.focus();
+    } else if (event.key === 'Tab') setKeys(false);
   };
   // the parts of the windows that can be seen, as shares of the desktop's width and height
   const parts = windows.flatMap((window) => window.seen.map((part) => ({ of: window.id, part })));
@@ -503,7 +560,36 @@ function Desktop({
             </ul>
           )}
           <span className="grow" />
-          <IconButton variant="ghost" label={filled ? t.unfill : t.fill} title={filled ? t.unfill : t.fill} onClick={fill} autoFocus>
+          <span
+            className="menuof"
+            ref={keysOf}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setKeys(false);
+            }}
+          >
+            <IconButton
+              variant="ghost"
+              label={t.keys}
+              title={t.keys}
+              className={keys ? 'is-open' : undefined}
+              aria-haspopup="menu"
+              aria-expanded={keys}
+              onClick={() => setKeys(!keys)}
+              autoFocus
+            >
+              <Keyboard size={16} aria-hidden="true" />
+            </IconButton>
+            {keys && (
+              <div className="sessmenu" role="menu" aria-label={t.keys} onKeyDown={inKeysMenu}>
+                {KEPT.map((kept) => (
+                  <button key={kept.name} type="button" role="menuitem" tabIndex={-1} className="nc-actionmenu__item" onClick={() => send(kept.keys)}>
+                    <span className="nc-actionmenu__label">{kept.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </span>
+          <IconButton variant="ghost" label={filled ? t.unfill : t.fill} title={filled ? t.unfill : t.fill} onClick={fill}>
             {filled ? <Minimize size={16} aria-hidden="true" /> : <Maximize size={16} aria-hidden="true" />}
           </IconButton>
           <IconButton variant="ghost" label={t.end} title={t.end} onClick={() => say(leaves())}>

@@ -874,11 +874,44 @@ test.describe('a session', () => {
     const bar = page.getByRole('toolbar', { name: "the session's bar" });
     await expect(bar).toContainText('desk-01');
     expect(await bar.getByRole('button').evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))).toEqual([
+      'keys',
       'fill the screen',
       'end',
       'close the bar',
     ]);
     await accessible(page);
+
+    // the keys a browser keeps for itself: a menu under their button, walked with the
+    // arrows; Esc closes the menu and leaves the bar
+    const keys = bar.getByRole('button', { name: 'keys' });
+    await expect(keys).toBeFocused();
+    await expect(keys).toHaveAttribute('aria-expanded', 'false');
+    await keys.click();
+    const kept = page.getByRole('menu', { name: 'keys' });
+    await expect(kept.getByRole('menuitem')).toHaveText(['ctrl + alt + del', 'alt + tab', 'alt + f4', 'windows key', 'ctrl + w']);
+    await expect(keys).toHaveAttribute('aria-expanded', 'true');
+    await expect(kept.getByRole('menuitem', { name: 'ctrl + alt + del' })).toBeFocused();
+    await accessible(page);
+    await page.keyboard.press('ArrowUp');
+    await expect(kept.getByRole('menuitem', { name: 'ctrl + w' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(kept).toHaveCount(0);
+    await expect(bar).toBeVisible();
+    await expect(keys).toBeFocused();
+    // one click sends the keys, in their order: the last to go down is Del, and the
+    // machine has the window again
+    await keys.click();
+    await kept.getByRole('menuitem', { name: 'ctrl + alt + del' }).click();
+    await expect(bar).toHaveCount(0);
+    await expect(screen).toBeFocused();
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 172, 83]);
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await bar.getByRole('button', { name: 'keys' }).click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 238, 17]);
+
+    await page.getByRole('button', { name: "open the session's bar" }).click();
     await page.keyboard.press('Escape');
     await expect(bar).toHaveCount(0);
     await expect(screen).toBeFocused();
