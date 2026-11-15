@@ -6,7 +6,7 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 
-use away_winauth::kerberos::exchange::{framed, unframed, First, Later, Ticket};
+use away_winauth::kerberos::exchange::{framed, unframed, First, Later, Ticket, WithAPassword};
 use away_winauth::kerberos::messages::{Name, NameKind};
 use away_winauth::kerberos::pkinit::{Fresh, Held, Trusts};
 use away_winauth::Error;
@@ -85,6 +85,29 @@ fn a_real_server_gives_a_first_ticket_for_a_certificate_and_with_it_one_for_a_ma
     let refused = later.receive(&ask(&at, &request)).expect_err("no such service");
     assert!(matches!(refused, Error::Refused { code: 7, .. }), "{refused}");
     assert!(refused.to_string().starts_with("The domain controller refused: it knows no such service (its own code 7)"), "{refused}");
+}
+
+#[test]
+fn a_real_server_gives_a_first_ticket_for_a_password_and_none_for_a_wrong_one() {
+    let Some(at) = server() else { return };
+    let with = |password: &str| -> Result<Ticket, Error> {
+        let (mut asking, request) = WithAPassword::begin("pat.typed", "CORP.EXAMPLE", now(), 0x0bad_cafe);
+        let proof = asking.prove(&ask(&at, &request), password, now(), [9; 16])?;
+        asking.receive(&ask(&at, &proof))
+    };
+    let first = with("a password that exists for these tests alone").expect("a first ticket");
+    assert_eq!((first.realm.as_str(), &first.account), ("CORP.EXAMPLE", &Name::new(NameKind::Account, &["pat.typed"])));
+    // and with it a ticket for a machine, as with a certificate
+    let machine = Name::new(NameKind::Service, &["TERMSRV", "desk-01.corp.example"]);
+    let (later, request) = Later::begin(&first, machine.clone(), now(), 3, [7; 16]);
+    assert_eq!(later.receive(&ask(&at, &request)).expect("a ticket for the machine").service, machine);
+
+    // a wrong password proves nothing, and an account that is not there is none
+    let wrong = with("another password").expect_err("a wrong password");
+    assert!(matches!(wrong, Error::Refused { code: 24, .. }), "{wrong}");
+    let (mut asking, request) = WithAPassword::begin("nobody.known", "CORP.EXAMPLE", now(), 1);
+    let unknown = asking.prove(&ask(&at, &request), "any", now(), [9; 16]).expect_err("no such account");
+    assert!(matches!(unknown, Error::Refused { code: 6, .. }), "{unknown}");
 }
 
 #[test]

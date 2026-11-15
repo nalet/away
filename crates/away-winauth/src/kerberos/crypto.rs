@@ -87,6 +87,32 @@ impl Key {
         Key { kind, bytes }
     }
 
+    /// The key an account has from its password (RFC 3962, 4): the password and what the
+    /// domain salts it with are stretched, as many times over as the domain says, and the
+    /// key is made from that.
+    pub fn from_password(kind: Kind, password: &str, salt: &[u8], times: u32) -> Key {
+        let mut stretched = Vec::with_capacity(kind.length() + 20);
+        let mut nth = 1u32;
+        while stretched.len() < kind.length() {
+            // one block of it: the salt and the block's number, hashed with the password
+            // as the key, and each result hashed again and laid over the last
+            let mut salted = salt.to_vec();
+            salted.extend_from_slice(&nth.to_be_bytes());
+            let mut last = keyed_hash(password.as_bytes(), &salted);
+            let mut block = last;
+            for _ in 1..times.max(1) {
+                last = keyed_hash(password.as_bytes(), &last);
+                for (byte, laid_over) in block.iter_mut().zip(last) {
+                    *byte ^= laid_over;
+                }
+            }
+            stretched.extend_from_slice(&block);
+            nth += 1;
+        }
+        stretched.truncate(kind.length());
+        Key { kind, bytes: stretched }.derive(b"kerberos")
+    }
+
     fn encrypt(&self, block: &mut [u8; BLOCK]) {
         match self.kind {
             Kind::Aes128 => aes::Aes128::new_from_slice(&self.bytes).expect("a key of 16 bytes").encrypt_block(block.into()),
@@ -215,11 +241,16 @@ impl Key {
     }
 }
 
+/// A message hashed with a key: HMAC with SHA-1.
+fn keyed_hash(key: &[u8], message: &[u8]) -> [u8; 20] {
+    let mut mac = Hmac::<Sha1>::new_from_slice(key).expect("HMAC takes a key of any length");
+    mac.update(message);
+    mac.finalize().into_bytes().into()
+}
+
 /// The check on a message: the first twelve bytes of its HMAC with SHA-1.
 fn mac(key: &Key, message: &[u8]) -> [u8; CHECK] {
-    let mut mac = Hmac::<Sha1>::new_from_slice(&key.bytes).expect("HMAC takes a key of any length");
-    mac.update(message);
-    mac.finalize().into_bytes()[..CHECK].try_into().expect("twelve bytes")
+    keyed_hash(&key.bytes, message)[..CHECK].try_into().expect("twelve bytes")
 }
 
 /// Makes bytes of one length from bytes of another, so that every bit of what is given
@@ -325,6 +356,16 @@ mod tests {
         assert_eq!(from.derive(b"kerberos").bytes, bytes("42263c6e89f4fc28b8df68ee09799f15"));
         let from = Key::new(Kind::Aes256, &bytes("cdedb5281bb2f801565a1122b25635150ad1f7a04bb9f3a333ecc0e2e1f70837")).unwrap();
         assert_eq!(from.derive(b"kerberos").bytes, bytes("fe697b52bc0d3ce14432ba036a92e65bbb52280990a2fa27883998d72af30161"));
+        // and the whole way from a password: stretched once, and 1200 times
+        let salt = b"ATHENA.MIT.EDUraeburn";
+        for (kind, times, key) in [
+            (Kind::Aes128, 1, "42263c6e89f4fc28b8df68ee09799f15"),
+            (Kind::Aes256, 1, "fe697b52bc0d3ce14432ba036a92e65bbb52280990a2fa27883998d72af30161"),
+            (Kind::Aes128, 1200, "4c01cd46d632d01e6dbe230a01ed642a"),
+            (Kind::Aes256, 1200, "55a6ac740ad17b4846941051e1e8b0a7548d93b0ab30a8bc3ff16280382b8c2a"),
+        ] {
+            assert_eq!(Key::from_password(kind, "password", salt, times).bytes, bytes(key), "{kind:?}, {times} times");
+        }
         assert_eq!(Kind::of(18).map(Kind::length), Some(32));
         assert_eq!((Kind::of(17), Kind::of(23)), (Some(Kind::Aes128), None));
         assert!(Key::new(Kind::Aes256, &[0; 16]).is_none());

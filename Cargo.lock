@@ -151,6 +151,7 @@ name = "away-try"
 version = "0.1.0"
 dependencies = [
  "away-rdp",
+ "away-winauth",
  "getrandom 0.4.3",
  "rustls",
  "sha2",

@@ -132,6 +132,11 @@ pub const WITH_A_CERTIFICATE_ANSWER: i64 = 17;
 pub const WITH_A_TICKET: i64 = 1;
 /// Whether the ticket should say what the account may do in the domain.
 pub const WITH_WHAT_THE_ACCOUNT_MAY: i64 = 128;
+/// The time, sealed with the key an account has from its password: the proof of who
+/// asks, where a password is what they have.
+pub const WITH_THE_TIME: i64 = 2;
+/// How the key an account has from its password is made.
+pub const HOW_THE_KEY_IS_MADE: i64 = 19;
 
 /// What is asked of a domain controller: a ticket for a service, for an account.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -189,6 +194,48 @@ pub fn request(first: bool, extras: &[Extra], asked: &[u8]) -> Vec<u8> {
 /// Whether the ticket is asked to say what the account may do in the domain: yes.
 pub fn with_what_the_account_may() -> Extra {
     Extra { kind: WITH_WHAT_THE_ACCOUNT_MAY, holds: der::sequence(&[der::under(0, &der::write(der::BOOLEAN, &[0xff]))]) }
+}
+
+/// The proof of who asks that a password gives: the time, sealed with the account's key.
+pub fn with_the_time(key: &Key, now: (u64, u32), begins_with: [u8; 16]) -> Extra {
+    let time = der::sequence(&[der::under(0, &der::time(now.0)), der::under(1, &der::number(i64::from(now.1)))]);
+    Extra { kind: WITH_THE_TIME, holds: Sealed::with(key, 1, begins_with, &time).write() }
+}
+
+/// How the key an account has from its password is made, in one of the ways of sealing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HowAKeyIsMade {
+    /// The way of sealing, as its number.
+    pub kind: i64,
+    /// What the password is salted with, where the domain says.
+    pub salt: Option<Vec<u8>>,
+    /// How many times over it is stretched, where the domain says.
+    pub times: Option<u32>,
+}
+
+/// Reads what a domain controller sends along with a refusal that asks for a proof: how
+/// the account's key is made, in each way of sealing it offers, the one it likes best
+/// first.
+pub fn read_how_keys_are_made(more: &[u8]) -> Result<Vec<HowAKeyIsMade>, Error> {
+    let mut ways = Vec::new();
+    let mut listed = Reader::new(more).expect(der::SEQUENCE)?.inside();
+    while !listed.is_empty() {
+        let mut extra = listed.expect(der::SEQUENCE)?.inside();
+        if extra.needed(1)?.number()? != HOW_THE_KEY_IS_MADE {
+            continue;
+        }
+        let holds = expect(extra.needed(2)?, der::OCTET_STRING)?.holds;
+        let mut entries = Reader::new(holds).expect(der::SEQUENCE)?.inside();
+        while !entries.is_empty() {
+            let mut entry = entries.expect(der::SEQUENCE)?.inside();
+            let kind = entry.needed(0)?.number()?;
+            let salt = entry.under(1)?.map(|salt| salt.holds.to_vec());
+            // the times it is stretched over, as four bytes
+            let times = entry.under(2)?.and_then(|times| times.holds.try_into().ok().map(u32::from_be_bytes));
+            ways.push(HowAKeyIsMade { kind, salt, times });
+        }
+    }
+    Ok(ways)
 }
 
 /// A domain controller's answer to a request for a ticket.

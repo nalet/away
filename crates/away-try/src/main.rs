@@ -11,6 +11,8 @@
 //! real machines, with no browser and nothing else of Away around it. It is not in the
 //! image.
 
+mod kerberos;
+
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::process::ExitCode;
@@ -115,12 +117,26 @@ fn main() -> ExitCode {
     let words: Vec<String> = std::env::args().skip(1).collect();
     if let [word] = words.as_slice() {
         if matches!(word.as_str(), "help" | "--help" | "-h") {
-            print!("{USAGE}");
+            print!("{USAGE}\n{}", kerberos::USAGE);
             return ExitCode::SUCCESS;
         }
     }
+    // a domain controller is tried with Kerberos, a machine with RDP
+    if words.first().is_some_and(|kind| kind == "kerberos") {
+        return match kerberos::run(&words[1..]) {
+            Some(Ok(())) => ExitCode::SUCCESS,
+            Some(Err(why)) => {
+                println!("   {why}");
+                ExitCode::FAILURE
+            }
+            None => {
+                eprint!("{}", kerberos::USAGE);
+                ExitCode::from(2)
+            }
+        };
+    }
     let Some(asked) = asked(&words) else {
-        eprint!("{USAGE}");
+        eprint!("{USAGE}\n{}", kerberos::USAGE);
         return ExitCode::from(2);
     };
     let tried = match (&asked.account, &asked.password_file) {

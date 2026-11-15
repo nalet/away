@@ -1,8 +1,8 @@
 #!/bin/sh
 # Tries Away's own Kerberos against a real Kerberos server: starts one in a container,
 # for the domain of the tests' certificates, CORP.EXAMPLE, with certificate sign-in
-# switched on, an account, a second account and a machine's service, and runs the tests
-# that need it.
+# switched on, two accounts that sign in with a certificate, one that signs in with a
+# password, and a machine's service, and runs the tests that need it.
 #
 #   tests/machines/kerberos/real.sh
 #
@@ -72,6 +72,8 @@ kdb5_util create -s -r CORP.EXAMPLE -P "a password for this machine alone" >/dev
 for account in alex.urban sam.other; do
   kadmin.local -q "addprinc -randkey +requires_preauth $account@CORP.EXAMPLE" >/dev/null 2>&1
 done
+# and one that is signed in with a password
+kadmin.local -q "addprinc -pw \"a password that exists for these tests alone\" +requires_preauth pat.typed@CORP.EXAMPLE" >/dev/null 2>&1
 kadmin.local -q "addprinc -randkey TERMSRV/desk-01.corp.example@CORP.EXAMPLE" >/dev/null 2>&1
 echo "the server is ready"
 exec krb5kdc -n

@@ -274,6 +274,22 @@ pass. The pipeline always has one, and fails where a test finds none. The
 certificates are made by `crates/away-winauth/tests/fixtures/make.sh`, for a
 domain that doesn't exist.
 
+`away-try` asks a domain controller with the same code, and says what it
+answers:
+
+```sh
+cargo run --package away-try -- kerberos dc-01.example.com --realm CORP.EXAMPLE --as alex.urban --password-file ~/.config/away/password --for TERMSRV/fin-app-02.example.com
+cargo run --package away-try -- kerberos dc-01.example.com --realm CORP.EXAMPLE --as alex.urban \
+  --certificate alex.der --key alex.key.der --authority authority.der --for TERMSRV/fin-app-02.example.com
+```
+
+With a password, the account proves itself as it does when it signs in at a
+machine of the domain. With a certificate, it proves itself with the
+certificate's key and nothing else, and the domain controller has to prove
+itself in turn with a certificate of the authority that is named. `--for` asks
+for a ticket for a service with the first ticket; a machine's desktop is
+`TERMSRV/` and its name. The realm is the domain's name in capitals.
+
 This is the first part of signing in as oneself. No page and no session uses
 it yet.
 

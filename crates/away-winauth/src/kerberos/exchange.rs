@@ -102,6 +102,67 @@ impl First {
     }
 }
 
+/// The first request where a password is what proves who asks: the domain controller is
+/// asked once to learn how the account's key is made, and once more with the proof.
+pub struct WithAPassword {
+    account: String,
+    realm: String,
+    nonce: u32,
+    key: Option<Key>,
+}
+
+impl WithAPassword {
+    /// Begins: the request to send, which proves nothing yet. The domain controller
+    /// answers it with how the account's key is made.
+    pub fn begin(account: &str, realm: &str, now: (u64, u32), nonce: u32) -> (WithAPassword, Vec<u8>) {
+        let asking = WithAPassword { account: account.to_string(), realm: realm.to_string(), nonce, key: None };
+        let request = messages::request(true, &[messages::with_what_the_account_may()], &asking.asked(now));
+        (asking, request)
+    }
+
+    fn asked(&self, now: (u64, u32)) -> Vec<u8> {
+        Asked {
+            account: Some(Name::new(NameKind::Account, &[&self.account])),
+            realm: self.realm.clone(),
+            service: Name::new(NameKind::Service, &["krbtgt", &self.realm]),
+            until: now.0 + GOOD_FOR,
+            nonce: self.nonce,
+            kinds: vec![Kind::Aes256, Kind::Aes128],
+        }
+        .write()
+    }
+
+    /// Takes the domain controller's first answer, which says how the account's key is
+    /// made, and gives the request that proves who asks: the time, sealed with that key.
+    pub fn prove(&mut self, reply: &[u8], password: &str, now: (u64, u32), begins_with: [u8; 16]) -> Result<Vec<u8>, Error> {
+        let how = match messages::read_reply(reply)? {
+            // it asks for the proof, and says how the key is made
+            Reply::Refused(asks) if asks.code == 25 => messages::read_how_keys_are_made(&asks.more.unwrap_or_default())?,
+            Reply::Refused(why) => return Err(refused(why)),
+            Reply::Answered(_) => return Err(Error::NotTrusted("it gave a ticket to somebody who proved nothing")),
+        };
+        // the first of its ways that is spoken here
+        let (kind, how) = how
+            .iter()
+            .find_map(|how| Kind::of(how.kind).map(|kind| (kind, how)))
+            .ok_or(Error::NotKerberos("it makes the account's key in no way that is spoken here"))?;
+        let salt = how.salt.clone().unwrap_or_else(|| [self.realm.as_bytes(), self.account.as_bytes()].concat());
+        let key = Key::from_password(kind, password, &salt, how.times.unwrap_or(4096));
+        let extras = [messages::with_the_time(&key, now, begins_with), messages::with_what_the_account_may()];
+        self.key = Some(key);
+        Ok(messages::request(true, &extras, &self.asked(now)))
+    }
+
+    /// Takes the domain controller's answer to the proof, and gives the first ticket.
+    pub fn receive(self, reply: &[u8]) -> Result<Ticket, Error> {
+        let key = self.key.ok_or(Error::NotKerberos("an answer came before the proof was sent"))?;
+        match messages::read_reply(reply)? {
+            Reply::Answered(answered) => given(answered, &key, 3, self.nonce),
+            Reply::Refused(why) => Err(refused(why)),
+        }
+    }
+}
+
 /// Opens what an answer seals for the client, and makes the ticket of it.
 fn given(answered: messages::Answered, key: &Key, usage: u32, nonce: u32) -> Result<Ticket, Error> {
     let given = messages::read_given(&answered.sealed.open(key, usage)?)?;

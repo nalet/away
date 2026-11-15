@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 away-rdp.workspace = true
+away-winauth.workspace = true
 rustls.workspace = true
 getrandom.workspace = true
 sha2.workspace = true
