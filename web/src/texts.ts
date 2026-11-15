@@ -112,6 +112,9 @@ export const texts = {
     running: 'running',
     failedAt: 'failed',
     asks: (machine: string) => `${machine} asks for a name and a password. Away passes them on and doesn't keep them.`,
+    // a person Away signs in as themselves on no machine, on a machine where others are
+    asksInstead: (machine: string) =>
+      `Away signs you in on no machine as yourself, so ${machine} asks for a name and a password. Away passes them on and doesn't keep them.`,
     asksAgain: (machine: string) => `${machine} didn't accept that name and password.`,
     name: 'Name',
     password: 'Password',

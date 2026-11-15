@@ -82,6 +82,9 @@ enum Takes {
     Account(String, String),
     /// A ticket for its service, which it opens with the service's key.
     Tickets(Key),
+    /// Either of them, as a machine of a domain does: a ticket for its service, or the
+    /// one account it knows, with its name and its password.
+    Either(Key, String, String),
 }
 
 /// A stand-in for a machine, listening.
@@ -113,6 +116,14 @@ impl Machine {
     /// service, which this is the key of, and reads the card it is handed.
     pub async fn start_in_a_domain(of_the_service: Key, shows: Picture) -> Machine {
         Machine::listening("127.0.0.1:0", Takes::Tickets(of_the_service), shows, None).await
+    }
+
+    /// A stand-in that is in a domain and knows an account besides, as a machine of a
+    /// domain does: it takes a ticket for its service and reads the card it is handed,
+    /// or signs that account in with its name and its password.
+    pub async fn start_in_a_domain_that_knows(of_the_service: Key, account: &str, password: &str, shows: Picture) -> Machine {
+        let takes = Takes::Either(of_the_service, account.to_string(), password.to_string());
+        Machine::listening("127.0.0.1:0", takes, shows, None).await
     }
 
     /// A stand-in for a farm's broker that is in a domain: it takes a ticket, and sends
@@ -226,6 +237,10 @@ async fn serve(
     let (mut with_a_password, mut with_a_ticket) = match takes {
         Takes::Account(account, password) => (Some(StandIn::new(Account::named(&account, Secret::new(password)), &holds)), None),
         Takes::Tickets(of_the_service) => (None, Some(away_winauth::sign_in::stand_in::Machine::new(of_the_service, &holds))),
+        Takes::Either(of_the_service, account, password) => (
+            Some(StandIn::new(Account::named(&account, Secret::new(password)), &holds)),
+            Some(away_winauth::sign_in::stand_in::Machine::new(of_the_service, &holds)),
+        ),
     };
     loop {
         let mut message = Vec::new();
@@ -239,6 +254,14 @@ async fn serve(
             match secured.read(&mut bytes).await? {
                 0 => return Ok(()),
                 count => message.extend_from_slice(&bytes[..count]),
+            }
+        }
+        // a machine that takes either tells them apart by the first message: the way of
+        // signing in that needs no directory names itself in it
+        if with_a_password.is_some() && with_a_ticket.is_some() {
+            match message.windows(8).any(|part| part == b"NTLMSSP\0") {
+                true => with_a_ticket = None,
+                false => with_a_password = None,
             }
         }
         // an account it doesn't know, a wrong password, a ticket that is not for its

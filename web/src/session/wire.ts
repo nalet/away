@@ -7,7 +7,7 @@ export type Step = 'reaching' | 'checking' | 'signing-in' | 'first-picture';
 // What the gateway says as text.
 export type Said =
   | { step: Step }
-  | { asks: { again: boolean } }
+  | { asks: { again: boolean; instead?: boolean } }
   | { desktop: { width: number; height: number } }
   | { drawn: number }
   | { failed: { step: Step; why: string; details: string } }

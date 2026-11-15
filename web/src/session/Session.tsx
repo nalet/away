@@ -20,7 +20,7 @@ const STEPS: Step[] = ['reaching', 'checking', 'signing-in', 'first-picture'];
 
 // How far a session has come.
 type State =
-  | { is: 'opening'; step: Step | null; asks: { again: boolean } | null }
+  | { is: 'opening'; step: Step | null; asks: { again: boolean; instead?: boolean } | null }
   | { is: 'refused'; status: number }
   | { is: 'failed'; step: Step; why: string; details: string }
   | { is: 'open' }
@@ -235,7 +235,7 @@ function Opening({
                   {asked && (
                     <>
                       <span className="why" role={asks.again ? 'alert' : undefined}>
-                        {asks.again ? t.asksAgain(name) : t.asks(name)}
+                        {asks.again ? t.asksAgain(name) : asks.instead ? t.asksInstead(name) : t.asks(name)}
                       </span>
                       <div className="form">
                         <Field label={t.name}>

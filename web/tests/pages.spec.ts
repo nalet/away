@@ -1098,7 +1098,10 @@ test("the session's messages are written and read as the examples say that the g
   expect(said.slice(0, 5)).toEqual([{ step: 'reaching' }, { step: 'first-picture' }, { asks: { again: false } }, { asks: { again: true } }, { desktop: { width: 1280, height: 800 } }]);
   expect(said[5]).toEqual({ left: 64, top: 128, width: 200, height: 120, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) });
   expect(said.slice(6, 9)).toEqual([{ drawn: 7 }, { failed: { step: 'reaching', why: 'no-answer', details: 'no answer within 10 seconds' } }, { ended: 'left' }]);
-  expect(said.slice(9)).toEqual([{ windows: [{ id: 65537, title: 'Ledger', shown: 'as-it-is', listed: true, seen: [[20, 10, 180, 110]] }], in_front: 65537 }]);
+  expect(said.slice(9)).toEqual([
+    { windows: [{ id: 65537, title: 'Ledger', shown: 'as-it-is', listed: true, seen: [[20, 10, 180, 110]] }], in_front: 65537 },
+    { asks: { again: false, instead: true } },
+  ]);
   expect([readSaid('no JSON'), readSaid('7'), readRectangle(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0, 1]).buffer)]).toEqual([null, null, null]);
 
   // what the pages say

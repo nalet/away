@@ -32,6 +32,9 @@ const WITHIN: Duration = Duration::from_secs(10);
 /// The name of the reader the card is in, and of the machine's own software that reads
 /// a card of this kind.
 const READER: &str = "Away 0";
+/// The issuer's word for a person Away signs in as themselves on no machine: an account
+/// or a group that the installation names for that, such as the directory's administrators.
+const NEVER: &str = "never";
 const PROVIDER: &str = "Microsoft Base Smart Card Crypto Provider";
 
 fn not(details: impl ToString) -> Failure {
@@ -62,8 +65,9 @@ impl Issuer {
     }
 
     /// Asks for what signs the person of a session in: a certificate for the key of
-    /// this request. The issuer's refusal is given in its own words.
-    async fn certificate(&self, session: &str, asked: &[u8]) -> Result<Vec<u8>, Failure> {
+    /// this request. Nothing where the issuer says that Away signs this person in as
+    /// themselves on no machine; any other refusal is given in the issuer's own words.
+    async fn certificate(&self, session: &str, asked: &[u8]) -> Result<Option<Vec<u8>>, Failure> {
         let at = Address { path: "/internal/certificate".to_string(), ..self.at.clone() };
         let request = base64::ordinary(asked);
         let got = self
@@ -73,13 +77,15 @@ impl Issuer {
             .map_err(|failed| not(format!("the issuer: {failed}")))?;
         let said = std::str::from_utf8(&got.body).ok().and_then(|text| Json::read(text).ok()).unwrap_or(Json::Null);
         if got.status != 200 {
-            return Err(match (said.text_of("why"), said.text_of("says")) {
-                (Some(why), Some(says)) => not(format!("{says} ({why})")),
-                _ => not(format!("the issuer answered with the status {}", got.status)),
-            });
+            return match (said.text_of("why"), said.text_of("says")) {
+                (Some(NEVER), Some(_)) => Ok(None),
+                (Some(why), Some(says)) => Err(not(format!("{says} ({why})"))),
+                _ => Err(not(format!("the issuer answered with the status {}", got.status))),
+            };
         }
         said.text_of("certificate")
             .and_then(|letters| base64::read_for_addresses(&letters.replace('+', "-").replace('/', "_").replace('=', "")))
+            .map(Some)
             .ok_or_else(|| not("the issuer answered with nothing that is a certificate"))
     }
 }
@@ -148,10 +154,12 @@ impl Domain {
 
     /// Makes the person of a session who they are in the domain: a key that stays
     /// here, a certificate for it from the issuer, and with it their first ticket.
-    pub async fn themselves(&self, session: &str) -> Result<Themselves, Failure> {
+    /// Nothing for a person Away signs in as themselves on no machine: they sign in as
+    /// on a machine where people type.
+    pub async fn themselves(&self, session: &str) -> Result<Option<Themselves>, Failure> {
         let key = tokio::task::spawn_blocking(Key::new).await.map_err(not)?.map_err(not)?;
         let asked = request::asked(&key, "a session's key").map_err(not)?;
-        let certificate = self.issuer.certificate(session, &asked).await?;
+        let Some(certificate) = self.issuer.certificate(session, &asked).await? else { return Ok(None) };
         let key = key.written().map_err(not)?;
         // the account is the one the certificate names, as the domain writes it
         let named = Certificate::read(&certificate).map_err(not)?.account.ok_or_else(|| not("the certificate names no account"))?;
@@ -168,7 +176,7 @@ impl Domain {
                     let first = first
                         .receive(&reply, &Trusts { authorities: &authorities, controller: host }, now().0)
                         .map_err(|error| not(format!("the domain controller {host}, asked for a first ticket for {named}: {error}")))?;
-                    return Ok(Themselves { certificate, key, name, first, controller: nth });
+                    return Ok(Some(Themselves { certificate, key, name, first, controller: nth }));
                 }
                 Err(why) => last = not(format!("the domain controller {why}")),
             }

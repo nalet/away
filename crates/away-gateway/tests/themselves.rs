@@ -64,8 +64,14 @@ async fn issuer() -> StandsIn {
             }
             let said = carried(asked, 16 * 1024).await.and_then(|sent| read_form(std::str::from_utf8(&sent).ok()?)).unwrap_or_default();
             let said = |name: &str| said.iter().find(|(its, _)| its == name).map(|(_, value)| value.clone()).unwrap_or_default();
-            if said("session") == "refused" {
-                let says = Json::object([("why", "never".into()), ("says", "Away signs nobody in as alex.urban.".into())]);
+            if said("session") == "refused" || said("session") == "never" {
+                let says = match said("session").as_str() {
+                    "never" => Json::object([("why", "never".into()), ("says", "Away signs nobody in as alex.urban.".into())]),
+                    _ => {
+                        let says = "The organisation's authority refused to sign CORP\\alex.urban in. It says: Denied by Policy Module";
+                        Json::object([("why", "authority-refused".into()), ("says", says.into())])
+                    }
+                };
                 return answer(StatusCode::FORBIDDEN, "application/json", says.write());
             }
             let request =
@@ -123,7 +129,7 @@ async fn a_person_is_signed_in_as_themselves_with_a_ticket_and_a_card_and_nothin
     let (host, port) = machine.address();
 
     // who the person is in the domain: a certificate for a key of the gateway's, and a first ticket
-    let who = domain.themselves("5e55").await.expect("the person, as the domain knows them");
+    let who = domain.themselves("5e55").await.expect("the person, as the domain knows them").expect("a person Away signs in so");
     assert_eq!(who.account(), "alex.urban@CORP.EXAMPLE");
     let issued = issuer.issued.lock().unwrap().last().cloned().expect("a certificate was issued");
 
@@ -183,10 +189,16 @@ async fn what_keeps_a_person_from_being_themselves_is_said_at_the_sign_in() {
     // the issuer refuses: in its own words
     let Err(refused) = domain.themselves("refused").await else { panic!("the issuer signs nobody in for this session") };
     assert_eq!((refused.step, refused.why), (Step::SigningIn, Why::NotThemselves));
-    assert_eq!(refused.details, "Away signs nobody in as alex.urban. (never)");
+    assert_eq!(
+        refused.details,
+        "The organisation's authority refused to sign CORP\\alex.urban in. It says: Denied by Policy Module (authority-refused)"
+    );
+    // a person Away signs in as themselves on no machine is no failure: there is
+    // nothing that signs them in, and they type as on any machine
+    assert!(matches!(domain.themselves("never").await, Ok(None)));
 
     // a machine the domain knows no desktop of
-    let who = domain.themselves("5e55").await.expect("the person, as the domain knows them");
+    let who = domain.themselves("5e55").await.expect("the person, as the domain knows them").expect("a person Away signs in so");
     let Err(unknown) = domain.on(&who, "elsewhere.corp.example").await else { panic!("the domain knows no such machine") };
     assert_eq!((unknown.step, unknown.why), (Step::SigningIn, Why::NotThemselves));
     assert!(unknown.details.contains("asked for a ticket for the desktop of elsewhere.corp.example: "), "{}", unknown.details);

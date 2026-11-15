@@ -35,6 +35,9 @@ pub enum ToBrowser<'a> {
     Asks {
         /// Whether it asks again.
         again: bool,
+        /// Whether they are asked for in place of signing the person in as themselves,
+        /// which Away does for this person on no machine.
+        instead: bool,
     },
     /// The desktop is open, at this size in pixels.
     Desktop {
@@ -123,7 +126,10 @@ impl ToBrowser<'_> {
         let object = |held: Json| Carried::Text(held.write());
         match *self {
             ToBrowser::Step(step) => object(Json::object([("step", step.into())])),
-            ToBrowser::Asks { again } => object(Json::object([("asks", Json::object([("again", again.into())]))])),
+            ToBrowser::Asks { again, instead: false } => object(Json::object([("asks", Json::object([("again", again.into())]))])),
+            ToBrowser::Asks { again, instead: true } => {
+                object(Json::object([("asks", Json::object([("again", again.into()), ("instead", true.into())]))]))
+            }
             ToBrowser::Desktop { width, height } => object(Json::object([(
                 "desktop",
                 Json::object([("width", u64::from(width).into()), ("height", u64::from(height).into())]),
@@ -426,8 +432,8 @@ mod tests {
         let written: Vec<Carried> = vec![
             ToBrowser::Step("reaching").write(),
             ToBrowser::Step("first-picture").write(),
-            ToBrowser::Asks { again: false }.write(),
-            ToBrowser::Asks { again: true }.write(),
+            ToBrowser::Asks { again: false, instead: false }.write(),
+            ToBrowser::Asks { again: true, instead: false }.write(),
             ToBrowser::Desktop { width: 1280, height: 800 }.write(),
             ToBrowser::Rectangle { left: 64, top: 128, width: 200, height: 120, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
             ToBrowser::Drawn(7).write(),
@@ -444,6 +450,7 @@ mod tests {
                 in_front: Some(65537),
             }
             .write(),
+            ToBrowser::Asks { again: false, instead: true }.write(),
         ];
         assert_eq!(written.len(), to_browser.len());
         for (written, example) in written.iter().zip(to_browser) {

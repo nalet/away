@@ -267,40 +267,46 @@ where
     known(server, taken, &taken.address, taken.port, &shows).await?;
     tell(browser, ToBrowser::Step("signing-in")).await.map_err(|()| gone(Step::SigningIn))?;
     let mut again = false;
+    // whether the person types in place of being signed in as themselves
+    let mut instead = false;
     let (mut desktop, served_by) = 'asked: {
         // the person is signed in as themselves: nothing is asked, and the connection
-        // that showed who the machine is goes on
+        // that showed who the machine is goes on. A person Away signs in so on no
+        // machine, such as one of the directory's administrators, is asked for a name
+        // and a password in its place, as on a machine where people type
         if taken.themselves {
             let not = |details: &str| Failure { step: Step::SigningIn, why: Why::NotThemselves, details: details.to_string() };
             let domain = domain.ok_or_else(|| not("this installation names no domain to sign people in on the machines of"))?;
-            let who = domain.themselves(&taken.session).await?;
-            let theirs = domain.on(&who, &taken.address).await?;
-            let program = taken.program.clone();
-            let sent_on = match secured.sign_in(Who::Themselves(Box::new(theirs)), screen, layout, None, program).await? {
-                Opened::Desktop(desktop) => break 'asked (*desktop, None),
-                Opened::SentOn(to) => to,
-            };
-            // a farm's broker says which machine serves the collection: the person is
-            // signed in there with a ticket for that machine, and a card of its own
-            let (host, port) = served_by(&sent_on, taken).await?;
-            let secured = machine::reach(&host, port, sent_on.token.as_deref()).await?.secure().await?;
-            known(server, taken, &host, port, &secured.identity().fingerprint_text()).await?;
-            let theirs = domain.on(&who, &host).await?;
-            let program = taken.program.clone();
-            match secured.sign_in(Who::Themselves(Box::new(theirs)), screen, layout, Some(sent_on.session), program).await? {
-                Opened::Desktop(desktop) => break 'asked (*desktop, Some(format!("{host}:{port}"))),
-                Opened::SentOn(_) => {
-                    let details = format!("{host} sends the connection on again, which a machine of a farm doesn't");
-                    return Err(Failure { step: Step::SigningIn, why: Why::Broken, details });
+            if let Some(who) = domain.themselves(&taken.session).await? {
+                let theirs = domain.on(&who, &taken.address).await?;
+                let program = taken.program.clone();
+                let sent_on = match secured.sign_in(Who::Themselves(Box::new(theirs)), screen, layout, None, program).await? {
+                    Opened::Desktop(desktop) => break 'asked (*desktop, None),
+                    Opened::SentOn(to) => to,
+                };
+                // a farm's broker says which machine serves the collection: the person is
+                // signed in there with a ticket for that machine, and a card of its own
+                let (host, port) = served_by(&sent_on, taken).await?;
+                let secured = machine::reach(&host, port, sent_on.token.as_deref()).await?.secure().await?;
+                known(server, taken, &host, port, &secured.identity().fingerprint_text()).await?;
+                let theirs = domain.on(&who, &host).await?;
+                let program = taken.program.clone();
+                match secured.sign_in(Who::Themselves(Box::new(theirs)), screen, layout, Some(sent_on.session), program).await? {
+                    Opened::Desktop(desktop) => break 'asked (*desktop, Some(format!("{host}:{port}"))),
+                    Opened::SentOn(_) => {
+                        let details = format!("{host} sends the connection on again, which a machine of a farm doesn't");
+                        return Err(Failure { step: Step::SigningIn, why: Why::Broken, details });
+                    }
                 }
             }
+            instead = true;
         }
         // the machine signs people in by what they type. The connection that showed who
         // it is is let go: the person may take their time to type, and a machine
         // doesn't wait that long
         drop(secured);
         for _ in 0..ASKS_AT_MOST {
-            tell(browser, ToBrowser::Asks { again }).await.map_err(|()| gone(Step::SigningIn))?;
+            tell(browser, ToBrowser::Asks { again, instead }).await.map_err(|()| gone(Step::SigningIn))?;
             let typed = tokio::time::timeout(TYPED_WITHIN, async {
                 loop {
                     match said(browser).await {

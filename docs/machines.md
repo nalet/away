@@ -259,9 +259,11 @@ machine that offers more is opened from its own page, where each way in is.
   that exists in Away's memory alone. The machine signs the person in as it
   does with a card at a desk, so they reach file shares and printers as
   themselves. Such a machine is named by the name its domain knows it by, and
-  by no number, and so are the machines that serve a farm. An account that
-  Away signs nobody in as, such as one of the directory's administrators, is
-  told so at the sign-in. It needs the installation to name the domain, its
+  by no number, and so are the machines that serve a farm. A person Away
+  signs in as themselves on no machine, such as one of the directory's
+  administrators, is asked for a name and a password on the same machine, and
+  told that it is in place of that: such a machine needs no second entry for
+  them. It needs the installation to name the domain, its
   authority and the account Away asks the authority as
   ([signing in as oneself](./install.md#signing-in-as-oneself-on-a-windows-domain)).
 - **A farm's desktop is opened through its broker.** Away tells the broker

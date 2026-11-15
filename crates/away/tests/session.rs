@@ -143,8 +143,11 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
     let password_of = |what: &str, salt: &[u8]| Key::from_password(Kind::Aes256, what, salt, 4096);
     let own = match kerberos {
         Some(_) => Some(
-            Machine::start_in_a_domain(
+            // a machine of the domain: it takes a ticket, and knows an account by its password too
+            Machine::start_in_a_domain_that_knows(
                 password_of("the password of a machine that exists for these tests alone", b"CORP.EXAMPLETERMSRVlocalhost"),
+                KNOWN,
+                PASSWORD,
                 stand_in::desktop(),
             )
             .await,
@@ -1088,7 +1091,7 @@ async fn a_person_opens_a_desktop_of_their_domain_as_themselves_and_nothing_is_a
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_person_away_signs_in_as_themselves_on_no_machine_is_told_so_and_it_is_a_record() {
+async fn a_person_away_signs_in_as_themselves_on_no_machine_types_there_and_it_is_a_line() {
     let Some(kerberos) = kerberos() else { return };
     let Some(world) = world_with("never-themselves", Some(&kerberos)).await else { return };
     let domain = world.domain.as_ref().expect("a world with a domain");
@@ -1099,24 +1102,32 @@ async fn a_person_away_signs_in_as_themselves_on_no_machine_is_told_so_and_it_is
     let sign_in = browser.signed_in_as(&world);
     let ticket = browser.ticket(&world, "own-01");
 
+    // on the machine where others are signed in as themselves, they are asked for a name
+    // and a password, and told that it is in place of that
     let mut session = Session::begin(&world, &sign_in, &ticket).await;
-    let (steps, failed) = session.steps().await;
+    let (steps, asks) = session.steps().await;
     assert_eq!(steps, ["reaching", "checking", "signing-in"]);
-    let failed = failed.get("failed").expect("the step failed");
-    assert_eq!((failed.text_of("step"), failed.text_of("why")), (Some("signing-in"), Some("not-as-yourself")));
-    assert_eq!(
-        failed.text_of("details"),
-        Some("Away signs nobody in on a machine as themselves who is in the group Domain Admins. (never)")
-    );
-    while session.next().await.is_some() {}
-
-    // nothing was asked of the authority, the machine saw no ticket, and the records say what happened
+    assert_eq!(asks.write(), r#"{"asks":{"again":false,"instead":true}}"#);
+    // nothing was asked of the authority, and the machine saw no ticket
     assert_eq!(domain.pages.seen(), Default::default());
     assert!(domain.machine.shown().is_empty());
+    assert!(domain.issuer_lines.kept().iter().any(|line| line.contains("signed nobody in") && line.contains("\"why\":\"never\"")));
+
+    // a password the machine doesn't take is asked for again, in the same words; with
+    // the right one the desktop opens, as on a machine where everyone types
+    session.say(credentials(KNOWN, "another password")).await;
+    assert_eq!(session.next().await.map(|says| says.write()).as_deref(), Some(r#"{"asks":{"again":true,"instead":true}}"#));
+    session.say(credentials(KNOWN, PASSWORD)).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!(steps, ["first-picture"], "{}", desktop.write());
+    assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120}}"#);
+    session.say(Json::object([("leaves", true.into())])).await;
+    assert_eq!(session.until("ended").await.write(), r#"{"ended":"left"}"#);
+    while session.next().await.is_some() {}
+
+    // still nothing was asked of the authority, and the records are those of a desktop that was opened
+    assert_eq!(domain.pages.seen(), Default::default());
     let kept = records(&world.database).await;
     let kinds: Vec<&str> = kept.iter().map(|(kind, ..)| kind.as_str()).filter(|kind| kind.starts_with("session-")).collect();
-    assert_eq!(kinds, ["session-asked", "session-failed"]);
-    let last = kept.last().expect("a record");
-    assert_eq!((last.3.text_of("step"), last.3.text_of("why")), (Some("signing-in"), Some("not-as-yourself")));
-    assert!(domain.issuer_lines.kept().iter().any(|line| line.contains("signed nobody in") && line.contains("\"why\":\"never\"")));
+    assert_eq!(kinds, ["session-asked", "session-opened", "session-ended"]);
 }

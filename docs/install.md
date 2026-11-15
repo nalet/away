@@ -298,7 +298,9 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
   the account is none of `domain.neverAs` and the person in none of the groups
   of `domain.neverOf`. Unless the installation says otherwise, those are
   `administrator`, `krbtgt` and `guest`, and the groups of a directory's
-  administrators, as the sign-in service names them.
+  administrators, as the sign-in service names them. Such a person is asked
+  for a name and a password on the machine, as where people type; the
+  sign-in service has to name those groups for Away to know them.
 - **Every sign-in is a record and a line of the issuer's**: who, as which
   account, on which machine, the certificate's number, until when. The record
   is kept before the certificate is handed out, and without it none is. What
