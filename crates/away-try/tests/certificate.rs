@@ -43,6 +43,7 @@ fn pages() -> (tokio::runtime::Runtime, Pages) {
         for_signing_in: "CorpSignIn".to_string(),
         for_an_agent: "CorpAgent".to_string(),
         never_for: vec!["sam.other".to_string()],
+        known_as: Vec::new(),
         good_for: 300,
     }));
     (runs, pages)

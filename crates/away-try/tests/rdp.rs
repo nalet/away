@@ -820,6 +820,7 @@ fn an_authoritys_pages() -> (tokio::runtime::Runtime, away_issuer::authority::st
         for_signing_in: "CorpSignIn".to_string(),
         for_an_agent: "CorpAgent".to_string(),
         never_for: Vec::new(),
+        known_as: Vec::new(),
         good_for: 300,
     }));
     (runs, pages)

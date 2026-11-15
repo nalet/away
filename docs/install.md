@@ -256,9 +256,13 @@ What the organisation prepares, once:
   signs people in with smart cards.
 - **The sign-in service says each person's account in the domain**, in an
   entry of the sign-in: the name the domain knows the account by, such as
-  `alex.urban`. `preferred_username` is asked unless `domain.accountEntry`
-  names another. A name with an `@` is not taken for one, since what stands
-  before the `@` need not be the account's name.
+  `alex.urban`, or the name the person signs in with in the directory, such
+  as `alex.urban@corp.example`. `preferred_username` is asked unless
+  `domain.accountEntry` names another. What stands before an `@` need not be
+  the account's name, so with a name of the second kind Away asks for the
+  account that is called what stands before the `@`, and takes what the
+  authority issues only if it names exactly the name of the sign-in. Where
+  the two differ, nobody is signed in.
 
 What the installation is told:
 

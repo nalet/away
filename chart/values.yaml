@@ -98,8 +98,10 @@ domain:
   # that proves itself with a certificate of no such authority is not believed.
   authoritiesConfigMap: ""
   # Which entry of a person's sign-in holds the name of their account in the domain,
-  # as the domain knows it: alex.urban, or CORP\alex.urban. A name with an @ is not
-  # taken for one.
+  # as the domain knows it: alex.urban, or CORP\alex.urban. The name a person signs in
+  # with in the directory, alex.urban@corp.example, is taken too: the account is then
+  # the one called what stands before the @, and what the authority issues for it has
+  # to name exactly the name of the sign-in.
   accountEntry: preferred_username
   # The accounts nobody is signed in as, and the groups whose people are signed in as
   # themselves on no machine, as the sign-in service names them: the directory's

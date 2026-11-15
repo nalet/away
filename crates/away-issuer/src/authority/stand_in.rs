@@ -54,6 +54,9 @@ pub struct With {
     pub for_an_agent: String,
     /// Accounts the authority issues nothing for, by their names.
     pub never_for: Vec<String>,
+    /// Accounts whose people sign in with another name than the account's own and the
+    /// realm: the account's name, and the name a certificate writes for it.
+    pub known_as: Vec<(String, String)>,
     /// How long a certificate for signing in is good for from the moment it is issued,
     /// in seconds.
     pub good_for: u64,
@@ -250,7 +253,8 @@ impl Inside {
                 let name = signed.account.strip_prefix(&format!("{}\\", with.domain)).map(str::to_string);
                 match name {
                     Some(name) if is_an_agent && !with.never_for.contains(&name) && !name.is_empty() => {
-                        (signed.asked, format!("{name}@{}", with.realm), For::SigningIn, now() + with.good_for)
+                        let written = with.known_as.iter().find(|(its, _)| *its == name).map(|(_, written)| written.clone());
+                        (signed.asked, written.unwrap_or_else(|| format!("{name}@{}", with.realm)), For::SigningIn, now() + with.good_for)
                     }
                     _ => return self.refuse("Denied by Policy Module"),
                 }

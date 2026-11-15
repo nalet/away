@@ -54,6 +54,16 @@ pub struct Made {
     pub until: u64,
 }
 
+/// The account a person's sign-in names in the domain.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Account {
+    /// Its name, as the domain knows it and as the authority is asked for it.
+    pub name: String,
+    /// The name the person signs in with in the directory, where their sign-in gives
+    /// that one: what the authority issues has to name exactly it.
+    pub signs_in_as: Option<String>,
+}
+
 /// The certificate Away asks for others with, and its key.
 struct Agent {
     held: Held,
@@ -83,10 +93,12 @@ impl Windows {
     /// Away signs people in as.
     ///
     /// The entry the installation named holds the account's name as the domain knows
-    /// it, with or without the domain's short name before it. A name with an `@` is not
-    /// taken for one: what stands before the `@` need not be the account's name, and
-    /// may be somebody else's.
-    pub fn account(&self, says: &Json) -> Result<String, Refused> {
+    /// it, with or without the domain's short name before it, or the name the person
+    /// signs in with in the directory, which has an `@` in it. What stands before that
+    /// `@` need not be the account's name, and may be somebody else's: the authority is
+    /// asked for the account of that name, and what it issues is taken only where it
+    /// names exactly the name of the sign-in.
+    pub fn account(&self, says: &Json) -> Result<Account, Refused> {
         let entry = &self.told.account_entry;
         let named = says
             .text_of(entry)
@@ -105,6 +117,12 @@ impl Windows {
                 ))
             }
             None => named,
+        };
+        // the name a person signs in with: an account's name, an @, and what such names
+        // end in, which is written as a domain's name is
+        let (name, signs_in_as) = match name.rsplit_once('@') {
+            Some((before, after)) if !named.contains('\\') && ends_as_a_name_does(after) => (before, Some(named.to_string())),
+            _ => (name, None),
         };
         let plain = !name.is_empty()
             && name.len() <= 64
@@ -134,7 +152,7 @@ impl Windows {
                 return Err(refused("never", format!("Away signs nobody in on a machine as themselves who is in the group {never}.")));
             }
         }
-        Ok(name.to_string())
+        Ok(Account { name: name.to_string(), signs_in_as })
     }
 
     /// The certificate Away asks for others with: the one it has while that is good,
@@ -188,7 +206,7 @@ impl Windows {
     /// account their sign-in names. `says` is what the sign-in service signed about the
     /// person, checked already.
     pub async fn sign_in(&self, says: &Json, asked: &[u8], now: u64) -> Result<Made, Refused> {
-        let account = self.account(says)?;
+        let Account { name: account, signs_in_as } = self.account(says)?;
         let for_key = request::read(asked)
             .map_err(|error| refused("request", format!("What was asked with is no request for a certificate: {error}.")))?
             .key;
@@ -220,11 +238,21 @@ impl Windows {
             return Err(unusable("it is not for signing in, or is not good now."));
         }
         let its = read.account.clone().unwrap_or_default();
-        let is_theirs = its
-            .split_once('@')
-            .is_some_and(|(name, domain)| name.eq_ignore_ascii_case(&account) && domain.eq_ignore_ascii_case(&self.told.domain));
-        if !is_theirs {
-            return Err(unusable(&format!("it names the account {its}.")));
+        match &signs_in_as {
+            // the name the person signs in with, whole: the account that was asked for
+            // by what stands before the @ may be somebody else's
+            Some(theirs) if its.to_lowercase() != theirs.to_lowercase() => {
+                return Err(unusable(&format!("it names the account {its}, and the person's sign-in names {theirs}.")));
+            }
+            Some(_) => {}
+            None => {
+                let is_theirs = its
+                    .split_once('@')
+                    .is_some_and(|(name, domain)| name.eq_ignore_ascii_case(&account) && domain.eq_ignore_ascii_case(&self.told.domain));
+                if !is_theirs {
+                    return Err(unusable(&format!("it names the account {its}.")));
+                }
+            }
         }
         if read.until > now + LASTS_AT_MOST + CLOCKS_APART {
             return Err(refused(
@@ -241,6 +269,18 @@ impl Windows {
             .unwrap_or_default();
         Ok(Made { account: its, number, until: read.until, certificate })
     }
+}
+
+/// Whether this is written as what the names people sign in with end in: a domain's
+/// name, of letters, digits and hyphens between dots.
+fn ends_as_a_name_does(end: &str) -> bool {
+    end.len() <= 255
+        && end.split('.').all(|part| {
+            !part.is_empty()
+                && !part.starts_with('-')
+                && !part.ends_with('-')
+                && part.chars().all(|letter| letter.is_alphanumeric() || letter == '-')
+        })
 }
 
 #[cfg(test)]
@@ -286,16 +326,37 @@ mod tests {
             ("desk-01$", "desk-01$"),
             ("zoë_k", "zoë_k"),
         ] {
-            assert_eq!(windows.account(&says(named.into(), &["staff"])).as_deref(), Ok(account), "{named}");
+            let named_so = windows.account(&says(named.into(), &["staff"]));
+            assert_eq!(named_so, Ok(Account { name: account.to_string(), signs_in_as: None }), "{named}");
         }
-        // a name that is none, of another domain, or written as an address: what stands
-        // before an @ need not be the account's name
+        // the name a person signs in with: the account is asked for by what stands
+        // before the @, and the name is kept whole for what the authority issues
+        for (named, account) in [
+            ("alex.urban@corp.example", "alex.urban"),
+            ("Alex.Urban@CORP.EXAMPLE", "Alex.Urban"),
+            ("alex.urban@firm.example", "alex.urban"),
+            (" zoë_k@corp.example ", "zoë_k"),
+        ] {
+            let named_so = windows.account(&says(named.into(), &["staff"]));
+            assert_eq!(named_so, Ok(Account { name: account.to_string(), signs_in_as: Some(named.trim().to_string()) }), "{named}");
+        }
+        // a name that is none, or of another domain
         for (named, says_so) in [
             ("", "The person's sign-in names no account: it has no entry preferred_username."),
             ("OTHER\\alex.urban", "The person's sign-in names an account of OTHER, and people are signed in on the machines of CORP."),
+            ("@corp.example", "The entry preferred_username of the person's sign-in holds @corp.example, which is no account's name as the domain CORP knows one."),
+            ("alex.urban@", "The entry preferred_username of the person's sign-in holds alex.urban@, which is no account's name as the domain CORP knows one."),
             (
-                "alex.urban@corp.example",
-                "The entry preferred_username of the person's sign-in holds alex.urban@corp.example, which is no account's name as the domain CORP knows one.",
+                "alex@urban@corp.example",
+                "The entry preferred_username of the person's sign-in holds alex@urban@corp.example, which is no account's name as the domain CORP knows one.",
+            ),
+            (
+                "alex.urban@corp..example",
+                "The entry preferred_username of the person's sign-in holds alex.urban@corp..example, which is no account's name as the domain CORP knows one.",
+            ),
+            (
+                "CORP\\alex.urban@corp.example",
+                "The entry preferred_username of the person's sign-in holds CORP\\alex.urban@corp.example, which is no account's name as the domain CORP knows one.",
             ),
             ("alex urban", "The entry preferred_username of the person's sign-in holds alex urban, which is no account's name as the domain CORP knows one."),
             ("CORP\\", "The entry preferred_username of the person's sign-in holds CORP\\, which is no account's name as the domain CORP knows one."),
@@ -310,7 +371,7 @@ mod tests {
     #[test]
     fn nobody_is_signed_in_as_an_account_or_out_of_a_group_that_is_never_signed_in() {
         let windows = windows();
-        for never in ["Administrator", "CORP\\administrator", "krbtgt", "GUEST"] {
+        for never in ["Administrator", "CORP\\administrator", "krbtgt", "GUEST", "Administrator@corp.example", "krbtgt@CORP.EXAMPLE"] {
             let refused = windows.account(&says(never.into(), &["staff"])).unwrap_err();
             assert_eq!((refused.why, refused.says.starts_with("Away signs nobody in as ")), ("never", true), "{never}");
         }
@@ -328,7 +389,11 @@ mod tests {
         }
         // a group that only sounds like one is none of them
         for group in ["Domain Admins of the canteen", "/Domain Admins/visitors", "Not Administrators"] {
-            assert_eq!(windows.account(&says("alex.urban".into(), &[group])).as_deref(), Ok("alex.urban"), "{group}");
+            assert_eq!(
+                windows.account(&says("alex.urban".into(), &[group])).map(|account| account.name).as_deref(),
+                Ok("alex.urban"),
+                "{group}"
+            );
         }
     }
 

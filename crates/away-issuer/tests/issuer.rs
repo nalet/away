@@ -191,6 +191,10 @@ async fn world_with(kerberos: &str, good_for: u64) -> World {
         for_signing_in: "CorpSignIn".to_string(),
         for_an_agent: "CorpAgent".to_string(),
         never_for: vec!["sam.other".to_string()],
+        known_as: vec![
+            ("robin.vale".to_string(), "robin.vale@firm.example".to_string()),
+            ("kim".to_string(), "kim.other@corp.example".to_string()),
+        ],
         good_for,
     })
     .await;
@@ -333,7 +337,7 @@ async fn nobody_is_signed_in_without_a_session_a_sign_in_of_their_own_and_an_acc
     world.server.runs("of-them", runs(world.service.signs("7c1f", "alex.urban", &["staff", "/Domain Admins"])));
     let (status, why, says) = refused(&world, "of-them", &asked).await;
     assert_eq!((status, why.as_str()), (403, "never"), "{says}");
-    world.server.runs("nameless", runs(world.service.signs("7c1f", "alex.urban@corp.example", &[])));
+    world.server.runs("nameless", runs(world.service.signs("7c1f", "alex urban", &[])));
     assert_eq!(refused(&world, "nameless", &asked).await.1, "no-account");
 
     // up to here the authority was asked nothing: not even for the issuer's own certificate
@@ -368,6 +372,45 @@ async fn nobody_is_signed_in_without_a_session_a_sign_in_of_their_own_and_an_acc
     let lines = world.lines.kept();
     assert_eq!(lines.iter().filter(|line| line.contains("signed nobody in")).count(), 12, "{lines:#?}");
     assert!(!lines.iter().any(|line| line.contains("signed a person in")));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_sign_in_that_gives_the_name_a_person_signs_in_with_is_taken_where_the_certificate_names_just_that() {
+    let Some(kerberos) = kerberos() else { return };
+    let world = world(&kerberos).await;
+    let runs = |signed: String| Vouches::Runs("7c1f".to_string(), "desk-01".to_string(), signed);
+    let (_key, asked) = a_request();
+
+    // what stands before the @ is the account's name, and the certificate names the
+    // person as their sign-in does, however either is written in capitals
+    world.server.runs("5e55", runs(world.service.signs("7c1f", "Alex.Urban@corp.example", &["staff"])));
+    let (status, says) = ask(&world, "5e55", &asked).await;
+    assert_eq!((status, says.text_of("account")), (200, Some("Alex.Urban@CORP.EXAMPLE")), "{}", says.write());
+    // a name that ends in something else than the domain's name, as the directory has it
+    world.server.runs("elsewhere", runs(world.service.signs("7c1f", "robin.vale@firm.example", &[])));
+    let (status, says) = ask(&world, "elsewhere", &asked).await;
+    assert_eq!((status, says.text_of("account")), (200, Some("robin.vale@firm.example")), "{}", says.write());
+    assert_eq!(world.server.told.lock().unwrap().len(), 2);
+
+    // what stands before the @ is somebody else's account: the certificate names them,
+    // and is not handed out
+    world.server.runs("another's", runs(world.service.signs("7c1f", "kim@corp.example", &[])));
+    let (status, why, says) = refused(&world, "another's", &asked).await;
+    assert_eq!((status, why.as_str()), (502, "authority"), "{says}");
+    assert_eq!(
+        says,
+        "What the organisation's authority issued as CorpSignIn for CORP\\kim is not taken: it names the account \
+         kim.other@corp.example, and the person's sign-in names kim@corp.example."
+    );
+    // the same account under its own name is not the one a sign-in without an @ names either
+    world.server.runs("by-name", runs(world.service.signs("7c1f", "robin.vale", &[])));
+    let (status, why, says) = refused(&world, "by-name", &asked).await;
+    assert_eq!((status, why.as_str()), (502, "authority"), "{says}");
+    assert!(says.ends_with("is not taken: it names the account robin.vale@firm.example."), "{says}");
+    // and there is nobody of the name before the @: the authority's refusal, in its words
+    world.server.runs("nobody", runs(world.service.signs("7c1f", "sam.other@corp.example", &[])));
+    assert_eq!(refused(&world, "nobody", &asked).await.1, "authority-refused");
+    assert_eq!(world.server.told.lock().unwrap().len(), 2);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
