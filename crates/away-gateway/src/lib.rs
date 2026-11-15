@@ -12,6 +12,7 @@
 //! | `AWAY_SERVER_AUTHORITIES_FILE` | the certificate of the authority that secures that address, as PEM |
 
 pub mod machine;
+pub mod restricted_admin;
 pub mod session;
 #[cfg(feature = "stand-in")]
 pub mod stand_in;
@@ -55,6 +56,8 @@ pub struct Told {
     /// The domain whose machines people are signed in on as themselves, where the
     /// installation names one.
     pub domain: Option<InADomain>,
+    /// Explicitly enabled, scoped browser Restricted Admin policy.
+    pub restricted_admin: Option<restricted_admin::RestrictedAdmin>,
 }
 
 /// What an installation tells the gateway of a Windows domain.
@@ -105,7 +108,8 @@ impl Told {
                 Some(InADomain { name, controllers, authorities, issuer, issuer_authorities: read("AWAY_ISSUER_AUTHORITIES_FILE")? })
             }
         };
-        Ok(Told { server, authorities, domain })
+        let restricted_admin = restricted_admin::RestrictedAdmin::read(&variable, &file)?;
+        Ok(Told { server, authorities, domain, restricted_admin })
     }
 }
 
@@ -151,7 +155,14 @@ impl Gateway {
         };
         let sessions = part.listen("sessions", &settings.address).await?;
         let health = part.listen("health", &settings.health_address).await?;
-        let around = Arc::new(Around { server, domain, lines: part.lines.clone(), stop: part.stop.clone(), running: Arc::default() });
+        let around = Arc::new(Around {
+            server,
+            domain,
+            restricted_admin: told.restricted_admin,
+            lines: part.lines.clone(),
+            stop: part.stop.clone(),
+            running: Arc::default(),
+        });
         Ok(Gateway { part, sessions, health, around })
     }
 

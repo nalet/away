@@ -125,6 +125,22 @@ domain:
     agentKind: ""
     signInKind: ""
 
+# Lab opt-in for signs-in: restricted-admin-sso on direct management desktops.
+# AD must separately constrain this service account to the same TERMSRV targets.
+restrictedAdmin:
+  enabled: false
+  realm: ""
+  controllers: []
+  account: ""
+  service: ""
+  secretName: ""
+  # Immutable subjects from this installation's OIDC provider -> canonical AD UPNs.
+  identities: {}
+  # Exact DNS names, RDP port 3389 only. No farms, redirects or RemoteApps.
+  targets: []
+  # Independently verified SHA-256 TLS certificate pins, one per target.
+  fingerprints: {}
+
 image:
   repository: ghcr.io/nalet/away
   # The image's tag. Empty takes the version of Away this chart was published with.

@@ -143,6 +143,8 @@ impl Screen {
 pub enum Who {
     /// An account, with a name and a password that somebody typed.
     Account(Account),
+    /// A scoped Kerberos service ticket, with no delegated password or smart card.
+    RestrictedAdmin(away_winauth::kerberos::exchange::Ticket),
     /// The person themselves: with a ticket of their domain for this machine, and a
     /// smart card that exists in the gateway's memory alone.
     Themselves(Box<OnAMachine>),
@@ -153,12 +155,22 @@ pub struct Reached {
     host: String,
     connection: TcpStream,
     security: Security,
+    restricted: bool,
 }
 
 /// Finds a machine at its address, connects to it, and asks which security it takes.
 /// A farm is told something first: its broker which collection is wanted, and the
 /// machine a broker sent the client on to what the broker gave for it.
 pub async fn reach(host: &str, port: u16, says_first: Option<&[u8]>) -> Result<Reached, Failure> {
+    reach_mode(host, port, says_first, false).await
+}
+
+/// Reaches a direct machine requiring Restricted Admin; no security downgrade.
+pub async fn reach_restricted_admin(host: &str, port: u16) -> Result<Reached, Failure> {
+    reach_mode(host, port, None, true).await
+}
+
+async fn reach_mode(host: &str, port: u16, says_first: Option<&[u8]>, restricted: bool) -> Result<Reached, Failure> {
     let reaching = async {
         // a number of the newer kind is written in brackets, which are not part of it
         let written = host.strip_prefix('[').and_then(|rest| rest.strip_suffix(']')).unwrap_or(host);
@@ -180,7 +192,11 @@ pub async fn reach(host: &str, port: u16, says_first: Option<&[u8]>) -> Result<R
         let mut connection = connection?;
         let _ = connection.set_nodelay(true);
         let broken = |error: std::io::Error| failure(Step::Reaching, Why::Broken, format!("the first request: {error}"));
-        let request = negotiation::request_with(says_first).map_err(|error| failure(Step::Reaching, Why::Broken, error))?;
+        let request = if restricted {
+            negotiation::request_restricted_admin()
+        } else {
+            negotiation::request_with(says_first).map_err(|error| failure(Step::Reaching, Why::Broken, error))?
+        };
         connection.write_all(&request).await.map_err(broken)?;
         let mut frames = Frames::new();
         let carried = loop {
@@ -195,7 +211,10 @@ pub async fn reach(host: &str, port: u16, says_first: Option<&[u8]>) -> Result<R
             }
         };
         let answer = negotiation::read_answer(&carried).map_err(|error| failure(Step::Reaching, Why::Refused, error))?;
-        Ok(Reached { host: host.to_string(), connection, security: answer.security })
+        if restricted && (!answer.restricted_admin || answer.security == Security::Tls) {
+            return Err(failure(Step::SigningIn, Why::SignInRefused, "the machine did not accept Restricted Admin with CredSSP"));
+        }
+        Ok(Reached { host: host.to_string(), connection, security: answer.security, restricted })
     };
     match tokio::time::timeout(WITHIN, reaching).await {
         Ok(reached) => reached,
@@ -208,6 +227,7 @@ pub struct Secured {
     host: String,
     secured: TlsStream<TcpStream>,
     security: Security,
+    restricted: bool,
     identity: Identity,
     /// Which ways the clipboard passes on the desktop that is opened over it.
     clipboard: Passes,
@@ -236,7 +256,7 @@ impl Reached {
             .and_then(|all| all.first())
             .ok_or_else(|| broken("it showed no certificate".to_string()))?;
         let identity = Identity::read(shown.as_ref()).map_err(|error| broken(error.to_string()))?;
-        Ok(Secured { host: self.host, secured, security: self.security, identity, clipboard: Passes::NEITHER })
+        Ok(Secured { host: self.host, secured, security: self.security, restricted: self.restricted, identity, clipboard: Passes::NEITHER })
     }
 }
 
@@ -271,6 +291,9 @@ impl Secured {
         sent_on_to: Option<u32>,
         program: Option<Program>,
     ) -> Result<Opened, Failure> {
+        if self.restricted != matches!(&who, Who::RestrictedAdmin(_)) {
+            return Err(failure(Step::SigningIn, Why::SignInRefused, "the sign-in does not match the negotiated Restricted Admin mode"));
+        }
         let signing_in = async {
             let random =
                 |step: Step| move |error: getrandom::Error| failure(step, Why::Broken, format!("the system gave no random bytes: {error}"));
@@ -328,6 +351,47 @@ impl Secured {
                         sign_in::read_verdict(verdict).map_err(|error| not(error.to_string()))?;
                     }
                     (card.domain, card.name, None, Some(reader))
+                }
+                Who::RestrictedAdmin(ticket) => {
+                    // Only a ticket is presented; every credential field is empty.
+
+                    let new = away_winauth::sign_in::New {
+                        for_the_ticket: away_winauth::kerberos::gss::Fresh {
+                            key: random_bytes(Step::SigningIn)?,
+                            begins_with: random_bytes(Step::SigningIn)?,
+                            counts_from: u32::from_be_bytes(random_bytes(Step::SigningIn)?) & 0x3fff_ffff,
+                        },
+                        number: random_bytes(Step::SigningIn)?,
+                        begin_with: [random_bytes(Step::SigningIn)?, random_bytes(Step::SigningIn)?],
+                    };
+                    let now = away_part::time::now();
+                    let (mut signing_in, first) = away_winauth::sign_in::SignIn::begin_restricted_admin(
+                        &ticket,
+                        &self.identity.public_key,
+                        (now.as_secs(), now.subsec_micros()),
+                        new,
+                    );
+                    let not = |details: String| failure(Step::SigningIn, Why::NotThemselves, details);
+                    self.secured.write_all(&first).await.map_err(broken)?;
+                    loop {
+                        let message =
+                            message(&mut self.secured).await.map_err(|error| not(format!("the machine ended the sign-in: {error}")))?;
+                        match signing_in.receive(&message).map_err(|error| not(error.to_string()))? {
+                            Next::Send(bytes) => self.secured.write_all(&bytes).await.map_err(broken)?,
+                            Next::SendLast(bytes) => {
+                                self.secured.write_all(&bytes).await.map_err(broken)?;
+                                break;
+                            }
+                        }
+                    }
+                    if self.security == (Security::SignInFirst { tells_result: true }) {
+                        let mut verdict = [0u8; 4];
+                        self.secured.read_exact(&mut verdict).await.map_err(|_| {
+                            not("the machine closed the connection where it says whether the person may come in".to_string())
+                        })?;
+                        sign_in::read_verdict(verdict).map_err(|error| not(error.to_string()))?;
+                    }
+                    (String::new(), String::new(), None, None)
                 }
                 Who::Account(account) => {
                     let (domain, name) = (account.domain.clone(), account.name.clone());

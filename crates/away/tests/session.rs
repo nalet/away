@@ -328,6 +328,7 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
     let told = away_gateway::Told {
         server: Some(Address::read(&format!("http://127.0.0.1:{}", internal.port())).unwrap()),
         authorities: None,
+        restricted_admin: None,
         domain: in_a_domain,
     };
     let settings = Settings { address: "127.0.0.1:0".to_string(), health_address: "127.0.0.1:0".to_string() };

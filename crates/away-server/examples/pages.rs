@@ -201,6 +201,7 @@ async fn main() -> std::io::Result<()> {
         let told = away_gateway::Told {
             server: Some(Address::read(&format!("http://127.0.0.1:{}", internal.port())).expect("the server's address")),
             authorities: None,
+            restricted_admin: None,
             domain: None,
         };
         let settings = Settings { address: "127.0.0.1:0".to_string(), health_address: "127.0.0.1:0".to_string() };

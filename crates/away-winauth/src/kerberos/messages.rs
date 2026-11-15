@@ -162,7 +162,12 @@ const OPTIONS: [u8; 4] = [0x40, 0x81, 0x00, 0x00];
 impl Asked {
     /// What is asked, as the part of the request that a check is made over.
     pub fn write(&self) -> Vec<u8> {
-        let mut fields = vec![der::under(0, &der::bits(&OPTIONS))];
+        self.with_options(OPTIONS, None)
+    }
+
+    /// A constrained-delegation request, with its exact options and evidence ticket.
+    pub(crate) fn with_options(&self, options: [u8; 4], evidence: Option<&[u8]>) -> Vec<u8> {
+        let mut fields = vec![der::under(0, &der::bits(&options))];
         fields.extend(self.account.as_ref().map(|account| der::under(1, &account.write())));
         fields.push(der::under(2, &der::text(&self.realm)));
         fields.push(der::under(3, &self.service.write()));
@@ -170,6 +175,9 @@ impl Asked {
         fields.push(der::under(7, &der::number(i64::from(self.nonce))));
         let kinds: Vec<Vec<u8>> = self.kinds.iter().map(|kind| der::number(*kind as i64)).collect();
         fields.push(der::under(8, &der::sequence(&kinds)));
+        if let Some(ticket) = evidence {
+            fields.push(der::under(11, &der::sequence(&[ticket.to_vec()])));
+        }
         der::sequence(&fields)
     }
 }

@@ -413,3 +413,22 @@ the machine is asked to start:
   who reaches each machine and by which rule, and since when the set is in
   force. It lists the farms as well: each with its feed, what it publishes,
   when its feed was last read, and what kept it from being read.
+
+### Browser Restricted Admin
+
+For a direct management desktop, `signs-in: restricted-admin-sso` opens the Windows
+session inside Away. This is separate from the native `restricted-admin` mode.
+The installation must explicitly enable `restrictedAdmin` in the chart and map
+immutable OIDC subjects to canonical AD UPNs. Only configured DNS targets on port
+3389 are admitted; farms, redirects and RemoteApps are refused. Existing Desktop
+and Apps collections retain their own sign-in settings.
+
+A dedicated AD service account needs protocol transition and constrained
+delegation to the exact target TERMSRV SPNs. It needs no administrator membership.
+The signed-in user must already be an administrator on the destination, and that
+host must allow Restricted Admin. Away refreshes the browser sign-in, validates
+its subject, checks the configured certificate fingerprint and obtains a
+short-lived target ticket. The RDP exchange requires Restricted Admin with NLA
+and sends empty credentials. Failure never falls back to asking for a password.
+
+See [the installation guide](install.md#browser-restricted-admin) for the opt-in.

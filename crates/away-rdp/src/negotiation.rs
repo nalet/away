@@ -65,6 +65,15 @@ pub const LONGEST_TOKEN: usize = 200;
 /// of a broker, or what a broker gave it for the machine it was sent on to. A farm reads
 /// it as one line.
 pub fn request_with(token: Option<&[u8]>) -> Result<Vec<u8>, Error> {
+    request_mode(token, false)
+}
+
+/// Requires Restricted Admin and CredSSP. TLS-only logon is never offered.
+pub fn request_restricted_admin() -> Vec<u8> {
+    request_mode(None, true).expect("a request without a routing token fits")
+}
+
+fn request_mode(token: Option<&[u8]>, restricted: bool) -> Result<Vec<u8>, Error> {
     let token = token.map(|token| token.strip_suffix(b"\r\n").unwrap_or(token));
     if token.is_some_and(|token| token.len() > LONGEST_TOKEN || token.iter().any(|byte| matches!(byte, b'\r' | b'\n'))) {
         return Err(Error::NotRdp("what is said first to a farm is one line, of 200 bytes at most"));
@@ -78,8 +87,9 @@ pub fn request_with(token: Option<&[u8]>) -> Result<Vec<u8>, Error> {
         asked.extend_from_slice(b"\r\n");
     }
     // the negotiation request: its kind, no flags, its length, what is asked for
-    asked.extend_from_slice(&[1, 0, 8, 0]);
-    asked.extend_from_slice(&ASKED_FOR.to_le_bytes());
+    asked.extend_from_slice(&[1, u8::from(restricted), 8, 0]);
+    let protocols = if restricted { SIGN_IN_FIRST | SIGN_IN_FIRST_WITH_RESULT } else { ASKED_FOR };
+    asked.extend_from_slice(&protocols.to_le_bytes());
     Ok(tpkt::frame(&asked))
 }
 
@@ -152,6 +162,12 @@ mod tests {
         let mut frames = Frames::new();
         frames.push(bytes);
         frames.next_frame().unwrap().unwrap()
+    }
+
+    #[test]
+    fn restricted_admin_requires_credentialless_credssp() {
+        let asked = carried(&request_restricted_admin());
+        assert_eq!(&asked[7..], &[1, 1, 8, 0, 10, 0, 0, 0]);
     }
 
     #[test]

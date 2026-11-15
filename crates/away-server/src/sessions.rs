@@ -35,6 +35,8 @@ pub struct Asked {
     pub served_by: Vec<String>,
     /// Whether the person is signed in on the machine as themselves, with nothing typed.
     pub themselves: bool,
+    /// Whether the direct desktop requires browser Restricted Admin.
+    pub restricted_admin: bool,
     /// Which ways the clipboard passes on the machine.
     pub clipboard: crate::register::Clipboard,
     /// The program the session is for, where it is for one and not for the desktop: its
@@ -47,6 +49,8 @@ pub struct Asked {
 /// A session the gateway took over.
 #[derive(Clone, Debug)]
 pub struct Running {
+    /// Whether fresh authorization is required for browser Restricted Admin.
+    pub restricted_admin: bool,
     /// Whose it is.
     pub person: Person,
     /// The sign-in of the browser that asked for it.
@@ -90,7 +94,13 @@ impl Sessions {
         if asked.sign_in != sign_in || now.saturating_sub(asked.at) > TICKET_GOOD_FOR {
             return None;
         }
-        let running = Running { person: asked.person.clone(), sign_in: asked.sign_in.clone(), machine: asked.machine.clone(), since: now };
+        let running = Running {
+            restricted_admin: asked.restricted_admin,
+            person: asked.person.clone(),
+            sign_in: asked.sign_in.clone(),
+            machine: asked.machine.clone(),
+            since: now,
+        };
         self.running.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(asked.session.clone(), running);
         Some(asked)
     }
@@ -126,6 +136,7 @@ mod tests {
             collection: None,
             served_by: Vec::new(),
             themselves: false,
+            restricted_admin: false,
             clipboard: crate::register::Clipboard::BOTH,
             program: None,
             at,

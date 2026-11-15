@@ -138,6 +138,8 @@ pub enum SignsIn {
     Themselves,
     /// The person's Windows client opens the desktop in Restricted Admin mode.
     RestrictedAdmin,
+    /// Away opens a direct desktop using its explicitly enabled Kerberos delegation policy.
+    RestrictedAdminSso,
 }
 
 /// One machine.
@@ -673,9 +675,17 @@ fn machine(
                 ));
             }
         }
-        SignsIn::RestrictedAdmin => {
-            if kind != Kind::Windows || !matches!(desktop, Some((Over::Rdp, _))) || collection.is_some() || !programs.is_empty() {
+        SignsIn::RestrictedAdmin | SignsIn::RestrictedAdminSso => {
+            if kind != Kind::Windows
+                || !matches!(desktop, Some((Over::Rdp, _)))
+                || collection.is_some()
+                || !programs.is_empty()
+                || !served_by.is_empty()
+            {
                 return Err(refused(file, line, format!("{name} needs a direct Windows desktop to use restricted-admin")));
+            }
+            if signs_in == SignsIn::RestrictedAdminSso && desktop != Some((Over::Rdp, 3389)) {
+                return Err(refused(file, line, format!("{name} needs RDP port 3389 to use restricted-admin-sso")));
             }
             // The destination is used in a Windows Run command. Only a DNS name already
             // validated above and the parsed desktop port can be part of that command.
@@ -714,7 +724,12 @@ fn signs_in(parts: &Parts, file: &str, of: &str) -> Result<Option<(SignsIn, usiz
             "themselves" => Ok(Some((SignsIn::Themselves, line))),
             "typed" => Ok(Some((SignsIn::Typed, line))),
             "restricted-admin" => Ok(Some((SignsIn::RestrictedAdmin, line))),
-            _ => Err(refused(file, line, format!("“{way}” is no way people are signed in: themselves, typed, or restricted-admin"))),
+            "restricted-admin-sso" => Ok(Some((SignsIn::RestrictedAdminSso, line))),
+            _ => Err(refused(
+                file,
+                line,
+                format!("“{way}” is no way people are signed in: themselves, typed, restricted-admin, or restricted-admin-sso"),
+            )),
         },
     }
 }
@@ -779,7 +794,7 @@ fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
             }
             true
         }
-        Some((SignsIn::RestrictedAdmin, line)) => {
+        Some((SignsIn::RestrictedAdmin | SignsIn::RestrictedAdminSso, line)) => {
             return Err(refused(file, line, format!("the farm {name} cannot use restricted-admin: it is for a direct Windows desktop")));
         }
         _ => false,
@@ -1258,7 +1273,7 @@ rules:
             (
                 "machines:\n  - name: a\n    kind: windows\n    address: a.example\n    desktop: true\n    signs-in: somehow\n",
                 6,
-                "“somehow” is no way people are signed in: themselves, typed, or restricted-admin",
+                "“somehow” is no way people are signed in: themselves, typed, restricted-admin, or restricted-admin-sso",
             ),
             (
                 "machines:\n  - name: a\n    kind: linux\n    address: a.example\n    shell: true\n    signs-in: themselves\n",

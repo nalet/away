@@ -185,3 +185,24 @@ async fn a_machine_that_does_not_take_the_password_or_is_not_there_says_at_which
     let Err(not_one) = reach("127.0.0.1", port, None).await else { panic!("no machine") };
     assert_eq!(not_one.step, Step::Reaching, "{}", not_one.details);
 }
+
+#[tokio::test]
+async fn restricted_admin_refuses_a_server_that_downgrades_or_omits_support() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    for (flags, protocol) in [(8u8, 1u8), (0, 8)] {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut request = [0u8; 19];
+            stream.read_exact(&mut request).await.unwrap();
+            assert_eq!(&request[11..], &[1, 1, 8, 0, 10, 0, 0, 0]);
+            stream.write_all(&[3, 0, 0, 19, 14, 0xd0, 0, 0, 0, 0, 0, 2, flags, 8, 0, protocol, 0, 0, 0]).await.unwrap();
+            let mut extra = [0u8; 1];
+            assert_eq!(stream.read(&mut extra).await.unwrap(), 0, "no TLS or credentials follow a downgrade");
+        });
+        let result = away_gateway::machine::reach_restricted_admin("127.0.0.1", port).await;
+        assert!(matches!(result, Err(ref failure) if failure.why==Why::SignInRefused));
+        server.await.unwrap();
+    }
+}

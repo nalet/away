@@ -71,6 +71,10 @@ pub struct Taken {
     pub program: Option<Program>,
     /// Whether the person is signed in on the machine as themselves, with nothing typed.
     pub themselves: bool,
+    /// Whether this session requires browser Restricted Admin.
+    pub restricted_admin: bool,
+    /// Immutable subject from the authenticated server session.
+    pub subject: String,
     /// Which ways the clipboard passes on the machine.
     pub clipboard: Passes,
 }
@@ -119,7 +123,21 @@ impl Server {
                     Some("from-the-machine") => Passes { to_the_machine: false, from_the_machine: true },
                     _ => Passes::NEITHER,
                 };
-                Ok(Some(Taken { session, machine: name, address, port, collection, served_by, program, themselves, clipboard }))
+                let restricted_admin = machine.and_then(|machine| machine.text_of("signs_in")) == Some("restricted-admin-sso");
+                let subject = text(said.get("person"), "subject").unwrap_or_default();
+                Ok(Some(Taken {
+                    restricted_admin,
+                    subject,
+                    session,
+                    machine: name,
+                    address,
+                    port,
+                    collection,
+                    served_by,
+                    program,
+                    themselves,
+                    clipboard,
+                }))
             }
             _ => Err(format!("the server answered the ticket with the status {status}, and with nothing a session can begin with")),
         }
@@ -140,6 +158,8 @@ pub struct Around {
     /// The domain whose machines people are signed in on as themselves, where the
     /// installation names one.
     pub domain: Option<Domain>,
+    /// The explicitly enabled browser Restricted Admin policy.
+    pub restricted_admin: Option<crate::restricted_admin::RestrictedAdmin>,
     /// Where the gateway writes what happens.
     pub lines: Lines,
     /// Learns that the gateway is stopping: a desktop that is open then is told so.
@@ -208,7 +228,7 @@ where
         .lines
         .info("a session was taken over", &[("session", taken.session.as_str().into()), ("machine", taken.machine.as_str().into())]);
 
-    let opened = open(&mut browser, server, around.domain.as_ref(), &taken, screen, layout).await;
+    let opened = open(&mut browser, server, &around, &taken, screen, layout).await;
     let (why, details) = match opened {
         Ok(Some(Open { mut desktop, served_by })) => {
             let picture = desktop.picture();
@@ -279,12 +299,16 @@ struct Open {
     served_by: Option<String>,
 }
 
+fn not_owned(details: String) -> Failure {
+    Failure { step: Step::SigningIn, why: Why::NotThemselves, details }
+}
+
 /// The way to the desktop, step by step, each said to the browser as it begins. Nothing
 /// where the person left on the way.
 async fn open<Connection>(
     browser: &mut WebSocketStream<Connection>,
     server: &Server,
-    domain: Option<&Domain>,
+    around: &Around,
     taken: &Taken,
     screen: Screen,
     layout: u32,
@@ -292,23 +316,54 @@ async fn open<Connection>(
 where
     Connection: AsyncRead + AsyncWrite + Unpin,
 {
+    let domain = around.domain.as_ref();
     let gone = |step: Step| Failure { step, why: Why::Broken, details: "the browser's connection ended".to_string() };
     // a farm's broker is told which collection is wanted, in the words a farm knows
     let wanted = taken.collection.as_ref().map(|collection| format!("tsv://MS Terminal Services Plugin.1.{collection}"));
     let wanted = wanted.as_deref().map(str::as_bytes);
     tell(browser, ToBrowser::Step("reaching")).await.map_err(|()| gone(Step::Reaching))?;
-    let reached = machine::reach(&taken.address, taken.port, wanted).await?;
+    let restricted = if taken.restricted_admin {
+        let not = |details: &str| Failure { step: Step::SigningIn, why: Why::NotThemselves, details: details.into() };
+        let policy = around.restricted_admin.as_ref().ok_or_else(|| not("browser Restricted Admin is not enabled in this installation"))?;
+        if taken.collection.is_some() || taken.program.is_some() || !taken.served_by.is_empty() {
+            return Err(not("browser Restricted Admin only opens a direct management desktop"));
+        }
+        policy.account_for(&taken.subject, &taken.address, taken.port)?;
+        // Refresh the authenticated sign-in immediately before privileged admission.
+        let (status, said) = server.ask("/internal/vouch", &[("session", &taken.session)]).await.map_err(not_owned)?;
+        if status != 200 || said.text_of("subject") != Some(&taken.subject) {
+            return Err(not("the signed-in identity could not be confirmed for Restricted Admin"));
+        }
+        Some(policy)
+    } else {
+        None
+    };
+    let reached = if restricted.is_some() {
+        machine::reach_restricted_admin(&taken.address, taken.port).await?
+    } else {
+        machine::reach(&taken.address, taken.port, wanted).await?
+    };
 
     // what the machine shows of itself, against what Away knows of it: kept the first time
     tell(browser, ToBrowser::Step("checking")).await.map_err(|()| gone(Step::Checking))?;
     let secured = reached.secure().await?.passing(taken.clipboard);
     let shows = secured.identity().fingerprint_text();
+    if let Some(policy) = restricted {
+        policy.check_identity(&taken.address, &shows)?;
+    }
     known(server, taken, &taken.address, taken.port, &shows).await?;
     tell(browser, ToBrowser::Step("signing-in")).await.map_err(|()| gone(Step::SigningIn))?;
     let mut again = false;
     // whether the person types in place of being signed in as themselves
     let mut instead = false;
     let (mut desktop, served_by) = 'asked: {
+        if let Some(policy) = restricted {
+            let ticket = policy.ticket(&taken.subject, &taken.address, taken.port).await?;
+            match secured.sign_in(Who::RestrictedAdmin(ticket), screen, layout, None, None).await? {
+                Opened::Desktop(desktop) => break 'asked (*desktop, None),
+                Opened::SentOn(_) => return Err(not_owned("Restricted Admin refuses redirected targets".into())),
+            }
+        }
         // the person is signed in as themselves: nothing is asked, and the connection
         // that showed who the machine is goes on. A person Away signs in so on no
         // machine, such as one of the directory's administrators, is asked for a name

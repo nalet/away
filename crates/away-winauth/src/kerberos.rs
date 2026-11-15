@@ -3,6 +3,7 @@
 //! controller that ends with a ticket for a machine.
 
 pub mod crypto;
+pub mod delegation;
 pub mod exchange;
 pub mod gss;
 pub mod messages;

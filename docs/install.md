@@ -437,3 +437,49 @@ monitoring:
 helm upgrade away oci://ghcr.io/nalet/charts/away --version <new version> --namespace away --reuse-values
 helm uninstall away --namespace away
 ```
+
+### Browser Restricted Admin
+
+This optional management path uses Away's own RDP client. It is disabled by default.
+It requires an AD service identity with Kerberos protocol transition and constrained
+delegation to the configured TERMSRV SPNs. The browser's identity provider must be
+trusted to authenticate the configured immutable subjects. The service account is
+not an administrator; the users it represents need administrative rights on each
+target. AD delegation restrictions on users (including Protected Users) remain in
+force.
+
+```yaml
+restrictedAdmin:
+  enabled: true
+  realm: CORP.EXAMPLE
+  controllers: [dc-01.corp.example]
+  account: svc-away-rdpsso
+  service: HTTP/away-rdp-sso.corp.example
+  secretName: away-restricted-admin  # password key, provisioned outside this chart
+  identities:
+    immutable-oidc-subject: alex.urban@corp.example
+  targets: [admin.corp.example]
+  fingerprints:
+    admin.corp.example: '11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11'
+```
+
+Use the independently verified SHA-256 fingerprint of the target's RDP TLS
+certificate, not the example above. Update it when the certificate renews. The
+password is mounted only in the gateway. Each configured direct machine also
+needs `signs-in: restricted-admin-sso`. Changing the switch to `false` stops new
+sessions through this path; to revoke the underlying trust, also disable the
+service account and remove its AD delegation grants. Already established Windows
+sessions require disconnection separately.
+
+The mapping accepts exact subjects and UPNs in one realm. It does not use editable
+email addresses, display names or names supplied in browser requests. Target
+restrictions are checked before contacting a KDC and again in the ticket response.
+AD must enforce the same target scope: the application switch alone does not
+limit what a compromised service credential could request. Restricted Admin does
+not provide onward SSO as the user. Enabling this lab feature is not a certification
+against a compliance framework.
+
+For a controlled live probe, `cargo run -p away-gateway --example restricted_admin`
+uses the gateway's `AWAY_RESTRICTED_ADMIN_*` environment settings and requires
+`AWAY_TEST_SUBJECT`, `AWAY_TEST_TARGET` and `AWAY_TEST_FINGERPRINT`. It opens one
+nonblank desktop and disconnects it without printing any credentials.

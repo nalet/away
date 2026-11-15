@@ -164,7 +164,7 @@ impl WithAPassword {
 }
 
 /// Opens what an answer seals for the client, and makes the ticket of it.
-fn given(answered: messages::Answered, key: &Key, usage: u32, nonce: u32) -> Result<Ticket, Error> {
+pub(crate) fn given(answered: messages::Answered, key: &Key, usage: u32, nonce: u32) -> Result<Ticket, Error> {
     let given = messages::read_given(&answered.sealed.open(key, usage)?)?;
     if given.nonce != nonce {
         return Err(Error::NotTrusted("it answered another request than the one that was made"));

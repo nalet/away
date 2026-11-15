@@ -507,6 +507,7 @@ impl GettingIn {
             return plain(StatusCode::FORBIDDEN, "This desktop opens in Windows Remote Desktop with Restricted Admin.\n");
         }
         let themselves = machine.signs_in == SignsIn::Themselves;
+        let restricted_admin = machine.signs_in == SignsIn::RestrictedAdminSso;
         // what Away opens so far: a Windows desktop and the programs of a Windows machine, of
         // one machine or of a farm's collection
         let asked_for = named.iter().find(|(its, value)| its == "program" && !value.is_empty()).map(|(_, value)| value.as_str());
@@ -552,7 +553,17 @@ impl GettingIn {
                 ("program", program.as_ref().map_or(Json::Null, |(name, _)| name.as_str().into())),
                 ("address", machine.address.as_str().into()),
                 ("port", u64::from(port).into()),
-                ("signs_in", if themselves { "themselves" } else { "typed" }.into()),
+                (
+                    "signs_in",
+                    if restricted_admin {
+                        "restricted-admin-sso"
+                    } else if themselves {
+                        "themselves"
+                    } else {
+                        "typed"
+                    }
+                    .into(),
+                ),
                 ("clipboard", machine.clipboard.word().into()),
             ]),
         };
@@ -575,6 +586,7 @@ impl GettingIn {
             collection: machine.collection.clone(),
             served_by: machine.served_by.clone(),
             themselves,
+            restricted_admin,
             clipboard: machine.clipboard,
             program,
             at: time::now().as_secs(),
@@ -609,9 +621,20 @@ impl GettingIn {
                     .zip(said("sign_in"))
                     .and_then(|(ticket, sign_in)| self.sessions.take(ticket, sign_in, time::now().as_secs()));
                 let Some(asked) = taken else { return plain(StatusCode::NOT_FOUND, "No session is asked for with this ticket.\n") };
-                // A machine may have switched to native sign-in while its ticket was pending.
+                // A pending ticket cannot outlive a management policy or target change.
                 let (in_force, _) = self.register.in_force();
-                if in_force.machines.iter().any(|machine| machine.name == asked.machine && machine.signs_in == SignsIn::RestrictedAdmin) {
+                let current = in_force.machines.iter().find(|machine| machine.name == asked.machine);
+                let changed = current.is_some_and(|machine| {
+                    machine.signs_in == SignsIn::RestrictedAdmin
+                        || (machine.signs_in == SignsIn::RestrictedAdminSso) != asked.restricted_admin
+                });
+                let no_longer_allowed = asked.restricted_admin
+                    && !current.is_some_and(|machine| {
+                        machine.address == asked.address
+                            && machine.desktop == Some((Over::Rdp, asked.port))
+                            && in_force.reached_by(&asked.person.groups).iter().any(|(allowed, _)| allowed.name == asked.machine)
+                    });
+                if changed || no_longer_allowed {
                     self.sessions.end(&asked.session);
                     return plain(StatusCode::NOT_FOUND, "No session is asked for with this ticket.\n");
                 }
@@ -630,7 +653,17 @@ impl GettingIn {
                             ("port", u64::from(asked.port).into()),
                             ("collection", asked.collection.as_deref().map_or(Json::Null, Json::from)),
                             ("served_by", Json::List(asked.served_by.iter().map(|served| served.as_str().into()).collect())),
-                            ("signs_in", if asked.themselves { "themselves" } else { "typed" }.into()),
+                            (
+                                "signs_in",
+                                if asked.restricted_admin {
+                                    "restricted-admin-sso"
+                                } else if asked.themselves {
+                                    "themselves"
+                                } else {
+                                    "typed"
+                                }
+                                .into(),
+                            ),
                             ("clipboard", asked.clipboard.word().into()),
                             (
                                 "program",
@@ -686,6 +719,19 @@ impl GettingIn {
         let (true, Some(token)) = (still_them, &signed.token) else {
             return plain(StatusCode::FORBIDDEN, "The sign-in service did not sign anew who this person is.\n");
         };
+        if running.restricted_admin {
+            let (in_force, _) = self.register.in_force();
+            let allowed = signing.sign_ins.who(&running.sign_in, now).is_some_and(|(person, expired)| {
+                !expired
+                    && in_force
+                        .reached_by(&person.groups)
+                        .iter()
+                        .any(|(machine, _)| machine.name == running.machine && machine.signs_in == SignsIn::RestrictedAdminSso)
+            });
+            if !allowed {
+                return plain(StatusCode::FORBIDDEN, "The refreshed sign-in no longer authorizes this management desktop.\n");
+            }
+        }
         let says = Json::object([
             ("session", session.into()),
             ("subject", running.person.subject.as_str().into()),

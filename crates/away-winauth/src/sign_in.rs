@@ -108,6 +108,13 @@ impl SignIn {
         Self::begun(ticket, public_key, on_a_card(card), now, new)
     }
 
+    /// Begins Restricted Admin: the authenticated ticket supplies the identity and
+    /// the sealed TSPasswordCreds fields are all empty (MS-RDPBCGR 2.2.1.1.1).
+    pub fn begin_restricted_admin(ticket: &Ticket, public_key: &[u8], now: (u64, u32), new: New) -> (SignIn, Vec<u8>) {
+        let empty = Account { domain: String::new(), name: String::new(), password: Secret::new("") };
+        Self::begun(ticket, public_key, sign_in::credentials(&empty), now, new)
+    }
+
     fn begun(ticket: &Ticket, public_key: &[u8], hands_over: Vec<u8>, now: (u64, u32), new: New) -> (SignIn, Vec<u8>) {
         let (shown, token) = gss::show(ticket, now, new.for_the_ticket);
         let message = Message { version: sign_in::VERSION, carried: Some(token), ..Message::default() }.write();
@@ -275,6 +282,32 @@ mod tests {
     use crate::kerberos::gss::stand_in;
     use crate::kerberos::messages::tests::ticket;
     use crate::kerberos::messages::{Name, NameKind};
+
+    #[test]
+    fn restricted_admin_proves_the_ticket_but_hands_over_only_empty_credentials() {
+        let key = b"the pinned machine key";
+        let (mut sign_in, first) = SignIn::begin_restricted_admin(&a_ticket(), key, (1_794_700_800, 123_456), new());
+        let first = Message::read(&first).unwrap();
+        let (mut machine, said, answer) =
+            stand_in::answer(&first.carried.unwrap(), &a_ticket().key, Some([7; 32]), stand_in::Ends::Content, [4; 16]).unwrap();
+        assert_eq!(said.account, "alex.urban");
+        let Next::Send(second) = sign_in.receive(&Message { version: 6, carried: Some(answer), ..Message::default() }.write()).unwrap()
+        else {
+            panic!()
+        };
+        assert_eq!(machine.open(&Message::read(&second).unwrap().proof.unwrap()).unwrap(), bound(TO_MACHINE, key));
+        let proof = machine.seal(&bound(FROM_MACHINE, key), [1; 16], 16, 28);
+        let Next::SendLast(last) = sign_in.receive(&Message { version: 6, proof: Some(proof), ..Message::default() }.write()).unwrap()
+        else {
+            panic!()
+        };
+        let credentials = machine.open(&Message::read(&last).unwrap().credentials.unwrap()).unwrap();
+        // TSCredentials type 1 wraps three present, empty UTF-16 fields.
+        assert_eq!(
+            credentials,
+            [0x30, 0x17, 0xa0, 3, 2, 1, 1, 0xa1, 0x10, 4, 0x0e, 0x30, 0x0c, 0xa0, 2, 4, 0, 0xa1, 2, 4, 0, 0xa2, 2, 4, 0]
+        );
+    }
 
     fn a_ticket() -> Ticket {
         Ticket {

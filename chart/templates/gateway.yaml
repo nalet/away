@@ -16,6 +16,21 @@
 {{- $mounts = append $mounts (dict "at" "/run/away/to-the-issuer" "volume" (dict "name" "to-the-issuer" "secret" $issuer)) -}}
 {{- end }}
 {{- end }}
+{{- with .Values.restrictedAdmin }}
+{{- if .enabled }}
+{{- $told = append $told (dict "name" "AWAY_RESTRICTED_ADMIN_ENABLED" "value" "true") -}}
+{{- $told = append $told (dict "name" "AWAY_RESTRICTED_ADMIN_REALM" "value" (required "restrictedAdmin.realm is not set" .realm)) -}}
+{{- $told = append $told (dict "name" "AWAY_RESTRICTED_ADMIN_CONTROLLERS" "value" (join "," (required "restrictedAdmin.controllers is not set" .controllers))) -}}
+{{- $told = append $told (dict "name" "AWAY_RESTRICTED_ADMIN_TARGETS" "value" (join "," (required "restrictedAdmin.targets is not set" .targets))) -}}
+{{- $told = append $told (dict "name" "AWAY_RESTRICTED_ADMIN_ACCOUNT" "value" (required "restrictedAdmin.account is not set" .account)) -}}
+{{- $told = append $told (dict "name" "AWAY_RESTRICTED_ADMIN_SERVICE" "value" (required "restrictedAdmin.service is not set" .service)) -}}
+{{- $told = append $told (dict "name" "AWAY_RESTRICTED_ADMIN_IDENTITIES" "value" (toJson (required "restrictedAdmin.identities is not set" .identities))) -}}
+{{- $told = append $told (dict "name" "AWAY_RESTRICTED_ADMIN_FINGERPRINTS" "value" (toJson (required "restrictedAdmin.fingerprints is not set" .fingerprints))) -}}
+{{- $told = append $told (dict "name" "AWAY_RESTRICTED_ADMIN_PASSWORD_FILE" "value" "/run/away/restricted-admin/password") -}}
+{{- $secret := dict "secretName" (required "restrictedAdmin.secretName is not set" .secretName) "items" (list (dict "key" "password" "path" "password")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/restricted-admin" "volume" (dict "name" "restricted-admin" "secret" $secret)) -}}
+{{- end }}
+{{- end }}
 {{ include "away.part" (dict "root" . "part" "gateway" "port" 8081 "named" "sessions" "told" $told "mounts" $mounts) }}
 ---
 apiVersion: v1
