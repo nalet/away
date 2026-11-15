@@ -3,3 +3,4 @@
 //! controller that ends with a ticket for a machine.
 
 pub mod crypto;
+pub mod messages;
