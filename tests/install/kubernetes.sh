@@ -153,7 +153,7 @@ probe() { pod "$1" "$2" "${3:-}" "$PROBE_IMAGE" 'command: [sleep, "3600"]' IfNot
 # question is whether the connection is let through, not who is at its end.
 reaches() {
   local how=http
-  case "$3" in *:8082) how=https ;; esac
+  case "$3" in *:8082 | *:8083) how=https ;; esac
   kubectl --namespace "$1" exec "$2" -- curl --silent --insecure --output /dev/null --max-time 4 "$how://$3" >/dev/null 2>&1
 }
 
@@ -308,6 +308,10 @@ server_ip=$(kubectl --namespace "$NAMESPACE" get pod "$server" --output jsonpath
 gateway_ip=$(kubectl --namespace "$NAMESPACE" get pod "$gateway" --output jsonpath='{.status.podIP}')
 issuer_ip=$(kubectl --namespace "$NAMESPACE" get pod "$(part_pod issuer)" --output jsonpath='{.status.podIP}')
 image=$(kubectl --namespace "$NAMESPACE" get pod "$server" --output jsonpath='{.spec.containers[0].image}')
+# an installation that names a domain signs people in on its machines as themselves: its
+# issuer is then asked by the gateway, and asks the server and what is outside Away
+domain=$(kubectl --namespace "$NAMESPACE" get pod "$(part_pod issuer)" \
+  --output jsonpath='{.spec.containers[0].env[?(@.name=="AWAY_DOMAIN")].value}')
 
 # where the pods that no rule of Away's covers live: a namespace of their own, or, for an
 # installation that is there, Away's own
@@ -347,15 +351,29 @@ refused "$other" outsider "$gateway_ip:9090" "a pod that is not of Away, to the 
 refused "$other" outsider "$issuer_ip:9090"  "a pod that is not of Away, to the issuer"
 [ -n "$INSTALLED" ] || refused "$NAMESPACE" stranger "$issuer_ip:9090" "another pod of Away's own namespace, to the issuer"
 refused "$other" outsider "$server_ip:8082"  "a pod that is not of Away, to the address the gateway asks the server at"
+[ -z "$domain" ] || refused "$other" outsider "$issuer_ip:8083" "a pod that is not of Away, to the address the gateway asks the issuer at"
 # out of Away: nothing for the server and the issuer. The gateway opens machines, on the
-# ports their desktops are opened on and on no other
+# ports their desktops are opened on and on no other. With a domain the issuer asks the
+# organisation's own services, on their ports and on no other
 refused "$NAMESPACE" as-server  "$elsewhere_ip:8080" "the server, to something outside Away"
 refused "$NAMESPACE" as-gateway "$elsewhere_ip:8080" "the gateway, to something outside Away that is no machine's desktop"
-refused "$NAMESPACE" as-issuer  "$elsewhere_ip:8080" "the issuer, to something outside Away"
-# between the parts: the gateway asks the server, at the server's own address for it, and nothing else
+if [ -n "$domain" ]; then
+  refused "$NAMESPACE" as-issuer "$elsewhere_ip:8080" "the issuer, to something outside Away that is none of the services it asks"
+else
+  refused "$NAMESPACE" as-issuer "$elsewhere_ip:8080" "the issuer, to something outside Away"
+fi
+# between the parts: the gateway asks the server, at the server's own address for it. With
+# a domain the gateway asks the issuer and the issuer the server, each at the other's own
+# address for it. Nothing else
 allowed "$NAMESPACE" as-gateway "$server_ip:8082"    "the gateway, to the address it asks the server at"
-refused "$NAMESPACE" as-issuer  "$server_ip:8082"    "the issuer, to the address the gateway asks the server at"
-refused "$NAMESPACE" as-gateway "$issuer_ip:9090"    "the gateway, to the issuer"
+if [ -n "$domain" ]; then
+  allowed "$NAMESPACE" as-issuer  "$server_ip:8082"  "the issuer, to the address the server is asked at"
+  allowed "$NAMESPACE" as-gateway "$issuer_ip:8083"  "the gateway, to the address it asks the issuer at"
+else
+  refused "$NAMESPACE" as-issuer  "$server_ip:8082"  "the issuer, to the address the gateway asks the server at"
+  refused "$NAMESPACE" as-gateway "$issuer_ip:8083"  "the gateway, to the address the issuer is asked at"
+fi
+refused "$NAMESPACE" as-gateway "$issuer_ip:9090"    "the gateway, to the issuer's measures"
 refused "$NAMESPACE" as-gateway "$server_ip:8080"    "the gateway, to the server's pages"
 refused "$NAMESPACE" as-server  "$gateway_ip:8081"   "the server, to the gateway"
 refused "$NAMESPACE" as-issuer  "$server_ip:8080"    "the issuer, to the server"
