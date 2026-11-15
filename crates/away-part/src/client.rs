@@ -259,6 +259,7 @@ pub struct Conversation {
     host: String,
     within: Duration,
     at_most: usize,
+    shown: Option<Vec<u8>>,
 }
 
 impl Drop for Conversation {
@@ -281,21 +282,24 @@ impl Client {
                     tokio::spawn(async move {
                         let _ = driven.await;
                     }),
+                    None,
                 ));
             }
             let name = ServerName::try_from(address.host.clone()).map_err(|error| Failed::NotSecured(error.to_string()))?;
             let secured = self.secures.connect(name, connection).await.map_err(|error| Failed::NotSecured(error.to_string()))?;
+            let shown = secured.get_ref().1.peer_certificates().and_then(|shown| shown.first()).map(|first| first.as_ref().to_vec());
             let (sender, driven) = hyper::client::conn::http1::handshake(TokioIo::new(secured)).await.map_err(broken)?;
             Ok((
                 sender,
                 tokio::spawn(async move {
                     let _ = driven.await;
                 }),
+                shown,
             ))
         };
         match tokio::time::timeout(self.within, opened).await {
-            Ok(Ok((sender, driving))) => {
-                Ok(Conversation { sender, driving, host: address.host_named(), within: self.within, at_most: self.at_most })
+            Ok(Ok((sender, driving, shown))) => {
+                Ok(Conversation { sender, driving, host: address.host_named(), within: self.within, at_most: self.at_most, shown })
             }
             Ok(Err(failed)) => Err(failed),
             Err(_) => Err(Failed::NoAnswerInTime),
@@ -307,18 +311,34 @@ impl Conversation {
     /// Asks for what is at a path of the service, with these headers. A header whose
     /// value is secret is never written to a log.
     pub async fn get(&mut self, path: &str, headers: &[(&str, &Secret)]) -> Result<Answered, Failed> {
+        self.ask(Method::GET, path, headers, None).await
+    }
+
+    /// Sends a form to a path of the service, with these headers.
+    pub async fn send_form(&mut self, path: &str, headers: &[(&str, &Secret)], pairs: &[(&str, &str)]) -> Result<Answered, Failed> {
+        self.ask(Method::POST, path, headers, Some(form(pairs))).await
+    }
+
+    /// The certificate the service showed when the connection was secured, as it is
+    /// written: what a sign-in is bound to that must be worth nothing on another
+    /// connection. A connection that is not secured has none.
+    pub fn shown(&self) -> Option<&[u8]> {
+        self.shown.as_deref()
+    }
+
+    async fn ask(&mut self, method: Method, path: &str, headers: &[(&str, &Secret)], sent: Option<String>) -> Result<Answered, Failed> {
         let broken = |error: hyper::http::Error| Failed::Broken(error.to_string());
-        let mut request = Request::builder()
-            .method(Method::GET)
-            .uri(path)
-            .header(HOST, &self.host)
-            .header(USER_AGENT, format!("away/{}", version::VERSION));
+        let mut request =
+            Request::builder().method(method).uri(path).header(HOST, &self.host).header(USER_AGENT, format!("away/{}", version::VERSION));
+        if sent.is_some() {
+            request = request.header(CONTENT_TYPE, "application/x-www-form-urlencoded");
+        }
         for (name, value) in headers {
             let mut value = HeaderValue::from_str(value.expose()).map_err(|error| Failed::Broken(error.to_string()))?;
             value.set_sensitive(true);
             request = request.header(*name, value);
         }
-        let request = request.body(Full::new(Bytes::new())).map_err(broken)?;
+        let request = request.body(Full::new(Bytes::from(sent.unwrap_or_default()))).map_err(broken)?;
         let at_most = self.at_most;
         let asked = async {
             let broken = |error: hyper::Error| Failed::Broken(error.to_string());
@@ -430,6 +450,8 @@ mod tests {
         let second = conversation.get("/two", &[("x-secret", &Secret::new("held"))]).await.unwrap();
         assert_eq!(&second.body[..], b"/two [held]");
         assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 2);
+        // a connection that is not secured showed no certificate
+        assert_eq!(conversation.shown(), None);
         // a service that isn't there
         let nowhere = Address::read("http://127.0.0.1:1/").unwrap();
         assert!(matches!(client.talk(&nowhere).await, Err(Failed::NotReached(_))));
@@ -540,9 +562,34 @@ mod tests {
         assert_eq!(knows.get(&address).await.map(|got| got.body), Ok(Bytes::from_static(b"secured\n")));
         let knows_not = Client::new(None).unwrap();
         assert!(matches!(knows_not.get(&address).await, Err(Failed::NotSecured(_))));
+        // a conversation says which certificate the service showed, as it is written
+        let conversation = knows.talk(&address).await.unwrap();
+        assert_eq!(conversation.shown(), Some(&include_bytes!("../tests/fixtures/localhost.der")[..]));
         // the certificate is for localhost, and for no other name of this machine
         let other_name = Address { host: "127.0.0.1".to_string(), ..address };
         assert!(matches!(knows.get(&other_name).await, Err(Failed::NotSecured(_))));
+    }
+
+    #[tokio::test]
+    async fn a_conversation_sends_a_form_with_its_headers() {
+        let (address, _stopper) = service(echo()).await;
+        let client = Client::new(None).unwrap();
+        let mut conversation = client.talk(&address).await.unwrap();
+        let signed_in = Secret::new("Negotiate abc=");
+        let sent = conversation
+            .send_form("/pages/ask", &[("authorization", &signed_in)], &[("kind", "a b"), ("request", "a+b/c=")])
+            .await
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&sent.body),
+            format!(
+                "POST /pages/ask [{}] [Negotiate abc=] [application/x-www-form-urlencoded]\nkind=a%20b&request=a%2Bb%2Fc%3D",
+                address.host_named()
+            )
+        );
+        // and asks again on the same connection
+        let again = conversation.get("/pages/fetch", &[]).await.unwrap();
+        assert_eq!(String::from_utf8_lossy(&again.body), format!("GET /pages/fetch [{}] [-] [-]\n", address.host_named()));
     }
 
     #[test]

@@ -55,12 +55,54 @@ fn framed(kind: [u8; 2], message: &[u8]) -> Vec<u8> {
 
 /// Shows a ticket to the machine it is for: the token to send, which offers Kerberos and
 /// carries the ticket with its proof. `now` is the client's time.
+///
+/// The proof is bound to nothing of the connection below, which the sign-in before a
+/// desktop does itself.
 pub fn show(ticket: &Ticket, now: (u64, u32), fresh: Fresh) -> (Shown, Vec<u8>) {
+    show_bound(ticket, now, fresh, &Bound([0; 16]))
+}
+
+/// What a proof is bound to: the connection it travels on, so that it is worth nothing
+/// on another one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Bound([u8; 16]);
+
+impl Bound {
+    /// Bound to a connection that TLS secures, by the certificate the service showed on
+    /// it (RFC 5929, `tls-server-end-point`): whoever passes the proof on to the service
+    /// over a connection of their own shows another certificate.
+    pub fn to_the_certificate(shown: &[u8]) -> Result<Bound, Error> {
+        use md5::Md5;
+        use sha2::{Digest, Sha256, Sha384, Sha512};
+        // the hash is the one the certificate was signed with, and SHA-256 where that
+        // one is weaker or is not named with the way of signing
+        let how = crate::certificate::Certificate::read(shown)?.signed_how;
+        let named = |numbers: &[u32]| how == &der::name(numbers)[2..];
+        let hash = if named(&[1, 2, 840, 113549, 1, 1, 12]) || named(&[1, 2, 840, 10045, 4, 3, 3]) {
+            Sha384::digest(shown).to_vec()
+        } else if named(&[1, 2, 840, 113549, 1, 1, 13]) || named(&[1, 2, 840, 10045, 4, 3, 4]) {
+            Sha512::digest(shown).to_vec()
+        } else {
+            Sha256::digest(shown).to_vec()
+        };
+        // what a proof is bound to is written as addresses of both ends, which a
+        // connection of this kind has none of, and then what the application adds
+        let of_the_connection = [&b"tls-server-end-point:"[..], &hash].concat();
+        let mut written = vec![0; 16];
+        written.extend((of_the_connection.len() as u32).to_le_bytes());
+        written.extend(of_the_connection);
+        Ok(Bound(Md5::digest(&written).into()))
+    }
+}
+
+/// Shows a ticket as [`show`] does, with its proof bound to the connection it travels
+/// on: what a service asks for that signs people in over HTTP.
+pub fn show_bound(ticket: &Ticket, now: (u64, u32), fresh: Fresh, bound: &Bound) -> (Shown, Vec<u8>) {
     let ours = Key::new(ticket.key.kind(), &fresh.key[..ticket.key.kind().length()]).expect("a key as long as its kind takes");
-    // the check that goes with the proof says what is asked of the connection; it is
-    // bound to nothing of the connection below, which the sign-in around it does itself
+    // the check that goes with the proof says what it is bound to and what is asked of
+    // the connection
     let mut asked = 16u32.to_le_bytes().to_vec();
-    asked.extend([0; 16]);
+    asked.extend(bound.0);
     asked.extend(WHAT_IS_ASKED.to_le_bytes());
     let proof = Proof {
         realm: ticket.realm.clone(),
@@ -236,6 +278,8 @@ pub mod stand_in {
         pub realm: String,
         /// What the client asks of the connection.
         pub asked: u32,
+        /// What the client's proof is bound to.
+        pub bound: Bound,
     }
 
     /// What a client's first token carries: the ticket and its proof, as their fields.
@@ -324,7 +368,9 @@ pub mod stand_in {
         let account = name.needed(1)?.inside().expect(der::GENERAL_STRING)?.text()?.to_string();
         let mut check = proof.needed(3)?.inside();
         check.skip_to(1)?;
-        let asked = u32::from_le_bytes(check.needed(1)?.holds[20..24].try_into().map_err(|_| WRONG)?);
+        let check = check.needed(1)?.holds;
+        let asked = u32::from_le_bytes(check.get(20..24).and_then(|asked| asked.try_into().ok()).ok_or(WRONG)?);
+        let bound = Bound(check.get(4..20).and_then(|bound| bound.try_into().ok()).ok_or(WRONG)?);
         let millionths = proof.needed(4)?.number()?;
         let seconds = proof.needed(5)?;
         let theirs_key = proof.needed(6)?;
@@ -362,7 +408,7 @@ pub mod stand_in {
         if ends != Ends::Content {
             fields.push(der::under(3, &der::bytes(&machine.check(&offered))));
         }
-        Ok((machine, Shown { account, realm, asked }, der::write(der::numbered(1), &der::sequence(&fields))))
+        Ok((machine, Shown { account, realm, asked, bound }, der::write(der::numbered(1), &der::sequence(&fields))))
     }
 
     impl Machine {
@@ -480,6 +526,24 @@ mod tests {
 
     fn fresh() -> Fresh {
         Fresh { key: [6; 32], begins_with: [3; 16], counts_from: 1000 }
+    }
+
+    #[test]
+    fn a_proof_is_bound_to_the_certificate_the_service_showed_on_its_connection() {
+        use crate::certificate::tests::{AUTHORITY, CONTROLLER};
+        // as RFC 5929 and RFC 4121 say it, worked out apart from this code
+        let bound = Bound::to_the_certificate(CONTROLLER).expect("a certificate");
+        assert_eq!(bound, Bound(bytes("f0cb80deb6a09895dffbbfa7189527be").try_into().unwrap()));
+        assert_ne!(bound, Bound::to_the_certificate(AUTHORITY).unwrap());
+        assert!(Bound::to_the_certificate(&CONTROLLER[..100]).is_err());
+
+        // the machine reads in the proof what it is bound to, and nothing where it is bound to nothing
+        let (_, token) = show_bound(&a_ticket(), (1_794_700_800, 123_456), fresh(), &bound);
+        let (_, said, _) = stand_in::answer(&token, &a_ticket().key, None, stand_in::Ends::Content, [4; 16]).unwrap();
+        assert_eq!(said.bound, bound);
+        let (_, token) = show(&a_ticket(), (1_794_700_800, 123_456), fresh());
+        let (_, said, _) = stand_in::answer(&token, &a_ticket().key, None, stand_in::Ends::Content, [4; 16]).unwrap();
+        assert_eq!(said.bound, Bound([0; 16]));
     }
 
     #[test]

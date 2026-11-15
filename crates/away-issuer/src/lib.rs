@@ -1,7 +1,11 @@
 //! The issuer: makes the sign-ins on machines.
 //!
-//! In this version it signs nothing. It runs apart from the server and the gateway, as it
-//! always will, and says whether it is well. Nothing reaches it from outside the cluster.
+//! In this version the part itself signs nothing yet. It runs apart from the server and
+//! the gateway, as it always will, and says whether it is well. Nothing reaches it from
+//! outside the cluster. What asks an organisation's own authority for a certificate is
+//! here already ([`authority`]), and no session uses it yet.
+
+pub mod authority;
 
 use away_part::http::Listener;
 use away_part::part::Bound;

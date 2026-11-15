@@ -10,6 +10,10 @@ publish.workspace = true
 
 [dependencies]
 away-part.workspace = true
+away-secret.workspace = true
+away-winauth.workspace = true
+tokio = { workspace = true, features = ["io-util"] }
+getrandom.workspace = true
 
 [lints]
 workspace = true

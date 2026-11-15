@@ -342,6 +342,50 @@ The tests run both against the real Kerberos server, with a stand-in for the
 machine that reads the card with the commands a Windows machine gives one,
 and checks the certificate it read and the signature the card made.
 
+### Asking an organisation's authority for the certificate
+
+Where an organisation has a certificate authority of its own, the certificate
+a person is signed in with comes from it. `away-try` asks a Windows authority
+the way Away's issuer does, over the pages the authority publishes for that,
+with nothing of Away's installed beside it:
+
+```sh
+cargo run --package away-try -- certificate https://authority.example.com/certsrv/ \
+  --kerberos dc-01.example.com --realm CORP.EXAMPLE --as svc-away --password-file ~/.config/away/issuer-password \
+  --kind AwaySignIn --for 'CORP\alex.urban' --agent agent.pem --agent-key agent.key.pem \
+  --trusts authority.pem --save alex.pem --save-key alex.key.pem
+```
+
+It makes a key of 2048 bits and the request for a certificate for it. The
+request is then signed in the name of the account it is for, with the
+certificate of an agent: one that allows asking for others. The kind is the
+name the authority gives the kind of certificate that is asked for.
+
+The program is signed in at the pages with Kerberos, as the account the
+organisation gave Away for this, with a ticket of the domain's. The proof that
+goes with the ticket is bound to the TLS connection it travels on, which an
+authority's pages can be set to ask for: passed on by somebody in between, it
+is worth nothing. The pages are asked over TLS alone, and their certificate
+has to lead to a public authority or to one that `--trusts` names.
+
+What comes back is the certificate, which is written beside its key, or the
+authority's refusal in its own words. Whether this agent may ask for that
+account, and for that kind of certificate, is the authority's to decide and
+not Away's. Neither file is written over where it is there already.
+
+Without `--for` the certificate is the account's own, which is how an agent's
+certificate is asked for in the first place.
+
+The certificate and its key are what `away-try rdp` takes with
+`--certificate` and `--key`: the two commands together sign a person in on a
+machine with nothing typed.
+
+The tests run this against the real Kerberos server too, with pages of their
+own that stand in for an authority's. Those pages open the ticket with the key
+of their service, check that its proof is bound to the certificate they
+showed, read the request as an authority reads one, and answer with pages
+built as a real authority's are.
+
 This is the first part of signing in as oneself. No page and no session uses
 it yet.
 

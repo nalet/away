@@ -11,6 +11,7 @@
 //! real machines, with no browser and nothing else of Away around it. It is not in the
 //! image.
 
+mod certificate;
 mod kerberos;
 
 use std::io::{Read, Write};
@@ -182,9 +183,23 @@ fn main() -> ExitCode {
     let words: Vec<String> = std::env::args().skip(1).collect();
     if let [word] = words.as_slice() {
         if matches!(word.as_str(), "help" | "--help" | "-h") {
-            print!("{USAGE}\n{}", kerberos::USAGE);
+            print!("{USAGE}\n{}\n{}", kerberos::USAGE, certificate::USAGE);
             return ExitCode::SUCCESS;
         }
+    }
+    // an authority is asked for a certificate
+    if words.first().is_some_and(|kind| kind == "certificate") {
+        return match certificate::run(&words[1..]) {
+            Some(Ok(())) => ExitCode::SUCCESS,
+            Some(Err(why)) => {
+                println!("   {why}");
+                ExitCode::FAILURE
+            }
+            None => {
+                eprint!("{}", certificate::USAGE);
+                ExitCode::from(2)
+            }
+        };
     }
     // a domain controller is tried with Kerberos, a machine with RDP
     if words.first().is_some_and(|kind| kind == "kerberos") {
@@ -201,7 +216,7 @@ fn main() -> ExitCode {
         };
     }
     let Some(asked) = asked(&words) else {
-        eprint!("{USAGE}\n{}", kerberos::USAGE);
+        eprint!("{USAGE}\n{}\n{}", kerberos::USAGE, certificate::USAGE);
         return ExitCode::from(2);
     };
     let tried = tried(&asked);

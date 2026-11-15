@@ -92,6 +92,10 @@ name = "away-issuer"
 version = "0.1.0"
 dependencies = [
  "away-part",
+ "away-secret",
+ "away-winauth",
+ "getrandom 0.4.3",
+ "tokio",
 ]
 
 [[package]]
@@ -150,11 +154,15 @@ dependencies = [
 name = "away-try"
 version = "0.1.0"
 dependencies = [
+ "away-issuer",
+ "away-part",
  "away-rdp",
+ "away-secret",
  "away-winauth",
  "getrandom 0.4.3",
  "rustls",
  "sha2",
+ "tokio",
 ]
 
 [[package]]
@@ -164,7 +172,9 @@ dependencies = [
  "aes",
  "away-rdp",
  "flate2",
+ "getrandom 0.4.3",
  "hmac",
+ "md-5",
  "num-bigint",
  "ring",
  "rsa",

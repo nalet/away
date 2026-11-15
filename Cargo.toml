@@ -35,13 +35,13 @@ webpki-roots = { version = "1", default-features = false } # the public authorit
 ring = { version = "0.17", default-features = false } # checks the signature on what a sign-in service signed
 sha2 = { version = "0.11", default-features = false } # makes the fingerprint a machine is known by, and binds a sign-in to its connection
 md4 = { version = "0.11", default-features = false } # turns a password into the key Windows knows it by: part of signing in with a name and a password
-md-5 = { version = "0.11", default-features = false } # the hash that signing in with a name and a password is built on
+md-5 = { version = "0.11", default-features = false } # the hash that signing in with a name and a password is built on, and that binds a ticket to the connection it is shown on
 hmac = { version = "0.13", default-features = false } # makes the proofs and the keys of signing in with a name and a password
 rc4 = { version = "0.2", default-features = false } # the cipher that signing in with a name and a password seals its messages with, and the taking of a licence too
 sha1 = { version = "0.11", default-features = false } # the second hash that the taking of a licence makes its keys and its checks with
 num-bigint = { version = "0.5", default-features = false } # does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is
 aes = { version = "0.9", default-features = false } # the cipher Kerberos seals its messages with: part of signing in on a Windows machine with a certificate
-rsa = { version = "0.10", default-features = false, features = ["encoding", "getrandom", "pkcs1v15"] } # signs with the key of the smart card that exists in memory alone, which a Windows machine signs a person in with
+rsa = { version = "0.10", default-features = false, features = ["encoding", "getrandom", "pkcs1v15"] } # makes the key of the smart card that exists in memory alone, which a Windows machine signs a person in with, and signs with it
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] } # packs the certificate on that card the way a card holds one
 getrandom = { version = "0.4", default-features = false } # takes random bytes from the system, for keys and for numbers used once
 saphyr-parser = { version = "0.3", default-features = false } # reads the files of machines and rules, which are YAML, and knows the line each thing is written in

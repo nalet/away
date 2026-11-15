@@ -2,7 +2,8 @@
 # Tries Away's own Kerberos against a real Kerberos server: starts one in a container,
 # for the domain of the tests' certificates, CORP.EXAMPLE, with certificate sign-in
 # switched on, two accounts that sign in with a certificate, one that signs in with a
-# password, and a machine's service, and runs the tests that need it. Beside it, in
+# password, a machine's service and the service of an authority's pages, and runs the
+# tests that need it. Beside it, in
 # the same container, a machine takes the tickets for that service, with the Kerberos
 # library's own code (machine.py).
 #
@@ -82,6 +83,9 @@ kadmin.local -q "addprinc -randkey TERMSRV/desk-01.corp.example@CORP.EXAMPLE" >/
 # a machine the tests reach by its address, and stand in for themselves: its service's
 # key is made from a password, so that they can hold it
 kadmin.local -q "addprinc -pw \"the password of a machine that exists for these tests alone\" TERMSRV/127.0.0.1@CORP.EXAMPLE" >/dev/null 2>&1
+# an authority's pages that the tests stand in for themselves, reached as localhost: the
+# key of their service is made from a password too
+kadmin.local -q "addprinc -pw \"the password of pages that exist for these tests alone\" HTTP/localhost@CORP.EXAMPLE" >/dev/null 2>&1
 # the machine that takes the tickets for that service holds the service's key
 kadmin.local -q "ktadd -k /etc/krb5.keytab TERMSRV/desk-01.corp.example@CORP.EXAMPLE" >/dev/null 2>&1
 python3 /given/machine.py &

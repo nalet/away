@@ -18,13 +18,13 @@ library has no line that says what it is for.
 | [ring](https://crates.io/crates/ring) | checks the signature on what a sign-in service signed | 0.17.14 | — |
 | [sha2](https://crates.io/crates/sha2) | makes the fingerprint a machine is known by, and binds a sign-in to its connection | 0.11.1 | — |
 | [md4](https://crates.io/crates/md4) | turns a password into the key Windows knows it by: part of signing in with a name and a password | 0.11.0 | — |
-| [md-5](https://crates.io/crates/md-5) | the hash that signing in with a name and a password is built on | 0.11.0 | — |
+| [md-5](https://crates.io/crates/md-5) | the hash that signing in with a name and a password is built on, and that binds a ticket to the connection it is shown on | 0.11.0 | — |
 | [hmac](https://crates.io/crates/hmac) | makes the proofs and the keys of signing in with a name and a password | 0.13.0 | — |
 | [rc4](https://crates.io/crates/rc4) | the cipher that signing in with a name and a password seals its messages with, and the taking of a licence too | 0.2.0 | — |
 | [sha1](https://crates.io/crates/sha1) | the second hash that the taking of a licence makes its keys and its checks with | 0.11.0 | — |
 | [num-bigint](https://crates.io/crates/num-bigint) | does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is | 0.5.1 | — |
 | [aes](https://crates.io/crates/aes) | the cipher Kerberos seals its messages with: part of signing in on a Windows machine with a certificate | 0.9.4 | — |
-| [rsa](https://crates.io/crates/rsa) | signs with the key of the smart card that exists in memory alone, which a Windows machine signs a person in with | 0.10.0 | `encoding`, `getrandom`, `pkcs1v15` |
+| [rsa](https://crates.io/crates/rsa) | makes the key of the smart card that exists in memory alone, which a Windows machine signs a person in with, and signs with it | 0.10.0 | `encoding`, `getrandom`, `pkcs1v15` |
 | [flate2](https://crates.io/crates/flate2) | packs the certificate on that card the way a card holds one | 1.1.11 | `rust_backend` |
 | [getrandom](https://crates.io/crates/getrandom) | takes random bytes from the system, for keys and for numbers used once | 0.2.17, 0.4.3 | — |
 | [saphyr-parser](https://crates.io/crates/saphyr-parser) | reads the files of machines and rules, which are YAML, and knows the line each thing is written in | 0.3.4 | — |

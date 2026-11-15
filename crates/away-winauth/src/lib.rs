@@ -12,6 +12,7 @@ pub mod card;
 pub mod certificate;
 pub mod der;
 pub mod kerberos;
+pub mod request;
 pub mod sign_in;
 
 mod error;
