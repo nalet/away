@@ -10,8 +10,8 @@ use rsa::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey};
 use rsa::traits::PublicKeyParts;
 use sha2::{Digest, Sha256};
 
-use crate::certificate::Certificate;
-use crate::der;
+use crate::certificate::{signed_with, Certificate};
+use crate::der::{self, Reader};
 use crate::kerberos::pkinit::Signs;
 use crate::Error;
 
@@ -29,6 +29,8 @@ const WIDE_TEXT: u8 = 0x1e;
 /// What a SHA-256 hash is written behind when RSA signs it (RFC 8017, 9.2).
 const A_SHA256_HASH: [u8; 19] =
     [0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20];
+
+const WRONG: Error = Error::NotACertificate("the request is not built as one");
 
 /// How many bits a key has: what a Windows machine reads from a smart card.
 pub const BITS: usize = 2048;
@@ -127,48 +129,44 @@ pub fn in_the_name_of(asked: &[u8], account: &str, agent: &dyn Signs) -> Result<
     Ok(der::sequence(&[der::name(SIGNED), der::under(0, &all)]))
 }
 
+/// What a request says.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Read {
+    /// What it calls its subject.
+    pub name: String,
+    /// The key it is for, as a certificate holds one.
+    pub key: Vec<u8>,
+}
+
+/// Reads a request, and checks that whoever made it holds the key it is for.
+pub fn read(asked: &[u8]) -> Result<Read, Error> {
+    let mut whole = Reader::new(asked).expect(der::SEQUENCE)?.inside();
+    let what = whole.value()?;
+    let how = whole.expect(der::SEQUENCE)?.inside().expect(der::OBJECT_NAME)?.holds;
+    let signature = whole.expect(der::BIT_STRING)?.holds.get(1..).ok_or(WRONG)?;
+    let mut inside = what.inside();
+    if inside.expect(der::INTEGER)?.number()? != 0 {
+        return Err(WRONG);
+    }
+    let mut named = inside.expect(der::SEQUENCE)?.inside().expect(der::SET)?.inside().expect(der::SEQUENCE)?.inside();
+    named.expect(der::OBJECT_NAME)?;
+    let name = named.expect(der::UTF8_STRING)?.text()?.to_string();
+    let key = inside.value()?;
+    // the key itself, as RSA writes it, is what the signature is checked with
+    let mut its = key.inside();
+    its.expect(der::SEQUENCE)?;
+    let as_rsa_writes_it = its.expect(der::BIT_STRING)?.holds.get(1..).ok_or(WRONG)?;
+    if !signed_with(as_rsa_writes_it, how, what.whole, signature) {
+        return Err(Error::NotTrusted("whoever made the request does not hold the key it is for"));
+    }
+    Ok(Read { name, key: key.whole.to_vec() })
+}
+
 /// What an authority would read in such requests, for tests and for whatever stands in
 /// for an authority.
 #[cfg(any(test, feature = "stand-in"))]
 pub mod stand_in {
     use super::*;
-    use crate::certificate::signed_with;
-    use crate::der::Reader;
-
-    const WRONG: Error = Error::NotACertificate("the request is not built as one");
-
-    /// What a request says.
-    #[derive(Clone, Debug, PartialEq, Eq)]
-    pub struct Read {
-        /// What it calls its subject.
-        pub name: String,
-        /// The key it is for, as a certificate holds one.
-        pub key: Vec<u8>,
-    }
-
-    /// Reads a request, and checks that whoever made it holds the key it is for.
-    pub fn read(asked: &[u8]) -> Result<Read, Error> {
-        let mut whole = Reader::new(asked).expect(der::SEQUENCE)?.inside();
-        let what = whole.value()?;
-        let how = whole.expect(der::SEQUENCE)?.inside().expect(der::OBJECT_NAME)?.holds;
-        let signature = whole.expect(der::BIT_STRING)?.holds.get(1..).ok_or(WRONG)?;
-        let mut inside = what.inside();
-        if inside.expect(der::INTEGER)?.number()? != 0 {
-            return Err(WRONG);
-        }
-        let mut named = inside.expect(der::SEQUENCE)?.inside().expect(der::SET)?.inside().expect(der::SEQUENCE)?.inside();
-        named.expect(der::OBJECT_NAME)?;
-        let name = named.expect(der::UTF8_STRING)?.text()?.to_string();
-        let key = inside.value()?;
-        // the key itself, as RSA writes it, is what the signature is checked with
-        let mut its = key.inside();
-        its.expect(der::SEQUENCE)?;
-        let as_rsa_writes_it = its.expect(der::BIT_STRING)?.holds.get(1..).ok_or(WRONG)?;
-        if !signed_with(as_rsa_writes_it, how, what.whole, signature) {
-            return Err(Error::NotTrusted("whoever made the request does not hold the key it is for"));
-        }
-        Ok(Read { name, key: key.whole.to_vec() })
-    }
 
     /// What a certificate is issued for.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -333,14 +331,14 @@ mod tests {
     #[test]
     fn a_request_carries_the_public_half_and_proves_that_the_private_one_is_held() {
         let asked = asked(key(), "alex.urban").expect("a request");
-        let read = stand_in::read(&asked).expect("the request, read");
+        let read = read(&asked).expect("the request, read");
         assert_eq!(read.name, "alex.urban");
         assert!(read.key == key().public().unwrap(), "the key in the request is the public half");
         // a request that was changed on the way proves nothing
         let mut changed = asked.clone();
         let at = changed.len() / 2;
         changed[at] ^= 1;
-        assert!(stand_in::read(&changed).is_err());
+        assert!(super::read(&changed).is_err());
     }
 
     #[test]

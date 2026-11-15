@@ -723,6 +723,29 @@ impl GettingIn {
                     Err(unusable) => self.kept_nothing(&unusable),
                 }
             }
+            // a sign-in the issuer made on the machine for the person: kept before the
+            // issuer hands out what signs them in, and not handed out where it can't be kept
+            Some("signed-in") => {
+                let (Some(account), Some(number)) =
+                    (said("as").filter(|said| !said.is_empty()), said("number").filter(|said| !said.is_empty()))
+                else {
+                    return plain(
+                        StatusCode::BAD_REQUEST,
+                        "A sign-in that was made is said with the account, as as=, and the certificate's number, as number=.\n",
+                    );
+                };
+                let details = Json::object([
+                    ("session", session.into()),
+                    ("as", account.into()),
+                    ("number", number.into()),
+                    ("until", count("until")),
+                ]);
+                let record = Record { key: format!("{session}-signed-in-{number}"), ..record("signed-in", details) };
+                match self.records.add(&record).await {
+                    Ok(()) => answer(StatusCode::OK, "application/json", "{}"),
+                    Err(unusable) => self.kept_nothing(&unusable),
+                }
+            }
             Some(what @ ("failed" | "ended")) => {
                 self.sessions.end(session);
                 self.count_sessions();
@@ -747,7 +770,7 @@ impl GettingIn {
                 }
                 answer(StatusCode::OK, "application/json", "{}")
             }
-            _ => plain(StatusCode::BAD_REQUEST, "What became of a session is one of: identity, opened, failed, ended.\n"),
+            _ => plain(StatusCode::BAD_REQUEST, "What became of a session is one of: identity, opened, signed-in, failed, ended.\n"),
         }
     }
 

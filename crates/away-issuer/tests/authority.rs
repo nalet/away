@@ -59,7 +59,7 @@ async fn pages() -> Pages {
 
 fn authority(pages: &Pages, server: &str, password: &str) -> Authority {
     let client = Client::new(Some(between_dashes("CERTIFICATE", AUTHORITY).as_bytes())).expect("a client that trusts the tests' authority");
-    Authority::new(client, &pages.address, server, "CORP.EXAMPLE", "pat.typed", Secret::new(password)).expect("an authority")
+    Authority::new(client, &pages.address, &[server.to_string()], "CORP.EXAMPLE", "pat.typed", Secret::new(password)).expect("an authority")
 }
 
 #[tokio::test]
@@ -160,8 +160,15 @@ async fn an_account_the_domain_controller_does_not_take_asks_nothing() {
 async fn pages_of_an_authority_that_is_not_trusted_are_not_asked() {
     let Some(server) = server() else { return };
     let pages = pages().await;
-    let authority = Authority::new(Client::new(None).unwrap(), &pages.address, &server, "CORP.EXAMPLE", "pat.typed", Secret::new(PASSWORD))
-        .expect("an authority");
+    let authority = Authority::new(
+        Client::new(None).unwrap(),
+        &pages.address,
+        std::slice::from_ref(&server),
+        "CORP.EXAMPLE",
+        "pat.typed",
+        Secret::new(PASSWORD),
+    )
+    .expect("an authority");
     let key = NewKey::new().expect("a key");
     let Err(Why::NotAsked(why)) = authority.ask(&request::asked(&key, "pat.typed").unwrap(), "CorpAgent").await else {
         panic!("pages whose certificate leads nowhere are not asked")

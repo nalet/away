@@ -54,7 +54,7 @@ impl std::fmt::Display for Why {
 pub struct Authority {
     client: Client,
     pages: Address,
-    controller: (String, u16),
+    controllers: Vec<(String, u16)>,
     realm: String,
     account: String,
     password: Secret,
@@ -75,8 +75,16 @@ fn random<const N: usize>() -> Result<[u8; N], Why> {
 impl Authority {
     /// An authority whose pages are at this address, such as
     /// `https://authority.corp.example/certsrv/`, asked as this account of the realm.
-    /// The domain controller is named with its port where that is not Kerberos' own.
-    pub fn new(client: Client, pages: &str, controller: &str, realm: &str, account: &str, password: Secret) -> Result<Authority, String> {
+    /// Each domain controller is named with its port where that is not Kerberos' own;
+    /// they are asked in their order, the next where one is not reached.
+    pub fn new(
+        client: Client,
+        pages: &str,
+        controllers: &[String],
+        realm: &str,
+        account: &str,
+        password: Secret,
+    ) -> Result<Authority, String> {
         let mut pages = Address::read(pages).map_err(|why| format!("The address of the authority's pages can't be used: {why}."))?;
         if !pages.secured {
             return Err("The authority's pages are asked over TLS alone: their address begins with https://.".to_string());
@@ -87,17 +95,20 @@ impl Authority {
         if !pages.path.ends_with('/') {
             pages.path.push('/');
         }
-        let controller = match controller.rsplit_once(':') {
-            Some((host, port)) => (host.to_string(), port.parse::<u16>().map_err(|_| format!("{port} is no port."))?),
-            None => (controller.to_string(), 88),
-        };
-        if controller.0.is_empty() || realm.is_empty() || account.is_empty() {
+        let controllers = controllers
+            .iter()
+            .map(|controller| match controller.rsplit_once(':') {
+                Some((host, port)) => Ok((host.to_string(), port.parse::<u16>().map_err(|_| format!("{port} is no port."))?)),
+                None => Ok((controller.to_string(), 88)),
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        if controllers.is_empty() || controllers.iter().any(|(host, _)| host.is_empty()) || realm.is_empty() || account.is_empty() {
             return Err("The authority is asked as an account of a realm, with a domain controller that gives its tickets.".to_string());
         }
         Ok(Authority {
             client,
             pages,
-            controller,
+            controllers,
             realm: realm.to_string(),
             account: account.to_string(),
             password,
@@ -183,9 +194,20 @@ impl Authority {
         Ok(ticket)
     }
 
-    /// Sends the domain controller one request, and gives what came back.
+    /// Sends a domain controller one request, and gives what came back: the first of
+    /// them that answers.
     async fn ask_the_controller(&self, request: &[u8]) -> Result<Vec<u8>, Why> {
-        let (host, port) = (self.controller.0.as_str(), self.controller.1);
+        let mut last = Why::NotAsked("No domain controller is named.".to_string());
+        for (host, port) in &self.controllers {
+            match self.ask_one_controller(host, *port, request).await {
+                Ok(answered) => return Ok(answered),
+                Err(why) => last = why,
+            }
+        }
+        Err(last)
+    }
+
+    async fn ask_one_controller(&self, host: &str, port: u16, request: &[u8]) -> Result<Vec<u8>, Why> {
         let asked = async {
             let mut connection = TcpStream::connect((host, port))
                 .await
@@ -218,14 +240,14 @@ mod tests {
     use super::*;
 
     fn authority(pages: &str, controller: &str) -> Result<Authority, String> {
-        Authority::new(Client::new(None).unwrap(), pages, controller, "CORP.EXAMPLE", "svc-away", Secret::new("a password"))
+        Authority::new(Client::new(None).unwrap(), pages, &[controller.to_string()], "CORP.EXAMPLE", "svc-away", Secret::new("a password"))
     }
 
     #[test]
     fn the_pages_are_asked_over_tls_alone_and_named_with_their_folder() {
         let asked = authority("https://authority.corp.example/certsrv", "dc-01.corp.example").expect("an authority");
-        assert_eq!((asked.pages.path.as_str(), asked.controller.clone()), ("/certsrv/", ("dc-01.corp.example".to_string(), 88)));
-        assert_eq!(authority("https://authority.corp.example/certsrv/", "dc-01.corp.example:1088").unwrap().controller.1, 1088);
+        assert_eq!((asked.pages.path.as_str(), asked.controllers.clone()), ("/certsrv/", vec![("dc-01.corp.example".to_string(), 88)]));
+        assert_eq!(authority("https://authority.corp.example/certsrv/", "dc-01.corp.example:1088").unwrap().controllers[0].1, 1088);
         assert!(authority("http://127.0.0.1/certsrv/", "dc-01.corp.example").err().unwrap().contains("over TLS alone"));
         assert!(authority("https://authority.corp.example/certsrv/?a=b", "dc-01.corp.example").is_err());
         assert!(authority("https://authority.corp.example/certsrv/", "dc-01.corp.example:port").is_err());

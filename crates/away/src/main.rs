@@ -123,7 +123,14 @@ async fn run(name: &'static str, lines: Lines) -> ExitCode {
         }
         _ => {
             let settings = Settings::with_address("").from_environment(from_environment);
-            match Issuer::bind(&settings, part).await {
+            let told = match away_issuer::Told::read(from_environment, |path| std::fs::read(path)) {
+                Ok(told) => told,
+                Err(why) => {
+                    part.lines.error("could not start", &[("why", (&why).into())]);
+                    return ExitCode::FAILURE;
+                }
+            };
+            match Issuer::bind(&settings, told, part).await {
                 Ok(issuer) => {
                     issuer.run().await;
                     true

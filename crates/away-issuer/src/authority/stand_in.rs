@@ -23,7 +23,8 @@ use away_winauth::kerberos::crypto::Key;
 use away_winauth::kerberos::gss::stand_in::{answer as answer_the_ticket, key_in_the_ticket, Ends};
 use away_winauth::kerberos::gss::Bound;
 use away_winauth::kerberos::pkinit::{Held, Signs};
-use away_winauth::request::stand_in::{issue, read, read_in_the_name_of, For};
+use away_winauth::request::read;
+use away_winauth::request::stand_in::{issue, read_in_the_name_of, For};
 use hyper::header::{HeaderValue, AUTHORIZATION, WWW_AUTHENTICATE};
 use hyper::{Method, StatusCode};
 

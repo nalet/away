@@ -20,6 +20,7 @@ hyper.workspace = true
 away-issuer = { workspace = true, features = ["stand-in"] }
 away-rdp.workspace = true
 tokio = { workspace = true, features = ["io-util"] }
+away-part = { workspace = true, features = ["stand-in"] }
 
 [features]
 # an organisation's authority that stands in for a real one, for tests

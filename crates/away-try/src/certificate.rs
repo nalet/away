@@ -145,7 +145,7 @@ fn tried(asked: &Asked) -> Result<(), String> {
     }
 
     let client = Client::new(trusts.as_deref())?;
-    let authority = Authority::new(client, &asked.pages, &given(&asked.controller), &realm, &account, password)?;
+    let authority = Authority::new(client, &asked.pages, &[given(&asked.controller)], &realm, &account, password)?;
     println!("Asking {} for a certificate of the kind {kind}, signed in as {account}@{realm}", asked.pages);
     let runs = tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|error| error.to_string())?;
     let certificate = runs.block_on(authority.ask(&request, &kind)).map_err(|why| why.to_string())?;
