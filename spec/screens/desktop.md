@@ -134,24 +134,20 @@ on by itself.
 
 ## 6.6 Ending a session
 
-![The end button is pressed. Under it a menu offers two choices: leave it running, and sign out of the machine.](img/desktop-end-computer.png)
-
-**Figure 6.7** Ending a Windows desktop.
-
-1. **Leave it running** ends the connection. The desktop goes on at the machine
-   with everything open, and is there again the next time the machine is opened.
-2. **Sign out of the machine** closes the programs there and ends the desktop.
-
-- A Windows desktop offers both. Any other desktop has one way to end, so its
-  button ends the connection at once, with no menu.
-- Closing the browser tab leaves the desktop running, as the first choice does.
-- After either, Away shows the page one came from.
+- **End** ends the connection. The desktop goes on at the machine with
+  everything open, and is there again the next time the machine is opened, on
+  this device or on another: a session is taken along from one device to the
+  next. The device it was open on says where it went (6.8).
+- Away signs nobody out of a machine. Whoever wants the desktop gone signs
+  out there, with the machine's own menu, and the session ends as in 6.8.
+- Closing the browser tab leaves the desktop running too.
+- After ending, Away shows the page one came from.
 
 ## 6.7 When the connection drops
 
 ![The desktop is dimmed. A card over it says the connection is lost and that Away is trying again.](img/desktop-reconnecting-computer.png)
 
-**Figure 6.8** The connection dropped.
+**Figure 6.7** The connection dropped.
 
 1. **What happened.**
 2. **What Away is doing about it**, and what became of the work: the desktop is
@@ -169,14 +165,14 @@ on by itself.
 
 ![A warning lies over the top of the desktop: this session ends in 60 seconds, with a button to keep it open.](img/desktop-idle-computer.png)
 
-**Figure 6.9** The warning before a session ends because nobody uses it.
+**Figure 6.8** The warning before a session ends because nobody uses it.
 
 1. **The warning** counts down, and **keep it open** starts the time again. So
    does any key or click on the machine's screen.
 
 ![An otherwise empty window says that this session ended, why, and offers to open it again.](img/desktop-ended-computer.png)
 
-**Figure 6.10** A session that ended.
+**Figure 6.9** A session that ended.
 
 1. **What happened.**
 2. **Why**, and what became of the work.
@@ -209,7 +205,6 @@ A session that ends without the person asking for it always says why:
 | The clipboard panel, the clipboard passes by itself | Text you copy on one side can be pasted on the other. |
 | The clipboard panel, the browser doesn't pass it on | This browser doesn't pass its clipboard on by itself. Paste here what fin-app-02 should have in its clipboard. |
 | The picture menu | fit the window · actual size |
-| The end menu | leave it running · sign out of the machine |
 | The connection dropped | connection lost · Trying again, for the third time. Your desktop is still running on fin-app-02. · leave · try now |
 | Before a session ends unused | This session ends in 60 seconds, because nobody has used it for 29 minutes. · keep it open |
 | A session that ended | the texts of the table in 6.8 · open again · bring it here · machines |
@@ -225,8 +220,7 @@ A session that ends without the person asking for it always says why:
 | 6.4 The clipboard panel | [Copy text on one side and paste it on the other](../capabilities/session.md#clipboard-files-and-printing) |
 | 6.5 The picture menu | [Fit the machine's screen to the window, and follow when its size changes](../capabilities/session.md#the-picture) |
 | 6.6 A desktop whose screen keeps its own shape | [Fit the machine's screen to the window, and follow when its size changes](../capabilities/session.md#the-picture), [Open a machine's desktop](../capabilities/session.md#opening-a-machine) |
-| 6.7 Ending a Windows desktop | [Choose between leaving a desktop running and signing out of the machine](../capabilities/session.md#opening-a-machine), [Leave a session running while the browser is closed, and pick it up again](../capabilities/session.md#opening-a-machine) |
-| 6.8 The connection dropped | [Come back to a session by itself after the connection dropped](../capabilities/session.md#opening-a-machine) |
-| 6.9 The warning before a session ends unused | [End a session nobody has used for a set time, with a warning before](../capabilities/admin.md#who-reaches-what) |
-| 6.10 A session that ended | [See why a session ended, and open it again from there](../capabilities/session.md#opening-a-machine) |
+| 6.7 The connection dropped | [Come back to a session by itself after the connection dropped](../capabilities/session.md#opening-a-machine) |
+| 6.8 The warning before a session ends unused | [End a session nobody has used for a set time, with a warning before](../capabilities/admin.md#who-reaches-what) |
+| 6.9 A session that ended | [See why a session ended, and open it again from there](../capabilities/session.md#opening-a-machine) |
 <!-- end: draws -->

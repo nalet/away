@@ -183,7 +183,7 @@ decided, why, what follows from it, and what it rules out.
 |---|---|---|---|---|
 | 15 |  | 15 |  |  |
 
-The first release holds 118 capabilities, and a component of Away's own carries each: 28 are carried by one component, the others by up to 6.
+The first release holds 117 capabilities, and a component of Away's own carries each: 28 are carried by one component, the others by up to 6.
 <!-- end: state -->
 
 ## What follows for the first release

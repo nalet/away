@@ -48,7 +48,7 @@ sessions at once.
 
 ## 9.2 A session's menu
 
-![The menu of the first card is open under its button, with three choices: open in a tab of its own, leave it running, sign out of the machine.](img/sessions-menu-computer.png)
+![The menu of the first card is open under its button, with two choices: open in a tab of its own, and leave it running.](img/sessions-menu-computer.png)
 
 **Figure 9.2** A session's menu, for a Windows desktop.
 
@@ -56,11 +56,11 @@ sessions at once.
    has the whole window. A session that already has its own tab is without this
    choice.
 2. **Leave it running** ends the connection, and the desktop goes on at the
-   machine.
-3. **Sign out of the machine** closes the programs there and ends the desktop.
+   machine, to be opened again here or on another device.
 
-- A Windows desktop and a machine's programs have the two ways to end of
-  [chapter 6](./desktop.md). Any other session has one, and its menu says end.
+- A desktop and a machine's programs go on at their machine, as in
+  [chapter 6](./desktop.md), and the menu says so. A shell ends, and its menu
+  says end.
 - Ending from here asks nothing more, as the end button of a session's bar
   does. The card leaves the list.
 
@@ -100,7 +100,7 @@ sessions at once.
 | What a session is | Windows desktop · Mac desktop · Linux desktop · shell · the open programs' names |
 | A card | as alex.urban · open for 2 h 14 min · in another tab |
 | A card's buttons | go to · the menu's name for a screen reader: more for fin-app-02 |
-| A session's menu | open in a tab of its own · leave it running · sign out of the machine · end |
+| A session's menu | open in a tab of its own · leave it running · end |
 | A tab whose session moved | this session is open in another tab · bring it back |
 | Nothing is open | no sessions open · Open a machine from home. · home |
 
@@ -110,7 +110,7 @@ sessions at once.
 | Figure | Draws |
 |---|---|
 | 9.1 The sessions that are open, on a computer | [See the sessions that are open, and go to one](../capabilities/app.md#the-frame), [Keep several machines open at once and move between them](../capabilities/session.md#opening-a-machine), [Move between home, the programs, the machines, the open sessions and the settings](../capabilities/app.md#the-frame), [Open a session in a browser tab or window of its own](../capabilities/session.md#opening-a-machine) |
-| 9.2 A session's menu, for a Windows desktop | [Open a session in a browser tab or window of its own](../capabilities/session.md#opening-a-machine), [Choose between leaving a desktop running and signing out of the machine](../capabilities/session.md#opening-a-machine) |
+| 9.2 A session's menu, for a Windows desktop | [Open a session in a browser tab or window of its own](../capabilities/session.md#opening-a-machine), [Leave a session running while the browser is closed, and pick it up again](../capabilities/session.md#opening-a-machine) |
 | 9.3 The same list on a phone | [See the sessions that are open, and go to one](../capabilities/app.md#the-frame), [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet) |
 | 9.4 No session is open | [See the sessions that are open, and go to one](../capabilities/app.md#the-frame) |
 <!-- end: draws -->

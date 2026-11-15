@@ -123,6 +123,7 @@ export const texts = {
     machines: 'machines',
     tryAgain: 'try again',
     openAgain: 'open again',
+    bringHere: 'bring it here',
     details: 'details',
     // a step that failed: what it says, and whether trying again can help
     failed: (step: string, why: string, machine: string, address: string): { says: string; again: boolean } => {
@@ -147,8 +148,17 @@ export const texts = {
       return { title: `couldn't open ${machine}`, why: 'Away did not begin the session.', again: true };
     },
     // a session that ended: what the page says, and whether it can be opened again
-    ended: (why: string, machine: string): { title: string; why: string; again: boolean } => {
+    ended: (why: string, machine: string): { title: string; why: string; again: boolean; bring?: boolean } => {
       if (why === 'machine') return { title: `${machine} closed this session`, why: 'It was shut down or restarted, or you were signed out there.', again: true };
+      // a desktop is taken along: opened on another device, it is there, and this one says so
+      if (why === 'elsewhere') {
+        return {
+          title: 'this desktop is open somewhere else',
+          why: `You opened ${machine} in another window or on another device. A desktop is in one place at a time.`,
+          again: true,
+          bring: true,
+        };
+      }
       return { title: `couldn't open ${machine}`, why: 'Away did not begin the session.', again: true };
     },
     screenOf: (machine: string) => `the desktop of ${machine}`,

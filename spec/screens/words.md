@@ -39,7 +39,6 @@ last section.
 | as yourself | single sign-on, pass-through | it says what happens: one is on the machine with one's own account |
 | you type a name and a password | enter credentials | the words people have for it |
 | leave it running | disconnect | it says what becomes of the desktop |
-| sign out of the machine | log off | the same pair as everywhere |
 | open, open again | connect, launch, start | a machine is opened, as a file is |
 | end | terminate, kill | a session ends |
 | couldn't | failed to, unable to | the design system's word for what didn't work |

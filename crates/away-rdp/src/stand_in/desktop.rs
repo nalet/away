@@ -669,6 +669,15 @@ impl Desktop {
         Ok(Some(next))
     }
 
+    /// What a machine sends a client whose desktop was opened over another connection:
+    /// its reason for ending this one, and that it ends it.
+    pub fn taken_elsewhere(&self) -> Vec<u8> {
+        let mut send = to_the_client(&pdu::share_data(mcs::MACHINE, SHARING, 0x2f, &5u32.to_le_bytes()));
+        // the reason a machine gives the connection's end itself: that it ends it
+        send.extend(tpkt::data_frame(&[0x20, 0x80]));
+        send
+    }
+
     /// Takes what a frame of the short kind tells of keys and of the pointer, and draws
     /// as a desktop would: a mark where the left button went down, and a mark in the
     /// corner for a key, whose colour says which key it was. The answer is what it drew.

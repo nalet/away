@@ -138,7 +138,9 @@ pub fn read_arrived(message: &[u8]) -> Result<Arrived<'_>, Error> {
             };
             carried.get(..length).map(|carried| Arrived::On(channel, carried)).ok_or(WRONG)
         }
-        [0x21, ..] => Ok(Arrived::Ending),
+        // the end of the connection, with whichever of its reasons: that the machine ends
+        // it, as a Windows machine says, or that the other side asked for it
+        [first, ..] if first & 0xfc == 0x20 => Ok(Arrived::Ending),
         _ => Err(WRONG),
     }
 }
@@ -199,6 +201,10 @@ mod tests {
         assert_eq!(read_arrived(&[0x68, 0x00, 0x01, 0x03, 0xeb, 0x70, 0x03, 1, 2, 3]), Ok(Arrived::On(1003, &[1, 2, 3][..])));
         assert_eq!(read_arrived(&[0x68, 0x00, 0x01, 0x03, 0xeb, 0x70, 0x80, 0x03, 1, 2, 3]), Ok(Arrived::On(1003, &[1, 2, 3][..])));
         assert_eq!(read_arrived(&[0x21, 0x80]), Ok(Arrived::Ending));
+        // a machine that ends the connection itself says so with another reason
+        assert_eq!(read_arrived(&[0x20, 0x80]), Ok(Arrived::Ending));
+        assert_eq!(read_arrived(&[0x20, 0x00]), Ok(Arrived::Ending));
+        assert!(read_arrived(&[0x24, 0x80]).is_err());
         assert!(read_arrived(&[0x68, 0x00, 0x01, 0x03, 0xeb, 0x70, 0x05, 1, 2]).is_err(), "shorter than it says");
         assert!(read_arrived(&[0x99]).is_err());
     }

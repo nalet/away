@@ -11,7 +11,6 @@ open-in-own-tab,web ; session-view,
 see-connecting-steps,session-view ; gateway ; wire,
 reconnect-by-itself,session-view ; gateway,
 keep-while-away,web ; gateway,The desktop goes on at its machine; opening the machine again picks it up
-leave-or-sign-out,session-view ; gateway ; rdp,
 see-why-ended,web ; session-view ; server ; gateway,
 see-in-use,web ; server,The server knows which sessions run on a machine
 fit-to-window,session-view ; gateway ; picture,

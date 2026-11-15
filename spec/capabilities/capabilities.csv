@@ -9,7 +9,7 @@ open-in-own-tab,open,Open a session in a browser tab or window of its own,person
 see-connecting-steps,open,"See how far a connection has come, and which step failed and why",person,built,v1,v1,—,"reaching the machine, checking who it is, signing in, the first picture"
 reconnect-by-itself,open,Come back to a session by itself after the connection dropped,system,v1,v1,v1,—,"a desktop goes on at its machine meanwhile; a shell is held by Away for a few minutes, while its page stays open"
 keep-while-away,open,"Leave a session running while the browser is closed, and pick it up again",person,v1,v1,later,—,a desktop goes on running on its machine; a shell has to be held by Away
-leave-or-sign-out,open,Choose between leaving a desktop running and signing out of the machine,person,v1,—,—,—,
+leave-or-sign-out,open,Choose between leaving a desktop running and signing out of the machine,person,no,—,—,—,"Away only ends the connection, so that a desktop is taken along to another device; signing out is done at the machine"
 see-why-ended,open,"See why a session ended, and open it again from there",person,v1,v1,v1,—,"nobody used it, an administrator ended it, the right to it is gone, the machine closed it, it was opened elsewhere"
 see-in-use,open,"See that a desktop is in use by someone else, where opening it would take it from them or show their screen",person,v1,v1,—,—,"a desktop with one screen for everyone, or one account that several people are signed in with"
 start-with-command,open,Open a machine straight into a given program or command,admin,later,—,later,—,

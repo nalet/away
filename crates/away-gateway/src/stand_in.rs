@@ -73,6 +73,9 @@ struct Kept {
     said_first: Vec<Option<Vec<u8>>>,
     /// Whom each ticket was for that a client showed: the account's name and its realm.
     shown: Vec<(String, String)>,
+    /// What tells the connection that has the desktop now that another one took it: a
+    /// desktop is in one place at a time, as on a Windows machine.
+    has_the_desktop: Option<Arc<tokio::sync::Notify>>,
 }
 
 /// How a stand-in signs people in before the desktop.
@@ -295,8 +298,13 @@ async fn serve(
         }
     }
     let mut frames = Frames::new();
+    // the desktop is this connection's from now on: the one that had it is told
+    let taken = Arc::new(tokio::sync::Notify::new());
     let nth = {
         let mut kept = keeps.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(before) = kept.has_the_desktop.replace(taken.clone()) {
+            before.notify_one();
+        }
         kept.seen.push(desktop.seen().clone());
         kept.picture = Some(desktop.picture().clone());
         kept.seen.len() - 1
@@ -316,9 +324,19 @@ async fn serve(
             secured.write_all(&answer).await?;
         }
         let mut bytes = [0u8; 4096];
-        match secured.read(&mut bytes).await? {
-            0 => return Ok(()),
-            count => frames.push(&bytes[..count]),
+        tokio::select! {
+            read = secured.read(&mut bytes) => match read? {
+                0 => return Ok(()),
+                count => frames.push(&bytes[..count]),
+            },
+            // another connection opened the desktop: this one is told why it ends
+            () = taken.notified() => {
+                secured.write_all(&desktop.taken_elsewhere()).await?;
+                // what it said has to be on its way before the connection ends
+                secured.flush().await?;
+                let _ = secured.shutdown().await;
+                return Ok(());
+            }
         }
     }
 }

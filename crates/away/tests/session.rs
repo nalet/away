@@ -1103,6 +1103,43 @@ async fn a_person_opens_a_desktop_of_their_domain_as_themselves_and_nothing_is_a
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_desktop_that_is_opened_on_another_device_is_there_and_the_one_it_was_on_says_so() {
+    let Some(world) = world("taken-along").await else { return };
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+    let open = |ticket: String| {
+        let (world, sign_in) = (&world, &sign_in);
+        async move {
+            let mut session = Session::begin(world, sign_in, &ticket).await;
+            session.steps().await;
+            session.say(credentials(KNOWN, PASSWORD)).await;
+            let (steps, desktop) = session.steps().await;
+            assert_eq!((steps, desktop.write().as_str()), (vec!["first-picture".to_string()], r#"{"desktop":{"width":200,"height":120}}"#));
+            session
+        }
+    };
+    // the desktop is open on one device, and is then opened on another
+    let mut first = open(browser.ticket(&world, "desk-01")).await;
+    let mut second = open(browser.ticket(&world, "desk-01")).await;
+    // the first is told where the desktop went, and ends; the second has it
+    assert_eq!(first.until("ended").await.write(), r#"{"ended":"elsewhere"}"#);
+    while first.next().await.is_some() {}
+    second.did(&[4, 0x1e, 0, 1, 4, 0x1e, 0, 0]).await;
+    while second.pixel(5, 5) != typed(0x1e) {
+        let drawn = second.until("drawn").await.get("drawn").and_then(Json::count).expect("a number");
+        second.say(Json::object([("seen", drawn.into())])).await;
+    }
+    second.say(Json::object([("leaves", true.into())])).await;
+    assert_eq!(second.until("ended").await.write(), r#"{"ended":"left"}"#);
+
+    // the records say how each ended
+    let kept = records(&world.database).await;
+    let ended: Vec<Option<&str>> = kept.iter().filter(|(kind, ..)| kind == "session-ended").map(|record| record.3.text_of("why")).collect();
+    assert_eq!(ended, [Some("elsewhere"), Some("left")]);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_gateway_that_stops_tells_the_desktops_that_are_open_so_that_their_pages_open_them_again() {
     let Some(world) = world("stops").await else { return };
     let mut browser = Browser::default();

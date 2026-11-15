@@ -10,10 +10,11 @@ To overrule one, change its cell in [capabilities.csv](./capabilities.csv) from
 <!-- generated: left-out -->
 ## Not planned at all
 
-13 capabilities.
+14 capabilities.
 
 | Left out | For | Why | Area | Key |
 |---|---|---|---|---|
+| Choose between leaving a desktop running and signing out of the machine | RDP | Away only ends the connection, so that a desktop is taken along to another device; signing out is done at the machine | [Opening a machine](./session.md#opening-a-machine) | `leave-or-sign-out` |
 | Open other kinds of target: Telnet, a serial console, a database, a web page | Away itself | Away is for desktops and shells | [Opening a machine](./session.md#opening-a-machine) | `open-other-kinds` |
 | Use one's own camera on the machine | RDP, VNC | a call is made on one's own device | [Sound and devices](./session.md#sound-and-devices) | `use-camera` |
 | Use a USB device or a smart card of one's own on the machine | RDP, VNC | a browser hands neither to a page | [Sound and devices](./session.md#sound-and-devices) | `use-own-devices` |

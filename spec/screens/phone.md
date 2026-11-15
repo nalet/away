@@ -100,8 +100,8 @@ Touch works the machine's pointer:
 3. **The picture's size**: fit the window or actual size, with the one in use
    marked.
 4. **Fill the screen** is in the menu where the phone's browser can do it.
-5. **End** ends the session. A Windows desktop asks first which way, as in
-   chapter 6: leave it running, or sign out of the machine.
+5. **End** ends the session. A desktop goes on running at its machine, as in
+   chapter 6.
 
 - For a shell, the menu has text and find where a desktop has the picture's
   size ([chapter 8](./shell.md)).

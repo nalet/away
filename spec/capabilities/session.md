@@ -22,7 +22,7 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 | See how far a connection has come, and which step failed and why | person | built | v1 | v1 | — | `see-connecting-steps` |
 | Come back to a session by itself after the connection dropped | system | v1 | v1 | v1 | — | `reconnect-by-itself` |
 | Leave a session running while the browser is closed, and pick it up again | person | v1 | v1 | later | — | `keep-while-away` |
-| Choose between leaving a desktop running and signing out of the machine | person | v1 | — | — | — | `leave-or-sign-out` |
+| Choose between leaving a desktop running and signing out of the machine | person | no | — | — | — | `leave-or-sign-out` |
 | See why a session ended, and open it again from there | person | v1 | v1 | v1 | — | `see-why-ended` |
 | See that a desktop is in use by someone else, where opening it would take it from them or show their screen | person | v1 | v1 | — | — | `see-in-use` |
 | Open a machine straight into a given program or command | admin | later | — | later | — | `start-with-command` |
@@ -39,6 +39,7 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 - *See how far a connection has come, and which step failed and why*: reaching the machine, checking who it is, signing in, the first picture.
 - *Come back to a session by itself after the connection dropped*: a desktop goes on at its machine meanwhile; a shell is held by Away for a few minutes, while its page stays open.
 - *Leave a session running while the browser is closed, and pick it up again*: a desktop goes on running on its machine; a shell has to be held by Away.
+- *Choose between leaving a desktop running and signing out of the machine*: Away only ends the connection, so that a desktop is taken along to another device; signing out is done at the machine.
 - *See why a session ended, and open it again from there*: nobody used it, an administrator ended it, the right to it is gone, the machine closed it, it was opened elsewhere.
 - *See that a desktop is in use by someone else, where opening it would take it from them or show their screen*: a desktop with one screen for everyone, or one account that several people are signed in with.
 - *See the programs of several machines side by side, in one list of windows*: in the first release each machine's programs are a session of their own.

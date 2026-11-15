@@ -73,6 +73,9 @@ pub enum Why {
     SentElsewhere,
     /// The machine did not start the program.
     ProgramNotStarted,
+    /// The machine ended the session because the same account's desktop was opened
+    /// over another connection: in another window, or on another device.
+    OpenedElsewhere,
     /// The connection broke, or the machine said something Away can't go on with.
     Broken,
 }
@@ -515,10 +518,31 @@ impl Desktop {
         if waited.is_empty() {
             return Ok(());
         }
-        self.writer
-            .write_all(&waited)
-            .await
-            .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
+        self.write(&waited).await
+    }
+
+    /// Writes to the machine. Where that fails, the machine may have ended the connection
+    /// and said why just before: what it sent is read first, so that its reason is not
+    /// lost to the write that failed.
+    async fn write(&mut self, bytes: &[u8]) -> Result<(), Failure> {
+        let Err(error) = self.writer.write_all(bytes).await else { return Ok(()) };
+        // what is on its way from the machine, until it has said everything
+        while let Ok(Ok(count)) = tokio::time::timeout(LAST_WORDS_WITHIN, self.reader.read(&mut self.scratch)).await {
+            if count == 0 {
+                break;
+            }
+            self.frames.push(&self.scratch[..count]);
+        }
+        while let Ok(Some(frame)) = self.frames.next_of_either_kind() {
+            match self.open.receive(frame) {
+                Ok(_) => {}
+                Err(away_rdp::Error::Ended(OPENED_ELSEWHERE)) => {
+                    return Err(failure(Step::FirstPicture, Why::OpenedElsewhere, away_rdp::Error::Ended(OPENED_ELSEWHERE)))
+                }
+                Err(said) => return Err(failure(Step::FirstPicture, Why::Broken, said)),
+            }
+        }
+        Err(failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
     }
 
     /// Draws what arrived into the picture, answers the machine where it wants an
@@ -533,12 +557,13 @@ impl Desktop {
         let broken = |details: String| failure(Step::FirstPicture, Why::Broken, details);
         while let Some(frame) = self.frames.next_of_either_kind().map_err(|error| broken(error.to_string()))? {
             let (send, happened) = self.open.receive(frame).map_err(|error| match error {
-                // the machine said why it ends the connection
-                away_rdp::Error::Ended(_) | away_rdp::Error::NoLicence(_) => broken(error.to_string()),
+                // the machine said why it ends the connection: the same desktop was
+                // opened over another connection, which a desktop is taken along by
+                away_rdp::Error::Ended(OPENED_ELSEWHERE) => failure(Step::FirstPicture, Why::OpenedElsewhere, error),
                 other => broken(other.to_string()),
             })?;
             if !send.is_empty() {
-                self.writer.write_all(&send).await.map_err(|error| broken(error.to_string()))?;
+                self.write(&send).await?;
             }
             for happened in happened {
                 match happened {
@@ -614,10 +639,7 @@ impl Desktop {
             Does::Restore => self.open.command(id, Command::Restore),
             Does::Close => self.open.command(id, Command::Close),
         };
-        self.writer
-            .write_all(&told)
-            .await
-            .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
+        self.write(&told).await
     }
 
     /// Tells the machine of keys and of the pointer.
@@ -626,10 +648,7 @@ impl Desktop {
         if told.is_empty() {
             return Ok(());
         }
-        self.writer
-            .write_all(&told)
-            .await
-            .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
+        self.write(&told).await
     }
 
     /// Tells the machine that the person's screen is now this, so that it offers its
@@ -640,11 +659,7 @@ impl Desktop {
         if told.is_empty() {
             return Ok(false);
         }
-        self.writer
-            .write_all(&told)
-            .await
-            .map(|()| true)
-            .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
+        self.write(&told).await.map(|()| true)
     }
 
     /// The text that was copied on the machine since this was last asked, where the
@@ -660,10 +675,7 @@ impl Desktop {
         if told.is_empty() {
             return Ok(());
         }
-        self.writer
-            .write_all(&told)
-            .await
-            .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
+        self.write(&told).await
     }
 
     /// Whether the machine offered its desktop anew, at another size, since this was
@@ -679,6 +691,11 @@ impl Desktop {
         let _ = self.writer.shutdown().await;
     }
 }
+
+/// A machine's own reason for ending a connection: another connection took the session.
+const OPENED_ELSEWHERE: u32 = 5;
+/// How long a machine whose connection broke gets to have said why.
+const LAST_WORDS_WITHIN: Duration = Duration::from_millis(250);
 
 /// How often at most a connection is told how much time passed.
 pub const TICKS_EVERY: Duration = Duration::from_millis(250);

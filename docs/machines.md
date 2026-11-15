@@ -307,7 +307,12 @@ machine that offers more is opened from its own page, where each way in is.
   the person's keyboard: where the browser says what the keys write, by that;
   elsewhere by the language the browser is set to.
 - **Ending a session leaves the desktop running** on the machine, for the
-  account to come back to.
+  account to come back to, on the same device or on another. Away signs
+  nobody out of a machine: whoever wants the desktop gone signs out there.
+- **A desktop is taken along from one device to the next.** Opened on another
+  device, or in another window, it is there with everything that was open,
+  and the device it was on says so: “this desktop is open somewhere else”,
+  with a button that brings it back.
 - **A desktop whose connection drops is opened again by itself**: at once,
   and then at longer intervals. After two seconds without the machine a card
   over the last picture says so, with a button to try now and one to leave.

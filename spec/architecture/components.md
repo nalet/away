@@ -17,7 +17,7 @@ What a person's browser runs.
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
 | `web` | the web app: Away's pages around the sessions | web | first release | 44 |
-| `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | there | 38 |
+| `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | there | 37 |
 
 - `web`: Built from the design system's components; the frame is Away's own until the design system has it. Keeps: in the browser's own storage, which sessions this browser has open and how wide the list of windows was left. Code: `web/`. Runs: served by the server. Governed by [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](./decisions/0011-the-web-app.md).
 - `session-view`: Drawn on a canvas, apart from the pages. Code: `web/src/session/`. Runs: part of the web app. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0011](./decisions/0011-the-web-app.md).
@@ -29,7 +29,7 @@ What the chart runs from Away's one image.
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
 | `server` | the server: the pages, the requests, people's sign-ins, the rules, the records | service | there | 55 |
-| `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | there | 47 |
+| `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | there | 46 |
 | `issuer` | the issuer: makes the sign-ins on machines | service | there | 15 |
 | `relay` | a relay placed in a network Away is not in | relay | later | — |
 
@@ -44,7 +44,7 @@ The libraries the parts and the session view are built from.
 
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
-| `rdp` | the RDP code | library | first release | 11 |
+| `rdp` | the RDP code | library | first release | 10 |
 | `windows-sign-in` | the Windows sign-in: Kerberos, the sign-in before the desktop, the smart card in memory | library | first release | 3 |
 | `vnc` | the VNC code | library | first release | 2 |
 | `ssh` | the SSH code | library | first release | 3 |

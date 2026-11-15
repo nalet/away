@@ -1031,12 +1031,20 @@ test.describe('a session', () => {
 
     // the connection drops while Away is not there: the page tries again and again, and
     // after two seconds a card over the last picture says so
-    await page.route('**/api/sessions?*', (route) => route.fulfill({ status: 503, body: 'not now' }));
+    let tried = 0;
+    await page.route('**/api/sessions?*', (route) => {
+      tried += 1;
+      return route.fulfill({ status: 503, body: 'not now' });
+    });
     connections[0]!.cut();
     await expect(card.getByRole('heading', { name: 'connection lost' })).toBeVisible();
     await expect(card).toContainText(/Trying again, for the (second|third|fourth) time\. Your desktop is still running on desk-01\./);
     await expect(screen).toBeVisible();
     await accessible(page);
+    // try now doesn't wait for the next try: Away is asked at once
+    const before = tried;
+    await card.getByRole('button', { name: 'try now' }).click();
+    await expect.poll(() => tried).toBeGreaterThan(before);
     // once Away is there again the desktop comes back: a machine where people type asks again
     await page.unroute('**/api/sessions?*');
     await card.getByRole('button', { name: 'try now' }).click();
@@ -1052,6 +1060,35 @@ test.describe('a session', () => {
     connections[connections.length - 1]!.says('{"ended":"updating"}');
     await expect(card).toContainText('Away is being updated. Your desktop comes back by itself.');
     await card.getByRole('button', { name: 'leave' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/desk-01`);
+  });
+
+  test('a desktop that is opened in another tab is there, and the tab it was in says where it went', async ({ page, context }) => {
+    const open = async (tab: Page) => {
+      await tab.getByLabel('Name').fill('CORP\\alex.urban');
+      await tab.getByLabel('Password').fill('a password that exists for these tests alone');
+      await tab.getByRole('button', { name: 'sign in' }).click();
+      await expect(tab.getByRole('application', { name: 'the desktop of desk-01' })).toBeVisible();
+    };
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/desk-01/desktop`);
+    await open(page);
+    // the same desktop is opened in another tab, as on another device: it is there now
+    const other = await context.newPage();
+    await other.goto(`${AWAY_THAT_KEEPS}/machines/desk-01/desktop`);
+    await open(other);
+    await expect(page.getByRole('heading', { name: 'this desktop is open somewhere else' })).toBeVisible();
+    await expect(page.getByText('You opened desk-01 in another window or on another device. A desktop is in one place at a time.')).toBeVisible();
+    await expect(page.getByRole('application')).toHaveCount(0);
+    await accessible(page);
+
+    // bring it here: the machine asks, as where people type, and the other tab says where the desktop went
+    await page.getByRole('button', { name: 'bring it here' }).click();
+    await open(page);
+    await expect(other.getByRole('heading', { name: 'this desktop is open somewhere else' })).toBeVisible();
+    await expect(other.getByRole('button', { name: 'bring it here' })).toBeVisible();
+    await other.close();
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await page.getByRole('toolbar', { name: "the session's bar" }).getByRole('button', { name: 'end' }).click();
     await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/desk-01`);
   });
 

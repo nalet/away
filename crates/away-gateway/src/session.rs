@@ -169,6 +169,8 @@ enum Ended {
     /// The gateway stops, as when Away is updated: the desktop goes on at the machine,
     /// and the page opens it again by itself.
     Updating,
+    /// The same desktop was opened in another window or on another device, and is there now.
+    Elsewhere,
     /// The person left.
     Left,
     /// The browser's connection ended.
@@ -232,6 +234,7 @@ where
             desktop.leave().await;
             match ended {
                 Ended::Updating => ("updating", String::new()),
+                Ended::Elsewhere => ("elsewhere", String::new()),
                 Ended::Left => ("left", String::new()),
                 Ended::BrowserGone => ("browser-gone", String::new()),
                 Ended::Machine(details) => ("machine", details),
@@ -545,7 +548,7 @@ where
             // a machine that reads a card over the connection is told how time passes
             _ = tokio::time::sleep(machine::TICKS_EVERY) => {
                 if let Err(failed) = desktop.tick().await {
-                    return Ended::Machine(failed.details);
+                    return ended_by(failed);
                 }
             }
             arrived = desktop.arrives() => {
@@ -555,7 +558,7 @@ where
                 };
                 let areas = match drawn {
                     Ok(areas) => areas,
-                    Err(failed) => return Ended::Machine(failed.details),
+                    Err(failed) => return ended_by(failed),
                 };
                 // the machine offers its desktop anew, at another size: the browser is
                 // told the size, and everything of the new picture is new to it
@@ -579,20 +582,20 @@ where
                 Some(FromBrowser::Did(did)) => {
                     let events: Vec<Input> = did.iter().map(|did| input(did, wide, high)).collect();
                     if let Err(failed) = desktop.tell(&events).await {
-                        return Ended::Machine(failed.details);
+                        return ended_by(failed);
                     }
                 }
                 Some(FromBrowser::Seen(number)) => seen = number,
                 Some(FromBrowser::Window { id, does }) => {
                     if let Err(failed) = desktop.window(id, does).await {
-                        return Ended::Machine(failed.details);
+                        return ended_by(failed);
                     }
                 }
                 Some(FromBrowser::Leaves) => return Ended::Left,
                 // what the person copied on their own device can be pasted on the machine
                 Some(FromBrowser::Copied(text)) => {
                     if let Err(failed) = desktop.offer(&text).await {
-                        return Ended::Machine(failed.details);
+                        return ended_by(failed);
                     }
                 }
                 // the window has another size, or is on another screen: a machine that
@@ -603,7 +606,7 @@ where
                         match desktop.resize(now).await {
                             Ok(true) => screen = now,
                             Ok(false) => {}
-                            Err(failed) => return Ended::Machine(failed.details),
+                            Err(failed) => return ended_by(failed),
                         }
                     }
                 }
@@ -614,6 +617,14 @@ where
             // the gateway stops: the browser is told, so that it comes back by itself
             () = stop.wait() => return Ended::Updating,
         }
+    }
+}
+
+/// How a session ended whose machine ended it, or whose connection to the machine broke.
+fn ended_by(failed: Failure) -> Ended {
+    match failed.why {
+        Why::OpenedElsewhere => Ended::Elsewhere,
+        _ => Ended::Machine(failed.details),
     }
 }
 
@@ -754,6 +765,7 @@ fn why_word(why: Why) -> &'static str {
         Why::NoPicture => "no-picture",
         Why::SentElsewhere => "sent-elsewhere",
         Why::ProgramNotStarted => "program-not-started",
+        Why::OpenedElsewhere => "opened-elsewhere",
         Why::Broken => "broken",
     }
 }

@@ -618,6 +618,22 @@ mod tests {
     }
 
     #[test]
+    fn a_machine_whose_desktop_was_opened_elsewhere_says_so_as_it_ends_the_connection() {
+        let (happened, mut connection, machine) = run(None, Desktop::new(picture()));
+        happened.expect("the connection opens");
+        let mut frames = Frames::new();
+        frames.push(&machine.taken_elsewhere());
+        let mut ended = None;
+        while let Some(frame) = frames.next_of_either_kind().expect("the machine's frames") {
+            if let Err(error) = connection.receive(frame) {
+                ended = Some(error);
+            }
+        }
+        // the reason is the machine's own: another connection took the session
+        assert_eq!(ended, Some(Error::Ended(5)));
+    }
+
+    #[test]
     fn text_passes_between_the_persons_clipboard_and_the_machines() {
         use crate::stand_in::desktop::COPIED;
         let client = Client {

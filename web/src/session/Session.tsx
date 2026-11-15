@@ -268,7 +268,7 @@ export function Session({ name, program, go, contact }: { name: string; program:
               </Button>
               {says.again && (
                 <Button variant="primary" onClick={again}>
-                  {state.is === 'ended' ? t.openAgain : t.tryAgain}
+                  {state.is !== 'ended' ? t.tryAgain : 'bring' in says && says.bring ? t.bringHere : t.openAgain}
                 </Button>
               )}
             </>
