@@ -918,14 +918,17 @@ test.describe('a session', () => {
 
     // the desktop follows the window: at another size the machine offers its desktop
     // anew, and draws all of it; a key reaches it as before
-    await page.setViewportSize({ width: 900, height: 700 });
-    await expect.poll(() => screen.evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height])).toEqual([900, 700]);
+    await page.setViewportSize({ width: 700, height: 500 });
+    await expect.poll(() => screen.evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height])).toEqual([700, 500]);
     await expect.poll(() => pixel(page, 10, 20)).toEqual([30, 100, 70]);
-    await expect.poll(() => pixel(page, 890, 690)).toEqual([44, 122, 86]);
+    await expect.poll(() => pixel(page, 690, 490)).toEqual([156, 146, 222]);
     await page.keyboard.press('b');
     await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 207, 48]);
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await expect.poll(() => screen.evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height])).toEqual([1280, 800]);
+    // and once more, to a larger one: all of that picture is drawn before the session goes on
+    await page.setViewportSize({ width: 800, height: 600 });
+    await expect.poll(() => screen.evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height])).toEqual([800, 600]);
+    await expect.poll(() => pixel(page, 10, 20)).toEqual([30, 100, 70]);
+    await expect.poll(() => pixel(page, 790, 590)).toEqual([100, 134, 154]);
     for (const key of ['Control', 'Alt', 'Shift']) await page.keyboard.down(key);
     for (const key of ['Shift', 'Alt', 'Control']) await page.keyboard.up(key);
     await expect(bar).toBeVisible();
