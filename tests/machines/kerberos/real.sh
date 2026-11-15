@@ -86,6 +86,7 @@ kadmin.local -q "addprinc -randkey TERMSRV/desk-01.corp.example@CORP.EXAMPLE" >/
 # a machine the tests reach by its address, and stand in for themselves: its service's
 # key is made from a password, so that they can hold it
 kadmin.local -q "addprinc -pw \"the password of a machine that exists for these tests alone\" TERMSRV/127.0.0.1@CORP.EXAMPLE" >/dev/null 2>&1
+kadmin.local -q "addprinc -pw \"the password of a machine that exists for these tests alone\" TERMSRV/localhost@CORP.EXAMPLE" >/dev/null 2>&1
 # an authority's pages that the tests stand in for themselves, reached as localhost: the
 # key of their service is made from a password too
 kadmin.local -q "addprinc -pw \"the password of pages that exist for these tests alone\" HTTP/localhost@CORP.EXAMPLE" >/dev/null 2>&1

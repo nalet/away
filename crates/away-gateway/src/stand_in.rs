@@ -3,6 +3,11 @@
 //! one account in before the desktop, and then shows a desktop that draws a mark for
 //! every click and for every key. It publishes one program, `||ledger`: a client that
 //! asks for it is shown the program's window in the place of the desktop.
+//!
+//! A stand-in that is in a domain knows no password. It takes a ticket for its service,
+//! which it opens with the service's key, is handed a smart card, and reads the card
+//! over the connection once the desktop begins, with the commands a Windows machine
+//! gives one: it has the card sign, as a machine does to sign the person in.
 
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -20,7 +25,11 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::TlsAcceptor;
 
+use away_winauth::kerberos::crypto::Key;
+
 const CERTIFICATE: &[u8] = include_bytes!("../../away-try/tests/fixtures/machine.der");
+/// What a stand-in in a domain has the card sign.
+pub const TO_SIGN: &[u8] = b"what proves the person to the domain";
 const KEY: &[u8] = include_bytes!("../../away-try/tests/fixtures/machine.key.der");
 
 /// What a Windows machine answers when it chooses the sign-in before the desktop, and
@@ -62,6 +71,17 @@ struct Kept {
     picture: Option<Picture>,
     /// What each client said first, where it said something: what a farm is told.
     said_first: Vec<Option<Vec<u8>>>,
+    /// Whom each ticket was for that a client showed: the account's name and its realm.
+    shown: Vec<(String, String)>,
+}
+
+/// How a stand-in signs people in before the desktop.
+#[derive(Clone)]
+enum Takes {
+    /// One account, with its name and its password.
+    Account(String, String),
+    /// A ticket for its service, which it opens with the service's key.
+    Tickets(Key),
 }
 
 /// A stand-in for a machine, listening.
@@ -89,7 +109,23 @@ impl Machine {
         Machine::listen(at, account, password, shows, None).await
     }
 
+    /// A stand-in that is in a domain: it knows no password, takes tickets for its
+    /// service, which this is the key of, and reads the card it is handed.
+    pub async fn start_in_a_domain(of_the_service: Key, shows: Picture) -> Machine {
+        Machine::listening("127.0.0.1:0", Takes::Tickets(of_the_service), shows, None).await
+    }
+
+    /// A stand-in for a farm's broker that is in a domain: it takes a ticket, and sends
+    /// whoever comes on to another machine.
+    pub async fn start_broker_in_a_domain(of_the_service: Key, sends_on: Redirection) -> Machine {
+        Machine::listening("127.0.0.1:0", Takes::Tickets(of_the_service), desktop(), Some(sends_on)).await
+    }
+
     async fn listen(at: &str, account: &str, password: &str, shows: Picture, sends_on: Option<Redirection>) -> Machine {
+        Machine::listening(at, Takes::Account(account.to_string(), password.to_string()), shows, sends_on).await
+    }
+
+    async fn listening(at: &str, takes: Takes, shows: Picture, sends_on: Option<Redirection>) -> Machine {
         let listener = TcpListener::bind(at).await.expect("an address for the stand-in machine");
         let address = listener.local_addr().expect("its address");
         let kept = Arc::new(Mutex::new(Kept::default()));
@@ -104,14 +140,13 @@ impl Machine {
             )
             .expect("the stand-in's certificate");
         let secures = TlsAcceptor::from(Arc::new(config));
-        let (account, password) = (account.to_string(), password.to_string());
         let keeps = kept.clone();
         let listening = tokio::spawn(async move {
             while let Ok((connection, _)) = listener.accept().await {
-                let (secures, keeps, shows, sends_on) = (secures.clone(), keeps.clone(), shows.clone(), sends_on.clone());
-                let knows = Account::named(&account, Secret::new(password.clone()));
+                let (secures, keeps, shows, sends_on, takes) =
+                    (secures.clone(), keeps.clone(), shows.clone(), sends_on.clone(), takes.clone());
                 tokio::spawn(async move {
-                    let _ = serve(connection, secures, knows, shows, sends_on, keeps).await;
+                    let _ = serve(connection, secures, takes, shows, sends_on, keeps).await;
                 });
             }
         });
@@ -143,6 +178,11 @@ impl Machine {
         self.kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).said_first.clone()
     }
 
+    /// Whom each ticket was for that a client showed: the account's name and its realm.
+    pub fn shown(&self) -> Vec<(String, String)> {
+        self.kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).shown.clone()
+    }
+
     /// Stops listening.
     pub fn stop(&self) {
         self.listening.abort();
@@ -159,7 +199,7 @@ impl Drop for Machine {
 async fn serve(
     mut connection: TcpStream,
     secures: TlsAcceptor,
-    knows: Account,
+    takes: Takes,
     shows: Picture,
     sends_on: Option<Redirection>,
     keeps: Arc<Mutex<Kept>>,
@@ -180,9 +220,13 @@ async fn serve(
     connection.write_all(&CHOSEN).await?;
     let mut secured = secures.accept(connection).await?;
 
-    // the sign-in before the desktop: it knows one account, and holds the certificate it showed
+    // the sign-in before the desktop: it knows one account, or takes a ticket, and holds
+    // the certificate it showed
     let holds = Identity::read(CERTIFICATE).map_err(std::io::Error::other)?.public_key;
-    let mut stand_in = StandIn::new(knows, &holds);
+    let (mut with_a_password, mut with_a_ticket) = match takes {
+        Takes::Account(account, password) => (Some(StandIn::new(Account::named(&account, Secret::new(password)), &holds)), None),
+        Takes::Tickets(of_the_service) => (None, Some(away_winauth::sign_in::stand_in::Machine::new(of_the_service, &holds))),
+    };
     loop {
         let mut message = Vec::new();
         loop {
@@ -197,8 +241,13 @@ async fn serve(
                 count => message.extend_from_slice(&bytes[..count]),
             }
         }
-        // an account it doesn't know, or a wrong password: it ends the connection
-        let answer = stand_in.answer(&message).map_err(std::io::Error::other)?;
+        // an account it doesn't know, a wrong password, a ticket that is not for its
+        // service: it ends the connection
+        let answer = match (&mut with_a_password, &mut with_a_ticket) {
+            (Some(stand_in), _) => stand_in.answer(&message).map_err(std::io::Error::other)?,
+            (_, Some(machine)) => machine.answer(&message).map_err(std::io::Error::other)?,
+            _ => return Ok(()),
+        };
         if answer.is_empty() {
             break;
         }
@@ -211,6 +260,17 @@ async fn serve(
         Some(to) => Desktop::new(shows).that_publishes(&[PROGRAM]).that_sends_on(to),
         None => Desktop::new(shows).that_publishes(&[PROGRAM]),
     };
+    // a machine that was handed a smart card reads it once the desktop begins, as a
+    // Windows machine does to sign the person in: with the PIN it was handed
+    if let Some(machine) = &with_a_ticket {
+        if let Some(shown) = machine.account.clone() {
+            keeps.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).shown.push(shown);
+        }
+        if let Some(card) = machine.handed_over.as_deref().and_then(away_winauth::sign_in::stand_in::on_a_card) {
+            let hash = away_winauth::card::stand_in::hash_of(TO_SIGN);
+            desktop = desktop.that_reads_a_card(&away_winauth::card::stand_in::commands(card.pin.expose(), &hash));
+        }
+    }
     let mut frames = Frames::new();
     let nth = {
         let mut kept = keeps.lock().unwrap_or_else(|poisoned| poisoned.into_inner());

@@ -409,6 +409,12 @@ pub mod stand_in {
     pub const SHA_256: [u8; 19] =
         [0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20];
 
+    /// What a machine has a card sign for a message: the message's hash.
+    pub fn hash_of(message: &[u8]) -> [u8; 32] {
+        use sha2::Digest;
+        sha2::Sha256::digest(message).into()
+    }
+
     /// How many times more of the certificate is fetched: enough for one of 2 KiB.
     const FETCHES: usize = 7;
 

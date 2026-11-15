@@ -396,8 +396,14 @@ is signed in at a stand-in machine with that certificate and nothing else: the
 Kerberos server takes the certificate, and the machine reads it from the card
 and has the card sign with its key.
 
-This is the first part of signing in as oneself. No page and no session uses
-it yet.
+A session uses all of this where a machine's file says `signs-in: themselves`
+([the machines and the rules](./machines.md#opening-a-desktop)). The gateway
+makes the key and keeps it, the issuer checks who the person is and asks the
+authority, and the gateway gets the ticket and hands the machine the card. The
+tests go through it with Away's three parts, a real Kerberos server, an
+authority that stands in and a machine of a domain that stands in; they need
+the Kerberos server and the database of the tests. The chart has no values for
+a domain yet.
 
 ## Trying a farm's feed
 

@@ -126,6 +126,8 @@ pub struct Machine {
     pub collection: Option<String>,
     /// The machines that serve the collection.
     pub served_by: Vec<String>,
+    /// Whether people are signed in on it as themselves, with nothing typed.
+    pub themselves: bool,
     /// The farm that publishes it, where it is not written in a file itself but read
     /// from a farm's feed.
     pub farm: Option<String>,
@@ -145,6 +147,8 @@ pub struct Farm {
     /// The machines that serve what it publishes, by their addresses: Away goes on to
     /// no other machine for it, whatever the farm's broker says.
     pub served_by: Vec<String>,
+    /// Whether people are signed in as themselves on what it publishes, with nothing typed.
+    pub themselves: bool,
     /// How many machines of the files are written before it, in the files' order: what
     /// it publishes shows after them, where the farm itself is written.
     pub after: usize,
@@ -536,7 +540,7 @@ fn machine(
     pictures: &[(String, Vec<u8>)],
     named: &mut BTreeMap<String, Arc<Vec<u8>>>,
 ) -> Result<Machine, Refused> {
-    let may_hold = ["name", "kind", "address", "groups", "desktop", "programs", "shell", "collection", "served-by"];
+    let may_hold = ["name", "kind", "address", "groups", "desktop", "programs", "shell", "collection", "served-by", "signs-in"];
     let shape = "a machine is written as its name, its kind, its address and its ways in, beginning with “- name:”";
     let parts = Parts::of(file, node, &may_hold, "a machine", shape)?;
     let Some((name, _)) = parts.text("name", "a machine")? else { return Err(refused(file, node.line, "the machine has no name")) };
@@ -609,6 +613,28 @@ fn machine(
     if let Some((other, line)) = served_by.iter().find(|(address, _)| !serves(address)) {
         return Err(refused(file, *line, format!("“{other}” is no address of a machine")));
     }
+    let themselves = match signs_in(&parts, file, of)? {
+        Some((true, line)) => {
+            let over_rdp = matches!(desktop, Some((Over::Rdp, _))) || !programs.is_empty();
+            if kind != Kind::Windows || !over_rdp {
+                return Err(refused(
+                    file,
+                    line,
+                    format!("{name} signs people in as themselves, which is for a Windows machine with a desktop or programs"),
+                ));
+            }
+            let named: Vec<&str> = std::iter::once(address.as_str()).chain(served_by.iter().map(|(address, _)| address.as_str())).collect();
+            if let Some(number) = named.into_iter().find(|address| is_a_number(address)) {
+                return Err(refused(
+                    file,
+                    line,
+                    format!("{name} signs people in as themselves and is reached at {number}: a domain knows a machine by its name, and by no number"),
+                ));
+            }
+            true
+        }
+        _ => false,
+    };
     Ok(Machine {
         name,
         kind,
@@ -619,15 +645,35 @@ fn machine(
         shell,
         collection: collection.map(|(collection, _)| collection),
         served_by: served_by.into_iter().map(|(address, _)| address).collect(),
+        themselves,
         farm: None,
         written_in: (file.to_string(), node.line),
     })
 }
 
+/// How people are signed in, where an entry says so: as themselves, or with what they
+/// type. Gives whether it is as themselves, and the line it is said in.
+fn signs_in(parts: &Parts, file: &str, of: &str) -> Result<Option<(bool, usize)>, Refused> {
+    match parts.text("signs-in", of)? {
+        None => Ok(None),
+        Some((way, line)) => match way.as_str() {
+            "themselves" => Ok(Some((true, line))),
+            "typed" => Ok(Some((false, line))),
+            _ => Err(refused(file, line, format!("“{way}” is no way people are signed in: themselves, or typed"))),
+        },
+    }
+}
+
+/// Whether an address is a number and no name, with or without a port after it.
+fn is_a_number(address: &str) -> bool {
+    let bare = |address: &str| address.trim_start_matches('[').trim_end_matches(']').parse::<std::net::IpAddr>().is_ok();
+    bare(address) || address.rsplit_once(':').is_some_and(|(host, port)| port.bytes().all(|digit| digit.is_ascii_digit()) && bare(host))
+}
+
 /// Reads one farm.
 fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
     let shape = "a farm is written as its name, its feed and its groups, beginning with “- name:”";
-    let parts = Parts::of(file, node, &["name", "feed", "groups", "served-by"], "a farm", shape)?;
+    let parts = Parts::of(file, node, &["name", "feed", "groups", "served-by", "signs-in"], "a farm", shape)?;
     let Some((name, _)) = parts.text("name", "a farm")? else { return Err(refused(file, node.line, "the farm has no name")) };
     if !name.chars().all(|character| character.is_alphanumeric() || " -_.()+&".contains(character)) {
         return Err(refused(
@@ -651,8 +697,21 @@ fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
     if let Some((other, line)) = served_by.iter().find(|(address, _)| !serves(address)) {
         return Err(refused(file, *line, format!("“{other}” is no address of a machine")));
     }
+    let themselves = match signs_in(&parts, file, &name)? {
+        Some((true, line)) => {
+            if let Some((number, _)) = served_by.iter().find(|(address, _)| is_a_number(address)) {
+                return Err(refused(
+                    file,
+                    line,
+                    format!("the farm {name} signs people in as themselves and is served at {number}: a domain knows a machine by its name, and by no number"),
+                ));
+            }
+            true
+        }
+        _ => false,
+    };
     let served_by = served_by.into_iter().map(|(address, _)| address).collect();
-    Ok(Farm { name, feed, groups, served_by, after: 0, written_in: (file.to_string(), node.line) })
+    Ok(Farm { name, feed, groups, served_by, themselves, after: 0, written_in: (file.to_string(), node.line) })
 }
 
 /// Reads one rule.
@@ -1037,6 +1096,63 @@ rules:
             wrong("machines:\n  - name: a\n    kind: windows\n    address: a.example\n    programs: Ledger\n", &[]).why,
             "the programs of a are a list: of names, or of names with their icons"
         );
+    }
+
+    #[test]
+    fn an_entry_says_how_people_are_signed_in_and_left_out_they_type() {
+        let machine = |name: &str, more: &str| {
+            format!("  - name: {name}\n    kind: windows\n    address: {name}.corp.example\n    desktop: true\n{more}")
+        };
+        let written = format!(
+            "machines:\n{}{}{}farms:\n  - name: Work Resources\n    feed: https://broker.corp.example/feed\n    served-by: [rdsh-01.corp.example]\n    signs-in: themselves\n  - name: Others\n    feed: https://other.corp.example/feed\n",
+            machine("as-oneself", "    signs-in: themselves\n"),
+            machine("by-typing", "    signs-in: typed\n"),
+            machine("unsaid", ""),
+        );
+        let in_force = InForce::read(&files(&[("ways.yaml", &written)])).unwrap();
+        let ways: Vec<(&str, bool)> = in_force.machines.iter().map(|machine| (machine.name.as_str(), machine.themselves)).collect();
+        assert_eq!(ways, [("as-oneself", true), ("by-typing", false), ("unsaid", false)]);
+        let ways: Vec<(&str, bool)> = in_force.farms.iter().map(|farm| (farm.name.as_str(), farm.themselves)).collect();
+        assert_eq!(ways, [("Work Resources", true), ("Others", false)]);
+
+        // as themselves: on a Windows machine with a desktop or programs, which a domain knows by its name
+        let reasons: [(&str, usize, &str); 5] = [
+            (
+                "machines:\n  - name: a\n    kind: windows\n    address: a.example\n    desktop: true\n    signs-in: somehow\n",
+                6,
+                "“somehow” is no way people are signed in: themselves, or typed",
+            ),
+            (
+                "machines:\n  - name: a\n    kind: linux\n    address: a.example\n    shell: true\n    signs-in: themselves\n",
+                6,
+                "a signs people in as themselves, which is for a Windows machine with a desktop or programs",
+            ),
+            (
+                "machines:\n  - name: a\n    kind: windows\n    address: 10.0.0.7\n    desktop: true\n    signs-in: themselves\n",
+                6,
+                "a signs people in as themselves and is reached at 10.0.0.7: a domain knows a machine by its name, and by no number",
+            ),
+            (
+                "machines:\n  - name: a\n    kind: windows\n    address: broker.example\n    desktop: true\n    collection: A\n    served-by: ['10.0.0.8:3390']\n    signs-in: themselves\n",
+                8,
+                "a signs people in as themselves and is reached at 10.0.0.8:3390: a domain knows a machine by its name, and by no number",
+            ),
+            (
+                "farms:\n  - name: A\n    feed: https://a.example/feed\n    served-by: ['[fd00::8]']\n    signs-in: themselves\n",
+                5,
+                "the farm A signs people in as themselves and is served at [fd00::8]: a domain knows a machine by its name, and by no number",
+            ),
+        ];
+        for (file, line, reason) in reasons {
+            let refused = why(file);
+            assert_eq!((refused.line, refused.why.as_str()), (line, reason), "{file}");
+        }
+        // typed, a machine is reached by a number as well
+        assert!(InForce::read(&files(&[(
+            "a.yaml",
+            "machines:\n  - name: a\n    kind: windows\n    address: 10.0.0.7\n    desktop: true\n    signs-in: typed\n"
+        )]))
+        .is_ok());
     }
 
     #[test]

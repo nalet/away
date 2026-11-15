@@ -26,6 +26,7 @@ use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;
 use tokio_rustls::TlsConnector;
 
+use crate::themselves::OnAMachine;
 use crate::windows::Windows;
 
 /// How long a machine gets to answer, at each step on the way to its desktop.
@@ -62,6 +63,9 @@ pub enum Why {
     AnotherIdentity,
     /// It did not accept the sign-in.
     SignInRefused,
+    /// The person could not be signed in as themselves: Away got nothing that signs
+    /// them in, or the domain did not take it.
+    NotThemselves,
     /// It took the sign-in and showed nothing in time.
     NoPicture,
     /// A farm's broker sent the connection to a machine the files don't name for it.
@@ -85,6 +89,15 @@ pub struct Failure {
 
 fn failure(step: Step, why: Why, details: impl ToString) -> Failure {
     Failure { step, why, details: details.to_string() }
+}
+
+/// Who is signed in on a machine.
+pub enum Who {
+    /// An account, with a name and a password that somebody typed.
+    Account(Account),
+    /// The person themselves: with a ticket of their domain for this machine, and a
+    /// smart card that exists in the gateway's memory alone.
+    Themselves(Box<OnAMachine>),
 }
 
 /// A machine that answered, and said which security it takes.
@@ -189,14 +202,14 @@ impl Secured {
         self.security == Security::Tls
     }
 
-    /// Signs the account in, and opens the desktop at this size, for a keyboard of this
+    /// Signs somebody in, and opens the desktop at this size, for a keyboard of this
     /// layout, as Windows numbers them. On the machine a farm's broker sent the client
     /// on to, the session the broker named is said. A broker opens nothing: it says
     /// where the connection belongs. With a program, no desktop is opened: the machine
     /// is asked to start the program, and shows its windows.
     pub async fn sign_in(
         mut self,
-        account: Account,
+        who: Who,
         width: u16,
         height: u16,
         layout: u32,
@@ -208,42 +221,93 @@ impl Secured {
                 |step: Step| move |error: getrandom::Error| failure(step, Why::Broken, format!("the system gave no random bytes: {error}"));
             let refused = |details: String| failure(Step::SigningIn, Why::SignInRefused, details);
             let broken = |error: std::io::Error| failure(Step::SigningIn, Why::Broken, error);
-            let (domain, name, password) = if self.security == Security::Tls {
+            let (domain, name, password, reader) = match who {
                 // the machine signs the account in itself, with what the client tells it
-                (account.domain, account.name, Some(account.password))
-            } else {
-                let (domain, name) = (account.domain.clone(), account.name.clone());
-                let mut fresh = [0u8; 56];
-                getrandom::fill(&mut fresh).map_err(random(Step::SigningIn))?;
-                let new = New {
-                    for_the_proof: Fresh {
-                        challenge: fresh[..8].try_into().expect("8 bytes"),
-                        key: fresh[8..24].try_into().expect("16 bytes"),
-                    },
-                    number: fresh[24..].try_into().expect("32 bytes"),
-                };
-                let (mut signing_in, first) = SignIn::begin(account, &self.host, &self.identity.public_key, new, clock());
-                self.secured.write_all(&first).await.map_err(broken)?;
-                loop {
-                    // a machine that doesn't take the name or the password ends the connection here
-                    let message =
-                        message(&mut self.secured).await.map_err(|error| refused(format!("the machine ended the sign-in: {error}")))?;
-                    match signing_in.receive(&message).map_err(|error| refused(error.to_string()))? {
-                        Next::Send(bytes) => self.secured.write_all(&bytes).await.map_err(broken)?,
-                        Next::SendLast(bytes) => {
-                            self.secured.write_all(&bytes).await.map_err(broken)?;
-                            break;
+                Who::Account(account) if self.security == Security::Tls => (account.domain, account.name, Some(account.password), None),
+                Who::Themselves(_) if self.security == Security::Tls => {
+                    return Err(failure(
+                        Step::SigningIn,
+                        Why::NotThemselves,
+                        "the machine takes no sign-in before the desktop, which signing a person in as themselves goes through",
+                    ))
+                }
+                Who::Themselves(theirs) => {
+                    // the ticket is shown in place of a proof of a password, and the card is
+                    // handed over in place of the password itself, sealed
+                    let OnAMachine { ticket, card, reader } = *theirs;
+                    let new = away_winauth::sign_in::New {
+                        for_the_ticket: away_winauth::kerberos::gss::Fresh {
+                            key: random_bytes(Step::SigningIn)?,
+                            begins_with: random_bytes(Step::SigningIn)?,
+                            counts_from: u32::from_be_bytes(random_bytes(Step::SigningIn)?) & 0x3fff_ffff,
+                        },
+                        number: random_bytes(Step::SigningIn)?,
+                        begin_with: [random_bytes(Step::SigningIn)?, random_bytes(Step::SigningIn)?],
+                    };
+                    let now = away_part::time::now();
+                    let (mut signing_in, first) = away_winauth::sign_in::SignIn::begin_with_a_card(
+                        &ticket,
+                        &self.identity.public_key,
+                        &card,
+                        (now.as_secs(), now.subsec_micros()),
+                        new,
+                    );
+                    let not = |details: String| failure(Step::SigningIn, Why::NotThemselves, details);
+                    self.secured.write_all(&first).await.map_err(broken)?;
+                    loop {
+                        let message =
+                            message(&mut self.secured).await.map_err(|error| not(format!("the machine ended the sign-in: {error}")))?;
+                        match signing_in.receive(&message).map_err(|error| not(error.to_string()))? {
+                            Next::Send(bytes) => self.secured.write_all(&bytes).await.map_err(broken)?,
+                            Next::SendLast(bytes) => {
+                                self.secured.write_all(&bytes).await.map_err(broken)?;
+                                break;
+                            }
                         }
                     }
+                    if self.security == (Security::SignInFirst { tells_result: true }) {
+                        let mut verdict = [0u8; 4];
+                        self.secured.read_exact(&mut verdict).await.map_err(|_| {
+                            not("the machine closed the connection where it says whether the person may come in".to_string())
+                        })?;
+                        sign_in::read_verdict(verdict).map_err(|error| not(error.to_string()))?;
+                    }
+                    (card.domain, card.name, None, Some(reader))
                 }
-                if self.security == (Security::SignInFirst { tells_result: true }) {
-                    let mut verdict = [0u8; 4];
-                    self.secured.read_exact(&mut verdict).await.map_err(|_| {
-                        refused("the machine closed the connection where it says whether the account may come in".to_string())
-                    })?;
-                    sign_in::read_verdict(verdict).map_err(|error| refused(error.to_string()))?;
+                Who::Account(account) => {
+                    let (domain, name) = (account.domain.clone(), account.name.clone());
+                    let mut fresh = [0u8; 56];
+                    getrandom::fill(&mut fresh).map_err(random(Step::SigningIn))?;
+                    let new = New {
+                        for_the_proof: Fresh {
+                            challenge: fresh[..8].try_into().expect("8 bytes"),
+                            key: fresh[8..24].try_into().expect("16 bytes"),
+                        },
+                        number: fresh[24..].try_into().expect("32 bytes"),
+                    };
+                    let (mut signing_in, first) = SignIn::begin(account, &self.host, &self.identity.public_key, new, clock());
+                    self.secured.write_all(&first).await.map_err(broken)?;
+                    loop {
+                        // a machine that doesn't take the name or the password ends the connection here
+                        let message =
+                            message(&mut self.secured).await.map_err(|error| refused(format!("the machine ended the sign-in: {error}")))?;
+                        match signing_in.receive(&message).map_err(|error| refused(error.to_string()))? {
+                            Next::Send(bytes) => self.secured.write_all(&bytes).await.map_err(broken)?,
+                            Next::SendLast(bytes) => {
+                                self.secured.write_all(&bytes).await.map_err(broken)?;
+                                break;
+                            }
+                        }
+                    }
+                    if self.security == (Security::SignInFirst { tells_result: true }) {
+                        let mut verdict = [0u8; 4];
+                        self.secured.read_exact(&mut verdict).await.map_err(|_| {
+                            refused("the machine closed the connection where it says whether the account may come in".to_string())
+                        })?;
+                        sign_in::read_verdict(verdict).map_err(|error| refused(error.to_string()))?;
+                    }
+                    (domain, name, None, None)
                 }
-                (domain, name, None)
             };
 
             // what Away is, the channels, the licence, and what each side can do
@@ -255,7 +319,8 @@ impl Secured {
                 secret: fresh[32..].try_into().expect("48 bytes"),
                 known_by: known_by(),
             };
-            let (open, first) = Connection::begin(client, &domain, &name, password, for_a_licence, None);
+            let reads_a_card = reader.is_some();
+            let (open, first) = Connection::begin(client, &domain, &name, password, for_a_licence, reader);
             self.secured.write_all(&first).await.map_err(broken)?;
             let (reader, writer) = tokio::io::split(self.secured);
             let mut desktop = Desktop {
@@ -271,12 +336,19 @@ impl Secured {
                 windows_changed: false,
                 started: false,
                 scratch: vec![0u8; 32 * 1024],
+                reads_a_card,
+                ticked: tokio::time::Instant::now(),
             };
             while !desktop.is_open {
-                match desktop.reader.read(&mut desktop.scratch).await.map_err(broken)? {
+                // a machine that reads a card waits for the reader's word as time passes
+                let arrived = tokio::time::timeout(TICKS_EVERY, desktop.reader.read(&mut desktop.scratch)).await;
+                desktop.tick().await.map_err(|failed| Failure { step: Step::SigningIn, ..failed })?;
+                match arrived {
+                    Err(_) => continue,
                     // a machine that refuses the account once the desktop is asked for ends the connection
-                    0 => return Err(refused("the machine closed the connection before its desktop was open".to_string())),
-                    count => desktop.frames.push(&desktop.scratch[..count]),
+                    Ok(Ok(0)) => return Err(refused("the machine closed the connection before its desktop was open".to_string())),
+                    Ok(Ok(count)) => desktop.frames.push(&desktop.scratch[..count]),
+                    Ok(Err(error)) => return Err(broken(error)),
                 }
                 // what the machine draws along with its last word is kept for whoever takes it first
                 desktop.draw().await.map_err(|failed| Failure { step: Step::SigningIn, ..failed })?;
@@ -333,6 +405,10 @@ pub struct Desktop {
     /// Whether the machine said that the program started.
     started: bool,
     scratch: Vec<u8>,
+    /// Whether the machine was handed a smart card, which it reads over the connection.
+    reads_a_card: bool,
+    /// When the connection was last told how much time passed.
+    ticked: tokio::time::Instant,
 }
 
 impl Desktop {
@@ -352,6 +428,29 @@ impl Desktop {
             }
             Err(error) => Err(failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}"))),
         }
+    }
+
+    /// Tells the connection how much time passed since it was last told: a machine
+    /// that asked the smart card reader to say when something changes gets its answer
+    /// when the time it gave is over.
+    pub async fn tick(&mut self) -> Result<(), Failure> {
+        if !self.reads_a_card {
+            return Ok(());
+        }
+        let now = tokio::time::Instant::now();
+        let passed = now.duration_since(self.ticked).as_millis() as u64;
+        if passed == 0 {
+            return Ok(());
+        }
+        self.ticked = now;
+        let waited = self.open.elapsed(passed);
+        if waited.is_empty() {
+            return Ok(());
+        }
+        self.writer
+            .write_all(&waited)
+            .await
+            .map_err(|error| failure(Step::FirstPicture, Why::Broken, format!("the connection to the machine broke: {error}")))
     }
 
     /// Draws what arrived into the picture, answers the machine where it wants an
@@ -404,7 +503,7 @@ impl Desktop {
                     Happened::Started => self.started = true,
                     Happened::Channels { .. } | Happened::Licensed | Happened::AsksToTakeALicence { .. } | Happened::LicenceTaken(_) => {}
                     Happened::AskedForTheProgram => {}
-                    // the gateway has no smart card reader for a machine yet
+                    // what a machine does with the reader is answered by the connection itself
                     Happened::Reader { .. } | Happened::AskedTheReader(_) => {}
                 }
             }
@@ -461,6 +560,15 @@ impl Desktop {
         let _ = self.writer.write_all(&self.open.leave()).await;
         let _ = self.writer.shutdown().await;
     }
+}
+
+/// How often at most a connection is told how much time passed.
+pub const TICKS_EVERY: Duration = Duration::from_millis(250);
+
+fn random_bytes<const N: usize>(step: Step) -> Result<[u8; N], Failure> {
+    let mut bytes = [0u8; N];
+    getrandom::fill(&mut bytes).map_err(|error| failure(step, Why::Broken, format!("the system gave no random bytes: {error}")))?;
+    Ok(bytes)
 }
 
 /// One message of the sign-in before the desktop: read until it is whole.

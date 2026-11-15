@@ -46,6 +46,7 @@ async fn main() -> std::process::ExitCode {
             feed: feed.clone(),
             groups: Vec::new(),
             served_by: Vec::new(),
+            themselves: false,
             after: 0,
             written_in: (String::new(), 0),
         };

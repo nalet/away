@@ -26,7 +26,8 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 
-use crate::machine::{self, Area, Desktop, Failure, Opened, Step, Why};
+use crate::machine::{self, Area, Desktop, Failure, Opened, Step, Who, Why};
+use crate::themselves::Domain;
 
 /// How long a browser gets to say which session it is, once its connection is open.
 const BEGINS_WITHIN: Duration = Duration::from_secs(10);
@@ -66,6 +67,8 @@ pub struct Taken {
     pub served_by: Vec<String>,
     /// The program the session is for, where it is for one and not for the desktop.
     pub program: Option<Program>,
+    /// Whether the person is signed in on the machine as themselves, with nothing typed.
+    pub themselves: bool,
 }
 
 impl Server {
@@ -104,7 +107,8 @@ impl Server {
                     .and_then(|machine| machine.get("program"))
                     .and_then(|program| program.text_of("run"))
                     .map(|run| Program { run: run.to_string(), arguments: String::new() });
-                Ok(Some(Taken { session, machine: name, address, port, collection, served_by, program }))
+                let themselves = machine.and_then(|machine| machine.text_of("signs_in")) == Some("themselves");
+                Ok(Some(Taken { session, machine: name, address, port, collection, served_by, program, themselves }))
             }
             _ => Err(format!("the server answered the ticket with the status {status}, and with nothing a session can begin with")),
         }
@@ -122,6 +126,9 @@ impl Server {
 pub struct Around {
     /// The server, where the gateway is told of one.
     pub server: Option<Server>,
+    /// The domain whose machines people are signed in on as themselves, where the
+    /// installation names one.
+    pub domain: Option<Domain>,
     /// Where the gateway writes what happens.
     pub lines: Lines,
 }
@@ -164,7 +171,7 @@ where
         .lines
         .info("a session was taken over", &[("session", taken.session.as_str().into()), ("machine", taken.machine.as_str().into())]);
 
-    let opened = open(&mut browser, server, &taken, width, height, layout).await;
+    let opened = open(&mut browser, server, around.domain.as_ref(), &taken, width, height, layout).await;
     let (why, details) = match opened {
         Ok(Some(Open { mut desktop, served_by })) => {
             let picture = desktop.picture();
@@ -238,6 +245,7 @@ struct Open {
 async fn open<Connection>(
     browser: &mut WebSocketStream<Connection>,
     server: &Server,
+    domain: Option<&Domain>,
     taken: &Taken,
     width: u16,
     height: u16,
@@ -258,15 +266,41 @@ where
     let secured = reached.secure().await?;
     let shows = secured.identity().fingerprint_text();
     known(server, taken, &taken.address, taken.port, &shows).await?;
-    // the connection that showed it is let go: the person may take their time to type,
-    // and a machine doesn't wait that long
-    drop(secured);
-
-    // the machine signs people in by what they type
     tell(browser, ToBrowser::Step("signing-in")).await.map_err(|()| gone(Step::SigningIn))?;
     let (width, height) = (width.clamp(640, 4096) & !3, height.clamp(480, 2160));
     let mut again = false;
     let (mut desktop, served_by) = 'asked: {
+        // the person is signed in as themselves: nothing is asked, and the connection
+        // that showed who the machine is goes on
+        if taken.themselves {
+            let not = |details: &str| Failure { step: Step::SigningIn, why: Why::NotThemselves, details: details.to_string() };
+            let domain = domain.ok_or_else(|| not("this installation names no domain to sign people in on the machines of"))?;
+            let who = domain.themselves(&taken.session).await?;
+            let theirs = domain.on(&who, &taken.address).await?;
+            let program = taken.program.clone();
+            let sent_on = match secured.sign_in(Who::Themselves(Box::new(theirs)), width, height, layout, None, program).await? {
+                Opened::Desktop(desktop) => break 'asked (*desktop, None),
+                Opened::SentOn(to) => to,
+            };
+            // a farm's broker says which machine serves the collection: the person is
+            // signed in there with a ticket for that machine, and a card of its own
+            let (host, port) = served_by(&sent_on, taken).await?;
+            let secured = machine::reach(&host, port, sent_on.token.as_deref()).await?.secure().await?;
+            known(server, taken, &host, port, &secured.identity().fingerprint_text()).await?;
+            let theirs = domain.on(&who, &host).await?;
+            let program = taken.program.clone();
+            match secured.sign_in(Who::Themselves(Box::new(theirs)), width, height, layout, Some(sent_on.session), program).await? {
+                Opened::Desktop(desktop) => break 'asked (*desktop, Some(format!("{host}:{port}"))),
+                Opened::SentOn(_) => {
+                    let details = format!("{host} sends the connection on again, which a machine of a farm doesn't");
+                    return Err(Failure { step: Step::SigningIn, why: Why::Broken, details });
+                }
+            }
+        }
+        // the machine signs people in by what they type. The connection that showed who
+        // it is is let go: the person may take their time to type, and a machine
+        // doesn't wait that long
+        drop(secured);
         for _ in 0..ASKS_AT_MOST {
             tell(browser, ToBrowser::Asks { again }).await.map_err(|()| gone(Step::SigningIn))?;
             let typed = tokio::time::timeout(TYPED_WITHIN, async {
@@ -286,7 +320,8 @@ where
                 return Err(Failure { step: Step::Checking, why: Why::AnotherIdentity, details });
             }
             let program = taken.program.clone();
-            let sent_on = match secured.sign_in(Account::named(&name, password.clone()), width, height, layout, None, program).await {
+            let typed = Who::Account(Account::named(&name, password.clone()));
+            let sent_on = match secured.sign_in(typed, width, height, layout, None, program).await {
                 Ok(Opened::Desktop(desktop)) => break 'asked (*desktop, None),
                 Ok(Opened::SentOn(to)) => to,
                 Err(Failure { why: Why::SignInRefused, .. }) => {
@@ -301,7 +336,8 @@ where
             let secured = machine::reach(&host, port, sent_on.token.as_deref()).await?.secure().await?;
             known(server, taken, &host, port, &secured.identity().fingerprint_text()).await?;
             let program = taken.program.clone();
-            match secured.sign_in(Account::named(&name, password), width, height, layout, Some(sent_on.session), program).await {
+            let typed = Who::Account(Account::named(&name, password));
+            match secured.sign_in(typed, width, height, layout, Some(sent_on.session), program).await {
                 Ok(Opened::Desktop(desktop)) => break 'asked (*desktop, Some(format!("{host}:{port}"))),
                 Ok(Opened::SentOn(_)) => {
                     let details = format!("{host} sends the connection on again, which a machine of a farm doesn't");
@@ -329,7 +365,12 @@ where
                 // what was drawn is for whoever shows the desktop: said again there
                 break Ok::<(), Failure>(());
             }
-            desktop.arrives().await?;
+            // a machine that signs the person in with a card asks the reader meanwhile,
+            // and waits for its word as time passes
+            if let Ok(arrived) = tokio::time::timeout(machine::TICKS_EVERY, desktop.arrives()).await {
+                arrived?;
+            }
+            desktop.tick().await?;
         }
     })
     .await;
@@ -450,6 +491,12 @@ where
             }
         }
         tokio::select! {
+            // a machine that reads a card over the connection is told how time passes
+            _ = tokio::time::sleep(machine::TICKS_EVERY) => {
+                if let Err(failed) = desktop.tick().await {
+                    return Ended::Machine(failed.details);
+                }
+            }
             arrived = desktop.arrives() => {
                 let drawn = match arrived {
                     Ok(()) => desktop.take().await,
@@ -615,6 +662,7 @@ fn why_word(why: Why) -> &'static str {
         Why::Refused => "refused",
         Why::AnotherIdentity => "another-identity",
         Why::SignInRefused => "sign-in-refused",
+        Why::NotThemselves => "not-as-yourself",
         Why::NoPicture => "no-picture",
         Why::SentElsewhere => "sent-elsewhere",
         Why::ProgramNotStarted => "program-not-started",

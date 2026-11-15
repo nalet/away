@@ -95,8 +95,31 @@ struct World {
     _lost: Machine,
     database: Database,
     server_lines: Lines,
+    /// What signing in as oneself takes, where the world has a domain.
+    domain: Option<OfADomain>,
     _stoppers: (Stopper, Stopper),
     _folder: Folder,
+}
+
+/// A domain's part of a world: a machine of the domain, which takes tickets and reads
+/// the card it is handed; the organisation's authority; and Away's issuer.
+struct OfADomain {
+    machine: Machine,
+    pages: away_issuer::authority::stand_in::Pages,
+    issuer_lines: Lines,
+    _stopper: Stopper,
+}
+
+const AUTHORITY: &[u8] = include_bytes!("../../away-winauth/tests/fixtures/authority.der");
+
+/// The Kerberos server of the tests, where one is named.
+fn kerberos() -> Option<String> {
+    let at = std::env::var("AWAY_TEST_KERBEROS").ok().filter(|at| !at.is_empty());
+    if at.is_none() {
+        assert!(std::env::var_os("CI").is_none(), "the pipeline's tests need a Kerberos server: AWAY_TEST_KERBEROS is not set");
+        eprintln!("no Kerberos server to test against: AWAY_TEST_KERBEROS is not set");
+    }
+    at
 }
 
 /// A folder of files for one test, removed when the test ends.
@@ -109,7 +132,25 @@ impl Drop for Folder {
 }
 
 async fn world(name: &str) -> Option<World> {
+    world_with(name, None).await
+}
+
+/// The same, with a domain whose Kerberos server is at this address: one machine more,
+/// `own-01`, on which people are signed in as themselves.
+async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
+    use away_winauth::kerberos::crypto::{Key, Kind};
     let database = a_database_of_its_own().await?;
+    let password_of = |what: &str, salt: &[u8]| Key::from_password(Kind::Aes256, what, salt, 4096);
+    let own = match kerberos {
+        Some(_) => Some(
+            Machine::start_in_a_domain(
+                password_of("the password of a machine that exists for these tests alone", b"CORP.EXAMPLETERMSRVlocalhost"),
+                stand_in::desktop(),
+            )
+            .await,
+        ),
+        None => None,
+    };
     let machine = Machine::start(KNOWN, PASSWORD, stand_in::desktop()).await;
     let (host, port) = machine.address();
     // a farm's broker beside it: it sends whoever signs in on to the machine, by its name and its number
@@ -161,6 +202,16 @@ async fn world(name: &str) -> Option<World> {
          - name: hidden-09\n    kind: windows\n    address: hidden-09.corp.example\n    desktop: true\n\
          rules:\n  - name: staff-desks\n    who: [staff]\n    reaches: [desk-01, apps-01, gone-02, build-01, Desktops, Elsewhere, Unnamed, Alone, Anywhere]\n"
     );
+    // the machine of the domain, where the world has one, in a file of its own: people
+    // are signed in on it as themselves
+    if let Some(own) = &own {
+        let (host, port) = own.address();
+        let of_the_domain = format!(
+            "machines:\n  - name: own-01\n    kind: windows\n    address: {host}\n    desktop: {{ port: {port} }}\n    signs-in: themselves\n\
+             rules:\n  - name: own\n    who: [staff]\n    reaches: [own-01]\n"
+        );
+        std::fs::write(folder.0.join("own.yaml"), of_the_domain).expect("the domain's file");
+    }
     std::fs::write(folder.0.join("machines.yaml"), files).expect("the files");
 
     let free = || std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
@@ -196,9 +247,85 @@ async fn world(name: &str) -> Option<World> {
     let internal = server.internal_address().expect("an address for the gateway");
     tokio::spawn(server.run());
 
+    // the issuer, and what it rests on, where the world has a domain: the organisation's
+    // authority, the sign-in service, the server, and the domain's Kerberos server
+    let authority = {
+        let letters = away_part::base64::ordinary(AUTHORITY);
+        let lines: Vec<&str> = letters.as_bytes().chunks(64).map(|line| std::str::from_utf8(line).unwrap()).collect();
+        format!("-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----\n", lines.join("\n"))
+    };
+    let (domain, in_a_domain) = match (kerberos, own) {
+        (Some(kerberos), Some(own)) => {
+            use away_issuer::authority::stand_in::{Pages, With};
+            let fixture =
+                |name: &str| std::fs::read(format!("{}/../away-winauth/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap();
+            let pages = Pages::open(With {
+                shows: (fixture("controller.der"), fixture("controller.key.der")),
+                of_the_service: password_of("the password of pages that exist for these tests alone", b"CORP.EXAMPLEHTTPlocalhost"),
+                issues_with: (fixture("issuing.der"), fixture("issuing.key.der")),
+                asked_as: "pat.typed".to_string(),
+                domain: "CORP".to_string(),
+                realm: "CORP.EXAMPLE".to_string(),
+                for_signing_in: "CorpSignIn".to_string(),
+                for_an_agent: "CorpAgent".to_string(),
+                never_for: Vec::new(),
+                good_for: 300,
+            })
+            .await;
+            let told = away_issuer::Told {
+                internal: Some(away_issuer::told::Internal { address: "127.0.0.1:0".to_string(), certificate: None }),
+                windows: Some(away_issuer::told::Windows {
+                    domain: "corp.example".to_string(),
+                    short_name: "CORP".to_string(),
+                    controllers: vec![kerberos.to_string()],
+                    pages: pages.address.clone(),
+                    authorities: Some(authority.clone().into_bytes()),
+                    account: "pat.typed".to_string(),
+                    password: Secret::new(PASSWORD),
+                    agent_kind: "CorpAgent".to_string(),
+                    sign_in_kind: "CorpSignIn".to_string(),
+                    account_entry: away_issuer::told::ACCOUNT_ENTRY.to_string(),
+                    groups_entry: away_issuer::told::GROUPS_ENTRY.to_string(),
+                    never_as: away_issuer::told::NEVER_AS.iter().map(|never| never.to_string()).collect(),
+                    never_of: away_issuer::told::NEVER_OF.iter().map(|never| never.to_string()).collect(),
+                }),
+                sign_in: Some(away_issuer::told::SignInService {
+                    service: service.address(),
+                    client: "away".to_string(),
+                    authorities: None,
+                }),
+                server: Some(away_issuer::told::Server {
+                    at: Address::read(&format!("http://127.0.0.1:{}", internal.port())).unwrap(),
+                    authorities: None,
+                }),
+            };
+            let (stopper, stop) = stop::pair();
+            let issuer_lines = Lines::kept_for("issuer");
+            let settings = Settings { address: String::new(), health_address: "127.0.0.1:0".to_string() };
+            let issuer = away_issuer::Issuer::bind(&settings, told, Part::new("issuer", issuer_lines.clone(), stop))
+                .await
+                .expect("the issuer binds");
+            let at =
+                Address::read(&format!("http://127.0.0.1:{}", issuer.bound().address.expect("where the gateway asks").port())).unwrap();
+            tokio::spawn(issuer.run());
+            let told = away_gateway::InADomain {
+                name: "corp.example".to_string(),
+                controllers: vec![kerberos.to_string()],
+                authorities: authority.into_bytes(),
+                issuer: at,
+                issuer_authorities: None,
+            };
+            (Some(OfADomain { machine: own, pages, issuer_lines, _stopper: stopper }), Some(told))
+        }
+        _ => (None, None),
+    };
+
     let (gateway_stopper, stop) = stop::pair();
-    let told =
-        away_gateway::Told { server: Some(Address::read(&format!("http://127.0.0.1:{}", internal.port())).unwrap()), authorities: None };
+    let told = away_gateway::Told {
+        server: Some(Address::read(&format!("http://127.0.0.1:{}", internal.port())).unwrap()),
+        authorities: None,
+        domain: in_a_domain,
+    };
     let settings = Settings { address: "127.0.0.1:0".to_string(), health_address: "127.0.0.1:0".to_string() };
     let gateway = Gateway::bind(&settings, told, Part::new("gateway", Lines::kept_for("gateway"), stop)).await.expect("the gateway binds");
     let at = format!("127.0.0.1:{}", gateway.bound().address.expect("the sessions' address").port());
@@ -222,6 +349,7 @@ async fn world(name: &str) -> Option<World> {
         _lost: lost,
         database,
         server_lines,
+        domain,
         _stoppers: (server_stopper, gateway_stopper),
         _folder: folder,
     })
@@ -862,4 +990,107 @@ async fn without_a_database_no_machine_is_opened() {
     let (status, _, body) = browser.ask("POST", &format!("{away}/api/sessions?machine=desk-01"), true);
     assert_eq!((status, body.as_str()), (503, "Away opens no machine here: it is given no database to keep its records in.\n"));
     drop(service);
+}
+
+/// What the sign-in service says of a person of the domain: the account's name as the
+/// domain knows it, and their groups.
+fn of_the_domain(groups: &[&str]) -> Json {
+    Json::object([
+        ("sub", "7c1f".into()),
+        ("name", "Alex Urban".into()),
+        ("preferred_username", "alex.urban".into()),
+        ("groups", Json::List(groups.iter().map(|group| (*group).into()).collect())),
+    ])
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_person_opens_a_desktop_of_their_domain_as_themselves_and_nothing_is_asked() {
+    let Some(kerberos) = kerberos() else { return };
+    let Some(world) = world_with("as-themselves", Some(&kerberos)).await else { return };
+    let domain = world.domain.as_ref().expect("a world with a domain");
+    world._service.signs_in(of_the_domain(&["staff"]));
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+    let ticket = browser.ticket(&world, "own-01");
+
+    // the steps, as a person sees them: no name and no password is asked for
+    let mut session = Session::begin(&world, &sign_in, &ticket).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!(steps, ["reaching", "checking", "signing-in", "first-picture"]);
+    assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120}}"#);
+    let shows = stand_in::desktop();
+    while session.picture.as_ref() != Some(&shows) {
+        let drawn = session.until("drawn").await.get("drawn").and_then(Json::count).expect("a number");
+        session.say(Json::object([("seen", drawn.into())])).await;
+    }
+
+    // the machine read in the ticket who the person is, and on the card what signs them in
+    assert_eq!(domain.machine.shown(), [("alex.urban".to_string(), "CORP.EXAMPLE".to_string())]);
+    let read_the_card = async {
+        while !domain.machine.seen().last().and_then(|seen| seen.card.as_ref()).is_some_and(|card| card.closed) {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    };
+    tokio::time::timeout(Duration::from_secs(10), read_the_card).await.expect("the machine reads the card to its end");
+    let card = domain.machine.seen().last().and_then(|seen| seen.card.clone()).expect("the machine read the card");
+    let read = away_winauth::card::stand_in::read(&card.answers).expect("the answers of a card of this kind");
+    let on_it = away_winauth::certificate::Certificate::read(&read.certificate).expect("the certificate on the card");
+    assert_eq!(on_it.account.as_deref(), Some("alex.urban@CORP.EXAMPLE"));
+    assert!(away_winauth::card::stand_in::is_signed_by(&read.certificate, stand_in::TO_SIGN, &read.signed));
+
+    // the organisation's authority issued the issuer's own certificate, and one for the person
+    let kinds: Vec<String> = domain.pages.seen().issued.iter().map(|issued| issued.kind.clone()).collect();
+    assert_eq!(kinds, ["CorpAgent", "CorpSignIn"]);
+    session.say(Json::object([("leaves", true.into())])).await;
+    while session.next().await.is_some() {}
+
+    // the sign-in that was made is a record, between the one that the session was asked
+    // for and the one that it is open, and a line of the issuer's
+    let kept = records(&world.database).await;
+    let of_sessions: Vec<_> = kept.iter().filter(|(kind, ..)| kind.starts_with("session-")).collect();
+    assert_eq!(
+        of_sessions.iter().map(|(kind, ..)| kind.as_str()).collect::<Vec<_>>(),
+        ["session-asked", "session-signed-in", "session-opened", "session-ended"]
+    );
+    assert_eq!(of_sessions[0].3.text_of("signs_in"), Some("themselves"));
+    let made = &of_sessions[1];
+    assert_eq!((made.1.as_deref(), made.2.as_deref()), (Some("Alex Urban"), Some("own-01")));
+    assert_eq!(made.3.text_of("as"), Some("alex.urban@CORP.EXAMPLE"));
+    assert!(made.3.text_of("number").is_some_and(|number| !number.is_empty()) && made.3.get("until").and_then(Json::count).is_some());
+    assert!(domain.issuer_lines.kept().iter().any(|line| line.contains("signed a person in") && line.contains("\"machine\":\"own-01\"")));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_person_away_signs_in_as_themselves_on_no_machine_is_told_so_and_it_is_a_record() {
+    let Some(kerberos) = kerberos() else { return };
+    let Some(world) = world_with("never-themselves", Some(&kerberos)).await else { return };
+    let domain = world.domain.as_ref().expect("a world with a domain");
+    // one of the directory's administrators
+    world._service.signs_in(of_the_domain(&["staff", "Domain Admins"]));
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+    let ticket = browser.ticket(&world, "own-01");
+
+    let mut session = Session::begin(&world, &sign_in, &ticket).await;
+    let (steps, failed) = session.steps().await;
+    assert_eq!(steps, ["reaching", "checking", "signing-in"]);
+    let failed = failed.get("failed").expect("the step failed");
+    assert_eq!((failed.text_of("step"), failed.text_of("why")), (Some("signing-in"), Some("not-as-yourself")));
+    assert_eq!(
+        failed.text_of("details"),
+        Some("Away signs nobody in on a machine as themselves who is in the group Domain Admins. (never)")
+    );
+    while session.next().await.is_some() {}
+
+    // nothing was asked of the authority, the machine saw no ticket, and the records say what happened
+    assert_eq!(domain.pages.seen(), Default::default());
+    assert!(domain.machine.shown().is_empty());
+    let kept = records(&world.database).await;
+    let kinds: Vec<&str> = kept.iter().map(|(kind, ..)| kind.as_str()).filter(|kind| kind.starts_with("session-")).collect();
+    assert_eq!(kinds, ["session-asked", "session-failed"]);
+    let last = kept.last().expect("a record");
+    assert_eq!((last.3.text_of("step"), last.3.text_of("why")), (Some("signing-in"), Some("not-as-yourself")));
+    assert!(domain.issuer_lines.kept().iter().any(|line| line.contains("signed nobody in") && line.contains("\"why\":\"never\"")));
 }

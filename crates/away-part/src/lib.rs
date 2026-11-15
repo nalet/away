@@ -7,6 +7,7 @@
 pub mod address;
 pub mod base64;
 pub mod client;
+pub mod framed;
 pub mod http;
 pub mod json;
 pub mod lines;

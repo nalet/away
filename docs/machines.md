@@ -60,6 +60,7 @@ rules:
 | `shell` | its shell: `true`, or its port | none |
 | `collection` | for a farm of Windows machines that people see as one: the collection this entry stands for. Its address is then the farm's broker | none |
 | `served-by` | the machines that serve the collection, by their addresses. One that opens its desktop on another port than the broker names it after a colon, as `rdsh-02.corp.example:3390`. Away goes on to no other machine for the collection | none |
+| `signs-in` | how people are signed in on a Windows machine: `typed`, with a name and a password they type, or `themselves`, with nothing typed | `typed` |
 
 A machine offers at least one way in: a desktop, programs, or a shell.
 
@@ -122,6 +123,9 @@ rules:
     who: [staff]
     reaches: [published]
 ```
+
+A farm says `signs-in: themselves` as a machine does, for everything it
+publishes.
 
 | Part | Means | |
 |---|---|---|
@@ -248,6 +252,18 @@ machine that offers more is opened from its own page, where each way in is.
 - **The person types a name and a password** when the machine asks. Away
   passes them on to the machine and keeps them nowhere. A Windows machine
   takes them before it shows anything, so a wrong one is asked for again.
+- **Or nothing is typed.** On a machine whose entry says
+  `signs-in: themselves`, the person is signed in as themselves. Away asks the
+  organisation's own authority for a certificate that lasts five minutes,
+  proves the person to the domain with it, and hands the machine a smart card
+  that exists in Away's memory alone. The machine signs the person in as it
+  does with a card at a desk, so they reach file shares and printers as
+  themselves. Such a machine is named by the name its domain knows it by, and
+  by no number, and so are the machines that serve a farm. An account that
+  Away signs nobody in as, such as one of the directory's administrators, is
+  told so at the sign-in. It needs the installation to name the domain, its
+  authority and the account Away asks the authority as; the chart has no
+  values for that yet.
 - **A farm's desktop is opened through its broker.** Away tells the broker
   which collection is wanted and signs the person in there. The broker says
   which machine serves the session, and Away goes on to that machine, where
@@ -270,7 +286,9 @@ machine that offers more is opened from its own page, where each way in is.
   account to come back to.
 - **No machine is opened without a record.** That a desktop was asked for,
   that it is open, and how it ended or failed is each kept as a record, with
-  who it was and which machine. Without a database, no machine is opened.
+  who it was and which machine. A sign-in that Away made for a person is a
+  record too, kept before they are signed in: as which account, and until
+  when. Without a database, no machine is opened.
 
 It needs a database ([installing Away](./install.md#the-database)), and the
 gateway has to reach the machines

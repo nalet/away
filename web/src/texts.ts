@@ -129,6 +129,7 @@ export const texts = {
         'reaching refused': { says: 'It refused the connection. Remote access may be switched off there.', again: true },
         'checking another-identity': { says: "It showed another identity than the one Away knows, so Away doesn't connect to it.", again: false },
         'signing-in sign-in-refused': { says: `${machine} didn't accept that name and password.`, again: true },
+        'signing-in not-as-yourself': { says: `Away couldn't sign you in on ${machine} as yourself.`, again: true },
         'signing-in sent-elsewhere': { says: "Its farm sent Away on to a machine that isn't among those named for it, so Away doesn't connect there.", again: false },
         'first-picture no-picture': { says: 'It took the sign-in and then showed nothing in time.', again: true },
         'first-picture program-not-started': { says: "It took the sign-in and didn't start the program.", again: true },

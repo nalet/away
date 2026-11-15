@@ -33,6 +33,8 @@ pub struct Asked {
     pub collection: Option<String>,
     /// The machines that serve the collection, by their addresses.
     pub served_by: Vec<String>,
+    /// Whether the person is signed in on the machine as themselves, with nothing typed.
+    pub themselves: bool,
     /// The program the session is for, where it is for one and not for the desktop: its
     /// name, and what the machine is asked to start.
     pub program: Option<(String, String)>,
@@ -121,6 +123,7 @@ mod tests {
             port: 3389,
             collection: None,
             served_by: Vec::new(),
+            themselves: false,
             program: None,
             at,
         }

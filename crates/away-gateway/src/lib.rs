@@ -15,6 +15,7 @@ pub mod machine;
 pub mod session;
 #[cfg(feature = "stand-in")]
 pub mod stand_in;
+pub mod themselves;
 pub mod windows;
 
 use std::sync::Arc;
@@ -51,6 +52,25 @@ pub struct Told {
     pub server: Option<Address>,
     /// The certificate of the authority that secures that address, as PEM.
     pub authorities: Option<Vec<u8>>,
+    /// The domain whose machines people are signed in on as themselves, where the
+    /// installation names one.
+    pub domain: Option<InADomain>,
+}
+
+/// What an installation tells the gateway of a Windows domain.
+#[derive(Clone, Debug)]
+pub struct InADomain {
+    /// The domain, as it is named in full: `corp.example`.
+    pub name: String,
+    /// The domain controllers that give tickets, each with its port where that is not
+    /// Kerberos' own.
+    pub controllers: Vec<String>,
+    /// The authorities a domain controller's certificate has to lead to, as PEM.
+    pub authorities: Vec<u8>,
+    /// Where the gateway asks the issuer.
+    pub issuer: Address,
+    /// The authority that secures that address, as PEM.
+    pub issuer_authorities: Option<Vec<u8>>,
 }
 
 impl Told {
@@ -63,7 +83,29 @@ impl Told {
         let authorities = variable("AWAY_SERVER_AUTHORITIES_FILE")
             .map(|path| file(&path).map_err(|error| format!("AWAY_SERVER_AUTHORITIES_FILE names {path}, which can't be read: {error}.")))
             .transpose()?;
-        Ok(Told { server, authorities })
+        let said = |name: &str| variable(name).map(|said| said.trim().to_string()).filter(|said| !said.is_empty());
+        let read = |name: &str| -> Result<Option<Vec<u8>>, String> {
+            said(name).map(|path| file(&path).map_err(|error| format!("{name} names {path}, which can't be read: {error}."))).transpose()
+        };
+        let domain = match said("AWAY_DOMAIN") {
+            None => None,
+            Some(name) => {
+                let needed = |what: &str| {
+                    said(what).ok_or_else(|| format!("{what} is not set, and signing people in on the machines of {name} needs it."))
+                };
+                let controllers = needed("AWAY_DOMAIN_CONTROLLERS")?
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|one| !one.is_empty())
+                    .map(str::to_string)
+                    .collect();
+                needed("AWAY_DOMAIN_AUTHORITIES_FILE")?;
+                let authorities = read("AWAY_DOMAIN_AUTHORITIES_FILE")?.unwrap_or_default();
+                let issuer = Address::read(&needed("AWAY_ISSUER")?).map_err(|why| format!("AWAY_ISSUER is no address: {why}."))?;
+                Some(InADomain { name, controllers, authorities, issuer, issuer_authorities: read("AWAY_ISSUER_AUTHORITIES_FILE")? })
+            }
+        };
+        Ok(Told { server, authorities, domain })
     }
 }
 
@@ -92,9 +134,24 @@ impl Gateway {
                 }
             },
         };
+        let domain = match told.domain {
+            None => None,
+            Some(told) => {
+                let could_not = |why: String| {
+                    let why = format!("The domain {} can't be used to sign people in on its machines: {why}.", told.name);
+                    part.lines.error("could not start", &[("why", (&why).into())]);
+                    std::io::Error::other(why)
+                };
+                let asks = Client::new(told.issuer_authorities.as_deref()).map_err(could_not)?;
+                let issuer = themselves::Issuer::new(asks, told.issuer.clone());
+                let domain = themselves::Domain::new(&told.name, &told.controllers, &told.authorities, issuer).map_err(could_not)?;
+                part.lines.info("people are signed in as themselves on the machines of a domain", &[("domain", (&told.name).into())]);
+                Some(domain)
+            }
+        };
         let sessions = part.listen("sessions", &settings.address).await?;
         let health = part.listen("health", &settings.health_address).await?;
-        let around = Arc::new(Around { server, lines: part.lines.clone() });
+        let around = Arc::new(Around { server, domain, lines: part.lines.clone() });
         Ok(Gateway { part, sessions, health, around })
     }
 

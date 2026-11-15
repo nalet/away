@@ -19,11 +19,9 @@ use away_part::address::Address;
 use away_part::base64;
 use away_part::client::{Client, Failed};
 use away_secret::Secret;
-use away_winauth::kerberos::exchange::{framed, unframed, Later, Ticket, WithAPassword};
+use away_winauth::kerberos::exchange::{Later, Ticket, WithAPassword};
 use away_winauth::kerberos::gss::{self, Bound, Fresh};
 use away_winauth::kerberos::messages::{Name, NameKind};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
 
 use pages::Answer;
 
@@ -208,30 +206,7 @@ impl Authority {
     }
 
     async fn ask_one_controller(&self, host: &str, port: u16, request: &[u8]) -> Result<Vec<u8>, Why> {
-        let asked = async {
-            let mut connection = TcpStream::connect((host, port))
-                .await
-                .map_err(|error| format!("The domain controller {host} could not be reached: {error}."))?;
-            connection
-                .write_all(&framed(request))
-                .await
-                .map_err(|error| format!("The domain controller {host} took no request: {error}."))?;
-            let mut arrived = Vec::new();
-            loop {
-                if let Some(reply) = unframed(&arrived).map_err(|error| format!("The domain controller {host}: {error}."))? {
-                    return Ok(reply.to_vec());
-                }
-                let mut bytes = [0u8; 4096];
-                match connection.read(&mut bytes).await {
-                    Ok(0) | Err(_) => return Err(format!("The domain controller {host} closed the connection without an answer.")),
-                    Ok(count) => arrived.extend_from_slice(&bytes[..count]),
-                }
-            }
-        };
-        match tokio::time::timeout(WITHIN, asked).await {
-            Ok(answered) => answered.map_err(Why::NotAsked),
-            Err(_) => Err(Why::NotAsked(format!("The domain controller {host} gave no answer within {} seconds.", WITHIN.as_secs()))),
-        }
+        away_part::framed::ask(host, port, request, WITHIN).await.map_err(|why| Why::NotAsked(format!("The domain controller {why}.")))
     }
 }
 
