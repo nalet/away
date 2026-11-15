@@ -50,8 +50,23 @@ fn block(kind: u16, holds: &[u8]) -> Vec<u8> {
     block
 }
 
+/// The further channels a client asks for, beside the desktop's, in the order it asks
+/// for them: the one programs are started over, where a program is asked for, and the
+/// one its devices are reached over, where it has a smart card reader. With that one
+/// goes the channel of sound, without which a Windows machine says nothing about devices.
+pub fn channels(client: &Client, with_a_reader: bool) -> Vec<&'static str> {
+    let mut channels = Vec::new();
+    if client.program.is_some() {
+        channels.push(crate::rail::CHANNEL);
+    }
+    if with_a_reader {
+        channels.extend([crate::devices::CHANNEL, crate::devices::SOUND]);
+    }
+    channels
+}
+
 /// The conference request that carries what the client says of itself.
-pub fn request(client: &Client) -> Vec<u8> {
+pub fn request(client: &Client, with_a_reader: bool) -> Vec<u8> {
     // the core: the version it speaks, its screen, its keyboard, its name
     let mut core = Vec::with_capacity(212);
     core.extend(0x0008_0004u32.to_le_bytes());
@@ -84,8 +99,10 @@ pub fn request(client: &Client) -> Vec<u8> {
     let mut blocks = block(0xc001, &core);
     // no encryption of RDP's own: TLS secures the connection
     blocks.extend(block(0xc002, &[0; 8]));
-    // the further channels: the one programs are started over, where a program is asked for
-    let channels: Vec<[u8; 12]> = client.program.iter().map(|_| crate::channel::asked_for(crate::rail::CHANNEL)).collect();
+    // the further channels; what reads the one of programs on the machine is shown the
+    // heads of its pieces, what reads the others is not
+    let channels: Vec<[u8; 12]> =
+        channels(client, with_a_reader).iter().map(|name| crate::channel::asked_for(name, *name == crate::rail::CHANNEL)).collect();
     let mut further = (channels.len() as u32).to_le_bytes().to_vec();
     further.extend(channels.concat());
     blocks.extend(block(0xc003, &further));
@@ -170,7 +187,7 @@ mod tests {
 
     #[test]
     fn the_client_says_its_screen_its_name_and_the_security_that_was_chosen() {
-        let request = request(&client());
+        let request = request(&client(), false);
         assert_eq!(&request[..7], &[0x00, 0x05, 0x00, 0x14, 0x7c, 0x00, 0x01]);
         // four blocks: 216, 12, 8 and 12 bytes
         assert_eq!(&request[7..9], &(0x8000u16 | (248 + 14)).to_be_bytes());
@@ -187,7 +204,7 @@ mod tests {
 
         // for a program it asks for the channel programs are started over
         let program = crate::rail::Program { run: "||ledger".to_string(), arguments: String::new() };
-        let request = super::request(&Client { program: Some(program), ..client() });
+        let request = super::request(&Client { program: Some(program), ..client() }, false);
         assert_eq!(&request[251..259], &[0x03, 0xc0, 0x14, 0x00, 1, 0, 0, 0]);
         assert_eq!(&request[259..271], &[b'r', b'a', b'i', b'l', 0, 0, 0, 0, 0x00, 0x00, 0x20, 0xc0]);
         assert_eq!(&request[271..275], &[0x04, 0xc0, 0x0c, 0x00]);

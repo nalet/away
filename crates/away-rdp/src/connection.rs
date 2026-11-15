@@ -6,6 +6,7 @@
 //! happened. It holds no connection itself.
 
 use crate::channel::{self, Pieces};
+use crate::devices;
 use crate::gcc::{self, Client, Machine};
 use crate::input::{self, Input};
 use crate::licence::{self, Said, Taking};
@@ -14,6 +15,7 @@ use crate::pdu::{self, FromMachine};
 use crate::rail::{self, Command};
 use crate::redirection::{self, Redirection};
 use crate::secret::Secret;
+use crate::smartcard::{self, Reader};
 use crate::tpkt::{self, Frame};
 use crate::update::{self, Rectangle, Updates};
 use crate::window::Change;
@@ -70,6 +72,25 @@ pub enum Happened {
     /// What the machine says of the windows of programs: new ones, changed ones, gone
     /// ones, and which is in front.
     Windows(Vec<Change>),
+    /// The machine's answer on the client's smart card reader: it took it, or did not.
+    Reader {
+        /// Whether the machine took the reader.
+        taken: bool,
+    },
+    /// The machine asked the reader for something.
+    AskedTheReader(smartcard::Asked),
+}
+
+/// The client's smart card reader, and how far the machine and the client are with it.
+struct Devices {
+    reader: Reader,
+    /// The pieces of a message about devices that is not whole yet.
+    pieces: Pieces,
+    /// Whether the machine said what it can do, and whether it took the client's number:
+    /// the reader is named once both are so.
+    can_do: bool,
+    confirmed: bool,
+    named: bool,
 }
 
 enum State {
@@ -100,6 +121,9 @@ pub struct Connection {
     pieces: Pieces,
     /// The size of the desktop the machine offers.
     size: (u16, u16),
+    /// The further channels the client asked for, in the order it asked for them.
+    asked_for: Vec<&'static str>,
+    devices: Option<Devices>,
 }
 
 impl Connection {
@@ -107,9 +131,18 @@ impl Connection {
     /// of the account the desktop is for. The password is given only where the machine
     /// signs the account in itself: where the account signed in before the desktop, the
     /// machine has it already. What a licence is taken with is used only where the
-    /// machine hands out licences.
-    pub fn begin(client: Client, domain: &str, name: &str, password: Option<Secret>, for_a_licence: licence::New) -> (Connection, Vec<u8>) {
-        let first = tpkt::data_frame(&mcs::connect(&gcc::request(&client)));
+    /// machine hands out licences. A smart card reader is given where the machine is to
+    /// reach one over the connection, with the card the person is signed in with.
+    pub fn begin(
+        client: Client,
+        domain: &str,
+        name: &str,
+        password: Option<Secret>,
+        for_a_licence: licence::New,
+        reader: Option<Reader>,
+    ) -> (Connection, Vec<u8>) {
+        let first = tpkt::data_frame(&mcs::connect(&gcc::request(&client, reader.is_some())));
+        let asked_for = gcc::channels(&client, reader.is_some());
         let connection = Connection {
             state: State::AwaitsMachine,
             client,
@@ -125,6 +158,8 @@ impl Connection {
             updates: Updates::new(),
             pieces: Pieces::default(),
             size: (0, 0),
+            asked_for,
+            devices: reader.map(|reader| Devices { reader, pieces: Pieces::default(), can_do: false, confirmed: false, named: false }),
         };
         (connection, first)
     }
@@ -157,7 +192,7 @@ impl Connection {
             State::AwaitsMachine => {
                 self.machine = gcc::read_answer(mcs::read_connect_answer(message)?)?;
                 // a program is started over a channel of its own, which the machine has to give
-                if self.client.program.is_some() && self.machine.channels.is_empty() {
+                if self.client.program.is_some() && self.channel(rail::CHANNEL).is_none() {
                     return Err(Error::NoPrograms);
                 }
                 self.state = State::AwaitsUser;
@@ -186,21 +221,88 @@ impl Connection {
             _ => match mcs::read_arrived(message)? {
                 Arrived::Ending => Err(Error::Ended(self.reason)),
                 Arrived::On(channel, arrived) if channel == self.machine.io_channel => self.on_the_desktops_channel(arrived),
-                Arrived::On(channel, arrived) if Some(channel) == self.programs_channel() => self.on_the_programs_channel(arrived),
+                Arrived::On(channel, arrived) if Some(channel) == self.channel(rail::CHANNEL) => self.on_the_programs_channel(arrived),
+                Arrived::On(channel, arrived) if Some(channel) == self.channel(devices::CHANNEL) => self.on_the_devices_channel(arrived),
                 Arrived::On(..) => Ok((Vec::new(), Vec::new())),
             },
         }
     }
 
-    /// The channel programs are started over, where this connection is for a program.
-    fn programs_channel(&self) -> Option<u16> {
-        self.client.program.as_ref().and_then(|_| self.machine.channels.first().copied())
+    /// The number the machine gave a channel the client asked for by this name.
+    fn channel(&self, name: &str) -> Option<u16> {
+        let at = self.asked_for.iter().position(|asked| *asked == name)?;
+        self.machine.channels.get(at).copied().filter(|number| *number != 0)
+    }
+
+    /// A message on a further channel, in the pieces and the frames it travels in.
+    fn on(&self, name: &str, message: &[u8]) -> Vec<u8> {
+        let Some(on) = self.channel(name) else { return Vec::new() };
+        channel::pieces(message, name == rail::CHANNEL)
+            .iter()
+            .flat_map(|piece| tpkt::data_frame(&mcs::send(self.user, on, piece)))
+            .collect()
     }
 
     /// A message about programs, in the frames it travels in.
     fn about_programs(&self, message: &[u8]) -> Vec<u8> {
-        let Some(on) = self.programs_channel() else { return Vec::new() };
-        channel::pieces(message).iter().flat_map(|piece| tpkt::data_frame(&mcs::send(self.user, on, piece))).collect()
+        self.on(rail::CHANNEL, message)
+    }
+
+    /// What the reader answers, as messages about devices. An answer that is longer
+    /// than the machine has room for is not sent: the machine is told so, and asks again.
+    fn answers(answered: Vec<smartcard::Answered>, room: Option<u32>) -> Vec<Vec<u8>> {
+        let answer = |answered: smartcard::Answered| match answered.gives {
+            Some(gives) if room.is_some_and(|room| gives.len() > room as usize) => devices::no_room(devices::READER, answered.request),
+            Some(gives) => devices::answer(devices::READER, answered.request, &gives),
+            None => devices::did_not_work(devices::READER, answered.request),
+        };
+        answered.into_iter().map(answer).collect()
+    }
+
+    fn on_the_devices_channel(&mut self, piece: &[u8]) -> Result<(Vec<u8>, Vec<Happened>), Error> {
+        let Some(devices) = self.devices.as_mut() else { return Ok((Vec::new(), Vec::new())) };
+        let Some(message) = devices.pieces.take(piece)? else { return Ok((Vec::new(), Vec::new())) };
+        let (mut says, mut happened) = (Vec::new(), Vec::new());
+        match devices::read(&message)? {
+            // the machine begins, or begins again on another session: everything of
+            // before is forgotten, and the client says who it is
+            devices::Said::Begins { client, .. } => {
+                devices.reader.forget();
+                (devices.can_do, devices.confirmed, devices.named) = (false, false, false);
+                says.extend([devices::begins(client), devices::name(&self.client.name)]);
+            }
+            devices::Said::CanDo => {
+                devices.can_do = true;
+                says.push(devices::can_do());
+            }
+            devices::Said::Confirms => devices.confirmed = true,
+            devices::Said::Took { device: devices::READER, result } => happened.push(Happened::Reader { taken: result == 0 }),
+            devices::Said::Asks(asked) if asked.device == devices::READER => match asked.what {
+                devices::What::Control { code, room, carried } => {
+                    let (answered, what) = devices.reader.asked(asked.request, code, &carried);
+                    // the room is that of this request; what waited and is answered with it had its own
+                    says.extend(Self::answers(answered, Some(room)));
+                    happened.push(Happened::AskedTheReader(what));
+                }
+                devices::What::Other(_) => says.push(devices::did_not_work(asked.device, asked.request)),
+            },
+            // a device the client never named, the person being signed in, and what is not Away's
+            devices::Said::Asks(_) | devices::Said::Took { .. } | devices::Said::SignedIn | devices::Said::Other(_) => {}
+        }
+        // the reader is named once the machine said what it can do and took the client's number
+        if devices.can_do && devices.confirmed && !devices.named {
+            devices.named = true;
+            says.push(devices::reader());
+        }
+        Ok((says.iter().flat_map(|message| self.on(devices::CHANNEL, message)).collect(), happened))
+    }
+
+    /// Time went by. Gives what to send: the answers to what the machine asked the
+    /// reader and waited for no longer than this.
+    pub fn elapsed(&mut self, milliseconds: u64) -> Vec<u8> {
+        let Some(devices) = self.devices.as_mut() else { return Vec::new() };
+        let says = Self::answers(devices.reader.elapsed(milliseconds), None);
+        says.iter().flat_map(|message| self.on(devices::CHANNEL, message)).collect()
     }
 
     fn on_the_programs_channel(&mut self, piece: &[u8]) -> Result<(Vec<u8>, Vec<Happened>), Error> {
@@ -374,10 +476,68 @@ mod tests {
         let client =
             Client { width: 1280, height: 800, security: 2, name: "away".to_string(), layout: gcc::LAYOUT_US, sent_on_to: None, program };
         let for_a_licence = licence::New { random: [1; 32], secret: [2; 48], known_by: [3; 16] };
-        let (mut connection, first) = Connection::begin(client, "CORP", "alex.urban", None, for_a_licence);
+        let (mut connection, first) = Connection::begin(client, "CORP", "alex.urban", None, for_a_licence, None);
         let mut machine = machine;
         let happened = talk(&mut connection, &mut machine, first);
         (happened, connection, machine)
+    }
+
+    #[test]
+    fn the_machine_reaches_the_clients_reader_and_gives_the_card_in_it_commands() {
+        use crate::smartcard::stand_in::Echo;
+        use crate::smartcard::Asked;
+        let client = Client {
+            width: 1280,
+            height: 800,
+            security: 2,
+            name: "away".to_string(),
+            layout: gcc::LAYOUT_US,
+            sent_on_to: None,
+            program: None,
+        };
+        let for_a_licence = licence::New { random: [1; 32], secret: [2; 48], known_by: [3; 16] };
+        let reader = Reader::new("Away 0", Box::new(Echo));
+        let (mut connection, first) = Connection::begin(client, "CORP", "alex.urban", None, for_a_licence, Some(reader));
+        // a long command travels in more than one piece, both ways
+        let long: Vec<u8> = (0..1800).map(|at| at as u8).collect();
+        let mut machine = Desktop::new(picture()).that_reads_a_card(&[vec![0x00, 0xa4, 0x04, 0x00], long.clone()]);
+        let happened = talk(&mut connection, &mut machine, first).expect("the connection opens");
+
+        // the client asked for the channel of devices and for the one of sound, named one reader, and the machine took it
+        let seen = machine.seen();
+        assert_eq!(seen.channels, ["rdpdr", "rdpsnd"]);
+        assert_eq!(seen.devices, [(0x20, devices::READER, "SCARD".to_string())]);
+        assert!(happened.contains(&Happened::Reader { taken: true }));
+        // the machine found the reader by its name, read what the card says of itself, and got an answer to each command
+        let card = seen.card.as_ref().expect("the machine read the card");
+        assert_eq!((card.reader.as_str(), &card.says[..]), ("Away 0", &[0x3b, 0x80, 0x80, 0x01, 0x01][..]));
+        assert_eq!(card.answers.len(), 2);
+        assert_eq!(card.answers[0], [0x00, 0xa4, 0x04, 0x00, 0x90, 0x00]);
+        assert!(card.answers[1] == [&long[..], &[0x90, 0x00]].concat(), "the long command came back whole");
+        assert!(card.closed, "it went through all of it");
+        // and what it asked is told, in its order
+        let asked: Vec<Asked> = happened
+            .iter()
+            .filter_map(|happened| match happened {
+                Happened::AskedTheReader(asked) => Some(*asked),
+                _ => None,
+            })
+            .collect();
+        use Asked::{ACommand, About, ForACard, Readers, TheCard, ToSpeak, WhetherThere};
+        assert_eq!(
+            asked,
+            [WhetherThere, ToSpeak, Readers, ForACard, TheCard, About, TheCard, ACommand, ACommand, TheCard, TheCard, ToSpeak]
+        );
+        // the desktop is drawn as it is without a reader
+        assert!(happened.iter().any(|happened| matches!(happened, Happened::Drawn(_))));
+    }
+
+    #[test]
+    fn without_a_reader_the_client_asks_for_no_further_channel_and_names_no_device() {
+        // without a reader, the client asks for no further channel, and the machine says nothing about devices
+        let (happened, _, machine) = run(None, Desktop::new(picture()));
+        assert!(machine.seen().channels.is_empty() && machine.seen().devices.is_empty());
+        assert!(!happened.expect("the connection opens").iter().any(|happened| matches!(happened, Happened::Reader { .. })));
     }
 
     /// Passes what one side says to the other, and back, until both are silent.

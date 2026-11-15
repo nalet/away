@@ -74,7 +74,7 @@ fn asked(words: &[String]) -> Option<Asked> {
 
 /// What a file holds: bytes as they are, or what is written as text between two lines
 /// of dashes.
-fn read(file: &str, what: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn read(file: &str, what: &str) -> Result<Vec<u8>, String> {
     let held = std::fs::read(file).map_err(|error| format!("The {what}'s file can't be read: {error}."))?;
     let Some(text) = std::str::from_utf8(&held).ok().filter(|text| text.trim_start().starts_with("-----BEGIN")) else {
         return Ok(held);
@@ -161,6 +161,46 @@ fn first_with_a_password(host: &str, port: u16, realm: &str, account: &str, pass
     asking.receive(&ask(host, port, &proof)?).map_err(|error| error.to_string())
 }
 
+/// A first ticket for an account, with a certificate and its key: the request, and
+/// what the domain controller answers. The domain controller has to prove itself with
+/// a certificate of the authority.
+fn first_with_a_certificate(
+    host: &str,
+    port: u16,
+    realm: &str,
+    account: &str,
+    held: &Held,
+    authority: &[u8],
+    nonce: u32,
+) -> Result<Ticket, String> {
+    println!("Asking {host}, on port {port}, for a first ticket for {account}@{realm}, with the certificate");
+    let fresh = Fresh { secret: random()?, once: random()? };
+    let (first, request) = First::begin(held, account, realm, now(), nonce, fresh).map_err(|error| error.to_string())?;
+    let reply = ask(host, port, &request)?;
+    let ticket =
+        first.receive(&reply, &Trusts { authorities: &[authority], controller: host }, now().0).map_err(|error| error.to_string())?;
+    println!("   It proved itself with a certificate of the authority, for {host}.");
+    Ok(ticket)
+}
+
+/// Where a domain controller is: its name, and its port where that is not Kerberos' own.
+fn at(controller: &str) -> Result<(&str, u16), String> {
+    match controller.rsplit_once(':') {
+        Some((host, port)) if !host.contains(':') => Ok((host, port.parse::<u16>().map_err(|_| format!("{port} is no port."))?)),
+        _ => Ok((controller, 88)),
+    }
+}
+
+/// A ticket for a service, with the first ticket.
+fn for_a_service(host: &str, port: u16, first: &Ticket, service: &str, nonce: u32) -> Result<Ticket, String> {
+    println!("Asking for a ticket for {service}, with the first ticket");
+    let parts: Vec<&str> = service.split('/').collect();
+    let (later, request) = Later::begin(first, Name::new(NameKind::Service, &parts), now(), nonce ^ 0x5555_5555, random()?);
+    let ticket = later.receive(&ask(host, port, &request)?).map_err(|error| error.to_string())?;
+    says(&ticket);
+    Ok(ticket)
+}
+
 /// A ticket for a service, for an account with its password: a first ticket, and with
 /// it the one that is asked for.
 pub(crate) fn ticket_with_a_password(
@@ -170,19 +210,28 @@ pub(crate) fn ticket_with_a_password(
     password: &str,
     service: &str,
 ) -> Result<Ticket, String> {
-    let (host, port) = match controller.rsplit_once(':') {
-        Some((host, port)) if !host.contains(':') => (host, port.parse::<u16>().map_err(|_| format!("{port} is no port."))?),
-        _ => (controller, 88),
-    };
+    let (host, port) = at(controller)?;
     let nonce = u32::from_be_bytes(random()?) & 0x7fff_ffff;
     let first = first_with_a_password(host, port, realm, account, password, nonce)?;
     says(&first);
-    println!("Asking for a ticket for {service}, with the first ticket");
-    let parts: Vec<&str> = service.split('/').collect();
-    let (later, request) = Later::begin(&first, Name::new(NameKind::Service, &parts), now(), nonce ^ 0x5555_5555, random()?);
-    let ticket = later.receive(&ask(host, port, &request)?).map_err(|error| error.to_string())?;
-    says(&ticket);
-    Ok(ticket)
+    for_a_service(host, port, &first, service, nonce)
+}
+
+/// The same, for an account with a certificate, its key, and the authority the domain
+/// controller has to prove itself with: no password is in it.
+pub(crate) fn ticket_with_a_certificate(
+    controller: &str,
+    realm: &str,
+    account: &str,
+    (certificate, key, authority): (&[u8], &[u8], &[u8]),
+    service: &str,
+) -> Result<Ticket, String> {
+    let (host, port) = at(controller)?;
+    let nonce = u32::from_be_bytes(random()?) & 0x7fff_ffff;
+    let held = Held::new(certificate, key).map_err(|error| error.to_string())?;
+    let first = first_with_a_certificate(host, port, realm, account, &held, authority, nonce)?;
+    says(&first);
+    for_a_service(host, port, &first, service, nonce)
 }
 
 /// The steps of the exchange. Gives the exit code where the words made no sense.
@@ -192,10 +241,7 @@ pub fn run(words: &[String]) -> Option<Result<(), String>> {
 }
 
 fn tried(asked: &Asked) -> Result<(), String> {
-    let (host, port) = match asked.controller.rsplit_once(':') {
-        Some((host, port)) if !host.contains(':') => (host, port.parse::<u16>().map_err(|_| format!("{port} is no port."))?),
-        _ => (asked.controller.as_str(), 88),
-    };
+    let (host, port) = at(&asked.controller)?;
     let (realm, account) = (asked.realm.as_deref().unwrap_or_default(), asked.account.as_deref().unwrap_or_default());
     let nonce = u32::from_be_bytes(random()?) & 0x7fff_ffff;
 
@@ -211,24 +257,13 @@ fn tried(asked: &Asked) -> Result<(), String> {
             )
             .map_err(|error| error.to_string())?;
             let authority = read(asked.authority.as_deref().unwrap_or_default(), "authority")?;
-            println!("Asking {host}, on port {port}, for a first ticket for {account}@{realm}, with the certificate");
-            let fresh = Fresh { secret: random()?, once: random()? };
-            let (first, request) = First::begin(&held, account, realm, now(), nonce, fresh).map_err(|error| error.to_string())?;
-            let reply = ask(host, port, &request)?;
-            let ticket = first
-                .receive(&reply, &Trusts { authorities: &[&authority], controller: host }, now().0)
-                .map_err(|error| error.to_string())?;
-            println!("   It proved itself with a certificate of the authority, for {host}.");
-            ticket
+            first_with_a_certificate(host, port, realm, account, &held, &authority, nonce)?
         }
     };
     says(&first);
 
     if let Some(service) = &asked.service {
-        println!("Asking for a ticket for {service}, with the first ticket");
-        let parts: Vec<&str> = service.split('/').collect();
-        let (later, request) = Later::begin(&first, Name::new(NameKind::Service, &parts), now(), nonce ^ 0x5555_5555, random()?);
-        says(&later.receive(&ask(host, port, &request)?).map_err(|error| error.to_string())?);
+        for_a_service(host, port, &first, service, nonce)?;
     }
     Ok(())
 }

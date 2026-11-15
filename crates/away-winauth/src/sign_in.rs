@@ -7,9 +7,11 @@
 //! certificate, and the client hands over what the machine signs the person in with.
 
 use away_rdp::ntlm::Account;
+use away_rdp::secret::Secret;
 use away_rdp::sign_in::{self, Message, Next};
 use sha2::{Digest, Sha256};
 
+use crate::der;
 use crate::kerberos::exchange::Ticket;
 use crate::kerberos::gss::{self, Sealing, Shown};
 use crate::Error;
@@ -26,6 +28,51 @@ pub struct New {
     pub number: [u8; 32],
     /// Sixteen random bytes for each of the two messages the client seals.
     pub begin_with: [[u8; 16]; 2],
+}
+
+/// A smart card that the machine signs the person in with on its desktop: who it is
+/// for, and where the machine finds the card and the key on it. The machine reads the
+/// card over the connection, through the client's reader.
+pub struct OnACard {
+    /// The card's PIN, which the machine gives the card before it asks for the key.
+    pub pin: Secret,
+    /// The account's name, without its domain.
+    pub name: String,
+    /// The account's domain.
+    pub domain: String,
+    /// The name the card goes by, or nothing where the machine is to find that out itself.
+    pub card: String,
+    /// The name of the reader the card is in.
+    pub reader: String,
+    /// The name of what holds the key on the card.
+    pub container: String,
+    /// The name of the machine's own software that speaks to the card.
+    pub provider: String,
+}
+
+/// The key on the card is one for exchanging keys, among the kinds of keys Windows knows.
+const FOR_EXCHANGING_KEYS: i64 = 1;
+
+/// What the machine signs the person in with, where that is a smart card (MS-CSSP
+/// 2.2.1.2.2): the PIN, where the card and its key are found, and whose it is.
+pub fn on_a_card(card: &OnACard) -> Vec<u8> {
+    let wide = |text: &str| der::bytes(&text.encode_utf16().flat_map(u16::to_le_bytes).collect::<Vec<u8>>());
+    // the card's own name is left out where there is none: the machine finds the card
+    // by its reader and by what holds the key
+    let mut found = vec![der::under(0, &der::number(FOR_EXCHANGING_KEYS))];
+    if !card.card.is_empty() {
+        found.push(der::under(1, &wide(&card.card)));
+    }
+    found.extend([der::under(2, &wide(&card.reader)), der::under(3, &wide(&card.container)), der::under(4, &wide(&card.provider))]);
+    let found = der::sequence(&found);
+    let with_a_card = der::sequence(&[
+        der::under(0, &wide(card.pin.expose())),
+        der::under(1, &found),
+        der::under(2, &wide(&card.name)),
+        der::under(3, &wide(&card.domain)),
+    ]);
+    // of the kinds of what is handed over, a smart card is the second
+    der::sequence(&[der::under(0, &der::number(2)), der::under(1, &der::bytes(&with_a_card))])
 }
 
 enum State {
@@ -52,6 +99,16 @@ impl SignIn {
     /// client's time. The account is what the machine signs the person in with on its
     /// desktop, once both have proven themselves.
     pub fn begin(ticket: &Ticket, public_key: &[u8], account: &Account, now: (u64, u32), new: New) -> (SignIn, Vec<u8>) {
+        Self::begun(ticket, public_key, sign_in::credentials(account), now, new)
+    }
+
+    /// Begins a sign-in that hands over a smart card in place of a name and a password:
+    /// the machine signs the person in with the card, which it reads over the connection.
+    pub fn begin_with_a_card(ticket: &Ticket, public_key: &[u8], card: &OnACard, now: (u64, u32), new: New) -> (SignIn, Vec<u8>) {
+        Self::begun(ticket, public_key, on_a_card(card), now, new)
+    }
+
+    fn begun(ticket: &Ticket, public_key: &[u8], hands_over: Vec<u8>, now: (u64, u32), new: New) -> (SignIn, Vec<u8>) {
         let (shown, token) = gss::show(ticket, now, new.for_the_ticket);
         let message = Message { version: sign_in::VERSION, carried: Some(token), ..Message::default() }.write();
         let sign_in = SignIn {
@@ -60,7 +117,7 @@ impl SignIn {
             public_key: public_key.to_vec(),
             number: new.number,
             begin_with: new.begin_with,
-            hands_over: sign_in::credentials(account),
+            hands_over,
         };
         (sign_in, message)
     }
@@ -133,6 +190,28 @@ pub mod stand_in {
     const BEGINS_WITH: [u8; 16] = [0x5a; 16];
     const ITS_OWN_KEY: [u8; 32] = [0x6b; 32];
 
+    /// What a smart card that was handed over says of itself: its PIN, the reader it is
+    /// in, the name of what holds the key, and whose it is by name and domain. Nothing
+    /// where what was handed over is no smart card.
+    pub fn on_a_card(handed_over: &[u8]) -> Option<OnACard> {
+        let text = |holds: &[u8]| {
+            String::from_utf16(&holds.as_chunks::<2>().0.iter().map(|two| u16::from_le_bytes(*two)).collect::<Vec<u16>>()).ok()
+        };
+        let mut outer = der::Reader::new(handed_over).expect(der::SEQUENCE).ok()?.inside();
+        if outer.needed(0).ok()?.number() != Ok(2) {
+            return None;
+        }
+        let mut inside = der::Reader::new(outer.needed(1).ok()?.holds).expect(der::SEQUENCE).ok()?.inside();
+        let pin = text(inside.needed(0).ok()?.holds)?;
+        let mut found = inside.needed(1).ok()?.inside();
+        found.needed(0).ok()?;
+        let card = found.under(1).ok()?.map(|card| text(card.holds)).unwrap_or(Some(String::new()))?;
+        let (reader, container, provider) =
+            (text(found.needed(2).ok()?.holds)?, text(found.needed(3).ok()?.holds)?, text(found.needed(4).ok()?.holds)?);
+        let (name, domain) = (text(inside.needed(2).ok()?.holds)?, text(inside.needed(3).ok()?.holds)?);
+        Some(OnACard { pin: Secret::new(&pin), name, domain, card, reader, container, provider })
+    }
+
     /// A machine that takes the sign-in before the desktop with a ticket.
     pub struct Machine {
         of_the_service: Key,
@@ -196,7 +275,6 @@ mod tests {
     use crate::kerberos::gss::stand_in;
     use crate::kerberos::messages::tests::ticket;
     use crate::kerberos::messages::{Name, NameKind};
-    use away_rdp::secret::Secret;
 
     fn a_ticket() -> Ticket {
         Ticket {
@@ -291,6 +369,68 @@ mod tests {
         let (mut signing_in, first) = SignIn::begin(&ticket, key, &account, (1_794_700_800, 123_456), new());
         let Next::Send(proof) = signing_in.receive(&in_between.answer(&first).unwrap()).unwrap() else { panic!("the client goes on") };
         assert_eq!(in_between.answer(&proof), Err(Error::NotTrusted("the client's proof is for another certificate than this machine's")));
+    }
+
+    #[test]
+    fn a_smart_card_is_handed_over_in_place_of_a_name_and_a_password() {
+        let card = OnACard {
+            pin: Secret::new("a PIN made for one session"),
+            name: "alex.urban".to_string(),
+            domain: "CORP.EXAMPLE".to_string(),
+            card: "a card".to_string(),
+            reader: "a reader".to_string(),
+            container: "a container".to_string(),
+            provider: "a provider".to_string(),
+        };
+        let wide = |text: &str| text.encode_utf16().flat_map(u16::to_le_bytes).collect::<Vec<u8>>();
+        // what is handed over: its kind, and inside it the PIN, where the key is, and whose it is
+        let handed = on_a_card(&card);
+        let mut outer = der::Reader::new(&handed).expect(der::SEQUENCE).unwrap().inside();
+        assert_eq!(outer.needed(0).unwrap().number(), Ok(2));
+        let inside = outer.needed(1).unwrap().holds;
+        let mut inside = der::Reader::new(inside).expect(der::SEQUENCE).unwrap().inside();
+        assert_eq!(inside.needed(0).unwrap().holds, wide("a PIN made for one session"));
+        let mut found = inside.needed(1).unwrap().inside();
+        assert_eq!(found.needed(0).unwrap().number(), Ok(1));
+        for (number, text) in [(1, "a card"), (2, "a reader"), (3, "a container"), (4, "a provider")] {
+            assert_eq!(found.needed(number).unwrap().holds, wide(text), "{text}");
+        }
+        assert_eq!(inside.needed(2).unwrap().holds, wide("alex.urban"));
+        assert_eq!(inside.needed(3).unwrap().holds, wide("CORP.EXAMPLE"));
+        // a machine reads the same out of it, and a card without a name of its own is handed over without one
+        let read = super::stand_in::on_a_card(&handed).expect("a smart card");
+        assert_eq!(
+            (read.pin.expose(), read.reader.as_str(), read.container.as_str()),
+            ("a PIN made for one session", "a reader", "a container")
+        );
+        assert_eq!(
+            (read.card.as_str(), read.provider.as_str(), read.name.as_str(), read.domain.as_str()),
+            ("a card", "a provider", "alex.urban", "CORP.EXAMPLE")
+        );
+        let unnamed = on_a_card(&OnACard { card: String::new(), pin: Secret::new("a PIN"), ..read });
+        assert_eq!(
+            super::stand_in::on_a_card(&unnamed).map(|read| (read.card, read.reader)),
+            Some((String::new(), "a reader".to_string()))
+        );
+        assert!(super::stand_in::on_a_card(&sign_in::credentials(&Account::named("CORP\\alex.urban", Secret::new("a password")))).is_none());
+
+        // and it travels sealed, as a password does: the machine opens it, and the PIN is in no message as it is
+        let of_the_service = Key::new(Kind::Aes256, &[0x11; 32]).unwrap();
+        let service = Name::new(NameKind::Service, &["TERMSRV", "desk-01.corp.example"]);
+        let ticket = Ticket { bytes: stand_in::ticket("CORP.EXAMPLE", &service, &of_the_service, &a_ticket().key, [2; 16]), ..a_ticket() };
+        let key = b"the key in the machine's certificate";
+        let mut machine = super::stand_in::Machine::new(of_the_service, key);
+        let (mut signing_in, mut message) = SignIn::begin_with_a_card(&ticket, key, &card, (1_794_700_800, 123_456), new());
+        let last = loop {
+            match signing_in.receive(&machine.answer(&message).expect("the machine goes on")).expect("the client goes on") {
+                Next::Send(next) => message = next,
+                Next::SendLast(last) => break last,
+            }
+        };
+        assert_eq!(machine.answer(&last), Ok(Vec::new()));
+        assert_eq!(machine.handed_over, Some(handed));
+        let pin = wide("a PIN made");
+        assert!(!last.windows(pin.len()).any(|part| part == pin));
     }
 
     #[test]

@@ -8,6 +8,7 @@
 //! connection itself. The ciphers and the hashes are libraries'; what the standards
 //! build from them is written here and tried against the standards' own examples.
 
+pub mod card;
 pub mod certificate;
 pub mod der;
 pub mod kerberos;

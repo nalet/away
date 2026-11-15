@@ -41,6 +41,8 @@ rc4 = { version = "0.2", default-features = false } # the cipher that signing in
 sha1 = { version = "0.11", default-features = false } # the second hash that the taking of a licence makes its keys and its checks with
 num-bigint = { version = "0.5", default-features = false } # does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is
 aes = { version = "0.9", default-features = false } # the cipher Kerberos seals its messages with: part of signing in on a Windows machine with a certificate
+rsa = { version = "0.10", default-features = false, features = ["encoding", "getrandom", "pkcs1v15"] } # signs with the key of the smart card that exists in memory alone, which a Windows machine signs a person in with
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] } # packs the certificate on that card the way a card holds one
 getrandom = { version = "0.4", default-features = false } # takes random bytes from the system, for keys and for numbers used once
 saphyr-parser = { version = "0.3", default-features = false } # reads the files of machines and rules, which are YAML, and knows the line each thing is written in
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] } # carries a session between a browser and the gateway: the WebSocket

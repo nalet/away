@@ -10,7 +10,7 @@ use crate::licence::stand_in::HandsOut;
 use crate::picture::Picture;
 use crate::rail::stand_in::Asked;
 use crate::redirection::{self, Redirection};
-use crate::{der, interleaved, mcs, ntlm, pdu, rail, tpkt, window, Error};
+use crate::{der, devices, interleaved, mcs, ntlm, pdu, rail, smartcard, tpkt, window, Error};
 
 const WRONG: Error = Error::NotRdp("the client's message is not built as one");
 
@@ -19,8 +19,11 @@ const WRONG: Error = Error::NotRdp("the client's message is not built as one");
 const USER: u16 = 1004;
 const DESKTOP: u16 = 1003;
 const SHARING: u32 = 0x0001_03ea;
-/// The channel it gives for programs, to a client that asks for one.
+/// The first of the further channels it gives. A client that asks for the channel of
+/// programs asks for it first, so that this is that channel's number then.
 const PROGRAMS: u16 = 1005;
+/// The number it gives a client for what it says about devices.
+const CLIENT: u32 = 0x0000_0d0c;
 
 /// The window a program opens in on the stand-in: what names it, where it is on the
 /// desktop, and how large it is.
@@ -62,6 +65,51 @@ pub struct Seen {
     pub for_a_program: bool,
     /// What the client said about programs, in the order it said it.
     pub about_programs: Vec<Asked>,
+    /// The further channels the client asked for, in the order it asked for them.
+    pub channels: Vec<String>,
+    /// The devices the client named: the kind, the number and the name of each.
+    pub devices: Vec<(u32, u32, String)>,
+    /// What the stand-in saw of the card in the client's reader, where it reads cards.
+    pub card: Option<Card>,
+}
+
+/// What a stand-in that reads the card in the client's reader saw of it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Card {
+    /// The name of the reader the card is in.
+    pub reader: String,
+    /// What the card says of itself.
+    pub says: Vec<u8>,
+    /// The card's answers to the commands the stand-in gave it, in their order.
+    pub answers: Vec<Vec<u8>>,
+    /// Whether the stand-in went through all of it, to closing the card.
+    pub closed: bool,
+}
+
+/// How far a stand-in that reads cards is with the client's reader.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Reading {
+    WhetherThere,
+    Begins,
+    Readers,
+    Watches,
+    Opens,
+    About,
+    Holds,
+    Commands(usize),
+    LetsGo,
+    Closes,
+    Ends,
+    Done,
+}
+
+/// The commands a stand-in gives the card, and where it is with them.
+struct Reads {
+    commands: Vec<Vec<u8>>,
+    step: Reading,
+    context: u32,
+    opened: u32,
+    request: u32,
 }
 
 /// How wide and how high the mark is that the stand-in draws where a button went down,
@@ -108,6 +156,10 @@ pub struct Desktop {
     programs: bool,
     /// The pieces of a message about programs that is not whole yet.
     pieces: Pieces,
+    /// The pieces of a message about devices that is not whole yet.
+    device_pieces: Pieces,
+    /// What it does with the card in the client's reader, where it reads cards.
+    reads: Option<Reads>,
 }
 
 impl Desktop {
@@ -124,7 +176,22 @@ impl Desktop {
             publishes: Vec::new(),
             programs: false,
             pieces: Pieces::default(),
+            device_pieces: Pieces::default(),
+            reads: None,
         }
+    }
+
+    /// The same, as a machine that reads the card in the client's reader the way a
+    /// Windows machine does when it signs a person in with one: it finds the reader,
+    /// opens the card, has it for itself, gives it these commands, and closes it.
+    pub fn that_reads_a_card(self, commands: &[Vec<u8>]) -> Desktop {
+        let reads = Reads { commands: commands.to_vec(), step: Reading::WhetherThere, context: 0, opened: 0, request: 100 };
+        Desktop { reads: Some(reads), ..self }
+    }
+
+    /// The number of a further channel the client asked for by this name.
+    fn channel(&self, name: &str) -> Option<u16> {
+        self.seen.channels.iter().position(|asked| asked == name).map(|at| PROGRAMS + at as u16)
     }
 
     /// The same, drawing at 16 bits a pixel, as a Windows Server does unless it is set
@@ -186,14 +253,17 @@ impl Desktop {
                     if kind == 0xc004 && block.len() >= 12 && block[4] & 0x02 != 0 {
                         self.seen.sent_on_to = Some(u32::from_le_bytes([block[8], block[9], block[10], block[11]]));
                     }
-                    // the further channels it asks for: the one programs are started over
+                    // the further channels it asks for, by their names
                     if kind == 0xc003 {
-                        self.programs = block.get(8..).ok_or(WRONG)?.as_chunks::<12>().0.iter().any(|asked| asked.starts_with(b"rail\0"));
+                        let asked = block.get(8..).ok_or(WRONG)?.as_chunks::<12>().0;
+                        let name = |asked: &[u8; 12]| asked[..8].iter().take_while(|byte| **byte != 0).map(|byte| *byte as char).collect();
+                        self.seen.channels = asked.iter().map(name).collect();
+                        self.programs = self.channel(rail::CHANNEL).is_some();
                     }
                     rest = &rest[block.len()..];
                 }
                 self.state = State::AwaitsUser;
-                Ok(tpkt::data_frame(&connect_answer(self.programs)))
+                Ok(tpkt::data_frame(&connect_answer(self.seen.channels.len())))
             }
             (State::AwaitsUser, [0x04, ..]) => Ok(Vec::new()),
             (State::AwaitsUser, [0x28]) => {
@@ -215,6 +285,7 @@ impl Desktop {
                 match (u16::from_be_bytes([*high, *low]), &self.state) {
                     (DESKTOP, _) => {}
                     (PROGRAMS, State::Open) if self.programs => return self.about_programs(arrived),
+                    (on, State::Open) if Some(on) == self.channel(devices::CHANNEL) => return self.about_devices(arrived),
                     _ => return Ok(Vec::new()),
                 }
                 match self.state {
@@ -337,6 +408,11 @@ impl Desktop {
                             true => send.extend(on_the_programs_channel(&rail::stand_in::ready())),
                             false => send.extend(self.draw()),
                         }
+                        // and to a client that asked for the channel of devices and the one
+                        // of sound, it begins to speak about devices
+                        if let (Some(on), Some(_)) = (self.channel(devices::CHANNEL), self.channel(devices::SOUND)) {
+                            send.extend(on_a_channel(on, &devices::stand_in::begins(CLIENT), false));
+                        }
                     }
                     _ => {}
                 },
@@ -378,6 +454,94 @@ impl Desktop {
             Asked::Command(WINDOW, rail::Command::Close) => words(&[window::stand_in::gone(WINDOW)]),
             _ => Vec::new(),
         })
+    }
+
+    /// What the client says about devices: the machine says what it can do and takes
+    /// the client's number, takes the reader the client names, and, where it reads
+    /// cards, asks the reader one thing after the other.
+    fn about_devices(&mut self, piece: &[u8]) -> Result<Vec<u8>, Error> {
+        let Some(on) = self.channel(devices::CHANNEL) else { return Ok(Vec::new()) };
+        let Some(message) = self.device_pieces.take(piece)? else { return Ok(Vec::new()) };
+        let mut says = Vec::new();
+        match devices::stand_in::read(&message)? {
+            devices::stand_in::Client::Begins { client, .. } if client != CLIENT => return Err(WRONG),
+            devices::stand_in::Client::Begins { .. } | devices::stand_in::Client::CanDo { .. } => {}
+            devices::stand_in::Client::Name(_) => says.extend([devices::stand_in::can_do(), devices::stand_in::confirms(CLIENT)]),
+            devices::stand_in::Client::Devices(named) => {
+                says.extend(named.iter().map(|(_, device, _)| devices::stand_in::took(*device)));
+                self.seen.devices.extend(named);
+                // a machine that reads cards begins with the reader at once
+                if self.reads.is_some() && self.seen.devices.iter().any(|(_, device, _)| *device == devices::READER) {
+                    self.seen.card = Some(Card::default());
+                    says.push(devices::stand_in::asks(
+                        devices::READER,
+                        100,
+                        smartcard::stand_in::started().0,
+                        &smartcard::stand_in::started().1,
+                    ));
+                }
+            }
+            devices::stand_in::Client::Answers { request, result, gives, .. } => {
+                if let Some((code, carried)) = self.reads_on(request, result, &gives)? {
+                    let request = self.reads.as_ref().map_or(0, |reads| reads.request);
+                    says.push(devices::stand_in::asks(devices::READER, request, code, &carried));
+                }
+            }
+        }
+        Ok(says.iter().flat_map(|message| on_a_channel(on, message, false)).collect())
+    }
+
+    /// Takes the reader's answer to what was asked last, and gives what to ask next.
+    fn reads_on(&mut self, request: u32, result: u32, gives: &[u8]) -> Result<Option<smartcard::stand_in::Request>, Error> {
+        use smartcard::stand_in as asks;
+        let (Some(reads), Some(card)) = (self.reads.as_mut(), self.seen.card.as_mut()) else { return Ok(None) };
+        // an answer to another request than the last, one that did not work, or one the reader refused
+        let answer = asks::read(gives)?;
+        if request != reads.request || result != 0 || answer.result != 0 {
+            reads.step = Reading::Done;
+            return Ok(None);
+        }
+        let (context, opened) = (reads.context, reads.opened);
+        let command = |at: usize, reads: &Reads| match reads.commands.get(at) {
+            Some(command) => (Reading::Commands(at), asks::transmit(context, opened, command)),
+            None => (Reading::LetsGo, asks::end(context, opened)),
+        };
+        let (step, next) = match reads.step {
+            Reading::WhetherThere => (Reading::Begins, asks::establish()),
+            Reading::Begins => {
+                reads.context = answer.context();
+                (Reading::Readers, asks::readers(reads.context, true, None))
+            }
+            Reading::Readers => {
+                let units: Vec<u16> = answer.carried().as_chunks::<2>().0.iter().map(|two| u16::from_le_bytes(*two)).collect();
+                card.reader = String::from_utf16_lossy(&units).split('\0').next().unwrap_or_default().to_string();
+                (Reading::Watches, asks::watch(context, None, &[(&card.reader, 0)]))
+            }
+            Reading::Watches => (Reading::Opens, asks::connect(context, &card.reader)),
+            Reading::Opens => {
+                reads.opened = answer.opened();
+                (Reading::About, asks::status(context, reads.opened))
+            }
+            Reading::About => {
+                card.says = answer.about_the_card().1;
+                (Reading::Holds, asks::begin(context, opened))
+            }
+            Reading::Holds => command(0, reads),
+            Reading::Commands(at) => {
+                card.answers.push(answer.carried());
+                command(at + 1, reads)
+            }
+            Reading::LetsGo => (Reading::Closes, asks::disconnect(context, opened, false)),
+            Reading::Closes => (Reading::Ends, asks::release(context)),
+            Reading::Ends | Reading::Done => {
+                card.closed = true;
+                reads.step = Reading::Done;
+                return Ok(None);
+            }
+        };
+        reads.step = step;
+        reads.request += 1;
+        Ok(Some(next))
     }
 
     /// Takes what a frame of the short kind tells of keys and of the pointer, and draws
@@ -534,7 +698,7 @@ fn length(of: usize) -> Vec<u8> {
 
 /// The machine's answer to what the client says of itself: the desktop's channel, and no
 /// encryption of RDP's own.
-fn connect_answer(programs: bool) -> Vec<u8> {
+fn connect_answer(further: usize) -> Vec<u8> {
     let block = |kind: u16, holds: &[u8]| {
         let mut block = pdu::words(&[kind, (holds.len() + 4) as u16]);
         block.extend_from_slice(holds);
@@ -542,11 +706,12 @@ fn connect_answer(programs: bool) -> Vec<u8> {
     };
     let mut blocks = block(0x0c01, &[0x04, 0x00, 0x08, 0x00, 0x0b, 0, 0, 0, 0x01, 0, 0, 0]);
     blocks.extend(block(0x0c02, &[0; 8]));
-    // the channels: the desktop's, and the one for programs where the client asked for it
-    match programs {
-        true => blocks.extend(block(0x0c03, &pdu::words(&[DESKTOP, 1, PROGRAMS, 0]))),
-        false => blocks.extend(block(0x0c03, &pdu::words(&[DESKTOP, 0]))),
-    }
+    // the channels: the desktop's, and one for each further channel the client asked
+    // for, filled up to a whole four bytes
+    let mut channels = vec![DESKTOP, further as u16];
+    channels.extend((0..further as u16).map(|at| PROGRAMS + at));
+    channels.resize(channels.len().next_multiple_of(2), 0);
+    blocks.extend(block(0x0c03, &pdu::words(&channels)));
     let mut says = vec![0x00, 0x05, 0x00, 0x14, 0x7c, 0x00, 0x01, 0x2a, 0x14, 0x76, 0x0a, 0x01, 0x01, 0x00, 0x01, 0xc0, 0x00];
     says.extend(b"McDn");
     says.extend(length(blocks.len()));
@@ -570,9 +735,15 @@ fn to_the_client(carried: &[u8]) -> Vec<u8> {
 
 /// A message about programs for the client, in the pieces and the frames it travels in.
 fn on_the_programs_channel(message: &[u8]) -> Vec<u8> {
-    let [high, low] = PROGRAMS.to_be_bytes();
+    on_a_channel(PROGRAMS, message, true)
+}
+
+/// A message for the client on a further channel, in the pieces and the frames it
+/// travels in.
+fn on_a_channel(on: u16, message: &[u8], shows_its_heads: bool) -> Vec<u8> {
+    let [high, low] = on.to_be_bytes();
     let mut send = Vec::new();
-    for piece in channel::pieces(message) {
+    for piece in channel::pieces(message, shows_its_heads) {
         let mut carried = vec![0x68, 0x00, 0x01, high, low, 0x70];
         carried.extend(length(piece.len()));
         carried.extend(piece);

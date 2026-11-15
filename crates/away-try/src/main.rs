@@ -40,6 +40,7 @@ use sha2::{Digest, Sha256};
 const USAGE: &str = "\
 away-try rdp <address> [--as <account> --password-file <file> [--save <file>]] [--collection <name>] [--program <name>]
                        [--kerberos <domain controller> [--realm <realm>]]
+                       [--certificate <file> --key <file> [--authority <file>]]
 
   Reaches a machine over RDP with Away's own code and says what it shows, step by step.
   The address is a name or a number, with a port after a colon where it is not 3389.
@@ -58,6 +59,15 @@ away-try rdp <address> [--as <account> --password-file <file> [--save <file>]] [
   controller is asked for one for this machine, with the account's password, and the
   machine is shown the ticket in place of a proof of the password. The realm is the
   domain's name in capitals; it is taken from an account written as name@domain.
+
+  With --certificate and --key the machine signs the account in with a smart card, in
+  place of a name and a password. The card exists in this program's memory alone, and
+  holds that certificate and its key. The machine reads it over the connection, gives
+  it a PIN that was made for this one connection, and has it sign what proves the
+  person to the domain. This needs --kerberos. With --authority there is no password
+  at all: the ticket is asked for with the certificate too, and the domain controller
+  has to prove itself with a certificate of that authority. Without it the ticket is
+  asked for with the password, and the card is still what the machine signs in with.
 
   With --program it opens no desktop: it asks the machine to start that program, and
   says whether it started and which windows it opens. A program that a farm publishes
@@ -92,7 +102,24 @@ struct Asked {
     program: Option<String>,
     kerberos: Option<String>,
     realm: Option<String>,
+    certificate: Option<String>,
+    key: Option<String>,
+    authority: Option<String>,
 }
+
+/// What the smart card holds that the machine signs the account in with: a certificate
+/// and its key, and the authority a domain controller proves itself with where the
+/// ticket is asked for with the certificate too.
+struct OnTheCard {
+    certificate: Vec<u8>,
+    key: Vec<u8>,
+    authority: Option<Vec<u8>>,
+}
+
+/// The name of the reader the card is in, and of the machine's own software that reads
+/// a card of this kind.
+const READER: &str = "Away 0";
+const PROVIDER: &str = "Microsoft Base Smart Card Crypto Provider";
 
 /// Reads the words the program was started with. Gives nothing where they make no sense.
 fn asked(words: &[String]) -> Option<Asked> {
@@ -110,6 +137,9 @@ fn asked(words: &[String]) -> Option<Asked> {
         program: None,
         kerberos: None,
         realm: None,
+        certificate: None,
+        key: None,
+        authority: None,
     };
     while let [option, value, after @ ..] = rest {
         let into = match option.as_str() {
@@ -120,6 +150,9 @@ fn asked(words: &[String]) -> Option<Asked> {
             "--program" => &mut asked.program,
             "--kerberos" => &mut asked.kerberos,
             "--realm" => &mut asked.realm,
+            "--certificate" => &mut asked.certificate,
+            "--key" => &mut asked.key,
+            "--authority" => &mut asked.authority,
             _ => return None,
         };
         if into.replace(value.clone()).is_some() {
@@ -127,11 +160,22 @@ fn asked(words: &[String]) -> Option<Asked> {
         }
         rest = after;
     }
-    // an account has a password; a picture, a program and a ticket need an account, and
-    // a realm is that of a ticket
-    let whole = rest.is_empty() && asked.account.is_some() == asked.password_file.is_some();
+    // a card is a certificate with its key, and goes with a ticket; an authority is that of
+    // a card, and a realm that of a ticket
+    let with_a_card = asked.certificate.is_some();
+    let a_card_is_whole = with_a_card == asked.key.is_some() && (!with_a_card || asked.kerberos.is_some());
+    let each_has_its_own = (asked.authority.is_none() || with_a_card) && (asked.realm.is_none() || asked.kerberos.is_some());
+    // an account proves itself with a password, or with the card's certificate where an
+    // authority is named, and never with both
+    let proves_itself = match (&asked.account, &asked.password_file) {
+        (Some(_), Some(_)) => asked.authority.is_none(),
+        (Some(_), None) => asked.authority.is_some(),
+        (None, password) => password.is_none(),
+    };
+    // a picture, a program and a ticket need an account
     let needs_an_account = asked.save.is_some() || asked.program.is_some() || asked.kerberos.is_some();
-    (whole && (!needs_an_account || asked.account.is_some()) && (asked.realm.is_none() || asked.kerberos.is_some())).then_some(asked)
+    (rest.is_empty() && a_card_is_whole && each_has_its_own && proves_itself && (!needs_an_account || asked.account.is_some()))
+        .then_some(asked)
 }
 
 fn main() -> ExitCode {
@@ -160,24 +204,7 @@ fn main() -> ExitCode {
         eprint!("{USAGE}\n{}", kerberos::USAGE);
         return ExitCode::from(2);
     };
-    let tried = match (&asked.account, &asked.password_file) {
-        (Some(name), Some(file)) => match std::fs::read_to_string(file) {
-            Ok(password) => {
-                let account = Account::named(name, Secret::new(password.trim_end_matches(['\r', '\n'])));
-                let with_a_ticket = asked.kerberos.as_deref().map(|controller| (controller, asked.realm.as_deref()));
-                rdp(
-                    &asked.address,
-                    Some(account),
-                    asked.save.as_deref(),
-                    asked.collection.as_deref(),
-                    asked.program.as_deref(),
-                    with_a_ticket,
-                )
-            }
-            Err(error) => Err(format!("The password's file can't be read: {error}.")),
-        },
-        _ => rdp(&asked.address, None, None, asked.collection.as_deref(), None, None),
-    };
+    let tried = tried(&asked);
     match tried {
         Ok(()) => ExitCode::SUCCESS,
         Err(why) => {
@@ -187,15 +214,35 @@ fn main() -> ExitCode {
     }
 }
 
+/// Reads what the program needs from its files, and goes through the connection.
+fn tried(asked: &Asked) -> Result<(), String> {
+    let Some(name) = &asked.account else { return rdp(asked, None, None) };
+    // an account whose card gets the ticket has no password
+    let password = match &asked.password_file {
+        Some(file) => std::fs::read_to_string(file).map_err(|error| format!("The password's file can't be read: {error}."))?,
+        None => String::new(),
+    };
+    let account = Account::named(name, Secret::new(password.trim_end_matches(['\r', '\n'])));
+    let on_the_card = match (&asked.certificate, &asked.key) {
+        (Some(certificate), Some(key)) => Some(OnTheCard {
+            certificate: kerberos::read(certificate, "certificate")?,
+            key: kerberos::read(key, "key")?,
+            authority: asked.authority.as_ref().map(|authority| kerberos::read(authority, "authority")).transpose()?,
+        }),
+        _ => None,
+    };
+    rdp(asked, Some(account), on_the_card)
+}
+
 /// The steps of a connection over RDP, as far as Away's code goes.
-fn rdp(
-    address: &str,
-    account: Option<Account>,
-    save: Option<&str>,
-    collection: Option<&str>,
-    program: Option<&str>,
-    with_a_ticket: Option<(&str, Option<&str>)>,
-) -> Result<(), String> {
+fn rdp(asked: &Asked, account: Option<Account>, on_the_card: Option<OnTheCard>) -> Result<(), String> {
+    let (address, save, collection, program) =
+        (asked.address.as_str(), asked.save.as_deref(), asked.collection.as_deref(), asked.program.as_deref());
+    let with_a_ticket = asked.kerberos.as_deref().map(|controller| (controller, asked.realm.as_deref()));
+    // the reader with the card in it, where the machine signs the account in with one,
+    // and where what the machine does with the card is told
+    let mut reader: Option<away_rdp::smartcard::Reader> = None;
+    let mut told: Option<away_winauth::card::Told> = None;
     let (host, port) = match address.rsplit_once(':') {
         Some((host, port)) if !host.contains(':') => (host, port.parse::<u16>().map_err(|_| format!("{port} is no port."))?),
         _ => (address, 3389),
@@ -334,7 +381,12 @@ fn rdp(
                 (None, None) => return Err("Name the realm, the domain's name in capitals: --realm <realm>.".to_string()),
             };
             let service = format!("TERMSRV/{host}");
-            let ticket = kerberos::ticket_with_a_password(controller, &realm, name, account.password.expose(), &service)?;
+            let ticket = match on_the_card.as_ref().and_then(|card| card.authority.as_deref().map(|authority| (card, authority))) {
+                Some((card, authority)) => {
+                    kerberos::ticket_with_a_certificate(controller, &realm, name, (&card.certificate, &card.key, authority), &service)?
+                }
+                None => kerberos::ticket_with_a_password(controller, &realm, name, account.password.expose(), &service)?,
+            };
             println!("Signing in, before the desktop, with the ticket");
             let new = away_winauth::sign_in::New {
                 for_the_ticket: away_winauth::kerberos::gss::Fresh {
@@ -345,8 +397,31 @@ fn rdp(
                 number: kerberos::random()?,
                 begin_with: [kerberos::random()?, kerberos::random()?],
             };
-            let (mut signing_in, first) =
-                away_winauth::sign_in::SignIn::begin(&ticket, &identity.public_key, &account, kerberos::now(), new);
+            let (mut signing_in, first) = match &on_the_card {
+                Some(holds) => {
+                    // a card for this one connection: a PIN nobody is told, a name for what
+                    // holds its key, and what a machine knows it by, each made new
+                    let hex = |bytes: &[u8]| bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+                    let pin = hex(&kerberos::random::<16>()?);
+                    let container = format!("away-{}", hex(&kerberos::random::<12>()?));
+                    let (card, tells) =
+                        away_winauth::card::Card::new(&holds.certificate, &holds.key, Secret::new(&pin), &container, kerberos::random()?)
+                            .map_err(|error| error.to_string())?;
+                    reader = Some(away_rdp::smartcard::Reader::new(READER, Box::new(card)));
+                    told = Some(tells);
+                    let on_a_card = away_winauth::sign_in::OnACard {
+                        pin: Secret::new(&pin),
+                        name: name.to_string(),
+                        domain: realm.clone(),
+                        card: String::new(),
+                        reader: READER.to_string(),
+                        container,
+                        provider: PROVIDER.to_string(),
+                    };
+                    away_winauth::sign_in::SignIn::begin_with_a_card(&ticket, &identity.public_key, &on_a_card, kerberos::now(), new)
+                }
+                None => away_winauth::sign_in::SignIn::begin(&ticket, &identity.public_key, &account, kerberos::now(), new),
+            };
             secured.write_all(&first).map_err(|error| format!("The sign-in couldn't be begun: {error}."))?;
             loop {
                 match signing_in.receive(&message(&mut secured)?).map_err(|error| error.to_string())? {
@@ -358,7 +433,12 @@ fn rdp(
                 }
             }
             println!("   It answered the ticket, and proved that it holds the certificate it showed.");
-            println!("   The name and the password were handed over, sealed.");
+            match reader {
+                Some(_) => {
+                    println!("   A smart card was handed over in place of a password, sealed: its PIN, and where the machine finds it.")
+                }
+                None => println!("   The name and the password were handed over, sealed."),
+            }
         } else {
             println!("Signing in, before the desktop, as {}", written(&account));
             let mut random = [0u8; 56];
@@ -420,7 +500,10 @@ fn rdp(
         secret: random[32..].try_into().expect("48 bytes"),
         known_by: known_by(),
     };
-    let (mut open, first) = Connection::begin(client, &domain, &name, password, for_a_licence);
+    let with_a_reader = reader.is_some();
+    let (mut open, first) = Connection::begin(client, &domain, &name, password, for_a_licence, reader);
+    let mut asked_the_reader = 0usize;
+    let mut ticked = Instant::now();
     secured.write_all(&first).map_err(|error| format!("It couldn't be sent: {error}."))?;
     let mut frames = Frames::new();
     let mut picture: Option<Picture> = None;
@@ -514,10 +597,25 @@ fn rdp(
                         }
                         last_drawn = Some(Instant::now());
                     }
+                    Happened::Reader { taken: true } => println!("   It took this client's smart card reader."),
+                    Happened::Reader { taken: false } => println!("   It did not take this client's smart card reader."),
+                    // while the machine is busy with the card it draws little: that is no quiet yet
+                    Happened::AskedTheReader(_) => {
+                        asked_the_reader += 1;
+                        if last_drawn.is_some() {
+                            last_drawn = Some(Instant::now());
+                        }
+                    }
                 }
             }
         }
         let now = Instant::now();
+        // what the machine asked the reader and waited for only so long is answered when the time is over
+        let waited = open.elapsed(now.duration_since(ticked).as_millis() as u64);
+        ticked = now;
+        if !waited.is_empty() {
+            secured.write_all(&waited).map_err(|error| format!("It couldn't be sent: {error}."))?;
+        }
         let quiet = last_drawn.is_some_and(|last| now.duration_since(last) >= QUIET_FOR);
         if opened.is_some_and(|opened| quiet || now.duration_since(opened) >= DRAWS_AT_MOST) {
             if !quiet {
@@ -545,6 +643,36 @@ fn rdp(
     }
     if drawn.is_empty() {
         println!("   It drew nothing in that time.");
+    }
+    if with_a_reader {
+        println!("What it did with the smart card");
+        println!("   It asked the reader {asked_the_reader} times.");
+        let did: Vec<away_winauth::card::Did> = told.and_then(|told| told.lock().ok().map(|told| told.clone())).unwrap_or_default();
+        let mut said = Vec::new();
+        for what in &did {
+            if said.contains(what) {
+                continue;
+            }
+            said.push(*what);
+            let times = match did.iter().filter(|other| *other == what).count() {
+                1 => String::new(),
+                times => format!(" ({times} times)"),
+            };
+            use away_winauth::card::Did;
+            match what {
+                Did::Found => println!("   It found the card to be of the kind it reads{times}."),
+                Did::ReadTheCertificate => println!("   It read the certificate{times}."),
+                Did::GaveThePin { right: true } => println!("   It gave the card its PIN{times}."),
+                Did::GaveThePin { right: false } => println!("   It gave the card a PIN that is not the card's{times}."),
+                Did::Signed => println!("   It had the card sign what proves the person to the domain{times}."),
+                Did::NotDone(command) => {
+                    println!("   It asked the card for something the card does not do: command {command:#04x}{times}.")
+                }
+            }
+        }
+        if did.is_empty() {
+            println!("   It gave the card no command.");
+        }
     }
     // leaving is a courtesy: the machine notices a closed connection as well
     let _ = secured.write_all(&open.leave());

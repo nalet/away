@@ -16,6 +16,8 @@ sha1.workspace = true
 sha2.workspace = true
 ring = { workspace = true, features = ["alloc"] }
 num-bigint.workspace = true
+rsa.workspace = true
+flate2.workspace = true
 
 [features]
 # the machine's side of it, for tests and for whatever stands in for a machine

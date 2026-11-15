@@ -16,23 +16,28 @@ const SHOWS_ITS_HEADS: u32 = 0x0000_0010;
 const COMPRESSED: u32 = 0x0020_0000;
 
 /// How a channel is asked for when the connection opens: its name, of seven letters at
-/// most, and that it is set up, travels secured as the connection is, and shows the
-/// heads of its pieces. Nothing on it is compressed.
-pub fn asked_for(name: &str) -> [u8; 12] {
+/// most, and that it is set up and travels secured as the connection is. Whether what
+/// reads the channel on the machine is shown the heads of its pieces depends on the
+/// part of RDP that travels on it: the one of programs is, the one of devices is not.
+/// Nothing on a channel is compressed.
+pub fn asked_for(name: &str, shows_its_heads: bool) -> [u8; 12] {
     let mut asked = [0u8; 12];
     for (to, from) in asked[..7].iter_mut().zip(name.bytes()) {
         *to = from;
     }
-    asked[8..].copy_from_slice(&0xc020_0000u32.to_le_bytes());
+    let how: u32 = if shows_its_heads { 0xc020_0000 } else { 0xc000_0000 };
+    asked[8..].copy_from_slice(&how.to_le_bytes());
     asked
 }
 
-/// A message in the pieces it travels in, each with its head.
-pub fn pieces(message: &[u8]) -> Vec<Vec<u8>> {
+/// A message in the pieces it travels in, each with its head, on a channel that was
+/// asked for this way.
+pub fn pieces(message: &[u8], shows_its_heads: bool) -> Vec<Vec<u8>> {
+    let shown = if shows_its_heads { SHOWS_ITS_HEADS } else { 0 };
     let piece = |flags: u32, carried: &[u8]| {
         let mut piece = Vec::with_capacity(carried.len() + 8);
         piece.extend((message.len() as u32).to_le_bytes());
-        piece.extend((flags | SHOWS_ITS_HEADS).to_le_bytes());
+        piece.extend((flags | shown).to_le_bytes());
         piece.extend_from_slice(carried);
         piece
     };
@@ -92,18 +97,21 @@ mod tests {
 
     #[test]
     fn a_message_travels_in_pieces_and_is_put_together_again() {
-        assert_eq!(&asked_for("rail"), &[b'r', b'a', b'i', b'l', 0, 0, 0, 0, 0x00, 0x00, 0x20, 0xc0]);
-        assert_eq!(&asked_for("a-long-name")[..8], b"a-long-\0");
+        assert_eq!(&asked_for("rail", true), &[b'r', b'a', b'i', b'l', 0, 0, 0, 0, 0x00, 0x00, 0x20, 0xc0]);
+        assert_eq!(&asked_for("a-long-name", true)[..8], b"a-long-\0");
+        // the channel of devices shows what reads it no heads, in how it is asked for and in each piece
+        assert_eq!(&asked_for("rdpdr", false), &[b'r', b'd', b'p', b'd', b'r', 0, 0, 0, 0x00, 0x00, 0x00, 0xc0]);
+        assert_eq!(pieces(b"ready", false), [[&[5, 0, 0, 0, 0x03, 0, 0, 0][..], b"ready"].concat()]);
 
-        let short = pieces(b"ready");
+        let short = pieces(b"ready", true);
         assert_eq!(short, [[&[5, 0, 0, 0, 0x13, 0, 0, 0][..], b"ready"].concat()]);
-        assert_eq!(pieces(b""), [vec![0, 0, 0, 0, 0x13, 0, 0, 0]]);
+        assert_eq!(pieces(b"", true), [vec![0, 0, 0, 0, 0x13, 0, 0, 0]]);
         let message: Vec<u8> = (0..4000u32).map(|at| at as u8).collect();
-        let long = pieces(&message);
+        let long = pieces(&message, true);
         assert_eq!(long.iter().map(|piece| (piece.len() - 8, piece[4])).collect::<Vec<_>>(), [(1600, 0x11), (1600, 0x10), (800, 0x12)]);
         assert!(long.iter().all(|piece| piece[..4] == 4000u32.to_le_bytes()));
         // exactly two pieces' worth is two pieces
-        assert_eq!(pieces(&message[..3200]).len(), 2);
+        assert_eq!(pieces(&message[..3200], true).len(), 2);
 
         let mut arriving = Pieces::default();
         assert_eq!(arriving.take(&short[0]), Ok(Some(b"ready".to_vec())));
@@ -111,13 +119,13 @@ mod tests {
         assert_eq!(arriving.take(&long[1]), Ok(None));
         assert_eq!(arriving.take(&long[2]), Ok(Some(message.clone())));
         // and the next message after it
-        assert_eq!(arriving.take(&pieces(b"")[0]), Ok(Some(Vec::new())));
+        assert_eq!(arriving.take(&pieces(b"", true)[0]), Ok(Some(Vec::new())));
     }
 
     #[test]
     fn pieces_that_do_not_make_a_message_are_refused() {
         let message = vec![7u8; 2000];
-        let long = pieces(&message);
+        let long = pieces(&message, true);
         // a piece of a message that never began
         assert!(Pieces::default().take(&long[1]).is_err());
         // more than the message said it is, and less
@@ -134,7 +142,7 @@ mod tests {
         let mut huge = long[0].clone();
         huge[..4].copy_from_slice(&(LONGEST as u32 + 1).to_le_bytes());
         assert!(Pieces::default().take(&huge).is_err());
-        let mut compressed = pieces(b"ready").remove(0);
+        let mut compressed = pieces(b"ready", true).remove(0);
         compressed[6] = 0x20;
         assert_eq!(Pieces::default().take(&compressed), Err(Error::NotYet("compresses what travels on a further channel")));
     }

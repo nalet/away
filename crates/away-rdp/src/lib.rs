@@ -27,6 +27,7 @@
 pub mod channel;
 pub mod connection;
 pub mod der;
+pub mod devices;
 pub mod gcc;
 pub mod identity;
 pub mod input;
@@ -45,6 +46,7 @@ pub mod secret {
     pub use away_secret::Secret;
 }
 pub mod sign_in;
+pub mod smartcard;
 #[cfg(any(test, feature = "stand-in"))]
 pub mod stand_in;
 pub mod tpkt;

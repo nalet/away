@@ -255,7 +255,7 @@ impl Secured {
                 secret: fresh[32..].try_into().expect("48 bytes"),
                 known_by: known_by(),
             };
-            let (open, first) = Connection::begin(client, &domain, &name, password, for_a_licence);
+            let (open, first) = Connection::begin(client, &domain, &name, password, for_a_licence, None);
             self.secured.write_all(&first).await.map_err(broken)?;
             let (reader, writer) = tokio::io::split(self.secured);
             let mut desktop = Desktop {
@@ -404,6 +404,8 @@ impl Desktop {
                     Happened::Started => self.started = true,
                     Happened::Channels { .. } | Happened::Licensed | Happened::AsksToTakeALicence { .. } | Happened::LicenceTaken(_) => {}
                     Happened::AskedForTheProgram => {}
+                    // the gateway has no smart card reader for a machine yet
+                    Happened::Reader { .. } | Happened::AskedTheReader(_) => {}
                 }
             }
         }

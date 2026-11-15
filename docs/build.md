@@ -313,6 +313,35 @@ account written with its domain after an `@`, or named with `--realm`. The
 tests run this against the real Kerberos server too, with a stand-in for the
 machine that holds the key of its service as a machine of a domain does.
 
+With a certificate and its key, the machine signs the account in with a smart
+card, and no password is in it at all:
+
+```sh
+cargo run --package away-try -- rdp fin-app-02.example.com --as alex.urban@corp.example --kerberos dc-01.example.com \
+  --certificate alex.der --key alex.key.der --authority authority.der
+```
+
+The card exists in the program's memory alone, for this one connection. It
+holds the certificate and its key, and takes a PIN that is made new and told
+to nobody but the machine, sealed. The ticket is asked for with the
+certificate, and the domain controller has to prove itself with a certificate
+of the authority that is named. The machine then reaches the program's smart
+card reader over the connection, finds the card, reads the certificate, gives
+the card its PIN, and has it sign what proves the person to the domain, and
+the program says each of these as the machine does it. The card signs, and
+does nothing else with its key: the key is not read from it, and nothing is
+deciphered with it. The key is an RSA key of 2048 bits, written as PKCS #8,
+which is what a Windows machine takes on a card of this kind.
+
+Without `--authority` the ticket is asked for with the account's password,
+and the machine is still handed the card to sign the person in with. That
+tries the card and the reader against a machine before a domain trusts the
+certificate: the machine goes through all of it, and the domain then refuses.
+
+The tests run both against the real Kerberos server, with a stand-in for the
+machine that reads the card with the commands a Windows machine gives one,
+and checks the certificate it read and the signature the card made.
+
 This is the first part of signing in as oneself. No page and no session uses
 it yet.
 

@@ -21,6 +21,12 @@ use away_winauth::sign_in::stand_in::Machine;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::{ServerConfig, ServerConnection};
 
+/// The tests' certificates: an authority, a domain controller's, and an account's with its key.
+const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../away-winauth/tests/fixtures");
+const ACCOUNTS_CERTIFICATE: &[u8] = include_bytes!("../../away-winauth/tests/fixtures/account.der");
+/// What a stand-in that reads a card has the card sign: the hash of this.
+const TO_SIGN: &[u8] = b"what proves the person to the domain";
+
 const CERTIFICATE: &[u8] = include_bytes!("fixtures/machine.der");
 const KEY: &[u8] = include_bytes!("fixtures/machine.key.der");
 
@@ -210,6 +216,15 @@ fn secure_with(
             None => return None,
         }
     }
+    // a machine that was handed a smart card reads it once the desktop begins, as a
+    // Windows machine does to sign the person in: with the PIN it was handed
+    if let Some(card) =
+        takes_tickets.as_ref().and_then(|(machine, _)| machine.handed_over.as_deref()).and_then(away_winauth::sign_in::stand_in::on_a_card)
+    {
+        use sha2::{Digest, Sha256};
+        let hash: [u8; 32] = Sha256::digest(TO_SIGN).into();
+        desktop = desktop.that_reads_a_card(&away_winauth::card::stand_in::commands(card.pin.expose(), &hash));
+    }
     // the name and the password have arrived: say whether the account may come in
     if let Some(verdict) = verdict {
         let _ = secured.write_all(&verdict);
@@ -365,6 +380,10 @@ fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
             sent_on_to: None,
             for_a_program: false,
             about_programs: Vec::new(),
+            // without a card, the client asks for no further channel and names no device
+            channels: Vec::new(),
+            devices: Vec::new(),
+            card: None,
         }
     );
 }
@@ -708,6 +727,110 @@ fn it_signs_in_with_a_ticket_of_a_real_kerberos_server_in_place_of_a_proof_of_th
     assert!(running.join().expect("the stand-in ends").told.account.is_none());
 }
 
+/// What the try program says of a smart card the machine read to its end.
+const WITH_THE_CARD: [&str; 5] = [
+    "What it did with the smart card",
+    "   It found the card to be of the kind it reads.",
+    "   It read the certificate.",
+    "   It gave the card its PIN.",
+    "   It had the card sign what proves the person to the domain.",
+];
+
+/// Checks what a stand-in that took a ticket and read the card saw: the card that was
+/// handed over, and on it the account's certificate and a signature of its key.
+fn the_machine_read_the_card(ended: &Ended, said: &str, name: &str) {
+    let handed = away_winauth::sign_in::stand_in::on_a_card(ended.told.handed_over.as_deref().expect("something was handed over"))
+        .expect("a smart card");
+    assert_eq!(
+        (handed.name.as_str(), handed.domain.as_str(), handed.reader.as_str(), handed.card.as_str()),
+        (name, "CORP.EXAMPLE", "Away 0", "")
+    );
+    assert_eq!(handed.provider, "Microsoft Base Smart Card Crypto Provider");
+    // a PIN and a name for what holds the key that were made for this connection, and the PIN is said nowhere
+    let pin = handed.pin.expose();
+    assert!(pin.len() == 32 && pin.chars().all(|digit| digit.is_ascii_hexdigit()), "a PIN of 32 digits");
+    assert!(handed.container.starts_with("away-") && !said.contains(pin));
+    let seen = ended.seen.as_ref().expect("the connection went on to the desktop");
+    assert_eq!(seen.channels, ["rdpdr", "rdpsnd"]);
+    let card = seen.card.as_ref().expect("the machine read the card");
+    assert!(card.closed && card.reader == "Away 0", "the machine went through all of it, with the reader it was told of");
+    let read = away_winauth::card::stand_in::read(&card.answers).expect("the answers of a card of this kind");
+    assert!(read.certificate == ACCOUNTS_CERTIFICATE, "the certificate on the card is the account's");
+    assert_eq!((read.container.as_str(), read.took_the_pin), (handed.container.as_str(), true));
+    assert!(
+        away_winauth::card::stand_in::is_signed_by(ACCOUNTS_CERTIFICATE, TO_SIGN, &read.signed),
+        "the card signed with the certificate's key"
+    );
+}
+
+#[test]
+fn it_signs_in_with_a_smart_card_and_a_certificate_and_no_password_is_in_it() {
+    let Some(server) = kerberos_server() else { return };
+    let (address, running) = machine_then(&CHOSEN, Then::TakesATicket { holds_the_services_key: true });
+    let files = [format!("{FIXTURES}/account.der"), format!("{FIXTURES}/account.key.der"), format!("{FIXTURES}/authority.der")];
+    let tried = Command::new(env!("CARGO_BIN_EXE_away-try"))
+        .args(["rdp", &address, "--as", "alex.urban@corp.example", "--kerberos", &server])
+        .args(["--certificate", &files[0], "--key", &files[1], "--authority", &files[2]])
+        .output()
+        .expect("the test program runs");
+    let said = String::from_utf8(tried.stdout).expect("text");
+    let ended = running.join().expect("the stand-in ends");
+    assert!(tried.status.success(), "{said}");
+    let lines: Vec<&str> = said.lines().skip(11).collect();
+    // the ticket is asked for with the certificate, and the domain controller proves itself
+    assert!(lines[0].ends_with(", for a first ticket for alex.urban@CORP.EXAMPLE, with the certificate"), "{said}");
+    assert!(lines[1].starts_with("   It proved itself with a certificate of the authority, for "), "{said}");
+    assert_eq!(lines[2], "   It gave a ticket for krbtgt/CORP.EXAMPLE, to alex.urban@CORP.EXAMPLE.", "{said}");
+    assert_eq!(lines[5], "   It gave a ticket for TERMSRV/127.0.0.1, to alex.urban@CORP.EXAMPLE.", "{said}");
+    assert_eq!(
+        lines[7..11],
+        [
+            "Signing in, before the desktop, with the ticket",
+            "   It answered the ticket, and proved that it holds the certificate it showed.",
+            "   A smart card was handed over in place of a password, sealed: its PIN, and where the machine finds it.",
+            "   It says the account may come in.",
+        ],
+        "{said}"
+    );
+    assert!(said.contains("\n   It took this client's smart card reader.\n"), "{said}");
+    let at = lines.iter().position(|line| *line == WITH_THE_CARD[0]).expect("what it did with the card");
+    assert!(lines[at + 1].starts_with("   It asked the reader ") && lines[at + 2..at + 6] == WITH_THE_CARD[1..], "{said}");
+    assert!(said.contains("\nThe desktop's picture\n   200 by 120 pixels. Their SHA-256: "), "{said}");
+    // the machine read in the ticket who it is for, and on the card the account's certificate
+    assert_eq!(ended.told.account, Some(("alex.urban".to_string(), "CORP.EXAMPLE".to_string())));
+    the_machine_read_the_card(&ended, &said, "alex.urban");
+}
+
+#[test]
+fn it_hands_a_smart_card_over_where_the_ticket_is_asked_for_with_the_password() {
+    let Some(server) = kerberos_server() else { return };
+    let (address, running) = machine_then(&CHOSEN, Then::TakesATicket { holds_the_services_key: true });
+    let files = [format!("{FIXTURES}/account.der"), format!("{FIXTURES}/account.key.der")];
+    let tried =
+        try_rdp_with_a_ticket(&address, "pat.typed@corp.example", &["--kerberos", &server, "--certificate", &files[0], "--key", &files[1]]);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    let ended = running.join().expect("the stand-in ends");
+    assert!(tried.status.success(), "{said}");
+    assert!(said.contains(", how the key of pat.typed@CORP.EXAMPLE is made\n") && !said.contains("with the certificate"), "{said}");
+    assert!(
+        said.contains("   A smart card was handed over in place of a password, sealed: its PIN, and where the machine finds it.\n"),
+        "{said}"
+    );
+    assert!(said.contains(&WITH_THE_CARD[1..].join("\n")), "{said}");
+    assert!(!said.contains(PASSWORD), "the password is never said");
+    the_machine_read_the_card(&ended, &said, "pat.typed");
+
+    // a key that is not the certificate's makes no card
+    let (address, running) = machine_then(&CHOSEN, Then::TakesATicket { holds_the_services_key: true });
+    let anothers = format!("{FIXTURES}/controller.key.der");
+    let tried =
+        try_rdp_with_a_ticket(&address, "pat.typed@corp.example", &["--kerberos", &server, "--certificate", &files[0], "--key", &anothers]);
+    let said = String::from_utf8(tried.stdout).expect("text");
+    assert_eq!(tried.status.code(), Some(1), "{said}");
+    assert!(said.ends_with("   The certificate can't be read: the key is not the certificate's.\n"), "{said}");
+    assert!(running.join().expect("the stand-in ends").told.handed_over.is_none());
+}
+
 #[test]
 fn a_ticket_needs_a_realm_which_is_named_or_read_in_the_accounts_name() {
     let (address, running) = machine(&CHOSEN, true);
@@ -732,6 +855,27 @@ fn it_says_what_it_takes() {
         &["rdp", "fin-app-02", "--program", "||ledger"],
         &["rdp", "fin-app-02", "--kerberos", "dc-01.corp.example"],
         &["rdp", "fin-app-02", "--realm", "CORP.EXAMPLE"],
+        // a card is a certificate with its key and goes with a ticket; an authority is a card's, and in place of a password
+        &["rdp", "fin-app-02", "--as", KNOWN, "--password-file", "f", "--kerberos", "dc-01", "--certificate", "c"],
+        &["rdp", "fin-app-02", "--as", KNOWN, "--password-file", "f", "--certificate", "c", "--key", "k"],
+        &["rdp", "fin-app-02", "--as", KNOWN, "--password-file", "f", "--kerberos", "dc-01", "--authority", "a"],
+        &[
+            "rdp",
+            "fin-app-02",
+            "--as",
+            KNOWN,
+            "--password-file",
+            "f",
+            "--kerberos",
+            "dc-01",
+            "--certificate",
+            "c",
+            "--key",
+            "k",
+            "--authority",
+            "a",
+        ],
+        &["rdp", "fin-app-02", "--as", KNOWN, "--kerberos", "dc-01", "--certificate", "c", "--key", "k"],
         &["rdp", "fin-app-02", "--as", KNOWN],
         &["rdp", "fin-app-02", "--as", KNOWN, "--as", KNOWN],
         &["rdp", "fin-app-02", "--anything", "else"],
