@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use away_gateway::machine::{reach, Area, Desktop, Opened, Step, Who, Why};
+use away_gateway::machine::{reach, Area, Desktop, Opened, Screen, Step, Who, Why};
 use away_gateway::stand_in::{self, Machine};
 use away_rdp::input::{Button, Input};
 use away_rdp::ntlm::Account;
@@ -39,7 +39,7 @@ async fn a_desktop_opens_shows_the_machines_picture_and_takes_keys_and_the_point
     assert_eq!(secured.identity().fingerprint_text(), machine.fingerprint());
     assert!(!secured.signs_in_itself());
     let Ok(Opened::Desktop(mut desktop)) =
-        secured.sign_in(Who::Account(Account::named(KNOWN, Secret::new(PASSWORD))), 1280, 800, 0x0807, None, None).await
+        secured.sign_in(Who::Account(Account::named(KNOWN, Secret::new(PASSWORD))), Screen::of(1280, 800), 0x0807, None, None).await
     else {
         panic!("the account is signed in, and the machine shows its desktop")
     };
@@ -86,7 +86,7 @@ async fn a_desktop_opens_shows_the_machines_picture_and_takes_keys_and_the_point
         tokio::time::sleep(Duration::from_millis(20)).await;
     };
     let seen = &seen[0];
-    assert_eq!((seen.asked, seen.name.as_str()), ((1280, 800), "away"));
+    assert_eq!((seen.asked, seen.scale, seen.name.as_str()), ((1280, 800), 100, "away"));
     assert_eq!(seen.account, ("CORP".to_string(), "alex.urban".to_string()));
     // the password was proven before the desktop, and does not travel with the account's name
     assert_eq!(seen.password, None);
@@ -115,15 +115,16 @@ async fn a_farms_broker_says_where_the_connection_belongs_and_the_machine_it_nam
     let (at, on) = broker.address();
     let wanted = b"tsv://MS Terminal Services Plugin.1.Desktops";
     let secured = reach(&at, on, Some(wanted)).await.expect("the broker is reached").secure().await.expect("the connection is secured");
-    let Ok(Opened::SentOn(to)) = secured.sign_in(Who::Account(account()), 1280, 800, 0x0409, None, None).await else {
+    let Ok(Opened::SentOn(to)) = secured.sign_in(Who::Account(account()), Screen::of(1280, 800), 0x0409, None, None).await else {
         panic!("the broker sends the connection on")
     };
     assert_eq!(to, sends_on);
     assert_eq!(broker.said_first(), [Some(wanted.to_vec())]);
     // a wrong password ends at the broker, as it does at a machine
     let secured = reach(&at, on, Some(wanted)).await.unwrap().secure().await.unwrap();
-    let Err(refused) =
-        secured.sign_in(Who::Account(Account::named(KNOWN, Secret::new("another password"))), 1280, 800, 0x0409, None, None).await
+    let Err(refused) = secured
+        .sign_in(Who::Account(Account::named(KNOWN, Secret::new("another password"))), Screen::of(1280, 800), 0x0409, None, None)
+        .await
     else {
         panic!("a wrong password")
     };
@@ -131,7 +132,9 @@ async fn a_farms_broker_says_where_the_connection_belongs_and_the_machine_it_nam
 
     // the machine it names is told what the broker gave for it, and which session is asked for
     let secured = reach(&host, port, to.token.as_deref()).await.expect("the machine is reached").secure().await.expect("it is secured");
-    let Ok(Opened::Desktop(mut desktop)) = secured.sign_in(Who::Account(account()), 1280, 800, 0x0409, Some(to.session), None).await else {
+    let Ok(Opened::Desktop(mut desktop)) =
+        secured.sign_in(Who::Account(account()), Screen::of(1280, 800), 0x0409, Some(to.session), None).await
+    else {
         panic!("the machine shows its desktop")
     };
     let shows = stand_in::desktop();
@@ -152,8 +155,9 @@ async fn a_machine_that_does_not_take_the_password_or_is_not_there_says_at_which
     let machine = Machine::start(KNOWN, PASSWORD, stand_in::desktop()).await;
     let (host, port) = machine.address();
     let secured = reach(&host, port, None).await.unwrap().secure().await.unwrap();
-    let Err(refused) =
-        secured.sign_in(Who::Account(Account::named(KNOWN, Secret::new("another password"))), 1280, 800, 0x0409, None, None).await
+    let Err(refused) = secured
+        .sign_in(Who::Account(Account::named(KNOWN, Secret::new("another password"))), Screen::of(1280, 800), 0x0409, None, None)
+        .await
     else {
         panic!("a wrong password")
     };

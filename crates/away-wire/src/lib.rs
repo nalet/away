@@ -241,18 +241,21 @@ pub enum Did {
 /// another, and none is printed.
 #[derive(Clone, Debug)]
 pub enum FromBrowser {
-    /// The first message: the ticket the server gave for this session, and the size the
-    /// desktop is to have.
+    /// The first message: the ticket the server gave for this session, and the window the
+    /// desktop is for.
     Begins {
         /// The ticket.
         ticket: Secret,
-        /// How wide the desktop is to be.
+        /// How wide the window is, as a page measures it.
         width: u16,
         /// How high.
         height: u16,
         /// The layout of the person's keyboard, as Windows numbers them, where the
         /// browser can tell.
         layout: Option<u32>,
+        /// How many dots the device shows for a hundred of the page's: 200 on a screen
+        /// with twice the dots each way. Where the browser says.
+        scale: Option<u32>,
     },
     /// The name and the password the machine asked for.
     Credentials {
@@ -289,7 +292,8 @@ impl FromBrowser {
                         return Err(NotThis("a session begins with the size of its desktop"));
                     };
                     let layout = said.get("layout").and_then(Json::count).and_then(|layout| u32::try_from(layout).ok());
-                    return Ok(FromBrowser::Begins { ticket: Secret::new(ticket), width, height, layout });
+                    let scale = said.get("scale").and_then(Json::count).and_then(|scale| u32::try_from(scale).ok());
+                    return Ok(FromBrowser::Begins { ticket: Secret::new(ticket), width, height, layout, scale });
                 }
                 if let (Some(name), Some(password)) = (said.text_of("name"), said.text_of("password")) {
                     return Ok(FromBrowser::Credentials { name: name.to_string(), password: Secret::new(password) });
@@ -451,7 +455,7 @@ mod tests {
         assert_eq!(read.len(), 7);
         assert!(matches!(read[6], FromBrowser::Window { id: 65537, does: Does::Close }));
         assert!(
-            matches!(&read[0], FromBrowser::Begins { ticket, width: 1280, height: 800, layout: Some(0x0807) } if ticket.expose() == "7f3a")
+            matches!(&read[0], FromBrowser::Begins { ticket, width: 1280, height: 800, layout: Some(0x0807), scale: Some(200) } if ticket.expose() == "7f3a")
         );
         assert!(
             matches!(&read[1], FromBrowser::Credentials { name, password } if name == "CORP\\alex.urban" && password.expose() == "a \"password\"")

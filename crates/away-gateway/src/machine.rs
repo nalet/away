@@ -91,6 +91,50 @@ fn failure(step: Step, why: Why, details: impl ToString) -> Failure {
     Failure { step, why, details: details.to_string() }
 }
 
+/// The screen a desktop is opened for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Screen {
+    /// How wide the desktop is, in the screen's own dots.
+    pub width: u16,
+    /// How high.
+    pub height: u16,
+    /// How much larger than usual the machine draws there, in percent.
+    pub scale: u32,
+}
+
+/// The most dots a desktop has: those of a screen of 3840 by 2160. Every one of them is
+/// read, compared and sent.
+const MOST_DOTS: u32 = 3840 * 2160;
+/// The most dots a desktop has along one side, which is what a Windows machine takes.
+const MOST_A_SIDE: u32 = 8192;
+
+impl Screen {
+    /// A screen of this size, on which the machine draws at its usual size.
+    pub fn of(width: u16, height: u16) -> Screen {
+        Screen { width, height, scale: 100 }
+    }
+
+    /// The screen for a window of this size, as a page measures it, on a device that
+    /// shows this many dots for a hundred of the page's. The desktop has the device's
+    /// dots, and the machine draws that much larger: text keeps the size it has at the
+    /// machine, and is as sharp as the device shows it. Where that would be more dots
+    /// than a desktop has, the machine draws less large, in steps of a quarter.
+    pub fn for_a_window(width: u16, height: u16, dots: u32) -> Screen {
+        let (width, height) = (u32::from(width.clamp(640, 4096)), u32::from(height.clamp(480, 2160)));
+        let fits = |scale: u32| {
+            let (wide, high) = (width * scale / 100, height * scale / 100);
+            wide <= MOST_A_SIDE && high <= MOST_A_SIDE && wide * high <= MOST_DOTS
+        };
+        let mut scale = dots.clamp(100, 500);
+        while scale > 100 && !fits(scale) {
+            scale = (scale - 1) / 25 * 25;
+        }
+        let scale = scale.max(100);
+        // a desktop's width is a multiple of four
+        Screen { width: (width * scale / 100) as u16 & !3, height: (height * scale / 100) as u16, scale }
+    }
+}
+
 /// Who is signed in on a machine.
 pub enum Who {
     /// An account, with a name and a password that somebody typed.
@@ -202,7 +246,7 @@ impl Secured {
         self.security == Security::Tls
     }
 
-    /// Signs somebody in, and opens the desktop at this size, for a keyboard of this
+    /// Signs somebody in, and opens the desktop for this screen, for a keyboard of this
     /// layout, as Windows numbers them. On the machine a farm's broker sent the client
     /// on to, the session the broker named is said. A broker opens nothing: it says
     /// where the connection belongs. With a program, no desktop is opened: the machine
@@ -210,8 +254,7 @@ impl Secured {
     pub async fn sign_in(
         mut self,
         who: Who,
-        width: u16,
-        height: u16,
+        screen: Screen,
         layout: u32,
         sent_on_to: Option<u32>,
         program: Option<Program>,
@@ -311,7 +354,16 @@ impl Secured {
             };
 
             // what Away is, the channels, the licence, and what each side can do
-            let client = Client { width, height, security: self.security.number(), name: "away".to_string(), layout, sent_on_to, program };
+            let client = Client {
+                width: screen.width,
+                height: screen.height,
+                scale: screen.scale,
+                security: self.security.number(),
+                name: "away".to_string(),
+                layout,
+                sent_on_to,
+                program,
+            };
             let mut fresh = [0u8; 80];
             getrandom::fill(&mut fresh).map_err(random(Step::SigningIn))?;
             let for_a_licence = licence::New {
@@ -597,4 +649,46 @@ fn clock() -> u64 {
 /// gateway of Away, so that a machine that counts devices counts Away once.
 fn known_by() -> [u8; 16] {
     *b"away-the-gateway"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_desktop_has_the_dots_of_the_screen_its_window_is_on() {
+        // a window on a screen that shows a dot for a dot, and one on a screen with
+        // twice the dots each way: the machine draws twice as large there
+        assert_eq!(Screen::for_a_window(1280, 800, 100), Screen { width: 1280, height: 800, scale: 100 });
+        assert_eq!(Screen::for_a_window(1280, 800, 200), Screen { width: 2560, height: 1600, scale: 200 });
+        assert_eq!(Screen::for_a_window(1728, 1117, 200), Screen { width: 3456, height: 2234, scale: 200 });
+        assert_eq!(Screen::for_a_window(1440, 900, 150), Screen { width: 2160, height: 1350, scale: 150 });
+        // a desktop's width is a multiple of four
+        assert_eq!(Screen::for_a_window(1283, 801, 100), Screen { width: 1280, height: 801, scale: 100 });
+        assert_eq!(Screen::for_a_window(1283, 801, 125), Screen { width: 1600, height: 1001, scale: 125 });
+        // a browser that says nothing of the kind, or something no screen is
+        assert_eq!(Screen::for_a_window(1280, 800, 0), Screen::of(1280, 800));
+        assert_eq!(Screen::for_a_window(640, 480, 900), Screen { width: 3200, height: 2400, scale: 500 });
+        // a window too small or too large for a desktop is brought to one that isn't
+        assert_eq!(Screen::for_a_window(200, 100, 100), Screen::of(640, 480));
+        assert_eq!(Screen::for_a_window(9000, 9000, 100), Screen::of(4096, 2160));
+    }
+
+    #[test]
+    fn where_a_screens_dots_are_more_than_a_desktop_has_the_machine_draws_less_large() {
+        // a large window on a dense screen: a quarter less at a time, until it fits
+        assert_eq!(Screen::for_a_window(2560, 1440, 200), Screen { width: 3840, height: 2160, scale: 150 });
+        assert_eq!(Screen::for_a_window(1920, 1080, 300), Screen { width: 3840, height: 2160, scale: 200 });
+        assert_eq!(Screen::for_a_window(2560, 1440, 250), Screen { width: 3840, height: 2160, scale: 150 });
+        // a scale between the quarters goes down to the next quarter
+        assert_eq!(Screen::for_a_window(2560, 1440, 160), Screen { width: 3840, height: 2160, scale: 150 });
+        // and never below the size the window has
+        assert_eq!(Screen::for_a_window(4096, 2160, 200), Screen { width: 4096, height: 2160, scale: 100 });
+        for (width, height, dots) in [(640, 480, 100), (1366, 768, 125), (3840, 2160, 300), (4096, 2160, 500), (800, 2160, 400)] {
+            let screen = Screen::for_a_window(width, height, dots);
+            assert!((100..=500).contains(&screen.scale), "{screen:?}");
+            assert!(u32::from(screen.width) * u32::from(screen.height) <= 4096 * 2160, "{screen:?}");
+            assert_eq!(screen.width % 4, 0, "{screen:?}");
+        }
+    }
 }

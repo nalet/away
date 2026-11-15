@@ -41,6 +41,8 @@ const TILE: usize = 64;
 pub struct Seen {
     /// The size of the desktop the client asked for.
     pub asked: (u16, u16),
+    /// How much larger than usual the client asked the machine to draw, in percent.
+    pub scale: u32,
     /// The name the client gave itself.
     pub name: String,
     /// The security the client says was chosen.
@@ -242,8 +244,16 @@ impl Desktop {
                     [_, rest @ ..] => rest,
                     _ => return Err(WRONG),
                 };
-                let core = blocks.get(..216).filter(|core| core[..4] == [0x01, 0xc0, 0xd8, 0x00]).ok_or(WRONG)?;
+                // the client's own block comes first: as long as it says, and long enough
+                // for what every client says
+                let length = usize::from(number16(blocks, 2)?);
+                let core = blocks.get(..length).filter(|core| core.len() >= 216 && core[..2] == [0x01, 0xc0]).ok_or(WRONG)?;
                 self.seen.asked = (number16(core, 8)?, number16(core, 10)?);
+                // a client that says nothing of a scale is drawn for at the usual size
+                self.seen.scale = match core.get(226..230) {
+                    Some(scale) => u32::from_le_bytes([scale[0], scale[1], scale[2], scale[3]]),
+                    None => 100,
+                };
                 self.seen.name = ntlm::utf16(&core[24..56]).trim_end_matches('\0').to_string();
                 self.seen.security = u32::from(number16(core, 212)?);
                 // what the client says of a farm: whether it was sent on, and to which session

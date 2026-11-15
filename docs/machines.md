@@ -279,6 +279,12 @@ machine that offers more is opened from its own page, where each way in is.
   to it. A small handle at the top edge opens the session's bar, and so does
   Ctrl + Alt + Shift, pressed and let go with no other key. The bar fills the
   screen and ends the session.
+- **A Windows desktop opens at the window's size, in the screen's own dots.**
+  On a screen with more dots than a page counts, the machine is asked for
+  that many and draws larger by as much, so text has the size it has at the
+  machine and is sharp. A very large window on such a screen gets a desktop of
+  3840 by 2160 dots at most, drawn a little less large. The desktop keeps the
+  size it opened with: it does not follow the window yet.
 - **A key writes what it writes at home.** The session is given the layout of
   the person's keyboard: where the browser says what the keys write, by that;
   elsewhere by the language the browser is set to.

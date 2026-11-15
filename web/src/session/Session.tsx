@@ -60,7 +60,7 @@ function useSession(machine: string, program: string | null) {
       opened.binaryType = 'arraybuffer';
       connection = opened;
       socket.current = opened;
-      opened.onopen = () => opened.send(begins(ticket, window.innerWidth, window.innerHeight, layout));
+      opened.onopen = () => opened.send(begins(ticket, window.innerWidth, window.innerHeight, layout, Math.round(window.devicePixelRatio * 100)));
       opened.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
         if (typeof event.data !== 'string') {
           const rectangle = readRectangle(event.data);

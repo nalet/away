@@ -50,8 +50,10 @@ export function readRectangle(bytes: ArrayBuffer): Rectangle | null {
   return { left: view.getUint16(1), top: view.getUint16(3), width: view.getUint16(5), height: view.getUint16(7), png: new Uint8Array(bytes, 10) };
 }
 
-export function begins(ticket: string, width: number, height: number, layout: number): string {
-  return JSON.stringify({ ticket, width, height, layout });
+// The window's size as the page measures it, and how many dots the device shows for a
+// hundred of the page's: the machine's desktop has the device's dots.
+export function begins(ticket: string, width: number, height: number, layout: number, scale: number): string {
+  return JSON.stringify({ ticket, width, height, layout, scale });
 }
 
 export function credentials(name: string, password: string): string {

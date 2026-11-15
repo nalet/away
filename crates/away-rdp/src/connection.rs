@@ -473,8 +473,16 @@ mod tests {
     /// anything to say, and gives what happened, the connection and the machine.
     fn run(program: Option<&str>, machine: Desktop) -> (Result<Vec<Happened>, Error>, Connection, Desktop) {
         let program = program.map(|run| Program { run: run.to_string(), arguments: String::new() });
-        let client =
-            Client { width: 1280, height: 800, security: 2, name: "away".to_string(), layout: gcc::LAYOUT_US, sent_on_to: None, program };
+        let client = Client {
+            width: 1280,
+            height: 800,
+            scale: 100,
+            security: 2,
+            name: "away".to_string(),
+            layout: gcc::LAYOUT_US,
+            sent_on_to: None,
+            program,
+        };
         let for_a_licence = licence::New { random: [1; 32], secret: [2; 48], known_by: [3; 16] };
         let (mut connection, first) = Connection::begin(client, "CORP", "alex.urban", None, for_a_licence, None);
         let mut machine = machine;
@@ -489,6 +497,7 @@ mod tests {
         let client = Client {
             width: 1280,
             height: 800,
+            scale: 100,
             security: 2,
             name: "away".to_string(),
             layout: gcc::LAYOUT_US,

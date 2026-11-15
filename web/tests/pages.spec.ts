@@ -1059,7 +1059,7 @@ test("the session's messages are written and read as the examples say that the g
 
   // what the pages say
   const written = [
-    begins('7f3a', 1280, 800, 2055),
+    begins('7f3a', 1280, 800, 2055, 200),
     credentials('CORP\\alex.urban', 'a "password"'),
     seen(7),
     leaves(),

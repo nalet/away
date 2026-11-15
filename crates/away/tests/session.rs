@@ -450,7 +450,9 @@ impl Session {
         request.headers_mut().insert("origin", format!("http://{}", world.gateway).parse().unwrap());
         let stream = TcpStream::connect(&world.gateway).await.expect("the gateway takes connections");
         let (mut connection, _) = tokio_tungstenite::client_async(request, stream).await.expect("the connection becomes a session's");
-        let begins = Json::object([("ticket", ticket.into()), ("width", 1280u64.into()), ("height", 800u64.into())]);
+        // a window of 1280 by 800, on a screen with twice the dots each way
+        let begins =
+            Json::object([("ticket", ticket.into()), ("width", 1280u64.into()), ("height", 800u64.into()), ("scale", 200u64.into())]);
         connection.send(Message::text(begins.write())).await.expect("the first message goes out");
         Session { connection, picture: None }
     }
@@ -582,7 +584,9 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
     assert!(session.picture == world.machine.picture(), "the picture is the machine's, with its marks");
     let seen = world.machine.seen();
     let last = seen.last().expect("a client came as far as the desktop");
-    assert_eq!((last.asked, last.account.clone()), ((1280, 800), ("CORP".to_string(), "alex.urban".to_string())));
+    // the machine was asked for the dots of the person's screen, drawn twice as large
+    assert_eq!((last.asked, last.scale), ((2560, 1600), 200));
+    assert_eq!(last.account, ("CORP".to_string(), "alex.urban".to_string()));
     assert_eq!(last.input.len(), 5);
 
     // the person leaves: the session says so and ends, and the machine was told

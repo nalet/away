@@ -6,7 +6,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use away_gateway::machine::{reach, Desktop, Opened, Step, Who, Why};
+use away_gateway::machine::{reach, Desktop, Opened, Screen, Step, Who, Why};
 use away_gateway::stand_in::{self, Machine, TO_SIGN};
 use away_gateway::themselves::{Domain, Issuer};
 use away_part::address::{read_form, Address};
@@ -130,7 +130,9 @@ async fn a_person_is_signed_in_as_themselves_with_a_ticket_and_a_card_and_nothin
     // on the machine: a ticket for its desktop, and the card
     let theirs = domain.on(&who, &host).await.expect("what signs them in on the machine");
     let secured = reach(&host, port, None).await.expect("it is reached").secure().await.expect("the connection is secured");
-    let Ok(Opened::Desktop(mut desktop)) = secured.sign_in(Who::Themselves(Box::new(theirs)), 1280, 800, 0x0807, None, None).await else {
+    let Ok(Opened::Desktop(mut desktop)) =
+        secured.sign_in(Who::Themselves(Box::new(theirs)), Screen::of(1280, 800), 0x0807, None, None).await
+    else {
         panic!("the person is signed in, and the machine shows its desktop")
     };
     let shows = stand_in::desktop();
@@ -165,7 +167,10 @@ async fn a_person_is_signed_in_as_themselves_with_a_ticket_and_a_card_and_nothin
     // another ticket, and a card of its own, with the same certificate
     let again = domain.on(&who, &host).await.expect("what signs them in on the next machine");
     let secured = reach(&host, port, None).await.expect("it is reached").secure().await.expect("the connection is secured");
-    assert!(matches!(secured.sign_in(Who::Themselves(Box::new(again)), 1280, 800, 0x0807, None, None).await, Ok(Opened::Desktop(_))));
+    assert!(matches!(
+        secured.sign_in(Who::Themselves(Box::new(again)), Screen::of(1280, 800), 0x0807, None, None).await,
+        Ok(Opened::Desktop(_))
+    ));
     assert_eq!(issuer.issued.lock().unwrap().len(), 1, "one certificate serves the session's way to its machine");
 }
 
@@ -192,7 +197,7 @@ async fn what_keeps_a_person_from_being_themselves_is_said_at_the_sign_in() {
     let (host, port) = machine.address();
     let theirs = domain.on(&who, &host).await.expect("what signs them in on the machine");
     let secured = reach(&host, port, None).await.expect("it is reached").secure().await.expect("the connection is secured");
-    let Err(not_taken) = secured.sign_in(Who::Themselves(Box::new(theirs)), 1280, 800, 0x0807, None, None).await else {
+    let Err(not_taken) = secured.sign_in(Who::Themselves(Box::new(theirs)), Screen::of(1280, 800), 0x0807, None, None).await else {
         panic!("a machine that can't open the ticket signs nobody in")
     };
     assert_eq!((not_taken.step, not_taken.why), (Step::SigningIn, Why::NotThemselves));

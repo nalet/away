@@ -26,7 +26,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 
-use crate::machine::{self, Area, Desktop, Failure, Opened, Step, Who, Why};
+use crate::machine::{self, Area, Desktop, Failure, Opened, Screen, Step, Who, Why};
 use crate::themselves::Domain;
 
 /// How long a browser gets to say which session it is, once its connection is open.
@@ -152,9 +152,9 @@ where
 {
     // which session this is: the ticket the server gave for it
     let begun = tokio::time::timeout(BEGINS_WITHIN, said(&mut browser)).await;
-    let (ticket, width, height, layout) = match begun {
-        Ok(Some(FromBrowser::Begins { ticket, width, height, layout })) => {
-            (ticket, width, height, layout.unwrap_or(away_rdp::gcc::LAYOUT_US))
+    let (ticket, screen, layout) = match begun {
+        Ok(Some(FromBrowser::Begins { ticket, width, height, layout, scale })) => {
+            (ticket, Screen::for_a_window(width, height, scale.unwrap_or(100)), layout.unwrap_or(away_rdp::gcc::LAYOUT_US))
         }
         _ => return end(&mut browser, "no-session").await,
     };
@@ -171,7 +171,7 @@ where
         .lines
         .info("a session was taken over", &[("session", taken.session.as_str().into()), ("machine", taken.machine.as_str().into())]);
 
-    let opened = open(&mut browser, server, around.domain.as_ref(), &taken, width, height, layout).await;
+    let opened = open(&mut browser, server, around.domain.as_ref(), &taken, screen, layout).await;
     let (why, details) = match opened {
         Ok(Some(Open { mut desktop, served_by })) => {
             let picture = desktop.picture();
@@ -247,8 +247,7 @@ async fn open<Connection>(
     server: &Server,
     domain: Option<&Domain>,
     taken: &Taken,
-    width: u16,
-    height: u16,
+    screen: Screen,
     layout: u32,
 ) -> Result<Option<Open>, Failure>
 where
@@ -267,7 +266,6 @@ where
     let shows = secured.identity().fingerprint_text();
     known(server, taken, &taken.address, taken.port, &shows).await?;
     tell(browser, ToBrowser::Step("signing-in")).await.map_err(|()| gone(Step::SigningIn))?;
-    let (width, height) = (width.clamp(640, 4096) & !3, height.clamp(480, 2160));
     let mut again = false;
     let (mut desktop, served_by) = 'asked: {
         // the person is signed in as themselves: nothing is asked, and the connection
@@ -278,7 +276,7 @@ where
             let who = domain.themselves(&taken.session).await?;
             let theirs = domain.on(&who, &taken.address).await?;
             let program = taken.program.clone();
-            let sent_on = match secured.sign_in(Who::Themselves(Box::new(theirs)), width, height, layout, None, program).await? {
+            let sent_on = match secured.sign_in(Who::Themselves(Box::new(theirs)), screen, layout, None, program).await? {
                 Opened::Desktop(desktop) => break 'asked (*desktop, None),
                 Opened::SentOn(to) => to,
             };
@@ -289,7 +287,7 @@ where
             known(server, taken, &host, port, &secured.identity().fingerprint_text()).await?;
             let theirs = domain.on(&who, &host).await?;
             let program = taken.program.clone();
-            match secured.sign_in(Who::Themselves(Box::new(theirs)), width, height, layout, Some(sent_on.session), program).await? {
+            match secured.sign_in(Who::Themselves(Box::new(theirs)), screen, layout, Some(sent_on.session), program).await? {
                 Opened::Desktop(desktop) => break 'asked (*desktop, Some(format!("{host}:{port}"))),
                 Opened::SentOn(_) => {
                     let details = format!("{host} sends the connection on again, which a machine of a farm doesn't");
@@ -321,7 +319,7 @@ where
             }
             let program = taken.program.clone();
             let typed = Who::Account(Account::named(&name, password.clone()));
-            let sent_on = match secured.sign_in(typed, width, height, layout, None, program).await {
+            let sent_on = match secured.sign_in(typed, screen, layout, None, program).await {
                 Ok(Opened::Desktop(desktop)) => break 'asked (*desktop, None),
                 Ok(Opened::SentOn(to)) => to,
                 Err(Failure { why: Why::SignInRefused, .. }) => {
@@ -337,7 +335,7 @@ where
             known(server, taken, &host, port, &secured.identity().fingerprint_text()).await?;
             let program = taken.program.clone();
             let typed = Who::Account(Account::named(&name, password));
-            match secured.sign_in(typed, width, height, layout, Some(sent_on.session), program).await {
+            match secured.sign_in(typed, screen, layout, Some(sent_on.session), program).await {
                 Ok(Opened::Desktop(desktop)) => break 'asked (*desktop, Some(format!("{host}:{port}"))),
                 Ok(Opened::SentOn(_)) => {
                     let details = format!("{host} sends the connection on again, which a machine of a farm doesn't");

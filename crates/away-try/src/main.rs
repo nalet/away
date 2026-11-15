@@ -502,6 +502,7 @@ fn rdp(asked: &Asked, account: Option<Account>, on_the_card: Option<OnTheCard>) 
     let client = Client {
         width: 1280,
         height: 800,
+        scale: 100,
         security: answer.security.number(),
         name: "away".to_string(),
         layout: away_rdp::gcc::LAYOUT_US,

@@ -14,6 +14,10 @@ pub struct Client {
     pub width: u16,
     /// How high.
     pub height: u16,
+    /// How much larger than usual the machine is to draw, in percent: 200 for a screen
+    /// with twice the dots each way, so that text keeps the size it has at the machine
+    /// and is sharp. From 100 to 500.
+    pub scale: u32,
     /// The security the machine chose in the first exchange, as the number it gave.
     pub security: u32,
     /// The name the client gives itself, of which the first 15 characters travel.
@@ -68,7 +72,7 @@ pub fn channels(client: &Client, with_a_reader: bool) -> Vec<&'static str> {
 /// The conference request that carries what the client says of itself.
 pub fn request(client: &Client, with_a_reader: bool) -> Vec<u8> {
     // the core: the version it speaks, its screen, its keyboard, its name
-    let mut core = Vec::with_capacity(212);
+    let mut core = Vec::with_capacity(230);
     core.extend(0x0008_0004u32.to_le_bytes());
     core.extend(client.width.to_le_bytes());
     core.extend(client.height.to_le_bytes());
@@ -95,6 +99,16 @@ pub fn request(client: &Client, with_a_reader: bool) -> Vec<u8> {
     core.push(6); // a local network
     core.push(0);
     core.extend(client.security.to_le_bytes());
+    // the screen as it is before the person: its size in millimetres, taken from a screen
+    // of 96 dots an inch at no scale, that it lies on its long side, and how much larger
+    // than usual the machine is to draw. A machine takes a scale from 100 to 500
+    let scale = client.scale.clamp(100, 500);
+    let millimetres = |dots: u16| (u32::from(dots) * 100 / scale * 254 / 960).clamp(10, 10_000);
+    core.extend(millimetres(client.width).to_le_bytes());
+    core.extend(millimetres(client.height).to_le_bytes());
+    core.extend(0u16.to_le_bytes());
+    core.extend(scale.to_le_bytes());
+    core.extend(100u32.to_le_bytes()); // of a device's own scales, the usual one
 
     let mut blocks = block(0xc001, &core);
     // no encryption of RDP's own: TLS secures the connection
@@ -182,32 +196,55 @@ mod tests {
     use super::*;
 
     fn client() -> Client {
-        Client { width: 1280, height: 800, security: 8, name: "away".to_string(), layout: LAYOUT_US, sent_on_to: None, program: None }
+        Client {
+            width: 1280,
+            height: 800,
+            scale: 100,
+            security: 8,
+            name: "away".to_string(),
+            layout: LAYOUT_US,
+            sent_on_to: None,
+            program: None,
+        }
     }
 
     #[test]
     fn the_client_says_its_screen_its_name_and_the_security_that_was_chosen() {
         let request = request(&client(), false);
         assert_eq!(&request[..7], &[0x00, 0x05, 0x00, 0x14, 0x7c, 0x00, 0x01]);
-        // four blocks: 216, 12, 8 and 12 bytes
-        assert_eq!(&request[7..9], &(0x8000u16 | (248 + 14)).to_be_bytes());
+        // four blocks: 234, 12, 8 and 12 bytes
+        assert_eq!(&request[7..9], &(0x8000u16 | (266 + 14)).to_be_bytes());
         assert_eq!(&request[9..21], &[0x00, 0x08, 0x00, 0x10, 0x00, 0x01, 0xc0, 0x00, 0x44, 0x75, 0x63, 0x61]);
-        assert_eq!(&request[21..23], &(0x8000u16 | 248).to_be_bytes());
-        let core = &request[23..23 + 216];
-        assert_eq!(&core[..4], &[0x01, 0xc0, 0xd8, 0x00]);
+        assert_eq!(&request[21..23], &(0x8000u16 | 266).to_be_bytes());
+        let core = &request[23..23 + 234];
+        assert_eq!(&core[..4], &[0x01, 0xc0, 0xea, 0x00]);
         assert_eq!(&core[8..12], &[0x00, 0x05, 0x20, 0x03], "1280 by 800");
         assert_eq!(&core[24..34], &[b'a', 0, b'w', 0, b'a', 0, b'y', 0, 0, 0]);
         assert_eq!(&core[212..216], &[8, 0, 0, 0], "the security that was chosen");
-        assert_eq!(&request[239..251], &[0x02, 0xc0, 0x0c, 0x00, 0, 0, 0, 0, 0, 0, 0, 0]);
-        assert_eq!(&request[251..259], &[0x03, 0xc0, 0x08, 0x00, 0, 0, 0, 0]);
-        assert_eq!(&request[259..], &[0x04, 0xc0, 0x0c, 0x00, 0x0d, 0, 0, 0, 0, 0, 0, 0]);
+        // a screen of 338 by 211 millimetres on its long side, drawn at the usual size
+        assert_eq!(&core[216..226], &[0x52, 0x01, 0, 0, 0xd3, 0, 0, 0, 0, 0]);
+        assert_eq!(&core[226..234], &[100, 0, 0, 0, 100, 0, 0, 0]);
+        assert_eq!(&request[257..269], &[0x02, 0xc0, 0x0c, 0x00, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(&request[269..277], &[0x03, 0xc0, 0x08, 0x00, 0, 0, 0, 0]);
+        assert_eq!(&request[277..], &[0x04, 0xc0, 0x0c, 0x00, 0x0d, 0, 0, 0, 0, 0, 0, 0]);
 
         // for a program it asks for the channel programs are started over
         let program = crate::rail::Program { run: "||ledger".to_string(), arguments: String::new() };
         let request = super::request(&Client { program: Some(program), ..client() }, false);
-        assert_eq!(&request[251..259], &[0x03, 0xc0, 0x14, 0x00, 1, 0, 0, 0]);
-        assert_eq!(&request[259..271], &[b'r', b'a', b'i', b'l', 0, 0, 0, 0, 0x00, 0x00, 0x20, 0xc0]);
-        assert_eq!(&request[271..275], &[0x04, 0xc0, 0x0c, 0x00]);
+        assert_eq!(&request[269..277], &[0x03, 0xc0, 0x14, 0x00, 1, 0, 0, 0]);
+        assert_eq!(&request[277..289], &[b'r', b'a', b'i', b'l', 0, 0, 0, 0, 0x00, 0x00, 0x20, 0xc0]);
+        assert_eq!(&request[289..293], &[0x04, 0xc0, 0x0c, 0x00]);
+
+        // on a screen with twice the dots each way the desktop has those dots, and the
+        // machine draws twice as large: the screen before the person is as large as it was
+        let dense = super::request(&Client { width: 2560, height: 1600, scale: 200, ..client() }, false);
+        let core = &dense[23..23 + 234];
+        assert_eq!(&core[8..12], &[0x00, 0x0a, 0x40, 0x06], "2560 by 1600");
+        assert_eq!(&core[216..226], &[0x52, 0x01, 0, 0, 0xd3, 0, 0, 0, 0, 0]);
+        assert_eq!(&core[226..234], &[200, 0, 0, 0, 100, 0, 0, 0]);
+        // a scale no machine takes is brought to one it does
+        let beyond = super::request(&Client { scale: 900, ..client() }, false);
+        assert_eq!(&beyond[23 + 226..23 + 230], &[0xf4, 0x01, 0, 0]);
     }
 
     #[test]

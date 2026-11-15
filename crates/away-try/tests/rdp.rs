@@ -368,6 +368,7 @@ fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
         seen,
         Seen {
             asked: (1280, 800),
+            scale: 100,
             name: "away".to_string(),
             security: 8,
             account: ("CORP".to_string(), "alex.urban".to_string()),
