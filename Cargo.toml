@@ -9,6 +9,7 @@ members = [
     "crates/away-issuer",
     "crates/away-secret",
     "crates/away-rdp",
+    "crates/away-winauth",
     "crates/away-wire",
     "crates/away-try",
 ]
@@ -39,6 +40,7 @@ hmac = { version = "0.13", default-features = false } # makes the proofs and the
 rc4 = { version = "0.2", default-features = false } # the cipher that signing in with a name and a password seals its messages with, and the taking of a licence too
 sha1 = { version = "0.11", default-features = false } # the second hash that the taking of a licence makes its keys and its checks with
 num-bigint = { version = "0.5", default-features = false } # does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is
+aes = { version = "0.9", default-features = false } # the cipher Kerberos seals its messages with: part of signing in on a Windows machine with a certificate
 getrandom = { version = "0.4", default-features = false } # takes random bytes from the system, for keys and for numbers used once
 saphyr-parser = { version = "0.3", default-features = false } # reads the files of machines and rules, which are YAML, and knows the line each thing is written in
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] } # carries a session between a browser and the gateway: the WebSocket
@@ -53,6 +55,7 @@ away-server = { path = "crates/away-server" }
 away-gateway = { path = "crates/away-gateway" }
 away-issuer = { path = "crates/away-issuer" }
 away-rdp = { path = "crates/away-rdp" }
+away-winauth = { path = "crates/away-winauth" }
 away-wire = { path = "crates/away-wire" }
 
 [workspace.lints.rust]

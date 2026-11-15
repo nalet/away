@@ -23,6 +23,7 @@ library has no line that says what it is for.
 | [rc4](https://crates.io/crates/rc4) | the cipher that signing in with a name and a password seals its messages with, and the taking of a licence too | 0.2.0 | — |
 | [sha1](https://crates.io/crates/sha1) | the second hash that the taking of a licence makes its keys and its checks with | 0.11.0 | — |
 | [num-bigint](https://crates.io/crates/num-bigint) | does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is | 0.5.1 | — |
+| [aes](https://crates.io/crates/aes) | the cipher Kerberos seals its messages with: part of signing in on a Windows machine with a certificate | 0.9.4 | — |
 | [getrandom](https://crates.io/crates/getrandom) | takes random bytes from the system, for keys and for numbers used once | 0.2.17, 0.4.3 | — |
 | [saphyr-parser](https://crates.io/crates/saphyr-parser) | reads the files of machines and rules, which are YAML, and knows the line each thing is written in | 0.3.4 | — |
 | [tokio-tungstenite](https://crates.io/crates/tokio-tungstenite) | carries a session between a browser and the gateway: the WebSocket | 0.30.0 | `handshake` |
@@ -31,7 +32,7 @@ library has no line that says what it is for.
 | [tokio-postgres](https://crates.io/crates/tokio-postgres) | speaks to the database: the client that most programs in this language use | 0.7.18 | `runtime` |
 | [tokio-postgres-rustls](https://crates.io/crates/tokio-postgres-rustls) | lets rustls secure the connection to the database | 0.14.0 | `ring` |
 
-Away names 22 libraries. With what they bring with them, a build holds 157 in all, each in the version Cargo.lock names.
+Away names 23 libraries. With what they bring with them, a build holds 159 in all, each in the version Cargo.lock names.
 <!-- end: libraries -->
 
 ## The pages
