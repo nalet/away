@@ -12,8 +12,11 @@ pub mod json;
 pub mod lines;
 pub mod measures;
 pub mod part;
+#[cfg(any(test, feature = "stand-in"))]
+pub mod stand_in;
 pub mod stop;
 pub mod time;
+pub mod token;
 pub mod version;
 
 pub use lines::{Lines, Value};

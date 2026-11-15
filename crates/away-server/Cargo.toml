@@ -14,7 +14,6 @@ away-secret.workspace = true
 away-rdp.workspace = true
 hyper.workspace = true
 tokio.workspace = true
-ring.workspace = true
 getrandom.workspace = true
 sha2.workspace = true
 saphyr-parser.workspace = true
@@ -36,7 +35,7 @@ name = "farm"
 
 [features]
 # a sign-in service and a farm's web access that stand in for real ones, for tests
-stand-in = ["away-rdp/stand-in"]
+stand-in = ["away-rdp/stand-in", "away-part/stand-in"]
 
 [lints]
 workspace = true

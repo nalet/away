@@ -17,10 +17,15 @@ http-body-util.workspace = true
 rustls.workspace = true
 tokio-rustls.workspace = true
 webpki-roots.workspace = true
+ring.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["io-util"] }
 
+
+[features]
+# what signs tokens as a sign-in service does, for tests
+stand-in = []
 
 [lints]
 workspace = true

@@ -5,8 +5,8 @@
 //! Nothing a token says is used before its signature is checked against the keys the
 //! service publishes. The signature itself is checked by the cryptography library.
 
-use away_part::base64;
-use away_part::json::Json;
+use crate::base64;
+use crate::json::Json;
 use ring::signature::{self, RsaPublicKeyComponents, UnparsedPublicKey};
 
 /// How far the service's clock and Away's may be apart, in seconds.

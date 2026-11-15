@@ -14,7 +14,6 @@ pub mod service;
 pub mod sessions;
 pub mod sign_ins;
 pub mod store;
-pub mod token;
 pub mod told;
 
 #[cfg(any(test, feature = "stand-in"))]

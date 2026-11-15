@@ -11,9 +11,8 @@ use std::sync::{Arc, Mutex};
 use away_part::address::Address;
 use away_part::client::{self, Client, Got};
 use away_part::json::Json;
+use away_part::token::{self, Expected, Keys};
 use away_secret::Secret;
-
-use crate::token::{self, Expected, Keys};
 
 /// How often at most the keys a service publishes are read anew because a token is
 /// signed with one that is not among them: once in this many seconds.
