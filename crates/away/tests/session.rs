@@ -1308,7 +1308,7 @@ async fn a_certificate_policy_refusal_never_falls_back_to_a_password() {
     let (steps, failed) = session.steps().await;
     assert_eq!(steps, ["reaching", "checking", "signing-in"]);
     let failed = failed.get("failed").expect("SSO fails closed, without asking for a password");
-    assert_eq!(failed.text_of("why"), Some("not-themselves"));
+    assert_eq!(failed.text_of("why"), Some("not-as-yourself"));
     assert_eq!(domain.pages.seen(), Default::default());
     assert!(domain.machine.shown().is_empty());
     assert!(domain.issuer_lines.kept().iter().any(|line| line.contains("signed nobody in") && line.contains("\"why\":\"never\"")));
