@@ -140,6 +140,23 @@ pub enum SignsIn {
     RestrictedAdmin,
     /// Away opens a direct desktop using its explicitly enabled Kerberos delegation policy.
     RestrictedAdminSso,
+    /// One management desktop offers Restricted Admin by default and certificate SSO explicitly.
+    ManagementSso,
+}
+
+impl SignsIn {
+    /// The default browser method and the methods an explicit request may select.
+    pub fn select(self, requested: Option<&str>) -> Option<Self> {
+        let default = if self == Self::ManagementSso { Self::RestrictedAdminSso } else { self };
+        let selected = match requested {
+            None => default,
+            Some("themselves") => Self::Themselves,
+            Some("restricted-admin-sso") => Self::RestrictedAdminSso,
+            Some("typed") => Self::Typed,
+            _ => return None,
+        };
+        (selected == default || (self == Self::ManagementSso && selected == Self::Themselves)).then_some(selected)
+    }
 }
 
 /// One machine.
@@ -675,7 +692,7 @@ fn machine(
                 ));
             }
         }
-        SignsIn::RestrictedAdmin | SignsIn::RestrictedAdminSso => {
+        SignsIn::RestrictedAdmin | SignsIn::RestrictedAdminSso | SignsIn::ManagementSso => {
             if kind != Kind::Windows
                 || !matches!(desktop, Some((Over::Rdp, _)))
                 || collection.is_some()
@@ -684,7 +701,7 @@ fn machine(
             {
                 return Err(refused(file, line, format!("{name} needs a direct Windows desktop to use restricted-admin")));
             }
-            if signs_in == SignsIn::RestrictedAdminSso && desktop != Some((Over::Rdp, 3389)) {
+            if matches!(signs_in, SignsIn::RestrictedAdminSso | SignsIn::ManagementSso) && desktop != Some((Over::Rdp, 3389)) {
                 return Err(refused(file, line, format!("{name} needs RDP port 3389 to use restricted-admin-sso")));
             }
             // The destination is used in a Windows Run command. Only a DNS name already
@@ -725,10 +742,13 @@ fn signs_in(parts: &Parts, file: &str, of: &str) -> Result<Option<(SignsIn, usiz
             "typed" => Ok(Some((SignsIn::Typed, line))),
             "restricted-admin" => Ok(Some((SignsIn::RestrictedAdmin, line))),
             "restricted-admin-sso" => Ok(Some((SignsIn::RestrictedAdminSso, line))),
+            "management-sso" => Ok(Some((SignsIn::ManagementSso, line))),
             _ => Err(refused(
                 file,
                 line,
-                format!("“{way}” is no way people are signed in: themselves, typed, restricted-admin, or restricted-admin-sso"),
+                format!(
+                    "“{way}” is no way people are signed in: themselves, typed, restricted-admin, restricted-admin-sso, or management-sso"
+                ),
             )),
         },
     }
@@ -794,7 +814,7 @@ fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
             }
             true
         }
-        Some((SignsIn::RestrictedAdmin | SignsIn::RestrictedAdminSso, line)) => {
+        Some((SignsIn::RestrictedAdmin | SignsIn::RestrictedAdminSso | SignsIn::ManagementSso, line)) => {
             return Err(refused(file, line, format!("the farm {name} cannot use restricted-admin: it is for a direct Windows desktop")));
         }
         _ => false,
@@ -888,6 +908,11 @@ impl Machine {
             let command = format!("mstsc.exe /restrictedAdmin /v:{}:{port}", self.address);
             fields.push(("native_rdp".to_string(), command.into()));
         }
+        if self.signs_in == SignsIn::ManagementSso {
+            if let Json::Object(fields) = &mut machine {
+                fields.push(("sign_in_methods".into(), Json::List(vec!["restricted-admin-sso".into(), "themselves".into()])));
+            }
+        }
         machine
     }
 }
@@ -895,6 +920,27 @@ impl Machine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn management_sso_offers_two_passwordless_methods_on_one_direct_desktop() {
+        let written = "machines:\n  - name: admin\n    kind: windows\n    address: host.corp.example\n    desktop: true\n    signs-in: management-sso\n";
+        let in_force = InForce::read(&files(&[("machines.yaml", written)])).expect("a management desktop");
+        let machine = &in_force.machines[0];
+        assert_eq!(machine.signs_in.select(None), Some(SignsIn::RestrictedAdminSso));
+        assert_eq!(machine.signs_in.select(Some("themselves")), Some(SignsIn::Themselves));
+        assert_eq!(machine.signs_in.select(Some("typed")), None);
+        assert_eq!(machine.signs_in.select(Some("unknown")), None);
+        assert!(machine.for_a_person().get("native_rdp").is_none());
+        assert_eq!(machine.for_a_person().get("sign_in_methods").unwrap().write(), "[\"restricted-admin-sso\",\"themselves\"]");
+        assert_eq!(SignsIn::Themselves.select(Some("restricted-admin-sso")), None);
+        assert_eq!(SignsIn::Themselves.select(Some("typed")), None);
+        assert_eq!(SignsIn::RestrictedAdminSso.select(Some("themselves")), None);
+        for extra in
+            ["    collection: A\n    served-by: [other.corp.example]\n", "    programs:\n      - name: Editor\n        run: notepad.exe\n"]
+        {
+            assert!(InForce::read(&files(&[("machines.yaml", &format!("{written}{extra}"))])).is_err());
+        }
+    }
 
     const MACHINES: &str = "\
 # the machines of the finance department
@@ -1273,7 +1319,7 @@ rules:
             (
                 "machines:\n  - name: a\n    kind: windows\n    address: a.example\n    desktop: true\n    signs-in: somehow\n",
                 6,
-                "“somehow” is no way people are signed in: themselves, typed, restricted-admin, or restricted-admin-sso",
+                "“somehow” is no way people are signed in: themselves, typed, restricted-admin, restricted-admin-sso, or management-sso",
             ),
             (
                 "machines:\n  - name: a\n    kind: linux\n    address: a.example\n    shell: true\n    signs-in: themselves\n",

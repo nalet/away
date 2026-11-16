@@ -88,6 +88,8 @@ impl Server {
                             ("session", named.as_str().into()),
                             ("subject", subject.as_str().into()),
                             ("machine", machine.as_str().into()),
+                            ("signs_in", "themselves".into()),
+                            ("targets", Json::List(vec!["host.corp.example:3389".into()])),
                             ("token", signed.as_str().into()),
                         ]);
                         answer(StatusCode::OK, "application/json", says.write())
@@ -199,6 +201,7 @@ async fn world_with(kerberos: &str, good_for: u64) -> World {
     })
     .await;
     let told = Told {
+        administrators: None,
         internal: Some(Internal { address: "127.0.0.1:0".to_string(), certificate: None }),
         windows: Some(Windows {
             domain: "corp.example".to_string(),
@@ -433,7 +436,11 @@ async fn what_an_authority_issues_for_longer_than_five_minutes_signs_nobody_in()
 
 #[tokio::test]
 async fn an_issuer_of_an_installation_without_a_domain_signs_nobody_in() {
-    let told = Told { internal: Some(Internal { address: "127.0.0.1:0".to_string(), certificate: None }), ..Told::default() };
+    let told = Told {
+        administrators: None,
+        internal: Some(Internal { address: "127.0.0.1:0".to_string(), certificate: None }),
+        ..Told::default()
+    };
     let (_stopper, stop) = stop::pair();
     let lines = Lines::kept_for("issuer");
     let settings = Settings { address: String::new(), health_address: "127.0.0.1:0".to_string() };

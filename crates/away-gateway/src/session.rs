@@ -369,8 +369,8 @@ where
     known(server, taken, &taken.address, taken.port, &shows).await?;
     tell(browser, ToBrowser::Step("signing-in")).await.map_err(|()| gone(Step::SigningIn))?;
     let mut again = false;
-    // whether the person types in place of being signed in as themselves
-    let mut instead = false;
+    // A password is requested only for an explicitly typed catalog entry.
+    let instead = false;
     let (mut desktop, served_by) = 'asked: {
         if let Some(policy) = restricted {
             let ticket = policy.ticket(&taken.subject, &taken.address, taken.port).await?;
@@ -379,10 +379,7 @@ where
                 Opened::SentOn(_) => return Err(not_owned("Restricted Admin refuses redirected targets".into())),
             }
         }
-        // the person is signed in as themselves: nothing is asked, and the connection
-        // that showed who the machine is goes on. A person Away signs in so on no
-        // machine, such as one of the directory's administrators, is asked for a name
-        // and a password in its place, as on a machine where people type
+        // A certificate refusal never downgrades a passwordless session to a password.
         if taken.themselves {
             let not = |details: &str| Failure { step: Step::SigningIn, why: Why::NotThemselves, details: details.to_string() };
             let domain = domain.ok_or_else(|| not("this installation names no domain to sign people in on the machines of"))?;
@@ -408,7 +405,7 @@ where
                     }
                 }
             }
-            instead = true;
+            return Err(not("certificate SSO is not authorized for this identity and destination"));
         }
         // the machine signs people in by what they type. The connection that showed who
         // it is is let go: the person may take their time to type, and a machine

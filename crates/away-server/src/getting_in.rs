@@ -507,8 +507,15 @@ impl GettingIn {
         if machine.signs_in == SignsIn::RestrictedAdmin {
             return plain(StatusCode::FORBIDDEN, "This desktop opens in Windows Remote Desktop with Restricted Admin.\n");
         }
-        let themselves = machine.signs_in == SignsIn::Themselves;
-        let restricted_admin = machine.signs_in == SignsIn::RestrictedAdminSso;
+        let methods: Vec<_> = named.iter().filter(|(key, _)| key == "signs_in").collect();
+        if methods.len() > 1 {
+            return plain(StatusCode::BAD_REQUEST, "Choose one sign-in method.\n");
+        }
+        let Some(method) = machine.signs_in.select(methods.first().map(|(_, value)| value.as_str())) else {
+            return plain(StatusCode::FORBIDDEN, "This sign-in method is not allowed for this machine.\n");
+        };
+        let themselves = method == SignsIn::Themselves;
+        let restricted_admin = method == SignsIn::RestrictedAdminSso;
         // what Away opens so far: a Windows desktop and the programs of a Windows machine, of
         // one machine or of a farm's collection
         let asked_for = named.iter().find(|(its, value)| its == "program" && !value.is_empty()).map(|(_, value)| value.as_str());
@@ -625,17 +632,28 @@ impl GettingIn {
                 // A pending ticket cannot outlive a management policy or target change.
                 let (in_force, _) = self.register.in_force();
                 let current = in_force.machines.iter().find(|machine| machine.name == asked.machine);
-                let changed = current.is_some_and(|machine| {
-                    machine.signs_in == SignsIn::RestrictedAdmin
-                        || (machine.signs_in == SignsIn::RestrictedAdminSso) != asked.restricted_admin
+                let method = if asked.restricted_admin {
+                    "restricted-admin-sso"
+                } else if asked.themselves {
+                    "themselves"
+                } else {
+                    "typed"
+                };
+                let allowed = current.is_some_and(|machine| {
+                    machine.signs_in.select(Some(method)).is_some()
+                        && machine.address == asked.address
+                        && machine.collection == asked.collection
+                        && machine.served_by == asked.served_by
+                        && (match &asked.program {
+                            None => machine.desktop == Some((Over::Rdp, asked.port)),
+                            Some((name, run)) => {
+                                machine.programs.iter().any(|p| &p.name == name && &p.run == run)
+                                    && machine.desktop.map_or(3389, |(_, port)| port) == asked.port
+                            }
+                        })
+                        && in_force.reached_by(&asked.person.groups).iter().any(|(allowed, _)| allowed.name == asked.machine)
                 });
-                let no_longer_allowed = asked.restricted_admin
-                    && !current.is_some_and(|machine| {
-                        machine.address == asked.address
-                            && machine.desktop == Some((Over::Rdp, asked.port))
-                            && in_force.reached_by(&asked.person.groups).iter().any(|(allowed, _)| allowed.name == asked.machine)
-                    });
-                if changed || no_longer_allowed {
+                if !allowed {
                     self.sessions.end(&asked.session);
                     return plain(StatusCode::NOT_FOUND, "No session is asked for with this ticket.\n");
                 }
@@ -721,23 +739,48 @@ impl GettingIn {
         let (true, Some(token)) = (still_them, &signed.token) else {
             return plain(StatusCode::FORBIDDEN, "The sign-in service did not sign anew who this person is.\n");
         };
-        if running.restricted_admin {
-            let (in_force, _) = self.register.in_force();
-            let allowed = signing.sign_ins.who(&running.sign_in, now).is_some_and(|(person, expired)| {
-                !expired
-                    && in_force
-                        .reached_by(&person.groups)
-                        .iter()
-                        .any(|(machine, _)| machine.name == running.machine && machine.signs_in == SignsIn::RestrictedAdminSso)
-            });
-            if !allowed {
-                return plain(StatusCode::FORBIDDEN, "The refreshed sign-in no longer authorizes this management desktop.\n");
-            }
+        let method = if running.restricted_admin {
+            "restricted-admin-sso"
+        } else if running.themselves {
+            "themselves"
+        } else {
+            "typed"
+        };
+        let (in_force, _) = self.register.in_force();
+        let allowed = signing.sign_ins.who(&running.sign_in, now).is_some_and(|(person, expired)| {
+            !expired
+                && in_force.reached_by(&person.groups).iter().any(|(machine, _)| {
+                    machine.name == running.machine
+                        && machine.signs_in.select(Some(method)).is_some()
+                        && machine.address == running.address
+                        && machine.collection == running.collection
+                        && machine.served_by == running.served_by
+                        && (match &running.program {
+                            None => machine.desktop == Some((Over::Rdp, running.port)),
+                            Some((name, run)) => {
+                                machine.programs.iter().any(|p| &p.name == name && &p.run == run)
+                                    && machine.desktop.map_or(3389, |(_, port)| port) == running.port
+                            }
+                        })
+                })
+        });
+        if !allowed {
+            return plain(StatusCode::FORBIDDEN, "The refreshed sign-in or current policy no longer authorizes this session.\n");
         }
         let says = Json::object([
             ("session", session.into()),
             ("subject", running.person.subject.as_str().into()),
             ("machine", running.machine.as_str().into()),
+            ("signs_in", method.into()),
+            (
+                "targets",
+                Json::List(
+                    std::iter::once(format!("{}:{}", running.address, running.port))
+                        .chain(running.served_by.iter().cloned())
+                        .map(Json::from)
+                        .collect(),
+                ),
+            ),
             ("token", token.expose().into()),
         ]);
         answer(StatusCode::OK, "application/json", says.write())

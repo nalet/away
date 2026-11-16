@@ -27,8 +27,8 @@ export function viewAt(path: string): View | null {
 }
 
 // Where a machine's desktop is open.
-export function desktopOf(name: string): string {
-  return `/machines/${encodeURIComponent(name)}/desktop`;
+export function desktopOf(name: string, method?: string): string {
+  return `/machines/${encodeURIComponent(name)}/desktop${method ? `/${encodeURIComponent(method)}` : ''}`;
 }
 
 // Where a program of a machine is open.
@@ -38,11 +38,11 @@ export function programOf(machine: string, program: string): string {
 
 // What a page's address opens, where it opens something: a machine's desktop, or one of
 // its programs.
-export function sessionAt(path: string): { machine: string; program: string | null } | null {
-  const [, machine, program] = /^\/machines\/([^/]+)\/(?:desktop|programs\/([^/]+))$/.exec(path) ?? [];
+export function sessionAt(path: string): { machine: string; program: string | null; method?: string } | null {
+  const [, machine, method, program] = /^\/machines\/([^/]+)\/(?:desktop(?:\/(themselves|restricted-admin-sso))?|programs\/([^/]+))$/.exec(path) ?? [];
   if (!machine) return null;
   try {
-    return { machine: decodeURIComponent(machine), program: program ? decodeURIComponent(program) : null };
+    return { machine: decodeURIComponent(machine), program: program ? decodeURIComponent(program) : null, ...(method ? { method } : {}) };
   } catch {
     return null;
   }

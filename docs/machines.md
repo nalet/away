@@ -455,3 +455,17 @@ short-lived target ticket. The RDP exchange requires Restricted Admin with NLA
 and sends empty credentials. Failure never falls back to asking for a password.
 
 See [the installation guide](install.md#browser-restricted-admin) for the opt-in.
+
+
+### One management tile with two methods
+
+Use `signs-in: management-sso` on a direct Windows desktop to offer Restricted
+Admin by default plus **Open with certificate SSO** on the same tile. Both
+`restrictedAdmin` and the relevant certificate policy must be configured in the
+installation. The server only accepts the methods allowed by the catalog; a URL
+or API parameter cannot enable another method. Both methods fail closed, without
+falling back to a password. This mode does not apply to farms or RemoteApps.
+
+Shared desktops and RemoteApps use `signs-in: themselves` and their existing
+resource access rules. Certificate SSO uses the person's normal Windows identity;
+it does not change their privileges or mean Windows Restricted Admin mode.

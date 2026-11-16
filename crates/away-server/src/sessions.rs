@@ -49,6 +49,18 @@ pub struct Asked {
 /// A session the gateway took over.
 #[derive(Clone, Debug)]
 pub struct Running {
+    /// The destination and mode fixed when the session was admitted.
+    pub address: String,
+    /// The original RDP port.
+    pub port: u16,
+    /// The allowed collection hosts.
+    pub served_by: Vec<String>,
+    /// The collection originally requested.
+    pub collection: Option<String>,
+    /// The program and its command, if any.
+    pub program: Option<(String, String)>,
+    /// Whether this session may request a sign-in certificate.
+    pub themselves: bool,
     /// Whether fresh authorization is required for browser Restricted Admin.
     pub restricted_admin: bool,
     /// Whose it is.
@@ -95,6 +107,12 @@ impl Sessions {
             return None;
         }
         let running = Running {
+            address: asked.address.clone(),
+            port: asked.port,
+            served_by: asked.served_by.clone(),
+            collection: asked.collection.clone(),
+            program: asked.program.clone(),
+            themselves: asked.themselves,
             restricted_admin: asked.restricted_admin,
             person: asked.person.clone(),
             sign_in: asked.sign_in.clone(),

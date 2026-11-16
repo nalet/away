@@ -316,6 +316,38 @@ mod tests {
     }
 
     #[test]
+    fn administrative_policy_binds_subject_account_and_every_destination() {
+        let mut windows = windows();
+        let about = says("alex.urban".into(), &["Domain Admins"]);
+        assert_eq!(windows.account(&about).unwrap_err().why, "never");
+        windows.told.never_of.clear();
+        let policy = crate::administrators::Policy::read(
+            r#"{"7c1f":"alex.urban@corp.example"}"#,
+            "host.corp.example,broker.corp.example",
+            "corp.example",
+        )
+        .unwrap();
+        let approved = vec!["host.corp.example:3389".into(), "broker.corp.example".into()];
+        assert!(policy.authorize(&about, &approved, &windows).is_ok());
+        for targets in [
+            vec![],
+            vec!["other.corp.example".into()],
+            vec!["host.corp.example:3390".into()],
+            vec!["host.corp.example".into(), "other.corp.example".into()],
+        ] {
+            assert!(policy.authorize(&about, &targets, &windows).is_err());
+        }
+        for name in ["sam.other", "alex.urban@other.example", "Administrator", "krbtgt"] {
+            assert!(policy.authorize(&says(name.into(), &[]), &approved, &windows).is_err());
+        }
+        let mut other = about.clone();
+        if let Json::Object(fields) = &mut other {
+            fields.iter_mut().find(|(key, _)| key == "sub").unwrap().1 = "another-subject".into();
+        }
+        assert!(policy.authorize(&other, &approved, &windows).is_err());
+    }
+
+    #[test]
     fn the_account_is_what_the_entry_the_installation_named_holds() {
         let windows = windows();
         for (named, account) in [

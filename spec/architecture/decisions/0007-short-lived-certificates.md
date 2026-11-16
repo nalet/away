@@ -67,3 +67,14 @@ Tried on 2026-11-15, on a real domain and with its own authority: an ordinary ac
 - **No being oneself over VNC**, and none on a Windows machine outside a domain in the first release.
 - **No sign-in as an administrator of the directory**, unless one is named.
 - **No certificate that outlasts minutes**, and none that leaves the gateway.
+
+
+## Administrative policy extension (2026-11-16)
+
+An installation may explicitly enable the separate administrative certificate
+policy described in [the installation guide](../../../docs/install.md#administrative-certificate-sso).
+It binds immutable subjects to accounts and approved destinations, using an
+independent enrollment identity and templates. The ordinary enrollment account
+continues to exclude administrators. A certificate refusal now fails the session
+without requesting a password. This extends the original ordinary-user-only
+decision; it does not remove the CA's independent recipient restrictions.

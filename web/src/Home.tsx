@@ -173,7 +173,7 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
                 const opens = program !== null && opensPrograms(machine);
                 const to = only ? desktopOf(machine.name) : opens ? programOf(machine.name, program.name) : pageOf(machine.name);
                 return (
-                  <li key={`${machine.name} ${program?.name ?? ''}`}>
+                  <li key={`${machine.name} ${program?.name ?? ''}`} className={program === null && machine.sign_in_methods ? 'with-methods' : undefined}>
                     <a className="m" href={to} onClick={inPlace(go, to)}>
                       {program?.icon ? <img className="icon" src={program.icon} alt="" width={24} height={24} /> : <Icon size={22} aria-hidden="true" />}
                       <span className="main">
@@ -181,6 +181,11 @@ export function Opens({ which, go, contact }: { which: Which; go: (to: string) =
                         <span className="sub">{program === null ? whatItIs(machine) : texts.programOn(machine.name)}</span>
                       </span>
                     </a>
+                    {program === null && machine.sign_in_methods?.includes('themselves') && (
+                      <a className="sign-in-choice" href={desktopOf(machine.name, 'themselves')} onClick={inPlace(go, desktopOf(machine.name, 'themselves'))} aria-label={`Open with certificate SSO on ${machine.name}`}>
+                        Open with certificate SSO
+                      </a>
+                    )}
                     <StarOf stars={stars} machine={machine.name} program={program?.name ?? null} />
                   </li>
                 );
@@ -283,12 +288,20 @@ export function MachinePage({ name, go }: { name: string; go: (to: string) => vo
               {machine.native_rdp ? (
                 <NativeRdp key={machine.native_rdp} command={machine.native_rdp} />
               ) : opensDesktop(machine) ? (
+                <>
                 <a className="m still" href={desktopOf(machine.name)} onClick={inPlace(go, desktopOf(machine.name))}>
                   <Monitor size={22} aria-hidden="true" />
                   <span className="main">
-                    <span className="name">{texts.machine.desktopOf[machine.kind]}</span>
+                    <span className="name">{machine.sign_in_methods ? 'Open with Restricted Admin' : texts.machine.desktopOf[machine.kind]}</span>
                   </span>
                 </a>
+                {machine.sign_in_methods?.includes('themselves') && (
+                  <a className="m still" href={desktopOf(machine.name, 'themselves')} onClick={inPlace(go, desktopOf(machine.name, 'themselves'))}>
+                    <Monitor size={22} aria-hidden="true" />
+                    <span className="main"><span className="name">Open with certificate SSO</span></span>
+                  </a>
+                )}
+                </>
               ) : (
                 <div className="m still">
                   <Monitor size={22} aria-hidden="true" />

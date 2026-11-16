@@ -277,6 +277,7 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
             })
             .await;
             let told = away_issuer::Told {
+                administrators: None,
                 internal: Some(away_issuer::told::Internal { address: "127.0.0.1:0".to_string(), certificate: None }),
                 windows: Some(away_issuer::told::Windows {
                     domain: "corp.example".to_string(),
@@ -683,6 +684,61 @@ async fn vouched(world: &World, session: &str) -> (u16, String) {
     let got =
         away_part::client::Client::new(None).expect("a client").send_form(&at, &[("session", session)], None).await.expect("an answer");
     (got.status, String::from_utf8_lossy(&got.body).to_string())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn management_methods_are_admitted_by_policy_and_rechecked_before_tickets_and_certificates() {
+    let Some(world) = world("management-methods").await else { return };
+    let file = world._folder.0.join("management.yaml");
+    let policy = |mode: &str| {
+        format!("machines:\n  - name: management\n    kind: windows\n    address: host.corp.example\n    desktop: true\n    signs-in: {mode}\nrules:\n  - name: management-access\n    who: [staff]\n    reaches: [management]\n")
+    };
+    std::fs::write(&file, policy("management-sso")).unwrap();
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while !browser.ask("GET", &format!("{}/api/machines", world.away), false).2.contains("management") {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
+    for method in ["typed", "unknown"] {
+        assert_eq!(browser.open(&world, &format!("management&signs_in={method}")).0, 403);
+    }
+    assert_eq!(browser.open(&world, "management&signs_in=themselves&signs_in=restricted-admin-sso").0, 400);
+    assert_eq!(browser.open(&world, "desk-01&signs_in=themselves").0, 403);
+    let client = away_part::client::Client::new(None).unwrap();
+    let at = Address::read(&format!("http://127.0.0.1:{}/internal/take", world.internal.port())).unwrap();
+    let mut certificate_session = String::new();
+    for (query, expected) in [("management", "restricted-admin-sso"), ("management&signs_in=themselves", "themselves")] {
+        let (status, body) = browser.open(&world, query);
+        assert_eq!(status, 200, "{body}");
+        let body = Json::read(&body).unwrap();
+        let got = client.send_form(&at, &[("ticket", body.text_of("ticket").unwrap()), ("sign_in", &sign_in)], None).await.unwrap();
+        assert_eq!(got.status, 200);
+        let taken = Json::read(std::str::from_utf8(&got.body).unwrap()).unwrap();
+        assert_eq!(taken.get("machine").unwrap().text_of("signs_in"), Some(expected));
+        let session = body.text_of("session").unwrap();
+        let (status, vouched) = vouched(&world, session).await;
+        assert_eq!(status, 200, "{vouched}");
+        assert_eq!(Json::read(&vouched).unwrap().text_of("signs_in"), Some(expected));
+        if expected == "themselves" {
+            certificate_session = session.to_string();
+        }
+    }
+    let pending = browser.ticket(&world, "management&signs_in=themselves");
+    std::fs::write(&file, policy("restricted-admin-sso")).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while browser.open(&world, "management&signs_in=themselves").0 != 403 {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(client.send_form(&at, &[("ticket", &pending), ("sign_in", &sign_in)], None).await.unwrap().status, 404);
+    assert_eq!(vouched(&world, &certificate_session).await.0, 403);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -1237,7 +1293,7 @@ async fn a_gateway_that_stops_tells_the_desktops_that_are_open_so_that_their_pag
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_person_away_signs_in_as_themselves_on_no_machine_types_there_and_it_is_a_line() {
+async fn a_certificate_policy_refusal_never_falls_back_to_a_password() {
     let Some(kerberos) = kerberos() else { return };
     let Some(world) = world_with("never-themselves", Some(&kerberos)).await else { return };
     let domain = world.domain.as_ref().expect("a world with a domain");
@@ -1248,32 +1304,15 @@ async fn a_person_away_signs_in_as_themselves_on_no_machine_types_there_and_it_i
     let sign_in = browser.signed_in_as(&world);
     let ticket = browser.ticket(&world, "own-01");
 
-    // on the machine where others are signed in as themselves, they are asked for a name
-    // and a password, and told that it is in place of that
     let mut session = Session::begin(&world, &sign_in, &ticket).await;
-    let (steps, asks) = session.steps().await;
+    let (steps, failed) = session.steps().await;
     assert_eq!(steps, ["reaching", "checking", "signing-in"]);
-    assert_eq!(asks.write(), r#"{"asks":{"again":false,"instead":true}}"#);
-    // nothing was asked of the authority, and the machine saw no ticket
+    let failed = failed.get("failed").expect("SSO fails closed, without asking for a password");
+    assert_eq!(failed.text_of("why"), Some("not-themselves"));
     assert_eq!(domain.pages.seen(), Default::default());
     assert!(domain.machine.shown().is_empty());
     assert!(domain.issuer_lines.kept().iter().any(|line| line.contains("signed nobody in") && line.contains("\"why\":\"never\"")));
-
-    // a password the machine doesn't take is asked for again, in the same words; with
-    // the right one the desktop opens, as on a machine where everyone types
-    session.say(credentials(KNOWN, "another password")).await;
-    assert_eq!(session.next().await.map(|says| says.write()).as_deref(), Some(r#"{"asks":{"again":true,"instead":true}}"#));
-    session.say(credentials(KNOWN, PASSWORD)).await;
-    let (steps, desktop) = session.steps().await;
-    assert_eq!(steps, ["first-picture"], "{}", desktop.write());
-    assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120}}"#);
-    session.say(Json::object([("leaves", true.into())])).await;
-    assert_eq!(session.until("ended").await.write(), r#"{"ended":"left"}"#);
     while session.next().await.is_some() {}
-
-    // still nothing was asked of the authority, and the records are those of a desktop that was opened
-    assert_eq!(domain.pages.seen(), Default::default());
     let kept = records(&world.database).await;
-    let kinds: Vec<&str> = kept.iter().map(|(kind, ..)| kind.as_str()).filter(|kind| kind.starts_with("session-")).collect();
-    assert_eq!(kinds, ["session-asked", "session-opened", "session-ended"]);
+    assert!(!kept.iter().any(|(kind, ..)| kind == "session-opened"));
 }

@@ -19,6 +19,10 @@ pub struct Server {
 /// What the server answers for: a session that runs.
 #[derive(Clone, Debug)]
 pub struct Vouched {
+    /// The admission method fixed by the server.
+    pub signs_in: String,
+    /// Every destination allowed for this resource, including collection hosts.
+    pub targets: Vec<String>,
     /// The person the session is of, as the sign-in service knows them.
     pub subject: String,
     /// The machine, by its name.
@@ -57,9 +61,20 @@ impl Server {
             200 => {
                 let said = Json::read(&said).unwrap_or(Json::Null);
                 match (said.text_of("subject"), said.text_of("machine"), said.text_of("token")) {
-                    (Some(subject), Some(machine), Some(signed)) if !subject.is_empty() => {
-                        Ok(Vouched { subject: subject.to_string(), machine: machine.to_string(), signed: Secret::new(signed) })
-                    }
+                    (Some(subject), Some(machine), Some(signed)) if !subject.is_empty() => Ok(Vouched {
+                        signs_in: said.text_of("signs_in").unwrap_or_default().to_string(),
+                        targets: said
+                            .get("targets")
+                            .and_then(Json::list)
+                            .unwrap_or_default()
+                            .iter()
+                            .filter_map(Json::text)
+                            .map(str::to_string)
+                            .collect(),
+                        subject: subject.to_string(),
+                        machine: machine.to_string(),
+                        signed: Secret::new(signed),
+                    }),
                     _ => Err(NotVouched::NotAsked("The server answered for the session with nothing a sign-in can rest on.".to_string())),
                 }
             }

@@ -322,3 +322,9 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .sess .srail .ticon .icon { width: 20px; height: 20px; }
 .sess .srail .ticon:hover { background: var(--surface-2); }
 .sess .srail .ticon:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+/* Both management methods belong to the same tile; each is a full touch target. */
+.mgrid > li.with-methods { display: flex; flex-direction: column; }
+.mgrid > li.with-methods > a.m { height: auto; flex: 1; border-bottom: 0; }
+.sign-in-choice { display: flex; align-items: center; min-height: 36px; padding: 6px 16px; background: var(--surface); border: 1px solid var(--border); color: var(--fg); font-size: 13px; text-underline-offset: 3px; }
+.sign-in-choice:focus-visible { outline: 2px solid var(--cloud-blue); outline-offset: 2px; }

@@ -246,8 +246,9 @@ What the organisation prepares, once:
   that lasts longer than five minutes from the moment it is issued.
 - **The authority's own limit on whom the account may ask for**, which a
   Windows authority calls restricted enrollment agents: the people who are
-  signed in this way, and never the directory's administrators. This limit is
-  the directory's own, and holds whatever Away is told.
+  signed in this way. The ordinary enrollment account excludes directory
+  administrators. An optional independent administrative policy is described
+  below; the ordinary policy remains in force.
 - **The authority's pages for asking it** (its web enrolment), over HTTPS.
   They may ask for a sign-in that is bound to its connection (extended
   protection), which Away's is.
@@ -298,9 +299,9 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
   the account is none of `domain.neverAs` and the person in none of the groups
   of `domain.neverOf`. Unless the installation says otherwise, those are
   `administrator`, `krbtgt` and `guest`, and the groups of a directory's
-  administrators, as the sign-in service names them. Such a person is asked
-  for a name and a password on the machine, as where people type; the
-  sign-in service has to name those groups for Away to know them.
+  administrators, as the sign-in service names them. A refusal fails the
+  session; no password is requested. The sign-in service has to name those
+  groups for Away to know them.
 - **Every sign-in is a record and a line of the issuer's**: who, as which
   account, on which machine, the certificate's number, until when. The record
   is kept before the certificate is handed out, and without it none is. What
@@ -483,3 +484,47 @@ For a controlled live probe, `cargo run -p away-gateway --example restricted_adm
 uses the gateway's `AWAY_RESTRICTED_ADMIN_*` environment settings and requires
 `AWAY_TEST_SUBJECT`, `AWAY_TEST_TARGET` and `AWAY_TEST_FINGERPRINT`. It opens one
 nonblank desktop and disconnects it without printing any credentials.
+
+
+### Administrative certificate SSO
+
+`adminCertificate` is disabled by default. It permits an explicit subject-to-UPN
+mapping to use a **separate** AD CS service account, enrollment agent template,
+and logon template. Keep `domain.neverOf` and the ordinary enrollment restrictions.
+At the CA, restrict this second agent to the administrative logon template and
+only the approved recipient SID(s). Neither service account needs administrator
+membership. Never grant a broad recipient group merely to make this work.
+
+```yaml
+adminCertificate:
+  enabled: true
+  identities:
+    immutable-oidc-subject: alex.urban@corp.example
+  targets: [admin.corp.example, broker.corp.example, rdsh.corp.example]
+  account: svc-away-adminca
+  secretName: away-admin-authority # password key; only the issuer mounts it
+  agentKind: AwayAdminEnrollmentAgent
+  signInKind: AwayAdminLogon
+```
+
+The issuer verifies the fresh OIDC token itself, matches its immutable subject and
+account to the configured UPN, and checks every server-vouched destination. The
+server rechecks current resource permissions, method and destination at ticket
+redemption and certificate issuance. All targets must be exact domain DNS names
+on RDP port 3389. A farm must name its serving hosts; include its broker and all
+serving hosts in the approved list. No approved identity falls back to ordinary
+enrollment when the administrative policy refuses it. `neverAs` still applies.
+
+This is normal certificate logon with the user's existing Windows privileges and
+onward network SSO. The certificate itself is not limited to an RDP destination;
+the target restriction is enforced by Away. The issuer, gateway, IdP and CA are
+therefore part of the administrative trust boundary. This opt-in is a documented
+lab policy, not a claim of compliance with an unspecified standard.
+
+A management machine with `signs-in: management-sso` offers both passwordless
+methods on one tile: Restricted Admin by default and **Open with certificate
+SSO** as a second action. Shared Desktop and Apps retain `signs-in: themselves`.
+Ordinary users continue to use the ordinary certificate enrollment account.
+Disable `adminCertificate.enabled` to stop new administrative certificate
+issuance, and disable the dedicated account and its CA grant to revoke the trust.
+Existing Windows sessions remain until disconnected or ended at Windows.

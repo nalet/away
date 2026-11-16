@@ -22,6 +22,19 @@
 {{- $told = append $told (dict "name" "AWAY_AUTHORITY_AUTHORITIES_FILE" "value" "/run/away/authority-authorities/authorities.pem") -}}
 {{- $mounts = append $mounts (dict "at" "/run/away/authority-authorities" "volume" (dict "name" "authority-authorities" "configMap" (dict "name" .authority.authoritiesConfigMap))) -}}
 {{- end }}
+{{- with $.Values.adminCertificate }}
+{{- if .enabled }}
+{{- $told = append $told (dict "name" "AWAY_ADMIN_CERTIFICATE_ENABLED" "value" "true") -}}
+{{- $told = append $told (dict "name" "AWAY_ADMIN_CERTIFICATE_IDENTITIES" "value" (toJson (required "adminCertificate.identities is not set" .identities))) -}}
+{{- $told = append $told (dict "name" "AWAY_ADMIN_CERTIFICATE_TARGETS" "value" (join "," (required "adminCertificate.targets is not set" .targets))) -}}
+{{- $told = append $told (dict "name" "AWAY_ADMIN_CERTIFICATE_ACCOUNT" "value" (required "adminCertificate.account is not set" .account)) -}}
+{{- $told = append $told (dict "name" "AWAY_ADMIN_CERTIFICATE_AGENT_KIND" "value" (required "adminCertificate.agentKind is not set" .agentKind)) -}}
+{{- $told = append $told (dict "name" "AWAY_ADMIN_CERTIFICATE_SIGN_IN_KIND" "value" (required "adminCertificate.signInKind is not set" .signInKind)) -}}
+{{- $told = append $told (dict "name" "AWAY_ADMIN_CERTIFICATE_PASSWORD_FILE" "value" "/run/away/admin-authority/password") -}}
+{{- $adminSecret := dict "secretName" (required "adminCertificate.secretName is not set" .secretName) "items" (list (dict "key" "password" "path" "password")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/admin-authority" "volume" (dict "name" "admin-authority" "secret" $adminSecret)) -}}
+{{- end }}
+{{- end }}
 {{- /* the issuer checks a person's sign-in itself: with the sign-in service the server signs people in at */ -}}
 {{- $told = append $told (dict "name" "AWAY_SIGN_IN_SERVICE" "value" (required "a domain needs the sign-in service: signIn.service is not set" $.Values.signIn.service)) -}}
 {{- $told = append $told (dict "name" "AWAY_SIGN_IN_CLIENT" "value" (required "a domain needs the sign-in service: signIn.client is not set" $.Values.signIn.client)) -}}

@@ -84,6 +84,8 @@ pub struct Windows {
 /// What an installation tells the issuer.
 #[derive(Clone, Debug, Default)]
 pub struct Told {
+    /// A separate, explicitly enabled administrative enrollment authority.
+    pub administrators: Option<crate::administrators::Administrator>,
     /// Where the gateway asks the issuer. Without it nothing is asked of it.
     pub internal: Option<Internal>,
     /// The Windows domain, where the installation names one.
@@ -124,6 +126,9 @@ impl Told {
             }
         };
         let Some(domain) = said("AWAY_DOMAIN") else {
+            if said("AWAY_ADMIN_CERTIFICATE_ENABLED").as_deref().is_some_and(|value| value != "false") {
+                return Err("Administrative certificate SSO requires AWAY_DOMAIN.".into());
+            }
             // no domain: whatever else is said of one is said by mistake
             for name in ["AWAY_AUTHORITY", "AWAY_AUTHORITY_ACCOUNT", "AWAY_DOMAIN_CONTROLLERS", "AWAY_DOMAIN_SHORT_NAME"] {
                 if said(name).is_some() {
@@ -179,6 +184,41 @@ impl Told {
             domain: domain.clone(),
         };
 
+        let administrators = match said("AWAY_ADMIN_CERTIFICATE_ENABLED").as_deref() {
+            None | Some("false") => None,
+            Some("true") => {
+                let policy = crate::administrators::Policy::read(
+                    &needed("AWAY_ADMIN_CERTIFICATE_IDENTITIES")?,
+                    &needed("AWAY_ADMIN_CERTIFICATE_TARGETS")?,
+                    &domain,
+                )?;
+                let mut admin = windows.clone();
+                admin.account = needed("AWAY_ADMIN_CERTIFICATE_ACCOUNT")?;
+                if admin.account.eq_ignore_ascii_case(&windows.account) || admin.account.contains(['\\', '@', '/']) {
+                    return Err("Administrative enrollment needs its own authority account, named without a domain.".into());
+                }
+                admin.agent_kind = needed("AWAY_ADMIN_CERTIFICATE_AGENT_KIND")?;
+                admin.sign_in_kind = needed("AWAY_ADMIN_CERTIFICATE_SIGN_IN_KIND")?;
+                if admin.agent_kind.eq_ignore_ascii_case(&windows.agent_kind)
+                    || admin.sign_in_kind.eq_ignore_ascii_case(&windows.sign_in_kind)
+                {
+                    return Err("Administrative enrollment needs its own agent and sign-in templates.".into());
+                }
+                let password = read("AWAY_ADMIN_CERTIFICATE_PASSWORD_FILE")?
+                    .ok_or_else(|| "AWAY_ADMIN_CERTIFICATE_PASSWORD_FILE is required.".to_string())?;
+                let password = String::from_utf8(password).map_err(|_| "The administrative authority password is not text.".to_string())?;
+                let password = password.trim_end_matches(['\r', '\n']);
+                if password.is_empty() {
+                    return Err("The administrative authority password is empty.".into());
+                }
+                admin.password = Secret::new(password);
+                // Only Policy::authorize may admit this branch; never_as still applies.
+                admin.never_of.clear();
+                Some(crate::administrators::Administrator { policy, windows: admin })
+            }
+            Some(_) => return Err("AWAY_ADMIN_CERTIFICATE_ENABLED must be true or false.".into()),
+        };
+
         // the issuer checks a person's sign-in itself, and asks the server whose a session is
         let service = needed("AWAY_SIGN_IN_SERVICE")?;
         Address::read(&service).map_err(|why| format!("AWAY_SIGN_IN_SERVICE is no address: {why}."))?;
@@ -191,7 +231,7 @@ impl Told {
                 "AWAY_INTERNAL_ADDRESS is not set, and signing people in on the machines of {domain} needs it: the gateway asks there."
             ));
         }
-        Ok(Told { internal, windows: Some(windows), sign_in: Some(sign_in), server: Some(server) })
+        Ok(Told { administrators, internal, windows: Some(windows), sign_in: Some(sign_in), server: Some(server) })
     }
 }
 
@@ -265,6 +305,37 @@ mod tests {
         assert_eq!((windows.account_entry.as_str(), windows.groups_entry.as_str()), ("account", "roles"));
         assert_eq!((windows.never_as, windows.never_of.len()), (vec!["root.admin".to_string(), "Administrator".to_string()], 0));
         assert!(windows.authorities.is_some());
+    }
+
+    #[test]
+    fn administrative_enrollment_is_opt_in_and_requires_independent_credentials_and_templates() {
+        let settings = [
+            ("AWAY_ADMIN_CERTIFICATE_ENABLED", "true"),
+            ("AWAY_ADMIN_CERTIFICATE_IDENTITIES", r#"{"subject":"alex@corp.example"}"#),
+            ("AWAY_ADMIN_CERTIFICATE_TARGETS", "host.corp.example"),
+            ("AWAY_ADMIN_CERTIFICATE_ACCOUNT", "svc-admin"),
+            ("AWAY_ADMIN_CERTIFICATE_PASSWORD_FILE", "/secrets/password"),
+            ("AWAY_ADMIN_CERTIFICATE_AGENT_KIND", "AdminAgent"),
+            ("AWAY_ADMIN_CERTIFICATE_SIGN_IN_KIND", "AdminLogon"),
+        ];
+        let told = read_with(&WHOLE, &settings).unwrap();
+        assert!(!told.windows.as_ref().unwrap().never_of.is_empty());
+        let admin = told.administrators.unwrap();
+        assert!(admin.windows.never_of.is_empty());
+        assert_eq!(admin.windows.never_as, told.windows.unwrap().never_as);
+        for (missing, _) in settings.iter().skip(1) {
+            let incomplete: Vec<_> = settings.iter().copied().filter(|(key, _)| key != missing).collect();
+            assert!(read_with(&WHOLE, &incomplete).is_err(), "{missing}");
+        }
+        for (key, ordinary) in [
+            ("AWAY_ADMIN_CERTIFICATE_ACCOUNT", "svc-away"),
+            ("AWAY_ADMIN_CERTIFICATE_AGENT_KIND", "CorpAgent"),
+            ("AWAY_ADMIN_CERTIFICATE_SIGN_IN_KIND", "CorpSignIn"),
+        ] {
+            let mut changed = settings.to_vec();
+            changed.iter_mut().find(|(name, _)| name == &key).unwrap().1 = ordinary;
+            assert!(read_with(&WHOLE, &changed).is_err());
+        }
     }
 
     #[test]

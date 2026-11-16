@@ -75,3 +75,14 @@ With Away's own authority, the key in the issuer can make a certificate for any 
 - **No helper of Away's on a Windows machine.**
 - **No sign-in as oneself on a Windows machine outside a domain** in the first release. Such a machine takes a kept account or what the person types.
 - **No certificate for an account the person's sign-in doesn't name.**
+
+
+## Administrative policy extension (2026-11-16)
+
+An installation may explicitly enable the separate administrative certificate
+policy described in [the installation guide](../../../docs/install.md#administrative-certificate-sso).
+It binds immutable subjects to accounts and approved destinations, using an
+independent enrollment identity and templates. The ordinary enrollment account
+continues to exclude administrators. A certificate refusal now fails the session
+without requesting a password. This extends the original ordinary-user-only
+decision; it does not remove the CA's independent recipient restrictions.

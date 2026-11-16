@@ -233,3 +233,14 @@ issuer:
 # Where the parts run.
 nodeSelector: {}
 tolerations: []
+
+# A separate enrollment identity for explicitly approved administrative users.
+# The ordinary domain.neverOf policy and its AD CS enrollment rules remain intact.
+adminCertificate:
+  enabled: false
+  identities: {}
+  targets: []
+  account: ""
+  secretName: ""
+  agentKind: ""
+  signInKind: ""

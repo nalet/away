@@ -10,6 +10,7 @@
 //! it is, and that the sign-in service signed who that person is a moment ago. An
 //! installation that names no domain has an issuer that signs nobody in.
 
+pub mod administrators;
 pub mod authority;
 pub mod server;
 pub mod sign_in;
@@ -39,6 +40,7 @@ const SIGNED_AT_MOST_AGO: u64 = 120;
 
 /// What signs people in on the machines of a domain, and what that rests on.
 struct Domain {
+    administrators: Option<(administrators::Policy, Windows)>,
     windows: Windows,
     service: Service,
     server: Server,
@@ -75,7 +77,13 @@ impl Issuer {
                     .map_err(|why| could_not(format!("The authorities that secure the sign-in service can't be used: {why}.")))?;
                 let asks = Client::new(server.authorities.as_deref())
                     .map_err(|why| could_not(format!("The authority that secures the server's address can't be used: {why}.")))?;
+                let administrators = told
+                    .administrators
+                    .map(|admin| Windows::new(admin.windows).map(|windows| (admin.policy, windows)))
+                    .transpose()
+                    .map_err(could_not)?;
                 let domain = Domain {
+                    administrators,
                     windows: Windows::new(windows).map_err(could_not)?,
                     service: Service::new(service, &sign_in.service, &sign_in.client),
                     server: Server::new(asks, server.at),
@@ -198,7 +206,19 @@ impl Inside {
             let why = "The sign-in service signed who this person is too long ago, or doesn't say when.";
             return refuse(StatusCode::FORBIDDEN, because("sign-in", why.to_string()));
         }
-        let made = match domain.windows.sign_in(&about, asked, now).await {
+        if vouched.signs_in != "themselves" {
+            return refuse(StatusCode::FORBIDDEN, because("policy", "This session is not authorized to request a certificate.".into()));
+        }
+        let windows = match &domain.administrators {
+            Some((policy, windows)) if policy.contains(&vouched.subject) => {
+                if let Err(why) = policy.authorize(&about, &vouched.targets, windows) {
+                    return refuse(StatusCode::FORBIDDEN, why);
+                }
+                windows
+            }
+            _ => &domain.windows,
+        };
+        let made = match windows.sign_in(&about, asked, now).await {
             Ok(made) => made,
             Err(refused) => {
                 let status = match refused.why {

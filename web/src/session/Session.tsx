@@ -37,7 +37,7 @@ type State =
 
 // One session with a machine's desktop, or with one of its programs: from asking the
 // server for it to its end.
-function useSession(machine: string, program: string | null) {
+function useSession(machine: string, program: string | null, method?: string) {
   const [state, setState] = useState<State>({ is: 'opening', step: null, asks: null });
   // the windows of the programs, from the front one back
   const [windows, setWindows] = useState<WindowOf[]>([]);
@@ -102,7 +102,7 @@ function useSession(machine: string, program: string | null) {
     };
     const begin = async (anew: boolean) => {
       const [asked, layout] = await Promise.all([
-        fetch(`/api/sessions?${new URLSearchParams(program === null ? { machine } : { machine, program })}`, { method: 'POST', headers: { 'x-away': '1' } }),
+        fetch(`/api/sessions?${new URLSearchParams({ machine, ...(program === null ? {} : { program }), ...(method ? { signs_in: method } : {}) })}`, { method: 'POST', headers: { 'x-away': '1' } }),
         layoutOf(),
       ]);
       if (over) return;
@@ -256,7 +256,7 @@ function useSession(machine: string, program: string | null) {
       pictures.forEach((picture) => picture.close());
       ofTheTray.forEach((picture) => picture.close());
     };
-  }, [machine, program, attempt, canvas]);
+  }, [machine, program, method, attempt, canvas]);
 
   const say = useCallback((message: string | Uint8Array<ArrayBuffer>) => {
     if (socket.current?.readyState === WebSocket.OPEN) socket.current.send(message);
@@ -282,6 +282,7 @@ function useSession(machine: string, program: string | null) {
 }
 
 interface SessionProps {
+  method?: string;
   name: string;
   program: string | null;
   go: (to: string) => void;
@@ -298,8 +299,8 @@ export function Session({ showMachine, ...session }: SessionProps & { showMachin
 }
 
 // The page of a session with a machine's desktop, or with one of its programs.
-function BrowserSession({ name, program, go, contact, machine }: SessionProps & { machine: Machine | null }) {
-  const { state, windows, inFront, icons, tray, trayPictures, layout, started, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program);
+function BrowserSession({ name, program, method, go, contact, machine }: SessionProps & { machine: Machine | null }) {
+  const { state, windows, inFront, icons, tray, trayPictures, layout, started, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program, method);
   const toMachines = () => go(machine ? pageOf(name) : addressOf.machines);
 
   useEffect(() => {

@@ -23,6 +23,7 @@ export interface Machine {
   shell: Way | null;
   collection: string | null;
   native_rdp?: string;
+  sign_in_methods?: ('restricted-admin-sso' | 'themselves')[];
 }
 
 // A machine as the files say it, for those who administer.

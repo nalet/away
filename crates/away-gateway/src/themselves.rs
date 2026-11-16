@@ -154,8 +154,7 @@ impl Domain {
 
     /// Makes the person of a session who they are in the domain: a key that stays
     /// here, a certificate for it from the issuer, and with it their first ticket.
-    /// Nothing for a person Away signs in as themselves on no machine: they sign in as
-    /// on a machine where people type.
+    /// Nothing for a person excluded by enrollment policy; the session must fail closed.
     pub async fn themselves(&self, session: &str) -> Result<Option<Themselves>, Failure> {
         let key = tokio::task::spawn_blocking(Key::new).await.map_err(not)?.map_err(not)?;
         let asked = request::asked(&key, "a session's key").map_err(not)?;

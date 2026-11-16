@@ -280,6 +280,43 @@ test('a native desktop uses its existing tile and a bookmark opens the same inst
   expect(sockets).toEqual([]);
 });
 
+test('one management tile opens Restricted Admin by default and offers certificate SSO explicitly', async ({ page }) => {
+  const requests: URL[] = [];
+  await page.route('**/api/machines', async (route) => {
+    const response = await route.fetch();
+    const catalog = (await response.json()) as { machines: { name: string; sign_in_methods?: string[] }[] };
+    const machine = catalog.machines.find((one) => one.name === 'hr-app-01');
+    expect(machine).toBeDefined();
+    if (machine) machine.sign_in_methods = ['restricted-admin-sso', 'themselves'];
+    await route.fulfill({ response, json: catalog });
+  });
+  await page.route('**/api/sessions?*', async (route) => {
+    requests.push(new URL(route.request().url()));
+    await route.fulfill({ status: 403, body: 'Test admission refused.' });
+  });
+  await page.goto('/');
+  const tile = page.getByRole('link', { name: /^hr-app-01/ });
+  await expect(tile).toHaveCount(1);
+  await expect(tile).toHaveAttribute('href', '/machines/hr-app-01/desktop');
+  await expect(page.getByRole('link', { name: 'Open with certificate SSO on hr-app-01', exact: true })).toHaveCount(1);
+  await accessible(page);
+  await tile.click();
+  await expect.poll(() => requests.length).toBe(1);
+  expect(requests[0]?.searchParams.get('signs_in')).toBeNull();
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Open with certificate SSO on hr-app-01', exact: true }).click();
+  await expect(page).toHaveURL(`${AWAY}/machines/hr-app-01/desktop/themselves`);
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1]?.searchParams.get('signs_in')).toBe('themselves');
+  await page.reload();
+  await expect.poll(() => requests.length).toBe(3);
+  expect(requests[2]?.searchParams.get('signs_in')).toBe('themselves');
+  await page.goto('/machines/hr-app-01');
+  await expect(page.getByRole('link', { name: 'Open with Restricted Admin', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open with certificate SSO', exact: true })).toBeVisible();
+  await accessible(page);
+});
+
 test('a machine has a page of its own, which says what it offers and what it is', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: /^fin-app-02/ }).click();
