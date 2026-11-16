@@ -16,12 +16,14 @@ const COMMAND: u16 = 0x0004;
 const READY: u16 = 0x0005;
 const CLIENT: u16 = 0x000b;
 const READY_WITH_MORE: u16 = 0x0013;
+const CLOAK: u16 = 0x0015;
 const RESULT: u16 = 0x0080;
 
 /// The setting that says how much room the windows have.
 const WORK_AREA: u32 = 0x0000_002f;
-/// The client shows no icons of windows, so none need to travel.
-const NO_ICONS: u32 = 0x0000_0400;
+/// The client hides windows from the machine's picture, and is told of those the
+/// machine hides.
+const CLOAKS: u32 = 0x0000_0200;
 
 const WRONG: Error = Error::NotRdp("a message about programs is not built as one");
 
@@ -66,10 +68,11 @@ pub fn ready() -> Vec<u8> {
     message(READY, &1u32.to_le_bytes())
 }
 
-/// What the client is: one that shows no icons of windows, and leaves moving a window
-/// and its place among the others to the machine.
+/// What the client is: one that hides windows, and leaves moving a window and its place
+/// among the others to the machine. The icons of the windows travel, for the client to
+/// show beside their titles.
 pub fn client() -> Vec<u8> {
-    message(CLIENT, &NO_ICONS.to_le_bytes())
+    message(CLIENT, &CLOAKS.to_le_bytes())
 }
 
 /// How much room the windows have: the whole desktop, which has no bar of the client's.
@@ -102,6 +105,13 @@ pub fn activate(window: u32, active: bool) -> Vec<u8> {
     let mut holds = window.to_le_bytes().to_vec();
     holds.push(u8::from(active));
     message(ACTIVATE, &holds)
+}
+
+/// Asks the machine to hide a window: it is drawn no more, as long as it is open.
+pub fn cloak(window: u32) -> Vec<u8> {
+    let mut holds = window.to_le_bytes().to_vec();
+    holds.push(1);
+    message(CLOAK, &holds)
 }
 
 /// Tells the machine what the person does with a window as a whole.
@@ -189,6 +199,8 @@ pub mod stand_in {
         Activate(u32, bool),
         /// What the person does with a window as a whole.
         Command(u32, Command),
+        /// To hide a window.
+        Cloak(u32),
         /// Something else: the message's kind.
         Other(u16),
     }
@@ -225,6 +237,7 @@ pub mod stand_in {
                     _ => return Err(WRONG),
                 },
             ),
+            CLOAK if message.get(8) == Some(&1) => Asked::Cloak(number32(4)?),
             other => Asked::Other(other),
         })
     }
@@ -257,7 +270,7 @@ mod tests {
     #[test]
     fn the_client_says_it_is_ready_what_it_is_and_which_program_it_wants() {
         assert_eq!(ready(), [0x05, 0x00, 0x08, 0x00, 1, 0, 0, 0]);
-        assert_eq!(client(), [0x0b, 0x00, 0x08, 0x00, 0x00, 0x04, 0, 0]);
+        assert_eq!(client(), [0x0b, 0x00, 0x08, 0x00, 0x00, 0x02, 0, 0]);
         assert_eq!(work_area(1280, 800), [0x03, 0x00, 0x10, 0x00, 0x2f, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x05, 0x20, 0x03]);
         let program = Program { run: "||ledger".to_string(), arguments: "a b".to_string() };
         let asks = start(&program).unwrap();
@@ -266,10 +279,12 @@ mod tests {
         assert_eq!(&asks[28..], &[b'a', 0, b' ', 0, b'b', 0]);
         assert_eq!(activate(0x1_0001, true), [0x02, 0x00, 0x09, 0x00, 0x01, 0x00, 0x01, 0x00, 1]);
         assert_eq!(command(7, Command::Close), [0x04, 0x00, 0x0a, 0x00, 7, 0, 0, 0, 0x60, 0xf0]);
+        assert_eq!(cloak(0x1_0001), [0x15, 0x00, 0x09, 0x00, 0x01, 0x00, 0x01, 0x00, 1]);
+        assert_eq!(stand_in::read(&cloak(0x1_0001)), Ok(Asked::Cloak(0x1_0001)));
 
         // each is read as what it is
         assert_eq!(stand_in::read(&ready()), Ok(Asked::Ready));
-        assert_eq!(stand_in::read(&client()), Ok(Asked::Client(0x400)));
+        assert_eq!(stand_in::read(&client()), Ok(Asked::Client(0x200)));
         assert_eq!(stand_in::read(&work_area(1280, 800)), Ok(Asked::WorkArea(1280, 800)));
         assert_eq!(stand_in::read(&asks), Ok(Asked::Start(program)));
         assert_eq!(stand_in::read(&activate(9, false)), Ok(Asked::Activate(9, false)));

@@ -20,8 +20,11 @@ use crate::secret::Secret;
 use crate::smartcard::{self, Reader};
 use crate::tpkt::{self, Frame};
 use crate::update::{self, Rectangle, Updates};
-use crate::window::Change;
+use crate::window::{Change, Window};
 use crate::Error;
+
+/// The title Windows gives the language bar where it floats on its own.
+const FLOATING_LANGUAGE_BAR: &str = "CiceroUIWndFrame-TF_FloatingLangBar_WndTitle";
 
 /// What happened, for whoever holds the connection to show or to act on.
 #[derive(Debug, PartialEq, Eq)]
@@ -134,6 +137,8 @@ pub struct Connection {
     /// The clipboard, and the pieces of a message about it that is not whole yet: where
     /// it passes at all.
     clipboard: Option<(Pieces, Clipboard)>,
+    /// The windows the client hid, which it says nothing of to whoever holds it.
+    hidden: Vec<u32>,
 }
 
 impl Connection {
@@ -174,6 +179,7 @@ impl Connection {
             devices: reader.map(|reader| Devices { reader, pieces: Pieces::default(), can_do: false, confirmed: false, named: false }),
             later,
             clipboard: passes,
+            hidden: Vec::new(),
         };
         (connection, first)
     }
@@ -185,8 +191,9 @@ impl Connection {
                 return match self.state {
                     State::Finishes | State::Open => {
                         let drawn = self.updates.short_frame(&carried)?;
-                        let windows = self.updates.take_windows();
+                        let mut windows = self.updates.take_windows();
                         let mut happened = Vec::new();
+                        let send = self.language_bar_put_away(&mut windows);
                         // where the windows are comes before what is drawn in them
                         if !windows.is_empty() {
                             happened.push(Happened::Windows(windows));
@@ -194,7 +201,7 @@ impl Connection {
                         if !drawn.is_empty() {
                             happened.push(Happened::Drawn(drawn));
                         }
-                        Ok((Vec::new(), happened))
+                        Ok((send, happened))
                     }
                     _ => Err(Error::NotRdp("the machine draws before the connection is open")),
                 };
@@ -264,6 +271,47 @@ impl Connection {
     /// A message about programs, in the frames it travels in.
     fn about_programs(&self, message: &[u8]) -> Vec<u8> {
         self.on(rail::CHANNEL, message)
+    }
+
+    /// What to send to hide the language bar that Windows floats over a program's
+    /// windows, where it covers what is under it: the page says which language the
+    /// session types in, beside the windows. What is said of a window the client hid is
+    /// left out of the changes, and one that was told of before it was known as the bar
+    /// is gone from them.
+    fn language_bar_put_away(&mut self, windows: &mut Vec<Change>) -> Vec<u8> {
+        let mut send = Vec::new();
+        let mut put_away = Vec::new();
+        for change in windows.iter() {
+            if let Change::Window(window) = change {
+                let is_the_bar = window.title.as_deref() == Some(FLOATING_LANGUAGE_BAR);
+                if is_the_bar && matches!(self.state, State::Open) && !self.hidden.contains(&window.id) {
+                    send.extend(self.about_programs(&rail::cloak(window.id)));
+                    self.hidden.push(window.id);
+                    put_away.push(window.id);
+                }
+            }
+        }
+        if self.hidden.is_empty() {
+            return send;
+        }
+        let hidden = &self.hidden;
+        let mut closed = Vec::new();
+        windows.retain_mut(|change| match change {
+            Change::Window(Window { id, .. }) | Change::Icon { id, .. } | Change::KeptIcon { id, .. } | Change::InFront(id) => {
+                !hidden.contains(id)
+            }
+            Change::Gone(id) => {
+                closed.push(*id);
+                !hidden.contains(id)
+            }
+            Change::Order(order) => {
+                order.retain(|id| !hidden.contains(id));
+                true
+            }
+        });
+        windows.extend(put_away.into_iter().map(Change::Gone));
+        self.hidden.retain(|id| !closed.contains(id));
+        send
     }
 
     /// What the reader answers, as messages about devices. An answer that is longer
@@ -456,7 +504,8 @@ impl Connection {
                         happened.push(Happened::Drawn(update::read_rectangles(drawn)?));
                     } else if drawn.starts_with(&[0, 0]) {
                         // instructions, of which Away takes the words on windows alone
-                        let windows = update::read_windows(drawn)?;
+                        let mut windows = update::read_windows(drawn)?;
+                        send.extend(self.language_bar_put_away(&mut windows));
                         if !windows.is_empty() {
                             happened.push(Happened::Windows(windows));
                         }
@@ -492,6 +541,15 @@ impl Connection {
         }
     }
 
+    /// What to send to ask the machine for another program, in the session that runs
+    /// one already. Nothing where the connection is for no program, or not open.
+    pub fn start(&self, program: &rail::Program) -> Result<Vec<u8>, Error> {
+        match self.state {
+            State::Open if self.client.program.is_some() => Ok(self.about_programs(&rail::start(program)?)),
+            _ => Ok(Vec::new()),
+        }
+    }
+
     /// What to send to tell the machine what the person does with a window as a whole:
     /// make it small, make it large, bring it back, close it.
     pub fn command(&self, window: u32, command: Command) -> Vec<u8> {
@@ -519,7 +577,7 @@ mod tests {
     use crate::picture::Picture;
     use crate::rail::stand_in::Asked;
     use crate::rail::Program;
-    use crate::stand_in::desktop::{Desktop, WINDOW, WINDOW_AT, WINDOW_SIZE};
+    use crate::stand_in::desktop::{program_icon, Desktop, LANGUAGE_BAR, WINDOW, WINDOW_AT, WINDOW_SIZE};
     use crate::tpkt::Frames;
     use crate::window::{Part, Shown, Window};
 
@@ -778,6 +836,7 @@ mod tests {
                     seen_at: Some((20, 10)),
                     seen: Some(vec![Part { left: 0, top: 0, right: 160, bottom: 100 }]),
                 }),
+                Change::Icon { id: WINDOW, large: true, icon: program_icon(), kept: Some((0, 0)) },
                 Change::InFront(WINDOW),
                 Change::Order(vec![WINDOW]),
             ]
@@ -804,7 +863,7 @@ mod tests {
             seen.about_programs,
             [
                 Asked::Ready,
-                Asked::Client(0x400),
+                Asked::Client(0x200),
                 Asked::WorkArea(200, 120),
                 Asked::Start(Program { run: "||ledger".to_string(), arguments: String::new() }),
             ]
@@ -817,6 +876,40 @@ mod tests {
         let after = talk(&mut connection, &mut machine, says).unwrap();
         assert_eq!(after, [Happened::Windows(vec![Change::Gone(WINDOW)])]);
         assert_eq!(machine.seen().about_programs[4..], [Asked::Activate(WINDOW, true), Asked::Command(WINDOW, Command::Close)]);
+    }
+
+    #[test]
+    fn another_program_starts_in_the_same_session_and_the_floating_language_bar_is_hidden() {
+        let machine = Desktop::new(picture()).that_publishes(&["||ledger"]).that_floats_its_language_bar();
+        let (happened, mut connection, mut machine) = run(Some("||ledger"), machine);
+        let happened = happened.expect("the connection opens");
+        // the language bar that opened with the first program was hidden, and only it; of
+        // its window nothing is told
+        assert_eq!(machine.seen().about_programs[4..], [Asked::Cloak(LANGUAGE_BAR)]);
+        let told: Vec<&Change> = happened
+            .iter()
+            .filter_map(|happened| if let Happened::Windows(changes) = happened { Some(changes) } else { None })
+            .flatten()
+            .collect();
+        assert!(told.iter().any(|change| matches!(change, Change::Window(window) if window.id == WINDOW)));
+        assert!(!told.iter().any(|change| matches!(change, Change::Window(window) if window.id == LANGUAGE_BAR)));
+
+        // another program, asked for on the same connection, opens a window of its own in front
+        let books = Program { run: "||ledger".to_string(), arguments: String::new() };
+        let said = connection.start(&books).expect("a program's name");
+        let after = talk(&mut connection, &mut machine, said).expect("the program starts");
+        assert_eq!(after[0], Happened::Started);
+        let windows = after.iter().find_map(|happened| if let Happened::Windows(windows) = happened { Some(windows) } else { None });
+        assert!(windows.unwrap().contains(&Change::Order(vec![WINDOW + 1, WINDOW])));
+        // one the machine doesn't publish is not started, and the session goes on
+        let payroll = Program { run: "||payroll".to_string(), arguments: String::new() };
+        let said = connection.start(&payroll).expect("a program's name");
+        assert_eq!(talk(&mut connection, &mut machine, said), Ok(vec![Happened::NotStarted { result: 3, raw: 2 }]));
+        assert!(!connection.activate(WINDOW, true).is_empty());
+
+        // a connection for the desktop starts no program
+        let (_, desktop, _) = run(None, Desktop::new(picture()).that_publishes(&["||ledger"]));
+        assert_eq!(desktop.start(&books), Ok(Vec::new()));
     }
 
     #[test]

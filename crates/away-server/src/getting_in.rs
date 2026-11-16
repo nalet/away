@@ -17,6 +17,7 @@
 //! |---|---|
 //! | `POST /internal/take` | takes a session over with its ticket, once: who it is for, and where the machine is |
 //! | `POST /internal/told` | says what became of a session: what the machine showed of itself, that it is open, that it failed, that it ended |
+//! | `POST /internal/start` | asks for another program of the machine in a session that runs: writes the record, and gives what the machine is asked to start |
 //!
 //! The browser holds two cookies and nothing else: one that names its sign-in, and for
 //! the minutes a sign-in is under way one that ties it to the browser that began it.
@@ -677,6 +678,7 @@ impl GettingIn {
                 answer(StatusCode::OK, "application/json", says.write())
             }
             "/internal/told" => self.told(&said).await,
+            "/internal/start" => self.start(said("session"), said("program")).await,
             "/internal/vouch" => self.vouch(said("session")).await,
             _ => plain(StatusCode::NOT_FOUND, "Nothing is at this address.\n"),
         }
@@ -738,6 +740,55 @@ impl GettingIn {
             ("machine", running.machine.as_str().into()),
             ("token", token.expose().into()),
         ]);
+        answer(StatusCode::OK, "application/json", says.write())
+    }
+
+    /// Answers the gateway that asks for another program of the machine in a session that
+    /// runs, by the name Away gives it: what the machine is asked to start, where the
+    /// person may open that program there as their sign-in says now. The record that it
+    /// was asked for is written first, as for every session.
+    async fn start(&self, session: Option<&str>, program: Option<&str>) -> Answer {
+        let (Some(session), Some(name)) = (session, program.filter(|program| !program.is_empty())) else {
+            return plain(StatusCode::BAD_REQUEST, "A program is asked for in a session, as session= and program=.\n");
+        };
+        let Some(running) = self.sessions.running(session) else { return plain(StatusCode::NOT_FOUND, "No session of that name runs.\n") };
+        let Some(signing) = &self.signing else { return plain(StatusCode::NOT_FOUND, "Nobody is signed in here.\n") };
+        // the person as their sign-in says now: one that ran out opens nothing more
+        let person = match signing.sign_ins.who(&running.sign_in, time::now().as_secs()) {
+            Some((person, false)) if person.subject == running.person.subject => person,
+            _ => return plain(StatusCode::FORBIDDEN, "The person's sign-in has run out.\n"),
+        };
+        let (in_force, _) = self.register.in_force();
+        let reached = in_force.reached_by(&person.groups);
+        let program = reached
+            .iter()
+            .find(|(machine, _)| machine.name == running.machine)
+            .and_then(|(machine, _)| machine.programs.iter().find(|program| program.name == name));
+        let Some(program) = program else { return plain(StatusCode::NOT_FOUND, "Nothing of that name is there for you.\n") };
+        let key = match Records::key() {
+            Ok(key) => key,
+            Err(why) => {
+                self.part.lines.error("a program could not be asked for", &[("why", why.as_str().into())]);
+                return plain(StatusCode::INTERNAL_SERVER_ERROR, "The program could not be asked for.\n");
+            }
+        };
+        let record = Record {
+            key: format!("{session}-started-{key}"),
+            kind: "session-started".to_string(),
+            person: Some((person.subject.clone(), person.name.clone())),
+            machine: Some(running.machine.clone()),
+            details: Json::object([("session", session.into()), ("program", program.name.as_str().into())]),
+        };
+        // no program is started without its record
+        if let Err(unusable) = self.records.add(&record).await {
+            let _ = self.kept_nothing(&unusable);
+            return plain(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "No program is started without a record, and the record can't be written right now.\n",
+            );
+        }
+        self.store_answers();
+        let says = Json::object([("program", program.name.as_str().into()), ("run", program.run.as_str().into())]);
         answer(StatusCode::OK, "application/json", says.write())
     }
 

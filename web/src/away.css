@@ -224,8 +224,8 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 /* a program's rail: a column down the left, in the design of the product's own rail. On a
    computer it stands always, as a taskbar, and the windows sit beside it; on a phone it waits at
    the left edge and is swiped in over the picture. A desktop has no rail: its bar is at the top */
-.sess .srail { z-index: 2; width: 56px; flex: none; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: 6px;
-               padding: 10px 0; background: var(--bg-2); border-right: 1px solid var(--border); }
+.sess .srail { z-index: 2; width: 56px; flex: none; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: 4px;
+               padding: 8px 0; background: var(--bg-2); border-right: 1px solid var(--border); }
 .sess .srail.over { position: absolute; top: 0; left: 0; bottom: 0; z-index: 4; box-shadow: 8px 0 24px #00000073; animation: away-rail-in 0.18s ease-out; }
 @keyframes away-rail-in { from { transform: translateX(-100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .sess .srail.over { animation: none; } }
@@ -235,14 +235,24 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .sess .sedge { position: absolute; top: 0; bottom: 0; left: 0; z-index: 2; width: 16px; padding: 0; border: 0; background: none; cursor: pointer; touch-action: none; }
 .sess .sedge::before { content: ""; position: absolute; top: 50%; left: 5px; width: 3px; height: 40px; margin-top: -20px; border-radius: 2px; background: var(--fg-muted); opacity: 0.6; }
 .sess .sedge:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.sess .srail .it, .sess .srail .nc-iconbutton, .sess .srail .menuof > .nc-iconbutton { width: 44px; height: 44px; flex: none; display: inline-flex; align-items: center; justify-content: center; color: var(--fg-muted); }
+/* every control of the rail is a square of the same size, its icon of the same size in the middle */
+.sess .srail .it, .sess .srail .nc-iconbutton, .sess .srail .menuof > .nc-iconbutton { width: 40px; height: 40px; flex: none; display: inline-flex; align-items: center;
+               justify-content: center; padding: 0; color: var(--fg-muted); }
+.sess .srail .nc-iconbutton svg { width: 18px; height: 18px; }
 .sess .srail .nc-iconbutton:hover, .sess .srail .it:hover { color: var(--fg); }
 .sess .srail .nc-iconbutton:focus-visible, .sess .srail .it:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.sess .srail .mark { border: 0; background: none; cursor: pointer; color: var(--fg-2); }
+/* the Away mark at the top, as on Away's own bar, and a line under it */
+.sess .srail .launch { padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.sess .srail .mark { gap: 1px; border: 0; background: none; cursor: pointer; font: 700 18px/1 var(--ff-mono); color: var(--fg-2); }
+.sess .srail .mark .letter { font: inherit; }
 .sess .srail .mark:hover { color: var(--cloud-blue); }
 .sess .srail .gap { flex: 1; min-height: 8px; }
-/* the clock at the foot, as a taskbar has */
-.sess .srail .clock { width: 100%; text-align: center; font: 500 13px/1.2 var(--ff-mono); color: var(--fg-muted); padding-top: 2px; }
+/* the foot, as a taskbar has: the keyboard the machine types as, and the time and the day on one line each */
+.sess .srail .foot { width: 40px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border); }
+.sess .srail .lang { padding: 3px 4px; border: 1px solid var(--border-2); font: 600 11px/1 var(--ff-mono); letter-spacing: 0.04em; color: var(--fg-2); text-decoration: none; cursor: default; }
+.sess .srail .clock { display: flex; flex-direction: column; align-items: center; gap: 3px; white-space: nowrap; font: 500 12px/1 var(--ff-mono);
+                      font-variant-numeric: tabular-nums; color: var(--fg-2); }
+.sess .srail .clock .day { font-size: 10px; color: var(--fg-muted); }
 /* the handle: the one thing of Away's that shows while a desktop is open */
 .sess .handle { position: absolute; top: 0; left: 50%; z-index: 2; width: 56px; height: 12px; margin-left: -28px; padding: 0; border: 1px solid var(--border-2); border-top: 0;
                 background: var(--surface-2); cursor: pointer; }
@@ -261,6 +271,20 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .sess .is-open { background: var(--surface-2); color: var(--cloud-blue); }
 .sess .sbar .sessmenu, .sess .sbar .sesspanel { top: 44px; right: 0; }
 .sess .srail .sessmenu, .sess .srail .sesspanel { left: calc(100% + 6px); bottom: 0; }
+/* the machine's programs hang from the mark, at the top of the rail */
+.sess .srail .launch .sesspanel { top: 0; bottom: auto; }
+.sess .launcher h2 { margin: 0; font: 600 14px/1.3 var(--ff-mono); text-transform: lowercase; }
+.sess .launcher .progs { padding: 0; list-style: none; display: flex; flex-direction: column; }
+.sess .launcher .progs, .sess .launcher .more { width: calc(100% + 16px); margin: 0 -8px; }
+.sess .launcher .prog { width: 100%; min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border: 0; background: none; color: var(--fg);
+                        font: 14px/1.3 var(--ff-sans); text-align: left; cursor: pointer; }
+/* the way to the other machines, under a line: it leaves the session, which goes on at the machine */
+.sess .launcher .more { border-top: 1px solid var(--border); color: var(--fg-2); }
+.sess .launcher .prog:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
+.sess .launcher .prog[aria-disabled="true"] { cursor: progress; }
+.sess .launcher .prog:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.sess .launcher .prog img, .sess .launcher .prog svg { flex: none; color: var(--fg-muted); }
+.sess .launcher .prog .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sess .sessmenu { position: absolute; z-index: 5; min-width: 200px; display: flex; flex-direction: column; padding: 4px 0;
                   background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
 .sess .sessmenu .nc-actionmenu__item { display: flex; min-height: 40px; font-family: var(--ff-mono); }
@@ -281,11 +305,16 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .sess .lostcard .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 /* the windows of the programs, as a column of icons in the rail: each is brought to the
    front by a click, and a small cross over it closes it */
-.sess .srail .wins { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0; padding: 0; list-style: none; min-height: 0; overflow-y: auto; }
-.sess .srail .wins li { position: relative; display: flex; }
-.sess .srail .win { border: 1px solid transparent; background: none; cursor: pointer; }
+.sess .srail .wins { width: 100%; flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0; padding: 0;
+                     list-style: none; overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
+.sess .srail .wins::-webkit-scrollbar { display: none; }
+.sess .srail .wins li { position: relative; display: flex; flex: none; }
+.sess .srail .win { border: 0; background: none; cursor: pointer; }
+.sess .srail .win .icon { display: block; width: 24px; height: 24px; }
 .sess .srail .win:hover { background: var(--surface-2); color: var(--fg); }
-.sess .srail .wins .x { position: absolute; top: -3px; right: -3px; width: 18px; height: 18px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+/* the window in front: on a lighter square, with a bar on its edge, as the current view of Away's own rail */
+.sess .srail .win.on { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--cloud-blue); color: var(--fg); }
+.sess .srail .wins .x { position: absolute; top: 1px; right: 1px; width: 16px; height: 16px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
                         border: 1px solid var(--border-2); background: var(--surface); color: var(--fg); cursor: pointer; opacity: 0; transition: opacity 0.1s; }
 .sess .srail .wins li:hover .x, .sess .srail .wins li:focus-within .x { opacity: 1; }
 .sess .srail .wins .x:focus-visible { outline: 2px solid var(--cloud-blue); outline-offset: -2px; }

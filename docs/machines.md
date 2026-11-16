@@ -354,13 +354,24 @@ and the records are those of a desktop.
   The windows are where the machine has them, on Away's ground. Keys, clicks
   and the wheel go to the window they are over.
 - **A program's session has a rail down the left, as a taskbar.** The Away
-  mark at its top opens another machine; the program's windows stand under it
-  as icons, and a click on one brings it to the front, a small cross over it
-  closes it; then the keys, the clipboard, filling the screen and ending; and
-  the clock at its foot. On a computer the rail stands always and the windows
-  sit beside it. On a phone it waits at the left edge: a swipe from the edge,
-  or a tap on it, brings it in over the picture, and a touch beside it puts it
+  mark at its top lists the machine's programs: one chosen there opens in the
+  same session, in a window of its own, and the way to the other machines is
+  under them. The program's windows stand under the mark, each as the icon the
+  machine gives it; a click on one brings it to the front, a small cross over
+  it closes it, and the one in front is marked. Then the keys, the clipboard,
+  filling the screen and ending; and at its foot the keyboard the machine types
+  as and the time. On a computer the rail stands always and the windows sit
+  beside it. On a phone it waits at the left edge: a swipe from the edge, or a
+  tap on it, brings it in over the picture, and a touch beside it puts it
   away. Dialogues and menus belong to their window and are in no list.
+- **Another program in the session is asked for like the first.** The server
+  decides whether the person may open it on that machine, as their sign-in
+  says at that moment, and keeps the record that it was asked for before the
+  machine is asked. One the machine doesn't start is said in the list, and the
+  session goes on.
+- **Windows' own language bar is not shown over a program's windows.** The
+  machine's floating bar is hidden; the rail says which keyboard the machine
+  was told of.
 - **Closing the program's last window ends the session**, and the person is
   back on the machine's page. Ending the session from the rail leaves the
   program running on the machine, for the account to come back to.

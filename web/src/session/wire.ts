@@ -14,7 +14,8 @@ export type Said =
   | { ended: string }
   | { windows: WindowOf[]; in_front: number | null }
   | { clipboard: { to: boolean; from: boolean } }
-  | { copied: string };
+  | { copied: string }
+  | { started: { program: string; ok: boolean } };
 
 // A window of a program: what names it, its title, how it shows, whether it is a window
 // of its own that a list names, and the parts of it that can be seen, each by its left,
@@ -50,6 +51,24 @@ export function readRectangle(bytes: ArrayBuffer): Rectangle | null {
   // a rectangle, with its pixels as a PNG picture
   if (bytes.byteLength < 10 || view.getUint8(0) !== 1 || view.getUint8(9) !== 1) return null;
   return { left: view.getUint16(1), top: view.getUint16(3), width: view.getUint16(5), height: view.getUint16(7), png: new Uint8Array(bytes, 10) };
+}
+
+// The icon of a window of a program: the window, and the icon as a PNG picture.
+export interface IconOf {
+  window: number;
+  png: Uint8Array<ArrayBuffer>;
+}
+
+export function readIcon(bytes: ArrayBuffer): IconOf | null {
+  const view = new DataView(bytes);
+  if (bytes.byteLength < 6 || view.getUint8(0) !== 2) return null;
+  return { window: view.getUint32(1), png: new Uint8Array(bytes, 5) };
+}
+
+// The person asks for another program of the machine, in the session that runs: by the
+// name Away gives it.
+export function start(program: string): string {
+  return JSON.stringify({ start: program });
 }
 
 // The window's size as the page measures it, and how many dots the device shows for a

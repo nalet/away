@@ -603,6 +603,30 @@ fn rdp(asked: &Asked, account: Option<Account>, on_the_card: Option<OnTheCard>) 
                                 Change::Gone(window) => println!("   A window is gone: number {window}."),
                                 Change::InFront(window) => println!("   In front is the window number {window}."),
                                 Change::Order(_) => {}
+                                Change::Icon { id, large, icon, kept } => {
+                                    let which = if large { "large" } else { "small" };
+                                    let kept = kept.map(|(cache, entry)| format!(", kept at {cache}.{entry}")).unwrap_or_default();
+                                    println!("   The window number {id} has a {which} icon of {} by {}{kept}.", icon.width, icon.height);
+                                    // beside the desktop's picture, each icon on grey, to look at
+                                    if let Some(save) = save {
+                                        let mut picture = Picture::new(usize::from(icon.width), usize::from(icon.height));
+                                        for (to, from) in
+                                            picture.pixels.as_chunks_mut::<4>().0.iter_mut().zip(icon.pixels.as_chunks::<4>().0)
+                                        {
+                                            let over = |c: u8| {
+                                                ((u32::from(c) * u32::from(from[3]) + 128 * (255 - u32::from(from[3]))) / 255) as u8
+                                            };
+                                            to[..3].copy_from_slice(&[over(from[2]), over(from[1]), over(from[0])]);
+                                        }
+                                        let file = format!("{save}.icon-{id}-{which}.bmp");
+                                        std::fs::write(&file, bmp(&picture))
+                                            .map_err(|error| format!("{file} could not be written: {error}."))?;
+                                    }
+                                }
+                                Change::KeptIcon { id, large, kept: (cache, entry) } => {
+                                    let which = if large { "large" } else { "small" };
+                                    println!("   The window number {id} shows its {which} icon, kept at {cache}.{entry}.");
+                                }
                             }
                         }
                     }

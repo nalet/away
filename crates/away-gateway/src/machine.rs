@@ -464,6 +464,7 @@ impl Secured {
                 windows: Windows::default(),
                 windows_changed: false,
                 started: false,
+                started_later: Vec::new(),
                 scratch: vec![0u8; 32 * 1024],
                 reads_a_card,
                 ticked: tokio::time::Instant::now(),
@@ -535,6 +536,8 @@ pub struct Desktop {
     windows_changed: bool,
     /// Whether the machine said that the program started.
     started: bool,
+    /// Whether each program asked for since the first started, in the order they were asked for.
+    started_later: Vec<bool>,
     scratch: Vec<u8>,
     /// Whether the machine was handed a smart card, which it reads over the connection.
     reads_a_card: bool,
@@ -663,10 +666,14 @@ impl Desktop {
                         self.windows.take(changes);
                         self.windows_changed = true;
                     }
+                    // a program asked for in a session that runs already is said not to
+                    // have started, and the session goes on
+                    Happened::NotStarted { .. } if self.started => self.started_later.push(false),
                     Happened::NotStarted { result, raw } => {
                         let details = format!("{} (its own code {raw:#010x})", away_rdp::rail::why(result));
                         return Err(failure(Step::FirstPicture, Why::ProgramNotStarted, details));
                     }
+                    Happened::Started if self.started => self.started_later.push(true),
                     Happened::Started => self.started = true,
                     Happened::Channels { .. } | Happened::Licensed | Happened::AsksToTakeALicence { .. } | Happened::LicenceTaken(_) => {}
                     Happened::AskedForTheProgram => {}
@@ -687,6 +694,23 @@ impl Desktop {
     /// Whether the machine said that the program started, where the session is for one.
     pub fn started(&self) -> bool {
         self.started
+    }
+
+    /// Asks the machine for another program, in the session that runs one.
+    pub async fn start(&mut self, program: &Program) -> Result<(), Failure> {
+        let told = self.open.start(program).map_err(|error| failure(Step::FirstPicture, Why::Broken, error.to_string()))?;
+        self.write(&told).await
+    }
+
+    /// Whether each program asked for since the first started, in the order they were
+    /// asked for, where the machine said so since this was last asked.
+    pub fn started_later(&mut self) -> Vec<bool> {
+        std::mem::take(&mut self.started_later)
+    }
+
+    /// The icons of windows that changed since this was last asked, as PNG pictures.
+    pub fn icons(&mut self) -> Vec<(u32, Vec<u8>)> {
+        self.windows.icons()
     }
 
     /// How many windows of their own are open.

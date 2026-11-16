@@ -176,7 +176,14 @@ export const texts = {
     closeWindow: (title: string) => `close: ${title}`,
     openBar: "open the session's bar",
     bar: "the session's bar",
-    another: 'open another machine',
+    // the Away mark at the top of a program's rail: the machine's other programs
+    launcher: 'open a program',
+    programsOf: (machine: string) => `programs of ${machine}`,
+    starting: (program: string) => `starting ${program}`,
+    notStarted: (program: string, machine: string) => `${program} didn't start on ${machine}.`,
+    otherMachines: 'other machines',
+    // the foot of the rail: the keyboard the machine is told of, and the clock
+    typesAs: (language: string) => `the keyboard: ${language}`,
     clockLabel: 'the time on your device',
     keys: 'keys',
     // the key combinations a browser or a device keeps for itself

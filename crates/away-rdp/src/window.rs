@@ -59,6 +59,22 @@ pub struct Window {
     pub seen: Option<Vec<Part>>,
 }
 
+/// A window's icon, as the machine draws it in a taskbar: how wide and how high it is,
+/// and its pixels from the top row down, four bytes each: red, green, blue, and how much
+/// of what is behind it they cover.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Icon {
+    /// How wide it is, in pixels.
+    pub width: u16,
+    /// How high.
+    pub height: u16,
+    /// Its pixels.
+    pub pixels: Vec<u8>,
+}
+
+/// Where the machine keeps an icon to name it again later: its cache, and the place in it.
+pub type Kept = (u8, u16);
+
 /// One thing the machine says of the windows.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Change {
@@ -70,6 +86,27 @@ pub enum Change {
     InFront(u32),
     /// The windows from the front one to the one furthest back.
     Order(Vec<u32>),
+    /// A window's icon: the large one a taskbar shows, or the small one, and where the
+    /// machine keeps it to name it again.
+    Icon {
+        /// The window.
+        id: u32,
+        /// Whether it is the large one.
+        large: bool,
+        /// The icon.
+        icon: Icon,
+        /// Where the machine keeps it, where it does.
+        kept: Option<Kept>,
+    },
+    /// A window's icon is one the machine sent before, and keeps.
+    KeptIcon {
+        /// The window.
+        id: u32,
+        /// Whether it is the large one.
+        large: bool,
+        /// Where the machine keeps it.
+        kept: Kept,
+    },
 }
 
 const OF_A_WINDOW: u32 = 0x0100_0000;
@@ -79,6 +116,10 @@ const NEW: u32 = 0x1000_0000;
 const GONE: u32 = 0x2000_0000;
 const ITS_ICON: u32 = 0x4000_0000;
 const ITS_KEPT_ICON: u32 = 0x8000_0000;
+/// Of a window's icon: the large one, which a taskbar shows.
+const LARGE: u32 = 0x0000_2000;
+/// The largest icon Away takes, each way: Windows draws them at 256 at most.
+const LARGEST_ICON: u16 = 256;
 
 struct Reader<'a> {
     rest: &'a [u8],
@@ -147,13 +188,24 @@ pub fn read(count: u16, mut orders: &[u8]) -> Result<Vec<Change>, Error> {
                 let count = reader.byte()?;
                 changes.push(Change::Order((0..count).map(|_| reader.number32()).collect::<Result<_, _>>()?));
             }
-        } else if has & OF_A_WINDOW != 0 && has & (ITS_ICON | ITS_KEPT_ICON) == 0 && has & OF_AN_ICON_IN_THE_BAR == 0 {
+        } else if has & OF_A_WINDOW != 0 && has & OF_AN_ICON_IN_THE_BAR == 0 {
             let id = reader.number32()?;
-            if has & GONE != 0 {
+            let large = has & LARGE != 0;
+            if has & ITS_ICON != 0 {
+                // an icon that is not built as Away reads one is passed over, as the rest
+                // of what is said of the window is not about the icon
+                if let Some((icon, kept)) = icon(&mut reader) {
+                    changes.push(Change::Icon { id, large, icon, kept });
+                }
+            } else if has & ITS_KEPT_ICON != 0 {
+                let entry = reader.number16()?;
+                let cache = reader.byte()?;
+                changes.push(Change::KeptIcon { id, large, kept: (cache, entry) });
+            } else if has & GONE != 0 {
                 changes.push(Change::Gone(id));
-                continue;
+            } else {
+                changes.push(Change::Window(window(id, has, &mut reader)?));
             }
-            changes.push(Change::Window(window(id, has, &mut reader)?));
         }
     }
     Ok(changes)
@@ -206,6 +258,85 @@ fn window(id: u32, has: u32, reader: &mut Reader) -> Result<Window, Error> {
     }
     // what follows is for a bar of the client's, which Away has none of
     Ok(window)
+}
+
+/// A window's icon as the machine writes it (MS-RDPERP 2.2.1.2.3): where it keeps it,
+/// how many bits a pixel, its size, then a mask of one bit a pixel that says which
+/// pixels are not drawn, the colours of an icon of few bits, and the pixels; each kind of
+/// rows from the bottom one up. Nothing for an icon of no size, of a depth Windows doesn't
+/// draw icons in, or whose parts are shorter than they say.
+fn icon(reader: &mut Reader) -> Option<(Icon, Option<Kept>)> {
+    let entry = reader.number16().ok()?;
+    let cache = reader.byte().ok()?;
+    let bits = reader.byte().ok()?;
+    let (width, height) = (reader.number16().ok()?, reader.number16().ok()?);
+    let table = if matches!(bits, 1 | 4 | 8) { reader.number16().ok()? } else { 0 };
+    let (mask, colour) = (reader.number16().ok()?, reader.number16().ok()?);
+    let mask = reader.bytes(usize::from(mask)).ok()?;
+    let table = reader.bytes(usize::from(table)).ok()?;
+    let colour = reader.bytes(usize::from(colour)).ok()?;
+    if width == 0 || height == 0 || width > LARGEST_ICON || height > LARGEST_ICON || !matches!(bits, 1 | 4 | 8 | 16 | 24 | 32) {
+        return None;
+    }
+    let (w, h) = (usize::from(width), usize::from(height));
+    // each row is as long as its part divided by the rows: rows are padded as the machine pads them
+    let colour_row = colour.len() / h;
+    let mask_row = mask.len() / h;
+    if colour_row < (w * usize::from(bits)).div_ceil(8) || (!mask.is_empty() && mask_row < w.div_ceil(8)) {
+        return None;
+    }
+    let from_table = |index: usize| -> Option<[u8; 3]> {
+        let entry = table.get(index * 4..index * 4 + 4)?;
+        Some([entry[2], entry[1], entry[0]])
+    };
+    let mut pixels = Vec::with_capacity(w * h * 4);
+    let mut has_alpha = false;
+    for y in 0..h {
+        // the rows are written from the bottom one up
+        let row = &colour[(h - 1 - y) * colour_row..][..colour_row];
+        for x in 0..w {
+            let (rgb, alpha) = match bits {
+                32 => {
+                    let p = &row[x * 4..x * 4 + 4];
+                    has_alpha |= p[3] != 0;
+                    ([p[2], p[1], p[0]], p[3])
+                }
+                24 => {
+                    let p = &row[x * 3..x * 3 + 3];
+                    ([p[2], p[1], p[0]], 0xff)
+                }
+                16 => {
+                    // five bits for each of red, green and blue
+                    let v = u16::from_le_bytes([row[x * 2], row[x * 2 + 1]]);
+                    let five = |shift: u16| ((((v >> shift) & 0x1f) as u32 * 255 + 15) / 31) as u8;
+                    ([five(10), five(5), five(0)], 0xff)
+                }
+                _ => {
+                    let per_byte = 8 / usize::from(bits);
+                    let byte = row[x / per_byte];
+                    let shift = 8 - usize::from(bits) * (x % per_byte + 1);
+                    let index = usize::from((byte >> shift) & ((1u16 << bits) - 1) as u8);
+                    (from_table(index)?, 0xff)
+                }
+            };
+            pixels.extend(rgb);
+            pixels.push(alpha);
+        }
+    }
+    // where the icon says nothing of how much each pixel covers, its mask says which it covers
+    if !has_alpha {
+        for y in 0..h {
+            for x in 0..w {
+                let drawn = match mask.is_empty() {
+                    true => true,
+                    false => mask[(h - 1 - y) * mask_row + x / 8] & (0x80 >> (x % 8)) == 0,
+                };
+                pixels[(y * w + x) * 4 + 3] = if drawn { 0xff } else { 0 };
+            }
+        }
+    }
+    let kept = (entry != 0xffff).then_some((cache, entry));
+    Some((Icon { width, height, pixels }, kept))
 }
 
 /// The machine's side of these words, for the tests' stand-in for one.
@@ -262,9 +393,37 @@ pub mod stand_in {
         order(OF_THE_DESKTOP | 0x20 | 0x10, &holds)
     }
 
-    /// The icon of a window, which a client that shows none passes over.
-    pub fn icon(id: u32) -> Vec<u8> {
-        order(OF_A_WINDOW | ITS_ICON, &[&id.to_le_bytes()[..], &[0; 20]].concat())
+    /// The icon of a window, the large one or the small one, kept by the client where it
+    /// says: of this size, its pixels as red, green, blue and how much each covers, from
+    /// the top row down. It travels as a Windows machine writes one of 32 bits a pixel,
+    /// with a mask that hides nothing.
+    pub fn icon(id: u32, large: bool, kept: Option<Kept>, icon: &Icon) -> Vec<u8> {
+        let (cache, entry) = kept.unwrap_or((0, 0xffff));
+        let (w, h) = (usize::from(icon.width), usize::from(icon.height));
+        let mut holds = id.to_le_bytes().to_vec();
+        holds.extend(entry.to_le_bytes());
+        holds.extend([cache, 32]);
+        holds.extend(icon.width.to_le_bytes());
+        holds.extend(icon.height.to_le_bytes());
+        // rows of the mask are as long as a number of pairs of bytes
+        let mask = vec![0u8; w.div_ceil(16) * 2 * h];
+        let mut colour = Vec::with_capacity(w * h * 4);
+        for row in icon.pixels.chunks(w * 4).rev() {
+            colour.extend(row.as_chunks::<4>().0.iter().flat_map(|p| [p[2], p[1], p[0], p[3]]));
+        }
+        holds.extend((mask.len() as u16).to_le_bytes());
+        holds.extend((colour.len() as u16).to_le_bytes());
+        holds.extend(mask);
+        holds.extend(colour);
+        order(OF_A_WINDOW | ITS_ICON | if large { LARGE } else { 0 }, &holds)
+    }
+
+    /// A window shows an icon the client keeps.
+    pub fn kept_icon(id: u32, large: bool, (cache, entry): Kept) -> Vec<u8> {
+        let mut holds = id.to_le_bytes().to_vec();
+        holds.extend(entry.to_le_bytes());
+        holds.push(cache);
+        order(OF_A_WINDOW | ITS_KEPT_ICON | if large { LARGE } else { 0 }, &holds)
     }
 }
 
@@ -274,9 +433,11 @@ mod tests {
 
     #[test]
     fn a_new_window_one_that_changed_and_one_that_is_gone_are_read() {
+        // an icon of no size, which is passed over
+        let no_icon = [&[0x2e, 31, 0][..], &(OF_A_WINDOW | ITS_ICON).to_le_bytes(), &0x1_0001u32.to_le_bytes(), &[0; 20]].concat();
         let orders = [
             stand_in::window(0x1_0001, true, "Ledger", (20, 10), (160, 100)),
-            stand_in::icon(0x1_0001),
+            no_icon,
             stand_in::in_front(0x1_0001, &[0x1_0001, 0x2_0002]),
             stand_in::gone(0x2_0002),
         ]
@@ -306,6 +467,45 @@ mod tests {
         assert_eq!(super::read(9, &orders).unwrap().len(), 4);
         // and only as many as it says are read
         assert_eq!(super::read(1, &orders).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn icons_are_read_in_the_depths_windows_draws_them_in() {
+        // of 32 bits a pixel, with how much each pixel covers: as it was written, row by row
+        let pixels: Vec<u8> = (0..2 * 3).flat_map(|at| [at * 40, 255 - at * 40, 7, if at == 0 { 0 } else { 255 }]).collect();
+        let written = Icon { width: 2, height: 3, pixels };
+        let orders = [stand_in::icon(5, true, Some((1, 4)), &written), stand_in::kept_icon(6, false, (1, 4))].concat();
+        assert_eq!(
+            read(2, &orders),
+            Ok(vec![
+                Change::Icon { id: 5, large: true, icon: written.clone(), kept: Some((1, 4)) },
+                Change::KeptIcon { id: 6, large: false, kept: (1, 4) },
+            ])
+        );
+        // one that the client is not to keep says so
+        assert!(matches!(
+            &read(1, &stand_in::icon(5, false, None, &written)).unwrap()[..],
+            [Change::Icon { kept: None, large: false, .. }]
+        ));
+
+        // of one bit a pixel, with two colours, and a mask that hides the first pixel of the
+        // top row: rows from the bottom one up, each as long as two bytes
+        let mut one_bit = 7u32.to_le_bytes().to_vec();
+        one_bit.extend([0xff, 0xff, 0, 1, 8, 0, 2, 0]);
+        one_bit.extend([8, 0, 4, 0, 4, 0]);
+        one_bit.extend([0x00, 0, 0x80, 0]); // the mask: the bottom row, then the top one
+        one_bit.extend([0, 0, 0, 0, 0xff, 0xff, 0xff, 0]); // black and white
+        one_bit.extend([0x0f, 0, 0xf0, 0]); // the bottom row black then white, the top one the other way
+        let order = [&[0x2e, 0, 0][..], &(OF_A_WINDOW | ITS_ICON).to_le_bytes(), &one_bit].concat();
+        let mut order = order;
+        let length = order.len() as u16;
+        order[1..3].copy_from_slice(&length.to_le_bytes());
+        let [Change::Icon { id: 7, icon, kept: None, .. }] = &read(1, &order).unwrap()[..] else { panic!("an icon of one bit a pixel") };
+        let (white, black) = ([255, 255, 255, 255], [0, 0, 0, 255]);
+        let top: Vec<[u8; 4]> = icon.pixels[..32].as_chunks::<4>().0.to_vec();
+        let bottom: Vec<[u8; 4]> = icon.pixels[32..].as_chunks::<4>().0.to_vec();
+        assert_eq!(top, [[255, 255, 255, 0], white, white, white, black, black, black, black]);
+        assert_eq!(bottom, [black, black, black, black, white, white, white, white]);
     }
 
     #[test]

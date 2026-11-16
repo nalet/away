@@ -444,6 +444,8 @@ struct Session {
     connection: WebSocketStream<TcpStream>,
     /// The desktop's picture, as the rectangles that arrived make it.
     picture: Option<Picture>,
+    /// The icons of windows that arrived, each with its window, as PNG pictures.
+    icons: Vec<(u32, Vec<u8>)>,
 }
 
 impl Session {
@@ -458,7 +460,7 @@ impl Session {
         let begins =
             Json::object([("ticket", ticket.into()), ("width", 1280u64.into()), ("height", 800u64.into()), ("scale", 200u64.into())]);
         connection.send(Message::text(begins.write())).await.expect("the first message goes out");
-        Session { connection, picture: None }
+        Session { connection, picture: None, icons: Vec::new() }
     }
 
     async fn say(&mut self, says: Json) {
@@ -491,8 +493,13 @@ impl Session {
         }
     }
 
-    /// Draws a rectangle that arrived: where it goes, and its pixels as a PNG picture.
+    /// Draws a rectangle that arrived: where it goes, and its pixels as a PNG picture. An
+    /// icon of a window is kept.
     fn draw(&mut self, bytes: &[u8]) {
+        if bytes[0] == 2 {
+            self.icons.push((u32::from_be_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]), bytes[5..].to_vec()));
+            return;
+        }
         assert_eq!((bytes[0], bytes[9]), (1, 1), "a rectangle, as a PNG picture");
         let number = |at: usize| usize::from(u16::from_be_bytes([bytes[at], bytes[at + 1]]));
         let (left, top, width, height) = (number(1), number(3), number(5), number(7));
@@ -951,21 +958,52 @@ async fn a_program_opens_in_a_window_of_its_own_and_closing_it_ends_the_session(
         Some(&away_rdp::rail::stand_in::Asked::Start(away_rdp::rail::Program { run: "||ledger".to_string(), arguments: String::new() }))
     );
 
-    // the person closes the window: it is gone, and with its last window the program's session ends
+    // the window's icon came with it, as a picture of 32 pixels square
+    let (window, icon) = session.icons.first().cloned().expect("the window's icon");
+    let picture = png::Decoder::new(std::io::Cursor::new(icon)).read_info().expect("a PNG picture").info().clone();
+    assert_eq!((window, picture.width, picture.height, picture.color_type), (65537, 32, 32, png::ColorType::Rgba));
+
+    // another program of the machine, asked for in the session, opens in it: in front of the first
+    session.say(Json::object([("start", "Ledger".into())])).await;
+    let windows = session.until("windows").await;
+    let ids: Vec<u64> =
+        windows.get("windows").and_then(Json::list).unwrap().iter().filter_map(|window| window.get("id").and_then(Json::count)).collect();
+    assert_eq!((ids, windows.get("in_front").and_then(Json::count)), (vec![65538, 65537], Some(65538)));
+    assert_eq!(session.until("started").await.write(), r#"{"started":{"program":"Ledger","ok":true}}"#);
+    // one the machine doesn't start, and one the person may not open there, are said not to
+    // have started, and the session goes on
+    session.say(Json::object([("start", "Payroll".into())])).await;
+    assert_eq!(session.until("started").await.write(), r#"{"started":{"program":"Payroll","ok":false}}"#);
+    session.say(Json::object([("start", "Nothing".into())])).await;
+    assert_eq!(session.until("started").await.write(), r#"{"started":{"program":"Nothing","ok":false}}"#);
+    let last = world.machine.seen().last().expect("a client came").about_programs.clone();
+    let asked: Vec<_> = last
+        .iter()
+        .filter_map(|asked| if let away_rdp::rail::stand_in::Asked::Start(program) = asked { Some(program.run.as_str()) } else { None })
+        .collect();
+    assert_eq!(asked, ["||ledger", "||ledger", "||Payroll"]);
+
+    // the person closes the windows: they are gone, and with the last one the program's session ends
+    session.say(Json::object([("window", 65538u64.into()), ("does", "close".into())])).await;
     session.say(Json::object([("window", 65537u64.into()), ("does", "close".into())])).await;
-    assert_eq!(session.until("windows").await.write(), r#"{"windows":[],"in_front":null}"#);
+    loop {
+        if session.until("windows").await.write() == r#"{"windows":[],"in_front":null}"# {
+            break;
+        }
+    }
     assert_eq!(session.until("ended").await.write(), r#"{"ended":"closed"}"#);
     assert!(session.next().await.is_none());
 
-    // the records say that it was a program, and which
+    // the records say that it was a program, and which, and which others were asked for in it
     let kept = records(&world.database).await;
     let of_sessions: Vec<_> = kept.iter().filter(|(kind, ..)| kind.starts_with("session-")).collect();
     assert_eq!(
         of_sessions.iter().map(|(kind, ..)| kind.as_str()).collect::<Vec<_>>(),
-        ["session-asked", "session-opened", "session-ended"]
+        ["session-asked", "session-opened", "session-started", "session-started", "session-ended"]
     );
     assert_eq!((of_sessions[0].3.text_of("way"), of_sessions[0].3.text_of("program")), (Some("program"), Some("Ledger")));
-    assert_eq!(of_sessions[2].3.text_of("why"), Some("closed"));
+    assert_eq!((of_sessions[2].3.text_of("program"), of_sessions[3].3.text_of("program")), (Some("Ledger"), Some("Payroll")));
+    assert_eq!(of_sessions[4].3.text_of("why"), Some("closed"));
 
     // a program the machine doesn't publish is not started, and the session says so
     let mut session = Session::begin(&world, &sign_in, &browser.ticket_for_a_program(&world, "apps-01", "Payroll")).await;

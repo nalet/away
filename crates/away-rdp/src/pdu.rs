@@ -5,6 +5,10 @@
 use crate::secret::Secret;
 use crate::Error;
 
+/// What a client of programs supports (MS-RDPERP 2.2.1.1.1): programs in windows of
+/// their own, and windows it hides from the machine's picture.
+const PROGRAMS: u32 = 0x0000_0001 | 0x0000_0040;
+
 fn wide(text: &str) -> Vec<u8> {
     text.encode_utf16().flat_map(u16::to_le_bytes).collect()
 }
@@ -142,9 +146,10 @@ pub fn confirm(user: u16, share_id: u32, width: u16, height: u16, bits: u16, lay
     // a picture may arrive in pieces, of up to this many bytes together
     sets.push(capability(0x001a, &(crate::update::LARGEST as u32).to_le_bytes()));
     if for_a_program {
-        // programs in windows of their own, and the machine's words on those windows with
-        // everything they may carry; the icons it would keep are passed over
-        sets.push(capability(0x0017, &1u32.to_le_bytes()));
+        // programs in windows of their own, windows the client may hide, and the machine's
+        // words on those windows with everything they may carry: their icons too, kept in
+        // three stores of twelve
+        sets.push(capability(0x0017, &PROGRAMS.to_le_bytes()));
         sets.push(capability(0x0018, &[2, 0, 0, 0, 3, 12, 0]));
     }
 
@@ -301,7 +306,7 @@ mod tests {
         // for a program it says two more: programs in windows of their own, and words on those windows
         let for_a_program = confirm(1007, 0x0001_03ea, 1280, 800, 32, 0x0409, true);
         assert_eq!(for_a_program.len(), answer.len() + 8 + 11);
-        assert_eq!(&for_a_program[for_a_program.len() - 19..], &[0x17, 0, 8, 0, 1, 0, 0, 0, 0x18, 0, 11, 0, 2, 0, 0, 0, 3, 12, 0]);
+        assert_eq!(&for_a_program[for_a_program.len() - 19..], &[0x17, 0, 8, 0, 0x41, 0, 0, 0, 0x18, 0, 11, 0, 2, 0, 0, 0, 3, 12, 0]);
         assert_eq!(u16::from_le_bytes([for_a_program[21], for_a_program[22]]), count + 2);
         // and its information says that the connection is for a program
         assert_eq!(&client_info("CORP", "alex.urban", None, true)[8..12], &0x000b_8173u32.to_le_bytes());

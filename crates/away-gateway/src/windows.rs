@@ -1,7 +1,9 @@
 //! The windows of the programs of one session, as the gateway knows them: the machine
 //! says what changed, and the gateway keeps what is so, to tell the browser of it.
 
-use away_rdp::window::{Change, Part, Shown};
+use std::collections::HashMap;
+
+use away_rdp::window::{Change, Icon, Kept, Part, Shown};
 use away_wire::Window;
 
 /// What Windows calls a window that belongs in no list of windows: a bar, a tip, a
@@ -18,6 +20,11 @@ struct Known {
     seen: Vec<Part>,
 }
 
+/// The icons the client keeps for the machine to name again: as many stores, and as
+/// many in each, as the client said it has room for.
+const STORES: u8 = 3;
+const IN_A_STORE: u16 = 12;
+
 /// The windows that are open, and which is in front.
 #[derive(Default)]
 pub struct Windows {
@@ -25,6 +32,12 @@ pub struct Windows {
     /// From the front one back, as the machine last said it.
     order: Vec<u32>,
     in_front: Option<u32>,
+    /// The icons of the windows: the large one and the small one, where the machine said them.
+    icons: HashMap<u32, (Option<Icon>, Option<Icon>)>,
+    /// The icons the machine said to keep.
+    kept: HashMap<Kept, Icon>,
+    /// The windows whose icon changed since that was last asked.
+    icons_changed: Vec<u32>,
 }
 
 impl Windows {
@@ -73,11 +86,50 @@ impl Windows {
                     self.known.retain(|known| known.id != id);
                     self.order.retain(|other| *other != id);
                     self.in_front = self.in_front.filter(|front| *front != id);
+                    self.icons.remove(&id);
+                    self.icons_changed.retain(|changed| *changed != id);
                 }
                 Change::InFront(id) => self.in_front = Some(id).filter(|id| *id != 0),
                 Change::Order(order) => self.order = order,
+                Change::Icon { id, large, icon, kept } => {
+                    if let Some(kept) = kept.filter(|(store, at)| *store < STORES && *at < IN_A_STORE) {
+                        self.kept.insert(kept, icon.clone());
+                    }
+                    self.shows(id, large, icon);
+                }
+                Change::KeptIcon { id, large, kept } => {
+                    if let Some(icon) = self.kept.get(&kept).cloned() {
+                        self.shows(id, large, icon);
+                    }
+                }
             }
         }
+    }
+
+    /// A window shows this icon, as its large one or its small one: the large one is
+    /// what the browser is shown, where there is one.
+    fn shows(&mut self, id: u32, large: bool, icon: Icon) {
+        let icons = self.icons.entry(id).or_default();
+        let before = icons.0.as_ref().or(icons.1.as_ref()).cloned();
+        match large {
+            true => icons.0 = Some(icon),
+            false => icons.1 = Some(icon),
+        }
+        if icons.0.as_ref().or(icons.1.as_ref()) != before.as_ref() && !self.icons_changed.contains(&id) {
+            self.icons_changed.push(id);
+        }
+    }
+
+    /// The icons that changed since this was last asked, each with its window, as PNG
+    /// pictures.
+    pub fn icons(&mut self) -> Vec<(u32, Vec<u8>)> {
+        std::mem::take(&mut self.icons_changed)
+            .into_iter()
+            .filter_map(|id| {
+                let (large, small) = self.icons.get(&id)?;
+                Some((id, png(large.as_ref().or(small.as_ref())?)?))
+            })
+            .collect()
     }
 
     /// The windows from the front one back, as the browser is told of them, and the one
@@ -127,6 +179,18 @@ impl Windows {
     pub fn listed(&self) -> usize {
         self.told().0.iter().filter(|window| window.listed).count()
     }
+}
+
+/// An icon as a PNG picture, which a browser shows by itself.
+fn png(icon: &Icon) -> Option<Vec<u8>> {
+    let mut png = Vec::with_capacity(icon.pixels.len() / 2 + 128);
+    let mut encoder = png::Encoder::new(&mut png, u32::from(icon.width), u32::from(icon.height));
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().ok()?;
+    writer.write_image_data(&icon.pixels).ok()?;
+    writer.finish().ok()?;
+    Some(png)
 }
 
 #[cfg(test)]
@@ -212,5 +276,43 @@ mod tests {
         assert_eq!(windows.told().1, Some(1));
         windows.take(vec![Change::InFront(0)]);
         assert_eq!(windows.told().1, None);
+    }
+
+    #[test]
+    fn a_windows_icon_is_told_once_as_a_picture_the_large_one_where_there_is_one() {
+        let icon =
+            |size: u16, colour: u8| Icon { width: size, height: size, pixels: vec![colour; usize::from(size) * usize::from(size) * 4] };
+        let mut windows = Windows::default();
+        windows.take(vec![
+            Change::Window(said(1, "Ledger", (0, 0), (10, 10))),
+            Change::Icon { id: 1, large: false, icon: icon(16, 9), kept: None },
+        ]);
+        let told = windows.icons();
+        assert_eq!(told.len(), 1);
+        let picture = png::Decoder::new(std::io::Cursor::new(told[0].1.clone())).read_info().unwrap().info().clone();
+        assert_eq!((told[0].0, picture.width, picture.color_type), (1, 16, png::ColorType::Rgba));
+        // said once, until it changes
+        assert!(windows.icons().is_empty());
+
+        // the large one, kept for later, is the one told; a small one after it changes nothing
+        windows.take(vec![Change::Icon { id: 1, large: true, icon: icon(32, 7), kept: Some((0, 3)) }]);
+        windows.take(vec![Change::Icon { id: 1, large: false, icon: icon(16, 5), kept: None }]);
+        let told = windows.icons();
+        let picture = png::Decoder::new(std::io::Cursor::new(told[0].1.clone())).read_info().unwrap().info().clone();
+        assert_eq!((told.len(), picture.width), (1, 32));
+
+        // another window shows the icon that was kept; one kept beyond the stores is not kept
+        windows.take(vec![
+            Change::Window(said(2, "Ledger", (0, 0), (10, 10))),
+            Change::KeptIcon { id: 2, large: true, kept: (0, 3) },
+            Change::Icon { id: 3, large: true, icon: icon(32, 1), kept: Some((9, 0)) },
+            Change::KeptIcon { id: 4, large: true, kept: (9, 0) },
+            Change::KeptIcon { id: 5, large: true, kept: (2, 11) },
+        ]);
+        assert_eq!(windows.icons().iter().map(|(id, _)| *id).collect::<Vec<_>>(), [2, 3]);
+
+        // a window that is gone takes its icon with it
+        windows.take(vec![Change::Icon { id: 2, large: true, icon: icon(32, 2), kept: None }, Change::Gone(2)]);
+        assert!(windows.icons().is_empty());
     }
 }

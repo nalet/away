@@ -7,7 +7,7 @@
 //! draws: as rectangles it reads by itself, and only as fast as it confirms them. Keys
 //! and the pointer go the other way.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -143,6 +143,19 @@ impl Server {
         }
     }
 
+    /// Asks for another program of the machine in a session that runs, by the name Away
+    /// gives it: what the machine is asked to start, where the person may open it there
+    /// still. Nothing where they may not.
+    pub async fn start(&self, session: &str, program: &str) -> Result<Option<Program>, String> {
+        let (status, said) = self.ask("/internal/start", &[("session", session), ("program", program)]).await?;
+        match (status, said.text_of("run")) {
+            (200, Some(run)) if !run.is_empty() => Ok(Some(Program { run: run.to_string(), arguments: String::new() })),
+            (200, _) => Err("the server named no program to start".to_string()),
+            (403 | 404, _) => Ok(None),
+            (status, _) => Err(format!("the server answered with the status {status}")),
+        }
+    }
+
     /// Says what became of a session. Gives the status the server answered with.
     pub async fn told(&self, session: &str, what: &str, more: &[(&str, &str)]) -> Result<u16, String> {
         let mut says = vec![("session", session), ("what", what)];
@@ -246,8 +259,10 @@ where
             let mut says = vec![("width", wide.as_str()), ("height", high.as_str())];
             says.extend(served_by.as_deref().map(|served_by| ("served_by", served_by)));
             let recorded = server.told(&taken.session, "opened", &says).await;
+            // in a session for a program, the person may ask for others of the machine
+            let starts = taken.program.is_some().then_some(Starts { server, session: &taken.session, lines: &around.lines });
             let ended = match recorded {
-                Ok(200) => show(&mut browser, &mut desktop, screen, taken.clipboard, around.stop.clone()).await,
+                Ok(200) => show(&mut browser, &mut desktop, screen, taken.clipboard, starts, around.stop.clone()).await,
                 Ok(status) => Ended::Machine(format!("the server did not take the record that the desktop is open: status {status}")),
                 Err(why) => Ended::Machine(why),
             };
@@ -532,6 +547,14 @@ async fn served_by(sent_on: &away_rdp::redirection::Redirection, taken: &Taken) 
     Err(Failure { step: Step::SigningIn, why: Why::SentElsewhere, details })
 }
 
+/// Where a session for a program asks for others: the server says whether the person
+/// may open them, and what the machine is asked to start.
+struct Starts<'a> {
+    server: &'a Server,
+    session: &'a str,
+    lines: &'a Lines,
+}
+
 /// Shows an open desktop to the browser, and passes keys and the pointer on, until one
 /// of the two sides ends it.
 async fn show<Connection>(
@@ -539,6 +562,7 @@ async fn show<Connection>(
     desktop: &mut Desktop,
     mut screen: Screen,
     clipboard: Passes,
+    starts: Option<Starts<'_>>,
     mut stop: Stop,
 ) -> Ended
 where
@@ -557,11 +581,15 @@ where
     let mut changed = Changed::default();
     changed.add(Area { left: 0, top: 0, width: wide, height: high });
     let (mut sent, mut seen) = (0u32, 0u32);
-    // a program whose last window was closed is at its end, once no new one came in its place
+    // a program whose last window was closed is at its end, once no new one came in its
+    // place and no program the person asked for is still on its way
     let mut had_windows = false;
     let mut closed_since: Option<tokio::time::Instant> = None;
+    // the programs asked for in the session, by their names, until the machine says whether they started
+    let mut asked_for: VecDeque<String> = VecDeque::new();
     loop {
-        // where the windows of the programs are goes out before what is drawn in them
+        // where the windows of the programs are goes out before what is drawn in them, and
+        // with them the icons that changed
         if let Some((windows, in_front)) = desktop.windows() {
             if tell(browser, ToBrowser::Windows { windows: &windows, in_front }).await.is_err() {
                 return Ended::BrowserGone;
@@ -572,8 +600,23 @@ where
                 _ => (had_windows, closed_since) = (true, None),
             }
         }
+        for (window, png) in desktop.icons() {
+            if tell(browser, ToBrowser::Icon { window, png: &png }).await.is_err() {
+                return Ended::BrowserGone;
+            }
+        }
+        for started in desktop.started_later() {
+            let program = asked_for.pop_front().unwrap_or_default();
+            if tell(browser, ToBrowser::Started { program: &program, started }).await.is_err() {
+                return Ended::BrowserGone;
+            }
+            if !started && had_windows && desktop.windows_listed() == 0 {
+                closed_since = closed_since.or(Some(tokio::time::Instant::now()));
+            }
+        }
+        let closing = closed_since.filter(|_| asked_for.is_empty());
         let closed = async {
-            match closed_since {
+            match closing {
                 Some(since) => tokio::time::sleep_until(since + CLOSED_FOR).await,
                 None => std::future::pending().await,
             }
@@ -644,6 +687,35 @@ where
                 Some(FromBrowser::Window { id, does }) => {
                     if let Err(failed) = desktop.window(id, does).await {
                         return ended_by(failed);
+                    }
+                }
+                Some(FromBrowser::Start(program)) => {
+                    // the server says whether the person may open it there, and what it is
+                    let asked = match &starts {
+                        Some(starts) => match starts.server.start(starts.session, &program).await {
+                            Ok(asked) => asked,
+                            Err(why) => {
+                                starts.lines.warn(
+                                    "a program could not be asked for in a session",
+                                    &[("session", starts.session.into()), ("program", program.as_str().into()), ("why", why.as_str().into())],
+                                );
+                                None
+                            }
+                        },
+                        None => None,
+                    };
+                    match asked {
+                        Some(run) => {
+                            if let Err(failed) = desktop.start(&run).await {
+                                return ended_by(failed);
+                            }
+                            asked_for.push_back(program);
+                        }
+                        None => {
+                            if tell(browser, ToBrowser::Started { program: &program, started: false }).await.is_err() {
+                                return Ended::BrowserGone;
+                            }
+                        }
                     }
                 }
                 Some(FromBrowser::Leaves) => return Ended::Left,

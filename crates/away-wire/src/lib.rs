@@ -90,6 +90,20 @@ pub enum ToBrowser<'a> {
         /// The window in front, where one is.
         in_front: Option<u32>,
     },
+    /// The icon of a window of a program, as a PNG picture: the one it shows from now on.
+    Icon {
+        /// The window.
+        window: u32,
+        /// The picture.
+        png: &'a [u8],
+    },
+    /// A program the person asked for in the session that runs started, or didn't.
+    Started {
+        /// The program, by the name Away gives it.
+        program: &'a str,
+        /// Whether it started.
+        started: bool,
+    },
 }
 
 /// A window of a program, as the browser is told of it.
@@ -126,6 +140,8 @@ pub enum Does {
 
 /// The kind of bytes that are a rectangle of the picture.
 const RECTANGLE: u8 = 1;
+/// The kind of bytes that are the icon of a window.
+const ICON: u8 = 2;
 /// The way a rectangle's pixels are written: as a PNG picture.
 const PNG: u8 = 1;
 
@@ -162,6 +178,16 @@ impl ToBrowser<'_> {
                 object(Json::object([("clipboard", Json::object([("to", to_the_machine.into()), ("from", from_the_machine.into())]))]))
             }
             ToBrowser::Copied(text) => object(Json::object([("copied", text.into())])),
+            ToBrowser::Icon { window, png } => {
+                let mut bytes = Vec::with_capacity(5 + png.len());
+                bytes.push(ICON);
+                bytes.extend(window.to_be_bytes());
+                bytes.extend_from_slice(png);
+                Carried::Bytes(bytes)
+            }
+            ToBrowser::Started { program, started } => {
+                object(Json::object([("started", Json::object([("program", program.into()), ("ok", started.into())]))]))
+            }
             ToBrowser::Windows { windows, in_front } => {
                 let window = |window: &Window| {
                     let part = |part: &[i32; 4]| Json::List(part.iter().map(|edge| Json::Number(f64::from(*edge))).collect());
@@ -307,6 +333,9 @@ pub enum FromBrowser {
         /// What they do with it.
         does: Does,
     },
+    /// The person asks for another program of the machine, in the session that runs: by
+    /// the name Away gives it.
+    Start(String),
 }
 
 impl FromBrowser {
@@ -336,6 +365,12 @@ impl FromBrowser {
                 }
                 if let Some(text) = said.text_of("copied") {
                     return Ok(FromBrowser::Copied(text.to_string()));
+                }
+                if let Some(program) = said.text_of("start") {
+                    if program.is_empty() {
+                        return Err(NotThis("a program is asked for by its name"));
+                    }
+                    return Ok(FromBrowser::Start(program.to_string()));
                 }
                 if let Some(sized) = said.get("sized") {
                     let size = |name: &str| sized.get(name).and_then(Json::count).and_then(|size| u16::try_from(size).ok());
@@ -471,6 +506,8 @@ mod tests {
             ToBrowser::Asks { again: false, instead: true }.write(),
             ToBrowser::Passes { to_the_machine: true, from_the_machine: false }.write(),
             ToBrowser::Copied("two\nlines").write(),
+            ToBrowser::Icon { window: 65537, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
+            ToBrowser::Started { program: "Wages", started: false }.write(),
         ];
         assert_eq!(written.len(), to_browser.len());
         for (written, example) in written.iter().zip(to_browser) {
@@ -496,7 +533,8 @@ mod tests {
                 FromBrowser::read(&carried).unwrap_or_else(|NotThis(why)| panic!("{}: {why}", example.write()))
             })
             .collect();
-        assert_eq!(read.len(), 9);
+        assert_eq!(read.len(), 10);
+        assert!(matches!(&read[9], FromBrowser::Start(program) if program == "Wages"));
         assert!(matches!(&read[8], FromBrowser::Copied(text) if text == "a text\nof two lines"));
         assert!(matches!(read[7], FromBrowser::Sized { width: 1440, height: 900, scale: Some(200) }));
         assert!(matches!(read[6], FromBrowser::Window { id: 65537, does: Does::Close }));
@@ -542,6 +580,8 @@ mod tests {
             r#"{"window":65537}"#,
             r#"{"window":65537,"does":"shake"}"#,
             r#"{"window":-1,"does":"close"}"#,
+            r#"{"start":""}"#,
+            r#"{"start":7}"#,
         ] {
             assert!(FromBrowser::read(&Carried::Text(text.to_string())).is_err(), "{text}");
         }

@@ -40,6 +40,33 @@ const BY_LANGUAGE: [string, number][] = [
   ['sv', 0x041d], ['nb', 0x0414], ['no', 0x0414], ['fi', 0x040b],
 ];
 
+// The layouts Away tells apart by name: the language each writes, short as a taskbar
+// shows it, and in full.
+const NAMES: Record<number, [string, string]> = {
+  0x0409: ['EN', 'English (United States)'],
+  0x0809: ['EN', 'English (United Kingdom)'],
+  0x0807: ['DE', 'German (Switzerland)'],
+  0x0407: ['DE', 'German'],
+  0x100c: ['FR', 'French (Switzerland)'],
+  0x080c: ['FR', 'French (Belgium)'],
+  0x0c0c: ['FR', 'French (Canada)'],
+  0x040c: ['FR', 'French'],
+  0x0410: ['IT', 'Italian'],
+  0x040a: ['ES', 'Spanish'],
+  0x0416: ['PT', 'Portuguese (Brazil)'],
+  0x0816: ['PT', 'Portuguese'],
+  0x0406: ['DA', 'Danish'],
+  0x041d: ['SV', 'Swedish'],
+  0x0414: ['NB', 'Norwegian'],
+  0x040b: ['FI', 'Finnish'],
+};
+
+// A layout's language, short and in full.
+export function layoutName(layout: number): { short: string; name: string } {
+  const [short, name] = NAMES[layout] ?? ['EN', 'English (United States)'];
+  return { short, name };
+}
+
 // The layout of the person's keyboard. Where the browser says what the keys write, that
 // decides. Elsewhere it is taken from the language the browser is set to, and is the
 // one of the United States where that says nothing.

@@ -42,6 +42,24 @@ pub const WINDOW: u32 = 0x0001_0001;
 pub const WINDOW_AT: (usize, usize) = (20, 10);
 /// How wide and how high the window is.
 pub const WINDOW_SIZE: (usize, usize) = (160, 100);
+/// The window of the language bar, which a stand-in that floats one opens with the first
+/// program, as Windows does.
+pub const LANGUAGE_BAR: u32 = 0x0001_0100;
+
+/// The icon of a program's window on the stand-in: 32 pixels square, blue, in a frame of
+/// two pixels that covers nothing.
+pub fn program_icon() -> window::Icon {
+    let pixels = (0..32 * 32)
+        .flat_map(|at| {
+            let (x, y) = (at % 32, at / 32);
+            match (2..30).contains(&x) && (2..30).contains(&y) {
+                true => [0x25, 0x63, 0xeb, 0xff],
+                false => [0, 0, 0, 0],
+            }
+        })
+        .collect();
+    window::Icon { width: 32, height: 32, pixels }
+}
 
 /// The most a piece of an update carries, so that its frame can say how long it is.
 const MOST_IN_A_PIECE: usize = 30_000;
@@ -191,6 +209,12 @@ pub struct Desktop {
     clipboard_pieces: Pieces,
     /// Whether it said that it is ready for the clipboard.
     speaks_of_the_clipboard: bool,
+    /// The windows of the programs that are open, the front one first.
+    windows: Vec<u32>,
+    /// How many windows of programs it opened.
+    opened: u32,
+    /// Whether it floats a language bar over the programs' windows.
+    floats_a_language_bar: bool,
 }
 
 /// The picture a stand-in draws on a desktop whose size the client asked for: every
@@ -224,7 +248,16 @@ impl Desktop {
             speaks_of_later: false,
             clipboard_pieces: Pieces::default(),
             speaks_of_the_clipboard: false,
+            windows: Vec::new(),
+            opened: 0,
+            floats_a_language_bar: false,
         }
+    }
+
+    /// The same, as a machine that floats its language bar over the programs' windows,
+    /// in a window of its own.
+    pub fn that_floats_its_language_bar(self) -> Desktop {
+        Desktop { floats_a_language_bar: true, ..self }
     }
 
     /// The same, as a machine that reads the card in the client's reader the way a
@@ -547,8 +580,9 @@ impl Desktop {
         Ok(send)
     }
 
-    /// What the client says about programs: the program it asks for opens in a window,
-    /// where the stand-in publishes it, and a window the person closes is gone.
+    /// What the client says about programs: each program it asks for opens in a window of
+    /// its own, with its icon, where the stand-in publishes it, and a window the person
+    /// closes is gone.
     fn about_programs(&mut self, piece: &[u8]) -> Result<Vec<u8>, Error> {
         let Some(message) = self.pieces.take(piece)? else { return Ok(Vec::new()) };
         let asked = rail::stand_in::read(&message)?;
@@ -557,13 +591,28 @@ impl Desktop {
         Ok(match asked {
             Asked::Start(program) if self.publishes.contains(&program.run) => {
                 let mut send = on_the_programs_channel(&rail::stand_in::result(&program, 0));
-                // where the window is and that it is in front, and then what is in it
+                // where the window is, its icon, and that it is in front, and then what is in
+                // it: a window opened later lies over the ones before
                 let title = program.run.trim_start_matches('|');
                 let (at, size) = ((WINDOW_AT.0 as i32, WINDOW_AT.1 as i32), (WINDOW_SIZE.0 as u16, WINDOW_SIZE.1 as u16));
-                send.extend(words(&[
-                    window::stand_in::window(WINDOW, true, title, at, size),
-                    window::stand_in::in_front(WINDOW, &[WINDOW]),
-                ]));
+                let id = WINDOW + self.opened;
+                self.windows.insert(0, id);
+                let mut orders = vec![
+                    window::stand_in::window(id, true, title, at, size),
+                    window::stand_in::icon(id, true, Some((0, self.opened as u16)), &program_icon()),
+                    window::stand_in::in_front(id, &self.windows),
+                ];
+                if self.floats_a_language_bar && self.opened == 0 {
+                    orders.push(window::stand_in::window(
+                        LANGUAGE_BAR,
+                        true,
+                        "CiceroUIWndFrame-TF_FloatingLangBar_WndTitle",
+                        (120, 0),
+                        (80, 8),
+                    ));
+                }
+                self.opened += 1;
+                send.extend(words(&orders));
                 for top in (WINDOW_AT.1..WINDOW_AT.1 + WINDOW_SIZE.1).step_by(TILE) {
                     for left in (WINDOW_AT.0..WINDOW_AT.0 + WINDOW_SIZE.0).step_by(TILE) {
                         let (wide, high) = (TILE.min(WINDOW_AT.0 + WINDOW_SIZE.0 - left), TILE.min(WINDOW_AT.1 + WINDOW_SIZE.1 - top));
@@ -576,7 +625,10 @@ impl Desktop {
             }
             // a program it doesn't publish is not among those it lets be started
             Asked::Start(program) => on_the_programs_channel(&rail::stand_in::result(&program, 3)),
-            Asked::Command(WINDOW, rail::Command::Close) => words(&[window::stand_in::gone(WINDOW)]),
+            Asked::Command(id, rail::Command::Close) if self.windows.contains(&id) => {
+                self.windows.retain(|open| *open != id);
+                words(&[window::stand_in::gone(id)])
+            }
             _ => Vec::new(),
         })
     }

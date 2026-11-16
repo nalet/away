@@ -4,18 +4,18 @@
 // its own but a handle. A program's windows show on Away's ground, where the machine
 // has them on its desktop.
 import { Button, Chevron, EmptyState, Field, IconButton, Input, Spinner } from '@nalet/design-system';
-import { AppWindow, Check, ClipboardList, House, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
+import { AppWindow, Check, ClipboardList, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent as KeyOfReact, PointerEvent as PointerOfReact, ReactNode } from 'react';
 
 import { pageOf, useMachines } from '../machines';
-import type { Machine } from '../machines';
+import type { Machine, Program } from '../machines';
 import { addressOf } from '../place';
 import { texts } from '../texts';
 import { ClipboardPanel, useClipboard } from './Clipboard';
 import type { Passes } from './Clipboard';
-import { layoutOf, placeOf } from './keys';
-import { begins, credentials, did, leaves, readRectangle, readSaid, seen, sized, windowDoes } from './wire';
+import { layoutName, layoutOf, placeOf } from './keys';
+import { begins, credentials, did, leaves, readIcon, readRectangle, readSaid, seen, sized, start, windowDoes } from './wire';
 import type { Did, Step, WindowOf } from './wire';
 
 const STEPS: Step[] = ['reaching', 'checking', 'signing-in', 'first-picture'];
@@ -41,10 +41,17 @@ function useSession(machine: string, program: string | null) {
   const [state, setState] = useState<State>({ is: 'opening', step: null, asks: null });
   // the windows of the programs, from the front one back
   const [windows, setWindows] = useState<WindowOf[]>([]);
+  const [inFront, setInFront] = useState<number | null>(null);
   const [attempt, setAttempt] = useState(0);
   // which ways the clipboard passes, and the text that was last copied on the machine
   const [passes, setPasses] = useState<Passes | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // the icons of the windows, each as a picture the page holds
+  const [icons, setIcons] = useState<Record<number, ImageBitmap>>({});
+  // the keyboard's layout the machine was told of, and what became of a program the
+  // person asked for in the session, the last of them
+  const [layout, setLayout] = useState<number | null>(null);
+  const [started, setStarted] = useState<{ program: string; ok: boolean } | null>(null);
   // the picture is drawn on a canvas of the session's own, which a page shows once it is open
   const [canvas] = useState(() => document.createElement('canvas'));
   const socket = useRef<WebSocket | null>(null);
@@ -69,6 +76,10 @@ function useSession(machine: string, program: string | null) {
     setPasses(null);
     setCopied(null);
     setLost(null);
+    setStarted(null);
+    // the pictures of the icons are the page's until the session ends
+    const pictures = new Map<number, ImageBitmap>();
+    setIcons({});
 
     // The desktop goes on at the machine: Away tries again, at once and then at longer
     // intervals, until it is back or the person leaves.
@@ -89,6 +100,7 @@ function useSession(machine: string, program: string | null) {
         layoutOf(),
       ]);
       if (over) return;
+      setLayout(layout);
       if (!asked.ok) {
         // while Away itself is not there, as when it is being updated, it is tried again
         if (anew && asked.status >= 500) throw new Error('Away is not there');
@@ -107,6 +119,22 @@ function useSession(machine: string, program: string | null) {
       opened.onopen = () => opened.send(begins(ticket, window.innerWidth - (docked(program) ? RAIL : 0), window.innerHeight, layout, Math.round(window.devicePixelRatio * 100)));
       opened.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
         if (typeof event.data !== 'string') {
+          const icon = readIcon(event.data);
+          if (icon) {
+            // read as the rectangles are, so that the page loads no picture from anywhere
+            createImageBitmap(new Blob([icon.png], { type: 'image/png' }))
+              .then((picture) => {
+                if (over) {
+                  picture.close();
+                  return;
+                }
+                pictures.get(icon.window)?.close();
+                pictures.set(icon.window, picture);
+                setIcons(Object.fromEntries(pictures));
+              })
+              .catch(() => undefined);
+            return;
+          }
           const rectangle = readRectangle(event.data);
           if (!rectangle) return;
           drawing = drawing
@@ -159,9 +187,13 @@ function useSession(machine: string, program: string | null) {
             setLost(null);
             setState({ is: 'ended', why: said.ended });
           }
-        } else if ('windows' in said) setWindows(said.windows);
+        } else if ('windows' in said) {
+          setWindows(said.windows);
+          setInFront(said.in_front);
+        }
         else if ('clipboard' in said) setPasses(said.clipboard);
         else if ('copied' in said) setCopied(said.copied);
+        else if ('started' in said) setStarted(said.started);
       };
       opened.onclose = () => {
         if (over || told || connection !== opened) return;
@@ -198,6 +230,7 @@ function useSession(machine: string, program: string | null) {
       if (connection?.readyState === WebSocket.OPEN) connection.send(leaves());
       connection?.close();
       socket.current = null;
+      pictures.forEach((picture) => picture.close());
     };
   }, [machine, program, attempt, canvas]);
 
@@ -207,6 +240,10 @@ function useSession(machine: string, program: string | null) {
   return {
     state,
     windows,
+    inFront,
+    icons,
+    layout,
+    started,
     passes,
     copied,
     canvas,
@@ -236,7 +273,7 @@ export function Session({ showMachine, ...session }: SessionProps & { showMachin
 
 // The page of a session with a machine's desktop, or with one of its programs.
 function BrowserSession({ name, program, go, contact, machine }: SessionProps & { machine: Machine | null }) {
-  const { state, windows, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program);
+  const { state, windows, inFront, icons, layout, started, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program);
   const toMachines = () => go(machine ? pageOf(name) : addressOf.machines);
 
   useEffect(() => {
@@ -253,6 +290,11 @@ function BrowserSession({ name, program, go, contact, machine }: SessionProps & 
         name={name}
         program={program}
         windows={windows}
+        inFront={inFront}
+        icons={icons}
+        programs={machine?.programs ?? []}
+        layout={layout}
+        started={started}
         passes={passes}
         copied={copied}
         canvas={canvas}
@@ -260,7 +302,7 @@ function BrowserSession({ name, program, go, contact, machine }: SessionProps & 
         lost={lost}
         tryNow={tryNow}
         leave={leave}
-        openAnother={() => go(addressOf.machines)}
+        otherMachines={() => go(addressOf.machines)}
       />
     );
   }
@@ -460,9 +502,30 @@ function usePhone(): boolean {
   return phone;
 }
 
-// The time on the person's own device, as a taskbar shows it.
-function timeNow(): string {
-  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+// The time and the day on the person's own device, as a taskbar shows them: the hours
+// of the whole day, so that the time is as short as it gets.
+function timeNow(): { time: string; day: string; at: string } {
+  const now = new Date();
+  return {
+    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
+    day: now.toLocaleDateString([], { day: '2-digit', month: '2-digit' }),
+    at: now.toISOString(),
+  };
+}
+
+// A window's icon, as the machine gave it: drawn on a canvas of its own.
+function WindowIcon({ picture }: { picture: ImageBitmap }) {
+  const drawn = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const canvas = drawn.current;
+    if (!canvas) return;
+    canvas.width = picture.width;
+    canvas.height = picture.height;
+    const context = canvas.getContext('2d');
+    context?.clearRect(0, 0, canvas.width, canvas.height);
+    context?.drawImage(picture, 0, 0);
+  }, [picture]);
+  return <canvas ref={drawn} className="icon" aria-hidden="true" />;
 }
 
 // The key combinations a browser or a device keeps for itself, each as its keys in the
@@ -484,6 +547,11 @@ function Desktop({
   name,
   program,
   windows,
+  inFront,
+  icons,
+  programs,
+  layout,
+  started,
   passes,
   copied,
   canvas,
@@ -491,11 +559,16 @@ function Desktop({
   lost,
   tryNow,
   leave,
-  openAnother,
+  otherMachines,
 }: {
   name: string;
   program: string | null;
   windows: WindowOf[];
+  inFront: number | null;
+  icons: Record<number, ImageBitmap>;
+  programs: Program[];
+  layout: number | null;
+  started: { program: string; ok: boolean } | null;
   passes: Passes | null;
   copied: string | null;
   canvas: HTMLCanvasElement;
@@ -503,7 +576,7 @@ function Desktop({
   lost: Lost | null;
   tryNow: () => void;
   leave: () => void;
-  openAnother: () => void;
+  otherMachines: () => void;
 }) {
   const t = texts.session;
   const [bar, setBar] = useState(false);
@@ -513,6 +586,11 @@ function Desktop({
   const keysOf = useRef<HTMLSpanElement | null>(null);
   // whether the panel of the clipboard is open
   const [clip, setClip] = useState(false);
+  // whether the machine's programs are listed, under the mark of a program's rail; the
+  // program asked for that is on its way, and the last one that didn't start
+  const [launch, setLaunch] = useState(false);
+  const [starting, setStarting] = useState<string | null>(null);
+  const [notStarted, setNotStarted] = useState<string | null>(null);
   const clipboard = useClipboard(canvas, passes, copied, say);
   // the clock at the foot of the rail, and the first control, focused when a desktop's
   // rail opens. For a program the rail is always there, as a taskbar
@@ -575,6 +653,17 @@ function Desktop({
   useEffect(() => {
     if (keys) keysOf.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
   }, [keys]);
+
+  // what the machine said of the program that was asked for: one that started shows its
+  // window, and the list goes away; one that didn't says so in the list
+  useEffect(() => {
+    if (started === null) return;
+    setStarting(null);
+    if (started.ok) {
+      setLaunch(false);
+      setNotStarted(null);
+    } else setNotStarted(started.program);
+  }, [started]);
 
   // the clock keeps the time
   useEffect(() => {
@@ -711,8 +800,15 @@ function Desktop({
   const close = () => {
     setKeys(false);
     setClip(false);
+    setLaunch(false);
     setBar(false);
     canvas.focus();
+  };
+  // another program of the machine, in this session: the machine opens its window here
+  const open = (asked: string) => {
+    setNotStarted(null);
+    setStarting(asked);
+    say(start(asked));
   };
   // the keys go down in their order and come up in the other, as under a hand; then
   // the machine has the window again
@@ -741,6 +837,7 @@ function Desktop({
   // the parts of the windows that can be seen, as shares of the desktop's width and height
   const parts = windows.flatMap((window) => window.seen.map((part) => ({ of: window.id, part })));
   const listed = windows.filter((window) => window.listed);
+  const keyboard = layout === null ? null : layoutName(layout);
   // the controls a session has: the same on a desktop's bar and on a program's rail
   const controls = (
     <>
@@ -760,6 +857,7 @@ function Desktop({
           aria-expanded={keys}
           onClick={() => {
             setClip(false);
+            setLaunch(false);
             setKeys(!keys);
           }}
           autoFocus={program === null}
@@ -786,6 +884,7 @@ function Desktop({
             aria-expanded={clip}
             onClick={() => {
               setKeys(false);
+              setLaunch(false);
               setClip(!clip);
             }}
           >
@@ -889,23 +988,87 @@ function Desktop({
             onPointerMove={railAlways ? undefined : swipeOut}
             onPointerUp={() => (swipe.current = null)}
           >
-            {/* the top of the rail is the Away mark: it opens another machine */}
-            <button type="button" ref={firstControl} className="it mark" aria-label={t.another} title={t.another} onClick={openAnother}>
-              <House size={22} aria-hidden="true" />
-            </button>
-            {/* the program's open windows, as icons: a click brings one to the front */}
+            {/* the top of the rail is the Away mark: the machine's programs, to open
+                another in this session, and the way to the other machines */}
+            <span
+              className="menuof launch"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setLaunch(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && launch) {
+                  event.stopPropagation();
+                  setLaunch(false);
+                  firstControl.current?.focus();
+                }
+              }}
+            >
+              <button
+                type="button"
+                ref={firstControl}
+                className={`it mark${launch ? ' is-open' : ''}`}
+                aria-label={t.launcher}
+                title={t.launcher}
+                aria-expanded={launch}
+                onClick={() => {
+                  setKeys(false);
+                  setClip(false);
+                  setLaunch(!launch);
+                }}
+              >
+                <Chevron size={14} aria-hidden="true" />
+                <b className="letter">a</b>
+              </button>
+              {launch && (
+                <div className="sesspanel launcher" role="group" aria-label={t.programsOf(name)}>
+                  <h2>{t.programsOf(name)}</h2>
+                  {programs.length > 0 && (
+                    <ul className="progs">
+                      {programs.map((one) => (
+                        <li key={one.name}>
+                          <button
+                            type="button"
+                            className="prog"
+                            aria-disabled={starting !== null}
+                            onClick={() => {
+                              // one program at a time: the button keeps the focus, and the list stays
+                              if (starting === null) open(one.name);
+                            }}
+                          >
+                            {one.icon ? <img src={one.icon} alt="" width={20} height={20} /> : <AppWindow size={20} aria-hidden="true" />}
+                            <span className="grow">{one.name}</span>
+                            {starting === one.name && <Spinner size={14} label={t.starting(one.name)} />}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {notStarted !== null && (
+                    <p className="off" role="alert">
+                      {t.notStarted(notStarted, name)}
+                    </p>
+                  )}
+                  <button type="button" className="prog more" onClick={otherMachines}>
+                    <Monitor size={20} aria-hidden="true" />
+                    <span className="grow">{t.otherMachines}</span>
+                  </button>
+                </div>
+              )}
+            </span>
+            {/* the program's open windows, each as its own icon: a click brings one to the front */}
             {listed.length > 0 && (
               <ul className="wins" aria-label={t.windows}>
                 {listed.map((window) => (
                   <li key={window.id}>
                     <button
                       type="button"
-                      className="it win"
+                      className={`it win${window.id === inFront ? ' on' : ''}`}
+                      aria-current={window.id === inFront ? 'true' : undefined}
                       aria-label={t.toFront(window.title)}
                       title={t.toFront(window.title)}
                       onClick={() => say(windowDoes(window.id, 'front'))}
                     >
-                      <AppWindow size={20} aria-hidden="true" />
+                      {icons[window.id] ? <WindowIcon picture={icons[window.id]!} /> : <AppWindow size={20} aria-hidden="true" />}
                     </button>
                     <button
                       type="button"
@@ -927,10 +1090,19 @@ function Desktop({
                 <X size={16} aria-hidden="true" />
               </IconButton>
             )}
-            {/* the foot of the rail is the clock, as a taskbar has */}
-            <time className="clock" aria-label={t.clockLabel}>
-              {clock}
-            </time>
+            {/* the foot of the rail, as a taskbar has: the keyboard the machine types as, and the clock */}
+            <div className="foot">
+              {keyboard && (
+                <span className="lang" title={t.typesAs(keyboard.name)}>
+                  <span aria-hidden="true">{keyboard.short}</span>
+                  <span className="unseen">{t.typesAs(keyboard.name)}</span>
+                </span>
+              )}
+              <time className="clock" dateTime={clock.at} aria-label={t.clockLabel}>
+                <span>{clock.time}</span>
+                <span className="day">{clock.day}</span>
+              </time>
+            </div>
           </div>
           {/* on a phone, a touch beside the rail puts it away again */}
           {!railAlways && <div className="scrim" aria-hidden="true" onPointerDown={close} />}

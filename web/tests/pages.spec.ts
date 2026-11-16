@@ -1218,19 +1218,66 @@ test.describe('a session', () => {
     await screen.click({ position: { x: 50, y: 60 } });
     await expect.poll(() => pixel(page, 55, 65)).toEqual([224, 64, 32]);
 
-    // a program's rail stands always, as a taskbar: no handle to open, and it lists the
-    // windows as icons, each brought to the front or closed
+    // a program's rail stands always, as a taskbar: no handle to open, Away's mark at its
+    // top, the windows as their own icons, each brought to the front or closed, and at its
+    // foot the keyboard the machine types as and the time
     const bar = page.getByRole('toolbar', { name: "the session's bar" });
     await expect(page.getByRole('button', { name: "open the session's bar" })).toHaveCount(0);
-    await expect(bar.getByRole('button', { name: 'open another machine' })).toBeVisible();
+    const mark = bar.getByRole('button', { name: 'open a program' });
+    await expect(mark).toBeVisible();
     // the program's picture is the space beside the rail, not under it
     const box = await screen.boundingBox();
     expect(box && box.x).toBeGreaterThanOrEqual(56);
     const windows = bar.getByRole('list', { name: 'windows' }).getByRole('listitem');
     await expect(windows).toHaveCount(1);
-    await expect(windows.getByRole('button', { name: 'bring to the front: ledger' })).toBeVisible();
+    const front = windows.getByRole('button', { name: 'bring to the front: ledger' });
+    await expect(front).toBeVisible();
+    await expect(front).toHaveAttribute('aria-current', 'true');
+    // the icon is the one the machine gave the window: blue, 32 pixels square, in a frame that covers nothing
+    const icon = (x: number, y: number) =>
+      front.locator('canvas').evaluate(
+        (drawn: HTMLCanvasElement, [x, y]) => {
+          // read from a copy, which is read once
+          const copy = document.createElement('canvas');
+          [copy.width, copy.height] = [drawn.width, drawn.height];
+          const context = copy.getContext('2d', { willReadFrequently: true })!;
+          context.drawImage(drawn, 0, 0);
+          return [drawn.width, ...context.getImageData(x!, y!, 1, 1).data];
+        },
+        [x, y],
+      );
+    await expect.poll(() => icon(16, 16)).toEqual([32, 0x25, 0x63, 0xeb, 255]);
+    expect(await icon(0, 0)).toEqual([32, 0, 0, 0, 0]);
+    await expect(bar.locator('.lang [aria-hidden="true"]')).toHaveText('EN');
+    await expect(bar.getByText('the keyboard: English (United States)')).toBeAttached();
+    await expect(bar.getByLabel('the time on your device')).toHaveText(/^\d\d:\d\d/);
+    // nothing in the rail is wider than the rail: it never scrolls sideways
+    for (const part of [bar, bar.getByRole('list', { name: 'windows' })]) {
+      expect(await part.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    }
     await accessible(page);
-    // closing the program's last window ends the session, and leads back to the machine
+
+    // the mark lists the machine's programs: one opens in the same session, in a window of its own
+    await mark.click();
+    const launcher = bar.getByRole('group', { name: 'programs of apps-01' });
+    await expect(launcher.getByRole('button')).toHaveText(['Books', 'Wages', 'other machines']);
+    await accessible(page);
+    await launcher.getByRole('button', { name: 'Books' }).click();
+    await expect(launcher).toHaveCount(0);
+    await expect(windows).toHaveCount(2);
+    // one the machine doesn't start says so there, and the session goes on
+    await mark.click();
+    await launcher.getByRole('button', { name: 'Wages' }).click();
+    await expect(launcher.getByRole('alert')).toHaveText("Wages didn't start on apps-01.");
+    await expect(screen).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(launcher).toHaveCount(0);
+    await expect(mark).toBeFocused();
+
+    // closing the program's windows ends the session with the last one, and leads back to the machine
+    await windows.first().hover();
+    await windows.first().getByRole('button', { name: 'close: ledger' }).click();
+    await expect(windows).toHaveCount(1);
     await windows.hover();
     await windows.getByRole('button', { name: 'close: ledger' }).click();
     await expect(windows).toHaveCount(0);
@@ -1275,7 +1322,7 @@ test.describe('a session', () => {
     await page.mouse.move(at!.x + 140, at!.y + at!.height / 2, { steps: 8 });
     await page.mouse.up();
     await expect(bar).toBeVisible();
-    await expect(bar.getByRole('button', { name: 'open another machine' })).toBeFocused();
+    await expect(bar.getByRole('button', { name: 'open a program' })).toBeFocused();
     await expect(bar.getByRole('list', { name: 'windows' }).getByRole('listitem')).toHaveCount(1);
     await expect(bar.getByLabel('the time on your device')).toBeVisible();
     await accessible(page);
@@ -1333,13 +1380,15 @@ test('without a database no machine is opened, and the page says why', async ({ 
 });
 
 test("the session's messages are written and read as the examples say that the gateway is tried against too", async () => {
-  const { begins, copied, credentials, did, leaves, readRectangle, readSaid, seen, sized, windowDoes } = await import('../src/session/wire');
+  const { begins, copied, credentials, did, leaves, readIcon, readRectangle, readSaid, seen, sized, start, windowDoes } = await import('../src/session/wire');
   const examples = JSON.parse(readFileSync('../crates/away-wire/fixtures/messages.json', 'utf8')) as Record<string, { text?: string; bytes?: string }[]>;
   const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   const bytes = (written: string) => new Uint8Array((written.match(/../g) ?? []).map((pair) => parseInt(pair, 16)));
 
   // what the gateway says
-  const said = (examples.to_browser ?? []).map((example) => (example.text ? readSaid(example.text) : readRectangle(bytes(example.bytes!).buffer)));
+  const said = (examples.to_browser ?? []).map((example) =>
+    example.text ? readSaid(example.text) : (readRectangle(bytes(example.bytes!).buffer) ?? readIcon(bytes(example.bytes!).buffer)),
+  );
   expect(said.slice(0, 5)).toEqual([{ step: 'reaching' }, { step: 'first-picture' }, { asks: { again: false } }, { asks: { again: true } }, { desktop: { width: 1280, height: 800 } }]);
   expect(said[5]).toEqual({ left: 64, top: 128, width: 200, height: 120, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) });
   expect(said.slice(6, 9)).toEqual([{ drawn: 7 }, { failed: { step: 'reaching', why: 'no-answer', details: 'no answer within 10 seconds' } }, { ended: 'left' }]);
@@ -1348,8 +1397,16 @@ test("the session's messages are written and read as the examples say that the g
     { asks: { again: false, instead: true } },
     { clipboard: { to: true, from: false } },
     { copied: 'two\nlines' },
+    { window: 65537, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) },
+    { started: { program: 'Wages', ok: false } },
   ]);
-  expect([readSaid('no JSON'), readSaid('7'), readRectangle(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0, 1]).buffer)]).toEqual([null, null, null]);
+  expect([
+    readSaid('no JSON'),
+    readSaid('7'),
+    readRectangle(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0, 1]).buffer),
+    readIcon(new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0, 0, 1]).buffer),
+    readIcon(new Uint8Array([2, 0, 1]).buffer),
+  ]).toEqual([null, null, null, null, null]);
 
   // what the pages say
   const written = [
@@ -1373,6 +1430,7 @@ test("the session's messages are written and read as the examples say that the g
     windowDoes(65537, 'close'),
     sized(1440, 900, 200),
     copied('a text\nof two lines'),
+    start('Wages'),
   ];
   expect(written).toEqual((examples.from_browser ?? []).map((example) => example.text ?? example.bytes));
 });
