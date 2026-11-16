@@ -1114,7 +1114,9 @@ function Desktop({
                       aria-label={t.toFront(window.title)}
                       title={t.toFront(window.title)}
                       onClick={() => {
-                        // the window comes to the front and has the keys; its icon keeps its place
+                        // the window comes to the front and has the keys, one made small back at its
+                        // size first, as a taskbar does; its icon keeps its place
+                        if (window.shown === 'minimized') say(windowDoes(window.id, 'restore'));
                         say(windowDoes(window.id, 'front'));
                         canvas.focus();
                       }}
