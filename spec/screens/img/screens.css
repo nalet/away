@@ -195,47 +195,50 @@ svg.i.s24 { width: 24px; height: 24px; } svg.i.s32 { width: 32px; height: 32px; 
 .spanel { position: absolute; z-index: 31; top: 52px; width: 320px; background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073;
           padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .spanel .h2 { font-size: 13px; }
-/* the list of windows, down the side of a session with programs (chapter 7): the machine's open windows, one in
-   a row, and the way to a further program. frame.js draws its head, its last row and its foot. Narrow, it has
-   one icon for each program; on a phone it lies along the foot, as the tabs of Away's pages do */
-.wlist { position: absolute; left: 0; top: 0; bottom: 0; width: 224px; z-index: 10; display: flex; flex-direction: column; background: var(--bg-2);
-         border-right: 1px solid var(--border); }
-.wlist .wl-head { height: 48px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--border);
-                  color: var(--fg-2); font: 500 13px/1 var(--ff-mono); white-space: nowrap; }
-.wlist .wl-head svg.i { width: 16px; height: 16px; color: var(--fg-muted); }
-.wlist .wl-row { height: 40px; flex: none; position: relative; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; color: var(--fg-muted);
-                 font: 500 12px/1 var(--ff-mono); white-space: nowrap; }
-.wlist .wl-row .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.5; }
-.wlist .wl-row > svg.i { width: 16px; height: 16px; }
+/* the rail of a session with programs (chapter 7): down the left, as a taskbar, in the design of Away's own rail.
+   frame.js draws the mark at its top, the controls and its foot; the drawing writes the windows, each as its icon.
+   The windows' room is beside it. On a phone it lies over the picture, swiped in from the strip at the edge */
+.prail { position: absolute; left: 0; top: 0; bottom: 0; width: 56px; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 4px;
+         padding: 8px 0; background: var(--bg-2); border-right: 1px solid var(--border); }
+.prail .pr-top { padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.prail .pr-mark { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; gap: 1px; font: 700 18px/1 var(--ff-mono); color: var(--fg-2); }
+.prail .pr-mark svg { width: 14px; height: 14px; }
+.prail .pr-mark.on { background: var(--surface-2); color: var(--cloud-blue); }   /* pressed, its list open */
+.prail .pr-win { width: 40px; height: 40px; flex: none; position: relative; display: flex; align-items: center; justify-content: center; }
 /* the window in front: a lighter ground and a bar on its edge, as the rail marks the current view, so not by colour alone */
-.wlist .wl-row.on { color: var(--fg); background: var(--surface-2); box-shadow: inset 2px 0 0 var(--cloud-blue); }
-/* a window that was made small: quieter, and with the sign of it */
-.wlist .wl-row.small { color: var(--fg-dim); }
-.wlist .wl-row.small .pico { opacity: .5; }
-.wlist .wl-add { margin-top: 4px; color: var(--fg-2); }
-.wlist .wl-add > svg.i { width: 20px; height: 20px; }
-.wlist .wl-add.on { color: var(--cloud-blue); background: var(--surface-2); box-shadow: none; }   /* pressed, its menu open */
-.wlist .wl-gap { flex: 1; }
-.wlist .wl-foot { height: 48px; flex: none; display: flex; align-items: center; justify-content: flex-end; padding: 0 8px; border-top: 1px solid var(--border); }
-.wlist .count { top: 4px; right: 6px; }
-.wlist.narrow { width: 56px; }
-.wlist.narrow .wl-head, .wlist.narrow .wl-foot { justify-content: center; padding: 0; }
-.wlist.narrow .wl-row { height: 48px; justify-content: center; padding: 0; }
-/* the room the programs' windows have: the window less the list */
-.warea { position: absolute; left: 224px; top: 0; right: 0; bottom: 0; overflow: hidden; }
-.wlist.narrow ~ .warea { left: 56px; }
-.phone .wlist { top: auto; right: 0; width: auto; height: 56px; flex-direction: row; border-right: 0; border-top: 1px solid var(--border); }
-.phone .wlist .wl-row { width: 56px; height: auto; justify-content: center; padding: 0; margin: 0; }
-.phone .wlist .wl-row.on { box-shadow: inset 0 2px 0 var(--cloud-blue); }
-.phone .wlist .wl-add { margin-left: auto; }
-.phone .wlist .count { top: 8px; right: 6px; }
-/* on a phone a window fills the room, so the room begins under the handle, which then covers nothing of its title */
-.phone .wlist ~ .warea { left: 0; top: 18px; bottom: 56px; }
+.prail .pr-win.on { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--cloud-blue); }
+.prail .pr-win .pico { width: 24px; height: 24px; font-size: 13px; }
+.prail .pr-x { position: absolute; top: 1px; right: 1px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
+               border: 1px solid var(--border-2); background: var(--surface); color: var(--fg); }
+.prail .pr-x svg.i { width: 12px; height: 12px; }
+.prail .pr-gap { flex: 1; }
+.prail .pr-btn { width: 40px; height: 40px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--fg-muted); }
+.prail .pr-btn svg.i { width: 18px; height: 18px; }
+.prail .pr-foot { width: 40px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border); }
+.prail .pr-lang { padding: 3px 4px; border: 1px solid var(--border-2); font: 600 11px/1 var(--ff-mono); letter-spacing: .04em; color: var(--fg-2); }
+.prail .pr-clock { display: flex; flex-direction: column; align-items: center; gap: 3px; white-space: nowrap; font: 500 12px/1 var(--ff-mono); color: var(--fg-2); }
+.prail .pr-clock .day { font-size: 10px; color: var(--fg-muted); }
+.prail.over { z-index: 32; box-shadow: 8px 0 24px #00000073; }
+/* the room the programs' windows have: the window less the rail */
+.warea { position: absolute; left: 56px; top: 0; right: 0; bottom: 0; overflow: hidden; }
+.prail.over ~ .warea, .phone .warea { left: 0; }
+/* beside a rail swiped in on a phone, a touch puts it away */
+.pscrim { position: absolute; inset: 0; z-index: 31; background: rgba(5, 7, 12, .35); }
+/* where the rail waits on a phone: a strip on the left edge */
+.pedge { position: absolute; left: 0; top: 0; bottom: 0; width: 16px; z-index: 10; }
+.pedge::before { content: ""; position: absolute; top: 50%; left: 5px; width: 3px; height: 40px; margin-top: -20px; border-radius: 2px; background: var(--fg-muted); opacity: .6; }
+/* the machine's programs, from the mark: beside the rail, at its top */
+.plaunch { left: 62px; top: 8px; width: 300px; gap: 8px; }
+.plaunch .pl-row { height: 40px; margin: 0 -8px; padding: 0 8px; display: flex; align-items: center; gap: 10px; font: 400 14px/1.3 var(--ff-ui); color: var(--fg); }
+.plaunch .pl-row svg.i { width: 20px; height: 20px; color: var(--fg-muted); flex: none; }
+.plaunch .pl-row .grow { flex: 1; }
+.plaunch .pl-row.hover { background: var(--surface-2); }
+.plaunch .pl-row.more { border-top: 1px solid var(--border); color: var(--fg-2); }
+.plaunch .said { margin: 0; font: 400 14px/1.45 var(--ff-ui); color: var(--fg-muted); }
 /* a program's own icon, as the machine gives it with a window: a stand-in, a letter on a flat tone */
 .pico { width: 20px; height: 20px; flex: none; display: inline-flex; align-items: center; justify-content: center; background: #2E7D5B; color: #fff;
         font: 700 11px/1 var(--ff-ui); }
 .pico.b { background: #2F6FD0; } .pico.o { background: #B5651D; } .pico.v { background: #7A52C7; }
-.wlist.narrow .pico, .phone .wlist .pico { width: 24px; height: 24px; font-size: 13px; }
 .w > .wt .pico { width: 14px; height: 14px; margin-right: 8px; font-size: 9px; }
 /* the keys a phone's keyboard lacks, in a row over it */
 .xkeys { display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: var(--bg-2); border-top: 1px solid var(--border); overflow: hidden; }

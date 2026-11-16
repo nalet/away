@@ -3,10 +3,10 @@
   Chapter 7, programs: the figures of spec/screens/programs.md.
   Each <figure class="shot" id="…"> becomes spec/screens/img/<id>.png:
     node scripts/render-mockups.mjs ch07 [id …]
-  The look is screens.css; frame.js draws the session's bar (chapter 6 specifies
-  it) and the head and foot of the list of windows; remote.js draws the programs'
-  windows. The design system's components are the <ds-*> tags, which ds.js expands
-  into the package's own markup.
+  The look is screens.css; frame.js draws the rail of a session with programs: its
+  mark, its controls and its foot, around the windows a drawing writes; remote.js
+  draws the programs' windows. The design system's components are the <ds-*> tags,
+  which ds.js expands into the package's own markup.
 -->
 <html lang="en">
 <head>
@@ -17,114 +17,99 @@
 <style>
   /* a point on the ground, for a note to mark */
   .spot { position: absolute; width: 8px; height: 8px; }
+  /* a program's windows are on Away's ground, and nothing of a desktop is around them */
+  .session.prog { background: var(--bg); }
 </style>
 </head>
 <body>
 
-<!-- Figure 7.1 · two programs of one machine, each in a window of its own, on Away's ground, beside the list of their windows -->
+<!-- Figure 7.1 · two programs of one machine, each in a window of its own, on Away's ground, beside the rail -->
 <figure class="shot" id="programs-computer">
   <div class="computer" data-bar="none">
-    <div class="session" data-sbar="closed">
-      <div class="wlist" data-machine="fin-app-02">
-        <span class="wl-row on" data-p="L">Ledger – November</span>
-        <span class="wl-row" data-p="R:b">Reports – Q3 2026</span>
+    <div class="session prog">
+      <div class="prail" data-co="3">
+        <span class="pr-win on" data-p="L" title="Ledger – November"></span>
+        <span class="pr-win" data-p="R:b" title="Reports – Q3 2026"></span>
       </div>
       <div class="warea">
         <div class="w" data-w="doc" data-p="R:b" data-title="Reports – Q3 2026" style="left: 48px; top: 120px; width: 560px; height: 400px"></div>
-        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 190px; top: 196px; width: 810px; height: 540px" data-co="1" data-co-side="right"></div>
+        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 260px; top: 196px; width: 810px; height: 540px" data-co="1" data-co-side="right"></div>
         <span class="spot" style="left: 96px; top: 640px" data-co="2" data-co-side="bottom"></span>
       </div>
-      <span class="guide" style="left: 0; top: 0; width: 224px; bottom: 0" data-co="3"></span>
     </div>
   </div>
 </figure>
 
-<!-- Figure 7.2 · the list: the machine, the window in front, another window of the same program, one that was made small -->
-<figure class="shot" id="programs-list-computer">
-  <div class="computer" data-bar="none" data-co-parts="whead:1,wadd:5,wsize:6">
-    <div class="session" data-sbar="closed">
-      <div class="wlist" data-machine="fin-app-02">
-        <span class="wl-row on" data-p="L" data-co="2">Ledger – November</span>
-        <span class="wl-row" data-p="L" data-co="3">Ledger – Budget 2027</span>
-        <span class="wl-row small" data-p="R:b" data-co="4">Reports – Q3 2026</span>
+<!-- Figure 7.2 · the rail: the mark, the window in front, another window with its cross, the controls, the keyboard and the time -->
+<figure class="shot" id="programs-rail-computer">
+  <div class="computer" data-bar="none" data-co-parts="pmark:1,pkeys:4,plang:5,pclock:6">
+    <div class="session prog">
+      <div class="prail">
+        <span class="pr-win on" data-p="L" title="Ledger – November" data-co="2"></span>
+        <span class="pr-win x" data-p="L" title="Ledger – Budget 2027" data-co="3"></span>
+        <span class="pr-win" data-p="R:b" title="Reports – Q3 2026"></span>
       </div>
       <div class="warea">
         <div class="w" data-w="sheet" data-p="L" data-title="Ledger – Budget 2027" style="left: 48px; top: 96px; width: 700px; height: 460px"></div>
-        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 190px; top: 196px; width: 810px; height: 540px"></div>
+        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 260px; top: 196px; width: 810px; height: 540px"></div>
       </div>
     </div>
   </div>
 </figure>
 
-<!-- Figure 7.3 · the list made narrow: one icon for each program, and the windows of a program that has two -->
-<figure class="shot" id="programs-narrow-computer">
-  <div class="computer" data-bar="none" data-co-parts="wsize:4">
-    <div class="session" data-sbar="closed">
-      <div class="wlist narrow" data-machine="fin-app-02">
-        <span class="wl-row on" data-p="L" data-n="2" title="Ledger – November, and 1 more window" data-co="1" data-co-in=".count 2 top"></span>
-        <span class="wl-row" data-p="R:b" title="Reports – Q3 2026"></span>
-      </div>
-      <div class="warea">
-        <div class="w" data-w="sheet" data-p="L" data-title="Ledger – Budget 2027" style="left: 250px; top: 96px; width: 700px; height: 460px"></div>
-        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 392px; top: 196px; width: 800px; height: 540px"></div>
-      </div>
-      <ds-menu style="left: 60px; top: 52px; min-width: 232px" data-co="3" data-co-side="top">
-        <ds-item icon="circle-dot"><span class="nc-keep-case">Ledger – November</span></ds-item>
-        <ds-item icon="circle"><span class="nc-keep-case">Ledger – Budget 2027</span></ds-item>
-      </ds-menu>
-    </div>
-  </div>
-</figure>
-
-<!-- Figure 7.4 · the programs the machine offers, from the list's last row -->
+<!-- Figure 7.3 · the machine's programs, from the mark: one that didn't start, and the way to the other machines -->
 <figure class="shot" id="programs-open-computer">
   <div class="computer" data-bar="none">
-    <div class="session" data-sbar="closed">
-      <div class="wlist" data-machine="fin-app-02" data-on="add">
-        <span class="wl-row on" data-p="L">Ledger – November</span>
-        <span class="wl-row" data-p="R:b">Reports – Q3 2026</span>
+    <div class="session prog">
+      <div class="prail" data-on="launch">
+        <span class="pr-win on" data-p="L" title="Ledger – November"></span>
+        <span class="pr-win" data-p="R:b" title="Reports – Q3 2026"></span>
       </div>
       <div class="warea">
         <div class="w" data-w="doc" data-p="R:b" data-title="Reports – Q3 2026" style="left: 240px; top: 120px; width: 560px; height: 400px"></div>
         <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 330px; top: 196px; width: 700px; height: 540px"></div>
       </div>
-      <ds-menu style="left: 228px; top: 132px; min-width: 200px" data-co="1" data-co-side="top">
-        <ds-item icon="app-window"><span class="nc-keep-case">Ledger</span></ds-item>
-        <ds-item icon="app-window"><span class="nc-keep-case">Mail</span></ds-item>
-        <ds-item icon="app-window"><span class="nc-keep-case">Payroll</span></ds-item>
-        <ds-item icon="app-window"><span class="nc-keep-case">Reports</span></ds-item>
-      </ds-menu>
-    </div>
-  </div>
-</figure>
-
-<!-- Figure 7.5 · the session's bar, open over the list and the windows -->
-<figure class="shot" id="programs-bar-computer">
-  <div class="computer" data-bar="none" data-co-parts="stab:1:top">
-    <div class="session" data-sbar="open" data-tabs="programs:fin-app-02,shell:build-01" data-as="as alex.urban">
-      <div class="wlist" data-machine="fin-app-02">
-        <span class="wl-row on" data-p="L" data-co="2">Ledger – November</span>
-        <span class="wl-row" data-p="R:b">Reports – Q3 2026</span>
-      </div>
-      <div class="warea">
-        <div class="w" data-w="doc" data-p="R:b" data-title="Reports – Q3 2026" style="left: 48px; top: 120px; width: 560px; height: 400px"></div>
-        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 190px; top: 196px; width: 810px; height: 540px"></div>
+      <div class="spanel plaunch" role="group" aria-label="programs of fin-app-02">
+        <span class="h2">programs of fin-app-02</span>
+        <div data-co="1" data-co-side="right">
+          <span class="pl-row hover"><i data-i="app-window"></i><span class="grow nc-keep-case">Ledger</span></span>
+          <span class="pl-row"><i data-i="app-window"></i><span class="grow nc-keep-case">Mail</span></span>
+          <span class="pl-row"><i data-i="app-window"></i><span class="grow nc-keep-case">Payroll</span></span>
+          <span class="pl-row"><i data-i="app-window"></i><span class="grow nc-keep-case">Reports</span></span>
+        </div>
+        <p class="said" data-co="2" data-co-side="right">Payroll didn't start on fin-app-02.</p>
+        <span class="pl-row more" data-co="3" data-co-side="right"><i data-i="monitor"></i><span class="grow">other machines</span></span>
       </div>
     </div>
   </div>
 </figure>
 
-<!-- Figure 7.6 · on a phone: one window at a time, and the programs as icons along the foot -->
+<!-- Figure 7.4 · on a phone: the window in front has the screen, and the rail waits at the left edge -->
 <figure class="shot" id="programs-phone">
-  <div class="phone" data-bar="none" data-co-parts="wadd:3:right">
-    <div class="session" data-sbar="closed">
-      <div class="wlist" data-machine="fin-app-02">
-        <span class="wl-row on" data-p="L" data-n="2" title="Ledger – November, and 1 more window" data-co="2"></span>
-        <span class="wl-row" data-p="R:b" title="Reports – Q3 2026"></span>
-      </div>
+  <div class="phone" data-bar="none">
+    <div class="session prog">
+      <span class="pedge" data-co="2"></span>
       <div class="warea">
         <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 0; top: 0; width: 360px; height: 100%; border: 0; box-shadow: none" data-co="1" data-co-side="right"></div>
       </div>
+    </div>
+  </div>
+</figure>
+
+<!-- Figure 7.5 · on a phone, the rail swiped in over the picture -->
+<figure class="shot" id="programs-phone-rail">
+  <div class="phone" data-bar="none">
+    <div class="session prog">
+      <div class="prail over" data-co="1">
+        <span class="pr-win on" data-p="L" title="Ledger – November"></span>
+        <span class="pr-win" data-p="L" title="Ledger – Budget 2027"></span>
+        <span class="pr-win" data-p="R:b" title="Reports – Q3 2026"></span>
+      </div>
+      <div class="warea">
+        <div class="w front" data-w="sheet" data-p="L" data-title="Ledger – November" style="left: 0; top: 0; width: 360px; height: 100%; border: 0; box-shadow: none"></div>
+      </div>
+      <div class="pscrim"></div>
+      <span class="spot" style="left: 240px; top: 420px; z-index: 33" data-co="2" data-co-side="right"></span>
     </div>
   </div>
 </figure>

@@ -40,6 +40,8 @@ try {
     if (files.length && !files.some((w) => html.startsWith(w))) continue;
     current = html;
     await page.goto(pathToFileURL(path.join(dir, html)).href, { waitUntil: 'networkidle' });
+    // a face no drawing of the page uses is loaded too, so that the check below sees it
+    await page.evaluate(() => Promise.all(['Inter', 'JetBrains Mono'].map((f) => document.fonts.load(`16px "${f}"`))));
     await page.evaluate(() => document.fonts.ready);
     const missing = await page.evaluate(() =>
       ['Inter', 'JetBrains Mono'].filter((f) => !document.fonts.check(`16px "${f}"`)));

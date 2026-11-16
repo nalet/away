@@ -88,7 +88,7 @@ release holds for a person or an administrator and no figure shows.
 | 4 | [Machines](./machines.md) | 9 | 14 |
 | 5 | [Opening a machine](./opening.md) | 7 | 8 |
 | 6 | [A desktop](./desktop.md) | 9 | 12 |
-| 7 | [Programs](./programs.md) | 6 | 7 |
+| 7 | [Programs](./programs.md) | 5 | 6 |
 | 8 | [A shell](./shell.md) | 8 | 10 |
 | 9 | [Sessions](./sessions.md) | 4 | 6 |
 | 10 | [On a phone](./phone.md) | 5 | 10 |
@@ -98,7 +98,7 @@ release holds for a person or an administrator and no figure shows.
 | 14 | [Administration: sessions and records](./admin-records.md) | 4 | 7 |
 | 15 | [Administration: status](./admin-status.md) | 2 | 8 |
 | 16 | [When something goes wrong](./errors.md) | 6 | 8 |
-|  | all | 84 | 85 |
+|  | all | 83 | 85 |
 
 The first release holds 67 capabilities for a person or an administrator. A figure shows 61 of them.
 <!-- end: figures -->
@@ -143,8 +143,8 @@ package looks like its figure.
 
 The rest is Away's own, drawn on the design system's colours, faces and sizes:
 the frame of [chapter 2](./frame.md), a machine's tile (4), the steps of a
-connection (5), the session's bar and its panels (6), the list of windows of a
-session with programs (7), the keys a phone lacks (10), and the stand-ins for
+connection (5), the session's bar and its panels (6), the rail of a session
+with programs (7), the keys a phone lacks (10), and the stand-ins for
 what a machine shows.
 
 Where the design system has nothing yet, the drawings show how Away draws it
@@ -170,7 +170,7 @@ a design system component as a short tag, such as
 `<ds-button variant="primary">open again</ds-button>`, and
 [img/ds.js](./img/ds.js) turns it into the markup the package's component
 renders. [img/frame.js](./img/frame.js) draws the frame of chapter 2, the session's
-bar of chapter 6 and the list of windows of chapter 7 around every screen and
+bar of chapter 6 and the rail of chapter 7 around every screen and
 places the pink marks, and
 [img/remote.js](./img/remote.js) draws the stand-ins for what a machine shows.
 

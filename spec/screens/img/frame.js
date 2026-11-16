@@ -29,16 +29,14 @@
 //       menu open (keys, clipboard, picture, look, find, fill, end; on a phone kb, more).
 //       The machine's picture is a <div class="remote …"> of remote.js.
 //
-//   <div class="wlist" data-machine="fin-app-02">…rows…</div><div class="warea">…windows…</div>
-//       in a session with programs: the list of the machine's open windows down the side, and
-//       the room its windows have beside it, against which they are placed. A drawing writes
-//       the rows; the head, the row that opens a program and the foot are drawn here:
-//         <span class="wl-row on" data-p="L">Ledger – November</span>        the window in front
-//         <span class="wl-row small" data-p="R:b">Reports – Q3 2026</span>   one that was made small
-//       data-p is the program's icon, as for a window of remote.js. class="wlist narrow" has one
-//       row for each program, its icon alone: <span class="wl-row on" data-p="L" data-n="2"
-//       title="Ledger"></span>, data-n being how many windows it has. On a phone the list lies
-//       along the foot, narrow. data-on="add" shows the row that opens a program pressed.
+//   <div class="prail" data-lang="DE" data-time="14:32" data-day="16.11.">…windows…</div><div class="warea">…</div>
+//       in a session with programs: the rail down the left, as a taskbar, and the room the windows
+//       have beside it, against which they are placed. A drawing writes the windows, each as its
+//       icon: <span class="pr-win on" data-p="L" title="Ledger – November"></span>, on being the
+//       one in front and x showing its cross, as under the pointer; data-p is the program's icon,
+//       as for a window of remote.js. The Away mark at the top, the controls and the foot (the
+//       keyboard and the time) are drawn here. data-on="launch" shows the mark pressed, its list
+//       of programs open. On a phone the rail lies over the picture (class="prail over").
 //
 // A dialog (<ds-modal>), the avatar's menu (class usermenu) and anything marked
 // data-over lie over the whole frame, the bar and the rail too, and are placed
@@ -48,8 +46,8 @@
 // frame.js draws itself: logo, rail, search, avatar, tabs, back, settings, sessions,
 // admin, current (the current view); and of a session's bar: handle, away (the mark),
 // stabs (the open sessions), stab (the current one), add, as, keys, clipboard, picture,
-// look, find, fill, endsession, closebar, kb, more; and of the list of windows: whead (the
-// machine), wadd (open a program), wsize (narrow or wide) (name:number:side).
+// look, find, fill, endsession, closebar, kb, more; and of a program's rail: pmark (the mark),
+// pkeys, pclip, pfill, pend, plang (the keyboard), pclock (name:number:side).
 //
 // data-co-in=".nc-illu__title 3, .nc-btn 4 right" numbers parts inside an element by a
 // selector (the parts a <ds-*> tag draws itself).
@@ -138,22 +136,22 @@
       <div class="sgrp">${sbtn('end', 'end', 'power', on)}</div><div class="sgrp">${sbtn('close', 'close the bar', 'chevron-up', on)}</div></div>`));
   }
 
-  // the list of windows of a session with programs: the rows are the drawing's; the head with the machine's
-  // name, the row that opens a program and the button that makes the list narrow or wide are drawn here
-  for (const l of document.querySelectorAll('.wlist')) {
-    const phone = !!l.closest('.phone'), slim = phone || l.classList.contains('narrow'), machine = l.dataset.machine || '';
-    for (const r of l.querySelectorAll('.wl-row')) {
-      const [letter, tone] = (r.dataset.p || '').split(':'), title = r.textContent.trim();
-      if (slim) r.setAttribute('aria-label', r.title || title);
-      r.innerHTML = `<span class="pico ${tone || ''}">${letter}</span>${slim ? '' : `<span class="t">${title}</span>`}`
-        + (r.dataset.n > 1 ? `<span class="count">${r.dataset.n}</span>` : '') + (!slim && r.classList.contains('small') ? icon('minus') : '');
+  // the rail of a session with programs: the windows are the drawing's; the mark at the top, the
+  // controls and the foot with the keyboard and the time are drawn here
+  for (const r of document.querySelectorAll('.prail')) {
+    for (const w of r.querySelectorAll('.pr-win')) {
+      const [letter, tone] = (w.dataset.p || '').split(':');
+      w.setAttribute('aria-label', `bring to the front: ${w.title}`);
+      w.innerHTML = `<span class="pico ${tone || ''}">${letter}</span>` + (w.classList.contains('x') ? `<span class="pr-x">${icon('x')}</span>` : '');
     }
-    l.append(make(`<span class="wl-row wl-add${l.dataset.on === 'add' ? ' on' : ''}" aria-label="open a program">${icon('plus')}${slim ? '' : '<span class="t">program</span>'}</span>`));
-    if (phone) continue;
-    l.prepend(make(`<span class="wl-head" title="${machine}">${icon('app-window')}${slim ? '' : `<span class="t">${machine}</span>`}</span>`));
-    const size = slim ? ['show the names', 'chevrons-right'] : ['make the list narrow', 'chevrons-left'];
-    l.append(make('<span class="wl-gap"></span>'));
-    l.append(make(`<span class="wl-foot"><button type="button" aria-label="${size[0]}" title="${size[0]}" class="nc-iconbtn nc-iconbtn--ghost nc-iconbtn--md wl-size">${icon(size[1], 's18')}</button></span>`));
+    const btn = (cls, name, i) => `<span class="pr-btn pr-${cls}" aria-label="${name}" title="${name}">${icon(i)}</span>`;
+    r.prepend(make(`<span class="pr-top"><span class="pr-mark${r.dataset.on === 'launch' ? ' on' : ''}" aria-label="open a program">${chevron}<b>a</b></span></span>`));
+    r.append(make('<span class="pr-gap"></span>'));
+    // over the picture on a phone, the rail has a button that puts it away
+    const close = r.classList.contains('over') ? [btn('close', 'close the bar', 'x')] : [];
+    for (const b of [btn('keys', 'keys', 'keyboard'), btn('clip', 'clipboard', 'clipboard'), btn('fill', 'fill the screen', 'fullscreen'), btn('end', 'end', 'power'), ...close]) r.append(make(b));
+    r.append(make(`<span class="pr-foot"><span class="pr-lang" title="the keyboard">${r.dataset.lang || 'DE'}</span>
+      <span class="pr-clock" aria-label="the time on your device"><span>${r.dataset.time || '14:32'}</span><span class="day">${r.dataset.day || '16.11.'}</span></span></span>`));
   }
 
   for (const el of document.querySelectorAll('i[data-i]')) {
@@ -173,7 +171,7 @@
                   handle: '.shandle', away: '.sbar .mark', stabs: '.sbar .stabs', stab: '.sbar .stab.on', add: '.sbar .stab.add', as: '.sbar .as',
                   keys: '.sb-keys', clipboard: '.sb-clipboard', picture: '.sb-picture', look: '.sb-look', find: '.sb-find', fill: '.sb-fill',
                   endsession: '.sb-end', closebar: '.sb-close', kb: '.sb-kb', more: '.sb-more',
-                  whead: '.wl-head', wadd: '.wl-add', wsize: '.wl-size' };
+                  pmark: '.pr-mark', pkeys: '.pr-keys', pclip: '.pr-clip', pfill: '.pr-fill', pend: '.pr-end', plang: '.pr-lang', pclock: '.pr-clock' };
   for (const f of document.querySelectorAll('[data-co-parts]')) {
     for (const entry of f.dataset.coParts.split(',')) {
       const [name, n, side] = entry.trim().split(':');
