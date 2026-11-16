@@ -14,7 +14,9 @@
     {"says": "the clipboard passes to the machine, and not from it", "text": "{\"clipboard\":{\"to\":true,\"from\":false}}"},
     {"says": "a text of two lines was copied on the machine", "text": "{\"copied\":\"two\\nlines\"}"},
     {"says": "the icon of the window 65537, as a PNG picture that begins 89 50 4e 47", "bytes": "020001000189504e47"},
-    {"says": "the program Wages that the person asked for did not start", "text": "{\"started\":{\"program\":\"Wages\",\"ok\":false}}"}
+    {"says": "the program Wages that the person asked for did not start", "text": "{\"started\":{\"program\":\"Wages\",\"ok\":false}}"},
+    {"says": "the icons of the tray: one, of the window 65537, its number 1, saying Ledger – 2 reminders", "text": "{\"tray\":[{\"window\":65537,\"icon\":1,\"tip\":\"Ledger – 2 reminders\"}]}"},
+    {"says": "the picture of the icon 1 of the window 65537 in the tray, as a PNG picture that begins 89 50 4e 47", "bytes": "03000100010000000189504e47"}
   ],
   "from_browser": [
     {"says": "the session begins: its ticket, a window of 1280 by 800 on a screen with twice the dots each way (200), and a keyboard with the Swiss German layout (2055)", "text": "{\"ticket\":\"7f3a\",\"width\":1280,\"height\":800,\"layout\":2055,\"scale\":200}"},
@@ -26,6 +28,7 @@
     {"says": "the person closes the window 65537", "text": "{\"window\":65537,\"does\":\"close\"}"},
     {"says": "the window is 1440 by 900 now, on a screen with twice the dots each way", "text": "{\"sized\":{\"width\":1440,\"height\":900,\"scale\":200}}"},
     {"says": "the person copied a text of two lines on their own device", "text": "{\"copied\":\"a text\\nof two lines\"}"},
-    {"says": "the person asks for the program Wages in the session", "text": "{\"start\":\"Wages\"}"}
+    {"says": "the person asks for the program Wages in the session", "text": "{\"start\":\"Wages\"}"},
+    {"says": "the person asks for the menu of the icon 1 of the window 65537 in the tray", "text": "{\"tray\":{\"window\":65537,\"icon\":1,\"does\":\"menu\"}}"}
   ]
 }

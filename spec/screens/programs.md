@@ -33,7 +33,8 @@ switched to.
   program of the same machine opens in the session that is already open, with
   nothing asked again (7.3).
 - A window is moved, sized, made small and closed as at the machine, with its
-  own title and buttons. Its room is the browser window less the rail.
+  own title and buttons. Its room is the browser window less the rail: when the
+  browser window changes size, or fills the screen, the room follows.
 - A window made as large as it gets fills that room. It lies beside the rail,
   never under it.
 - A click on a window brings it to the front. A dialog of a program stays over
@@ -46,7 +47,7 @@ switched to.
 
 ## 7.2 The rail
 
-![The rail down the left edge: the Away mark at its top, then a green L on a lighter ground with a blue bar on its edge, a second green L with a small cross at its corner, and a blue R; low down the buttons for the keys, the clipboard, filling the screen and ending; at the foot DE in a frame, and 14:32 over 16.11.](img/programs-rail-computer.png)
+![The rail down the left edge: the Away mark at its top, then a green L, a second green L on a lighter ground with a blue bar on its edge, and a blue R; low down the buttons for the keys, the clipboard, filling the screen and ending; at the foot a button with an arrow pointing up, DE in a frame, and 14:32 over 16.11.](img/programs-rail-computer.png)
 
 **Figure 7.2** The rail, with three windows open.
 
@@ -54,14 +55,16 @@ switched to.
 2. **The window in front**, as its own icon, stands on a lighter ground with a
    blue bar on its edge, as the current view does in the rail of
    [chapter 2](./frame.md).
-3. **Another window.** A click brings it to the front. Under the pointer or the
-   keyboard's focus a small cross shows at its corner, which closes it.
+3. **Another window.** A click brings it to the front and gives it the keys; its
+   icon keeps its place.
 4. **The session's controls**: keys, clipboard, fill the screen and end, as on
    the bar of a desktop ([chapter 6](./desktop.md)).
-5. **The keyboard** the machine was told of, as its language, short: DE, FR,
+5. **The tray**: the icons the programs put there (7.4). The button is there
+   while there is one.
+6. **The keyboard** the machine was told of, as its language, short: DE, FR,
    EN. Its full name is for the pointer that rests on it and for a screen
    reader.
-6. **The time and the day** on the person's own device, as a taskbar has them.
+7. **The time and the day** on the person's own device, as a taskbar has them.
 
 - The rail is there for as long as the session is, and while the session fills
   the screen. It is 56 px wide, in the design of Away's own rail: every button
@@ -70,9 +73,11 @@ switched to.
   sets it, is the button's name, for the pointer that rests on it and for a
   screen reader. Dialogs, menus and tips belong to their window and are in no
   list.
-- The windows stand in the order the machine has them. With more of them than
-  the rail has room for, they scroll up and down; the rail never scrolls
-  sideways.
+- The windows stand in the order they opened, as on a taskbar, and keep it
+  when one is brought to the front. With more of them than the rail has room
+  for, they scroll up and down; the rail never scrolls sideways.
+- A window is closed as its program closes it, with its own title bar or
+  menu: the rail has no cross.
 - Alt + Tab, in the keys menu, moves between the windows as at the machine.
 - The rail holds one machine's windows. Programs of another machine are
   another session. Programs of several machines side by side come later.
@@ -98,18 +103,37 @@ switched to.
   other choice. Once its window is there the list closes.
 - Esc closes the list, and the mark has the keys again.
 
-## 7.4 On a phone
+## 7.4 The tray
+
+![Beside the foot of the rail, over the windows, a small panel holds three icons in a row: an orange M under the pointer, a green L and a violet U. The button with the arrow pointing up is pressed.](img/programs-tray-computer.png)
+
+**Figure 7.4** The icons of the tray, beside the rail's foot.
+
+1. **The icons the programs put in the tray**, in rows of four, in the order
+   they came, as Windows keeps the ones it hides.
+2. **An icon**: a click chooses it, as a click on it in Windows' own tray does;
+   the second button, or the menu key, asks for its menu. What the program
+   opens, a window or its menu, opens on the machine, at the lower left of the
+   windows' room, and the panel closes.
+
+- An icon's tip, as the program sets it, is its name, for the pointer that rests
+  on it and for a screen reader.
+- The tray holds the icons a program puts there while the session is open. An
+  icon that a program put there before, while the session was away, shows once
+  the program changes it.
+
+## 7.5 On a phone
 
 ![A phone showing one window, a table of figures, over the whole screen. A short grip lies on the left edge.](img/programs-phone.png)
 
-**Figure 7.4** Programs on a phone.
+**Figure 7.5** Programs on a phone.
 
 1. **The window in front** has the screen.
 2. **The rail waits at the left edge**, as a short grip.
 
 ![The same phone with the rail over the left part of the window, which is dimmed: the mark, three window icons, the controls with a cross to put the rail away, the keyboard and the time.](img/programs-phone-rail.png)
 
-**Figure 7.5** On a phone, the rail swiped in.
+**Figure 7.6** On a phone, the rail swiped in.
 
 1. **The rail**, as on a computer, with a button that puts it away.
 2. **A touch beside it** puts it away, and reaches nothing of the window.
@@ -120,7 +144,7 @@ switched to.
 - The rail is the phone's way to the windows, the programs and the session's
   controls, held upright and sideways.
 
-## 7.5 Ending
+## 7.6 Ending
 
 - Ending is as for a desktop ([chapter 6](./desktop.md)). It ends the
   connection, and the programs stay open at the machine, to be there again the
@@ -131,7 +155,7 @@ switched to.
 - A session with programs is one session in the list of
   [chapter 9](./sessions.md), under the machine's name, with its programs named.
 
-## 7.6 States
+## 7.7 States
 
 | State | What shows |
 |---|---|
@@ -140,7 +164,7 @@ switched to.
 | The last window was closed | the session ends, and the machine's page shows |
 | The connection drops | as for a desktop, in the words of [chapter 6](./desktop.md), with “Your programs are still running on fin-app-02.” |
 
-## 7.7 Words
+## 7.8 Words
 
 | Where | Text |
 |---|---|
@@ -150,13 +174,15 @@ switched to.
 | The list's last row | other machines |
 | A program didn't start | Payroll didn't start on fin-app-02. |
 | A window's icon, for a screen reader and as a tooltip | bring to the front: Ledger – November |
-| A window's cross | close: Ledger – November |
+| The button of the tray, as a tooltip | the tray |
+| The panel of the tray, for a screen reader | the tray of fin-app-02 |
+| An icon of the tray | its tip, as the program sets it; one without a tip: an icon of the tray |
 | The keyboard, for a screen reader and as a tooltip | the keyboard: German (Switzerland) |
 | The time, for a screen reader | the time on your device |
 | The rail's buttons, as tooltips | keys · clipboard · fill the screen · end; on a phone also close the bar |
 | The connection dropped | connection lost · Trying again, for the third time. Your programs are still running on fin-app-02. · leave · try now |
 
-## 7.8 What the figures draw
+## 7.9 What the figures draw
 
 <!-- generated: draws -->
 | Figure | Draws |
@@ -164,6 +190,7 @@ switched to.
 | 7.1 Two programs of one machine, and the rail beside their windows | [Open one program of a Windows machine, without its desktop](../capabilities/session.md#opening-a-machine), [Switch between the programs open on a machine, each in a window of its own](../capabilities/session.md#opening-a-machine), [See a machine's open windows in a list beside them, and bring one to the front, also one made small](../capabilities/session.md#opening-a-machine) |
 | 7.2 The rail, with three windows open | [See a machine's open windows in a list beside them, and bring one to the front, also one made small](../capabilities/session.md#opening-a-machine), [Switch between the programs open on a machine, each in a window of its own](../capabilities/session.md#opening-a-machine), [Reach a session's own controls without leaving it: keys, clipboard, files, size, ending it](../capabilities/app.md#the-frame) |
 | 7.3 The machine's programs, from the mark | [See the programs a Windows machine offers, and open one](../capabilities/app.md#finding-a-machine), [Open one program of a Windows machine, without its desktop](../capabilities/session.md#opening-a-machine), [Switch between the programs open on a machine, each in a window of its own](../capabilities/session.md#opening-a-machine) |
-| 7.4 Programs on a phone | [Open one program of a Windows machine, without its desktop](../capabilities/session.md#opening-a-machine), [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet) |
-| 7.5 On a phone, the rail swiped in | [See a machine's open windows in a list beside them, and bring one to the front, also one made small](../capabilities/session.md#opening-a-machine), [Reach a session's own controls without leaving it: keys, clipboard, files, size, ending it](../capabilities/app.md#the-frame), [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet) |
+| 7.4 The icons of the tray, beside the rail's foot | [See a machine's open windows in a list beside them, and bring one to the front, also one made small](../capabilities/session.md#opening-a-machine), [Reach a session's own controls without leaving it: keys, clipboard, files, size, ending it](../capabilities/app.md#the-frame) |
+| 7.5 Programs on a phone | [Open one program of a Windows machine, without its desktop](../capabilities/session.md#opening-a-machine), [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet) |
+| 7.6 On a phone, the rail swiped in | [See a machine's open windows in a list beside them, and bring one to the front, also one made small](../capabilities/session.md#opening-a-machine), [Reach a session's own controls without leaving it: keys, clipboard, files, size, ending it](../capabilities/app.md#the-frame), [Find a machine and open it on a phone, with every page fitted to it](../capabilities/session.md#on-a-phone-or-a-tablet) |
 <!-- end: draws -->

@@ -208,12 +208,16 @@ svg.i.s24 { width: 24px; height: 24px; } svg.i.s32 { width: 32px; height: 32px; 
 /* the window in front: a lighter ground and a bar on its edge, as the rail marks the current view, so not by colour alone */
 .prail .pr-win.on { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--cloud-blue); }
 .prail .pr-win .pico { width: 24px; height: 24px; font-size: 13px; }
-.prail .pr-x { position: absolute; top: 1px; right: 1px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
-               border: 1px solid var(--border-2); background: var(--surface); color: var(--fg); }
-.prail .pr-x svg.i { width: 12px; height: 12px; }
 .prail .pr-gap { flex: 1; }
 .prail .pr-btn { width: 40px; height: 40px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--fg-muted); }
 .prail .pr-btn svg.i { width: 18px; height: 18px; }
+.prail .pr-btn.on { background: var(--surface-2); color: var(--cloud-blue); }   /* pressed, its panel open */
+/* the icons of the tray, beside the rail's foot, in rows of four */
+.ptray { left: 62px; bottom: 8px; top: auto; width: auto; padding: 8px; }
+.ptray .pt-grid { display: grid; grid-template-columns: repeat(4, 40px); gap: 4px; }
+.ptray .pt-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+.ptray .pt-icon.hover { background: var(--surface-2); }
+.ptray .pt-icon .pico { width: 18px; height: 18px; font-size: 10px; }
 .prail .pr-foot { width: 40px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border); }
 .prail .pr-lang { padding: 3px 4px; border: 1px solid var(--border-2); font: 600 11px/1 var(--ff-mono); letter-spacing: .04em; color: var(--fg-2); }
 .prail .pr-clock { display: flex; flex-direction: column; align-items: center; gap: 3px; white-space: nowrap; font: 500 12px/1 var(--ff-mono); color: var(--fg-2); }

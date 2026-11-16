@@ -446,6 +446,9 @@ struct Session {
     picture: Option<Picture>,
     /// The icons of windows that arrived, each with its window, as PNG pictures.
     icons: Vec<(u32, Vec<u8>)>,
+    /// What the tray was last said to hold, and the pictures of its icons that arrived.
+    tray: Option<Json>,
+    tray_pictures: Vec<(u32, u32, Vec<u8>)>,
 }
 
 impl Session {
@@ -460,7 +463,7 @@ impl Session {
         let begins =
             Json::object([("ticket", ticket.into()), ("width", 1280u64.into()), ("height", 800u64.into()), ("scale", 200u64.into())]);
         connection.send(Message::text(begins.write())).await.expect("the first message goes out");
-        Session { connection, picture: None, icons: Vec::new() }
+        Session { connection, picture: None, icons: Vec::new(), tray: None, tray_pictures: Vec::new() }
     }
 
     async fn say(&mut self, says: Json) {
@@ -480,6 +483,9 @@ impl Session {
             match message.ok()? {
                 Message::Text(text) => {
                     let says = Json::read(text.as_str()).expect("JSON");
+                    if let Some(tray) = says.get("tray") {
+                        self.tray = Some(tray.clone());
+                    }
                     if let Some(desktop) = says.get("desktop") {
                         let size = |name: &str| desktop.get(name).and_then(Json::count).expect("a size") as usize;
                         self.picture = Some(Picture::new(size("width"), size("height")));
@@ -496,8 +502,13 @@ impl Session {
     /// Draws a rectangle that arrived: where it goes, and its pixels as a PNG picture. An
     /// icon of a window is kept.
     fn draw(&mut self, bytes: &[u8]) {
+        let number = |at: usize| u32::from_be_bytes([bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]]);
         if bytes[0] == 2 {
-            self.icons.push((u32::from_be_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]), bytes[5..].to_vec()));
+            self.icons.push((number(1), bytes[5..].to_vec()));
+            return;
+        }
+        if bytes[0] == 3 {
+            self.tray_pictures.push((number(1), number(5), bytes[9..].to_vec()));
             return;
         }
         assert_eq!((bytes[0], bytes[9]), (1, 1), "a rectangle, as a PNG picture");
@@ -962,6 +973,27 @@ async fn a_program_opens_in_a_window_of_its_own_and_closing_it_ends_the_session(
     let (window, icon) = session.icons.first().cloned().expect("the window's icon");
     let picture = png::Decoder::new(std::io::Cursor::new(icon)).read_info().expect("a PNG picture").info().clone();
     assert_eq!((window, picture.width, picture.height, picture.color_type), (65537, 32, 32, png::ColorType::Rgba));
+
+    // the program put an icon in the tray: its tip, and its picture after it
+    assert_eq!(session.tray.as_ref().map(Json::write).as_deref(), Some(r#"[{"window":65537,"icon":1,"tip":"ledger"}]"#));
+    assert_eq!(session.tray_pictures.iter().map(|(window, icon, _)| (*window, *icon)).collect::<Vec<_>>(), [(65537, 1)]);
+    // its menu, asked for from the page, is asked of the program as Windows' taskbar asks it
+    session
+        .say(Json::object([("tray", Json::object([("window", 65537u64.into()), ("icon", 1u64.into()), ("does", "menu".into())]))]))
+        .await;
+    let asked_the_tray = async {
+        loop {
+            let told =
+                world.machine.seen().last().map(|seen| {
+                    seen.about_programs.iter().filter(|asked| matches!(asked, away_rdp::rail::stand_in::Asked::Tray(..))).count()
+                });
+            if told == Some(3) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    };
+    tokio::time::timeout(Duration::from_secs(10), asked_the_tray).await.expect("the program is asked for the icon's menu");
 
     // another program of the machine, asked for in the session, opens in it: in front of the first
     session.say(Json::object([("start", "Ledger".into())])).await;

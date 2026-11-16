@@ -173,7 +173,6 @@ export const texts = {
     windowsOf: (program: string) => `the windows of ${program}`,
     windows: 'windows',
     toFront: (title: string) => `bring to the front: ${title}`,
-    closeWindow: (title: string) => `close: ${title}`,
     openBar: "open the session's bar",
     bar: "the session's bar",
     // the Away mark at the top of a program's rail: the machine's other programs
@@ -184,6 +183,10 @@ export const texts = {
     otherMachines: 'other machines',
     // the foot of the rail: the keyboard the machine is told of, and the clock
     typesAs: (language: string) => `the keyboard: ${language}`,
+    // the icons the programs put in the tray, behind a button at the foot of the rail
+    tray: 'the tray',
+    trayOf: (machine: string) => `the tray of ${machine}`,
+    trayIcon: 'an icon of the tray',
     clockLabel: 'the time on your device',
     keys: 'keys',
     // the key combinations a browser or a device keeps for itself

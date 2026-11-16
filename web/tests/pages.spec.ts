@@ -1181,7 +1181,7 @@ test.describe('a session', () => {
     expect(seen.complaints).toEqual([]);
   });
 
-  test("a program opens in a window of its own on Away's ground, and closing the window ends it", async ({ page }) => {
+  test("a program opens in a window of its own on Away's ground, beside a rail that is its taskbar", async ({ page }) => {
     const seen = watch(page);
     // a program is opened by a click on it
     await page.goto(`${AWAY_THAT_KEEPS}/programs`);
@@ -1265,6 +1265,15 @@ test.describe('a session', () => {
     await launcher.getByRole('button', { name: 'Books' }).click();
     await expect(launcher).toHaveCount(0);
     await expect(windows).toHaveCount(2);
+    // the windows keep the order they came in, as on a taskbar: the new one is in front, below the first
+    await expect(windows.nth(1).getByRole('button')).toHaveAttribute('aria-current', 'true');
+    // one brought to the front keeps its place, and the window has the keys
+    await windows.nth(0).getByRole('button').click();
+    await expect(windows.nth(0).getByRole('button')).toHaveAttribute('aria-current', 'true');
+    await expect(windows.nth(1).getByRole('button')).not.toHaveAttribute('aria-current');
+    await expect(screen).toBeFocused();
+    // there is no cross to close a window: a window is closed as the program closes it
+    await expect(bar.getByRole('button', { name: /^close/ })).toHaveCount(0);
     // one the machine doesn't start says so there, and the session goes on
     await mark.click();
     await launcher.getByRole('button', { name: 'Wages' }).click();
@@ -1274,13 +1283,22 @@ test.describe('a session', () => {
     await expect(launcher).toHaveCount(0);
     await expect(mark).toBeFocused();
 
-    // closing the program's windows ends the session with the last one, and leads back to the machine
-    await windows.first().hover();
-    await windows.first().getByRole('button', { name: 'close: ledger' }).click();
-    await expect(windows).toHaveCount(1);
-    await windows.hover();
-    await windows.getByRole('button', { name: 'close: ledger' }).click();
-    await expect(windows).toHaveCount(0);
+    // the icons the programs put in the tray are behind a button at the rail's foot
+    const trayButton = bar.getByRole('button', { name: 'the tray' });
+    await trayButton.click();
+    const tray = bar.getByRole('group', { name: 'the tray of apps-01' });
+    await expect(tray.getByRole('button', { name: 'ledger' })).toBeVisible();
+    await accessible(page);
+    await tray.getByRole('button', { name: 'ledger' }).click({ button: 'right' });
+    await expect(tray).toHaveCount(0);
+    await expect(screen).toBeFocused();
+
+    // the windows have the window's room: a window of another size is a desktop of that size, beside the rail
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await expect.poll(() => screen.evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height]), { timeout: 10000 }).toEqual([944, 700]);
+
+    // ending the session leaves the programs running on the machine, and leads back to it
+    await bar.getByRole('button', { name: 'end' }).click();
     await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/apps-01`, { timeout: 15000 });
     // its page offers the desktop and each program, and says nothing of what Away doesn't open
     await expect(page.getByRole('region', { name: 'programs 2' }).getByRole('link')).toHaveText(['Books', 'Wages']);
@@ -1380,14 +1398,18 @@ test('without a database no machine is opened, and the page says why', async ({ 
 });
 
 test("the session's messages are written and read as the examples say that the gateway is tried against too", async () => {
-  const { begins, copied, credentials, did, leaves, readIcon, readRectangle, readSaid, seen, sized, start, windowDoes } = await import('../src/session/wire');
+  const { begins, copied, credentials, did, leaves, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } = await import(
+    '../src/session/wire'
+  );
   const examples = JSON.parse(readFileSync('../crates/away-wire/fixtures/messages.json', 'utf8')) as Record<string, { text?: string; bytes?: string }[]>;
   const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   const bytes = (written: string) => new Uint8Array((written.match(/../g) ?? []).map((pair) => parseInt(pair, 16)));
 
   // what the gateway says
   const said = (examples.to_browser ?? []).map((example) =>
-    example.text ? readSaid(example.text) : (readRectangle(bytes(example.bytes!).buffer) ?? readIcon(bytes(example.bytes!).buffer)),
+    example.text
+      ? readSaid(example.text)
+      : (readRectangle(bytes(example.bytes!).buffer) ?? readIcon(bytes(example.bytes!).buffer) ?? readTrayPicture(bytes(example.bytes!).buffer)),
   );
   expect(said.slice(0, 5)).toEqual([{ step: 'reaching' }, { step: 'first-picture' }, { asks: { again: false } }, { asks: { again: true } }, { desktop: { width: 1280, height: 800 } }]);
   expect(said[5]).toEqual({ left: 64, top: 128, width: 200, height: 120, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) });
@@ -1399,6 +1421,8 @@ test("the session's messages are written and read as the examples say that the g
     { copied: 'two\nlines' },
     { window: 65537, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) },
     { started: { program: 'Wages', ok: false } },
+    { tray: [{ window: 65537, icon: 1, tip: 'Ledger – 2 reminders' }] },
+    { window: 65537, icon: 1, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) },
   ]);
   expect([
     readSaid('no JSON'),
@@ -1406,7 +1430,8 @@ test("the session's messages are written and read as the examples say that the g
     readRectangle(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0, 1]).buffer),
     readIcon(new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0, 0, 1]).buffer),
     readIcon(new Uint8Array([2, 0, 1]).buffer),
-  ]).toEqual([null, null, null, null, null]);
+    readTrayPicture(new Uint8Array([2, 0, 1, 0, 1, 0, 0, 0, 1, 0x89]).buffer),
+  ]).toEqual([null, null, null, null, null, null]);
 
   // what the pages say
   const written = [
@@ -1431,6 +1456,7 @@ test("the session's messages are written and read as the examples say that the g
     sized(1440, 900, 200),
     copied('a text\nof two lines'),
     start('Wages'),
+    trayDoes(65537, 1, 'menu'),
   ];
   expect(written).toEqual((examples.from_browser ?? []).map((example) => example.text ?? example.bytes));
 });

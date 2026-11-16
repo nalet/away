@@ -33,10 +33,11 @@
 //       in a session with programs: the rail down the left, as a taskbar, and the room the windows
 //       have beside it, against which they are placed. A drawing writes the windows, each as its
 //       icon: <span class="pr-win on" data-p="L" title="Ledger – November"></span>, on being the
-//       one in front and x showing its cross, as under the pointer; data-p is the program's icon,
-//       as for a window of remote.js. The Away mark at the top, the controls and the foot (the
+//       one in front; data-p is the program's icon, as for a window of remote.js. The Away mark at
+//       the top, the controls and the foot (the button of the tray where data-tray is set, the
 //       keyboard and the time) are drawn here. data-on="launch" shows the mark pressed, its list
-//       of programs open. On a phone the rail lies over the picture (class="prail over").
+//       of programs open; data-on="tray" the button of the tray. On a phone the rail lies over
+//       the picture (class="prail over").
 //
 // A dialog (<ds-modal>), the avatar's menu (class usermenu) and anything marked
 // data-over lie over the whole frame, the bar and the rail too, and are placed
@@ -47,7 +48,8 @@
 // admin, current (the current view); and of a session's bar: handle, away (the mark),
 // stabs (the open sessions), stab (the current one), add, as, keys, clipboard, picture,
 // look, find, fill, endsession, closebar, kb, more; and of a program's rail: pmark (the mark),
-// pkeys, pclip, pfill, pend, plang (the keyboard), pclock (name:number:side).
+// pkeys, pclip, pfill, pend, ptray (the button of the tray), plang (the keyboard), pclock
+// (name:number:side).
 //
 // data-co-in=".nc-illu__title 3, .nc-btn 4 right" numbers parts inside an element by a
 // selector (the parts a <ds-*> tag draws itself).
@@ -142,7 +144,7 @@
     for (const w of r.querySelectorAll('.pr-win')) {
       const [letter, tone] = (w.dataset.p || '').split(':');
       w.setAttribute('aria-label', `bring to the front: ${w.title}`);
-      w.innerHTML = `<span class="pico ${tone || ''}">${letter}</span>` + (w.classList.contains('x') ? `<span class="pr-x">${icon('x')}</span>` : '');
+      w.innerHTML = `<span class="pico ${tone || ''}">${letter}</span>`;
     }
     const btn = (cls, name, i) => `<span class="pr-btn pr-${cls}" aria-label="${name}" title="${name}">${icon(i)}</span>`;
     r.prepend(make(`<span class="pr-top"><span class="pr-mark${r.dataset.on === 'launch' ? ' on' : ''}" aria-label="open a program">${chevron}<b>a</b></span></span>`));
@@ -150,7 +152,8 @@
     // over the picture on a phone, the rail has a button that puts it away
     const close = r.classList.contains('over') ? [btn('close', 'close the bar', 'x')] : [];
     for (const b of [btn('keys', 'keys', 'keyboard'), btn('clip', 'clipboard', 'clipboard'), btn('fill', 'fill the screen', 'fullscreen'), btn('end', 'end', 'power'), ...close]) r.append(make(b));
-    r.append(make(`<span class="pr-foot"><span class="pr-lang" title="the keyboard">${r.dataset.lang || 'DE'}</span>
+    const tray = r.dataset.tray !== undefined ? `<span class="pr-btn pr-tray${r.dataset.on === 'tray' ? ' on' : ''}" aria-label="the tray" title="the tray">${icon('chevron-up')}</span>` : '';
+    r.append(make(`<span class="pr-foot">${tray}<span class="pr-lang" title="the keyboard">${r.dataset.lang || 'DE'}</span>
       <span class="pr-clock" aria-label="the time on your device"><span>${r.dataset.time || '14:32'}</span><span class="day">${r.dataset.day || '16.11.'}</span></span></span>`));
   }
 
@@ -171,7 +174,8 @@
                   handle: '.shandle', away: '.sbar .mark', stabs: '.sbar .stabs', stab: '.sbar .stab.on', add: '.sbar .stab.add', as: '.sbar .as',
                   keys: '.sb-keys', clipboard: '.sb-clipboard', picture: '.sb-picture', look: '.sb-look', find: '.sb-find', fill: '.sb-fill',
                   endsession: '.sb-end', closebar: '.sb-close', kb: '.sb-kb', more: '.sb-more',
-                  pmark: '.pr-mark', pkeys: '.pr-keys', pclip: '.pr-clip', pfill: '.pr-fill', pend: '.pr-end', plang: '.pr-lang', pclock: '.pr-clock' };
+                  pmark: '.pr-mark', pkeys: '.pr-keys', pclip: '.pr-clip', pfill: '.pr-fill', pend: '.pr-end', ptray: '.pr-tray', plang: '.pr-lang',
+                  pclock: '.pr-clock' };
   for (const f of document.querySelectorAll('[data-co-parts]')) {
     for (const entry of f.dataset.coParts.split(',')) {
       const [name, n, side] = entry.trim().split(':');

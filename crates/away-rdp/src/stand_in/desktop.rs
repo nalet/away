@@ -46,6 +46,9 @@ pub const WINDOW_SIZE: (usize, usize) = (160, 100);
 /// program, as Windows does.
 pub const LANGUAGE_BAR: u32 = 0x0001_0100;
 
+/// The icon the first program puts in the tray, among those of its window.
+pub const TRAY_ICON: u32 = 1;
+
 /// The icon of a program's window on the stand-in: 32 pixels square, blue, in a frame of
 /// two pixels that covers nothing.
 pub fn program_icon() -> window::Icon {
@@ -215,6 +218,8 @@ pub struct Desktop {
     opened: u32,
     /// Whether it floats a language bar over the programs' windows.
     floats_a_language_bar: bool,
+    /// Whether it said that it is ready for programs.
+    ready_for_programs: bool,
 }
 
 /// The picture a stand-in draws on a desktop whose size the client asked for: every
@@ -251,6 +256,7 @@ impl Desktop {
             windows: Vec::new(),
             opened: 0,
             floats_a_language_bar: false,
+            ready_for_programs: false,
         }
     }
 
@@ -493,9 +499,14 @@ impl Desktop {
                         send.extend(data(0x28, &pdu::words(&[0, 0, 3, 4])));
                         // a client that came for a program is shown no desktop: the machine
                         // says that it is ready for programs
-                        match self.programs {
-                            true => send.extend(on_the_programs_channel(&rail::stand_in::ready())),
-                            false => send.extend(self.draw()),
+                        // once: a desktop of programs offered anew goes on with the programs it has
+                        match (self.programs, self.ready_for_programs) {
+                            (true, false) => {
+                                self.ready_for_programs = true;
+                                send.extend(on_the_programs_channel(&rail::stand_in::ready()));
+                            }
+                            (true, true) => {}
+                            (false, _) => send.extend(self.draw()),
                         }
                         // to a client that asked for the channel of the ones that are
                         // opened later, it says once which version of them it speaks
@@ -602,6 +613,10 @@ impl Desktop {
                     window::stand_in::icon(id, true, Some((0, self.opened as u16)), &program_icon()),
                     window::stand_in::in_front(id, &self.windows),
                 ];
+                // the first program puts an icon in the tray, as many do
+                if self.opened == 0 {
+                    orders.push(window::stand_in::tray(id, TRAY_ICON, title, 4, &program_icon()));
+                }
                 if self.floats_a_language_bar && self.opened == 0 {
                     orders.push(window::stand_in::window(
                         LANGUAGE_BAR,
@@ -625,6 +640,12 @@ impl Desktop {
             }
             // a program it doesn't publish is not among those it lets be started
             Asked::Start(program) => on_the_programs_channel(&rail::stand_in::result(&program, 3)),
+            // a window the person works in comes to the front, as on a Windows machine
+            Asked::Activate(id, true) if self.windows.contains(&id) => {
+                self.windows.retain(|open| *open != id);
+                self.windows.insert(0, id);
+                words(&[window::stand_in::in_front(id, &self.windows)])
+            }
             Asked::Command(id, rail::Command::Close) if self.windows.contains(&id) => {
                 self.windows.retain(|open| *open != id);
                 words(&[window::stand_in::gone(id)])

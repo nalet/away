@@ -15,7 +15,16 @@ export type Said =
   | { windows: WindowOf[]; in_front: number | null }
   | { clipboard: { to: boolean; from: boolean } }
   | { copied: string }
-  | { started: { program: string; ok: boolean } };
+  | { started: { program: string; ok: boolean } }
+  | { tray: TrayOf[] };
+
+// An icon of the tray: the window it is of, its number among that window's icons, and
+// what it says when the pointer rests on it.
+export interface TrayOf {
+  window: number;
+  icon: number;
+  tip: string;
+}
 
 // A window of a program: what names it, its title, how it shows, whether it is a window
 // of its own that a list names, and the parts of it that can be seen, each by its left,
@@ -63,6 +72,24 @@ export function readIcon(bytes: ArrayBuffer): IconOf | null {
   const view = new DataView(bytes);
   if (bytes.byteLength < 6 || view.getUint8(0) !== 2) return null;
   return { window: view.getUint32(1), png: new Uint8Array(bytes, 5) };
+}
+
+// The picture of an icon of the tray: the icon, and the picture as a PNG picture.
+export interface TrayPictureOf {
+  window: number;
+  icon: number;
+  png: Uint8Array<ArrayBuffer>;
+}
+
+export function readTrayPicture(bytes: ArrayBuffer): TrayPictureOf | null {
+  const view = new DataView(bytes);
+  if (bytes.byteLength < 10 || view.getUint8(0) !== 3) return null;
+  return { window: view.getUint32(1), icon: view.getUint32(5), png: new Uint8Array(bytes, 9) };
+}
+
+// What a person does with an icon of the tray: chooses it, or asks for its menu.
+export function trayDoes(window: number, icon: number, does: 'choose' | 'menu'): string {
+  return JSON.stringify({ tray: { window, icon, does } });
 }
 
 // The person asks for another program of the machine, in the session that runs: by the

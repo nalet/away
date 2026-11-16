@@ -97,6 +97,17 @@ pub enum ToBrowser<'a> {
         /// The picture.
         png: &'a [u8],
     },
+    /// The icons of the tray, in the order they came: those the programs show.
+    Tray(&'a [TrayIcon]),
+    /// The picture of an icon of the tray, as a PNG picture: the one it shows from now on.
+    TrayPicture {
+        /// The window the icon is of.
+        window: u32,
+        /// The icon, among those of its window.
+        icon: u32,
+        /// The picture.
+        png: &'a [u8],
+    },
     /// A program the person asked for in the session that runs started, or didn't.
     Started {
         /// The program, by the name Away gives it.
@@ -123,6 +134,26 @@ pub struct Window {
     pub seen: Vec<[i32; 4]>,
 }
 
+/// An icon of the tray, as the browser is told of it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TrayIcon {
+    /// The window the icon is of.
+    pub window: u32,
+    /// The icon, among those of its window.
+    pub icon: u32,
+    /// What it says when the pointer rests on it.
+    pub tip: String,
+}
+
+/// What a person does with an icon of the tray.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrayDoes {
+    /// Chooses it, with the main button or the keyboard.
+    Choose,
+    /// Asks for its menu.
+    Menu,
+}
+
 /// What a person does with a window as a whole.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Does {
@@ -142,6 +173,8 @@ pub enum Does {
 const RECTANGLE: u8 = 1;
 /// The kind of bytes that are the icon of a window.
 const ICON: u8 = 2;
+/// The kind of bytes that are the picture of an icon of the tray.
+const TRAY_PICTURE: u8 = 3;
 /// The way a rectangle's pixels are written: as a PNG picture.
 const PNG: u8 = 1;
 
@@ -182,6 +215,29 @@ impl ToBrowser<'_> {
                 let mut bytes = Vec::with_capacity(5 + png.len());
                 bytes.push(ICON);
                 bytes.extend(window.to_be_bytes());
+                bytes.extend_from_slice(png);
+                Carried::Bytes(bytes)
+            }
+            ToBrowser::Tray(icons) => object(Json::object([(
+                "tray",
+                Json::List(
+                    icons
+                        .iter()
+                        .map(|icon| {
+                            Json::object([
+                                ("window", u64::from(icon.window).into()),
+                                ("icon", u64::from(icon.icon).into()),
+                                ("tip", icon.tip.as_str().into()),
+                            ])
+                        })
+                        .collect(),
+                ),
+            )])),
+            ToBrowser::TrayPicture { window, icon, png } => {
+                let mut bytes = Vec::with_capacity(9 + png.len());
+                bytes.push(TRAY_PICTURE);
+                bytes.extend(window.to_be_bytes());
+                bytes.extend(icon.to_be_bytes());
                 bytes.extend_from_slice(png);
                 Carried::Bytes(bytes)
             }
@@ -336,6 +392,15 @@ pub enum FromBrowser {
     /// The person asks for another program of the machine, in the session that runs: by
     /// the name Away gives it.
     Start(String),
+    /// What the person does with an icon of the tray.
+    Tray {
+        /// The window the icon is of.
+        window: u32,
+        /// The icon, among those of its window.
+        icon: u32,
+        /// What they do with it.
+        does: TrayDoes,
+    },
 }
 
 impl FromBrowser {
@@ -365,6 +430,18 @@ impl FromBrowser {
                 }
                 if let Some(text) = said.text_of("copied") {
                     return Ok(FromBrowser::Copied(text.to_string()));
+                }
+                if let Some(tray) = said.get("tray") {
+                    let number = |name: &str| tray.get(name).and_then(Json::count).and_then(|number| u32::try_from(number).ok());
+                    let does = match tray.text_of("does") {
+                        Some("choose") => TrayDoes::Choose,
+                        Some("menu") => TrayDoes::Menu,
+                        _ => return Err(NotThis("an icon of the tray is chosen, or asked for its menu")),
+                    };
+                    let (Some(window), Some(icon)) = (number("window"), number("icon")) else {
+                        return Err(NotThis("an icon of the tray is named by its window and its number"));
+                    };
+                    return Ok(FromBrowser::Tray { window, icon, does });
                 }
                 if let Some(program) = said.text_of("start") {
                     if program.is_empty() {
@@ -508,6 +585,8 @@ mod tests {
             ToBrowser::Copied("two\nlines").write(),
             ToBrowser::Icon { window: 65537, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
             ToBrowser::Started { program: "Wages", started: false }.write(),
+            ToBrowser::Tray(&[TrayIcon { window: 65537, icon: 1, tip: "Ledger – 2 reminders".to_string() }]).write(),
+            ToBrowser::TrayPicture { window: 65537, icon: 1, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
         ];
         assert_eq!(written.len(), to_browser.len());
         for (written, example) in written.iter().zip(to_browser) {
@@ -533,7 +612,8 @@ mod tests {
                 FromBrowser::read(&carried).unwrap_or_else(|NotThis(why)| panic!("{}: {why}", example.write()))
             })
             .collect();
-        assert_eq!(read.len(), 10);
+        assert_eq!(read.len(), 11);
+        assert!(matches!(read[10], FromBrowser::Tray { window: 65537, icon: 1, does: TrayDoes::Menu }));
         assert!(matches!(&read[9], FromBrowser::Start(program) if program == "Wages"));
         assert!(matches!(&read[8], FromBrowser::Copied(text) if text == "a text\nof two lines"));
         assert!(matches!(read[7], FromBrowser::Sized { width: 1440, height: 900, scale: Some(200) }));
@@ -581,6 +661,8 @@ mod tests {
             r#"{"window":65537,"does":"shake"}"#,
             r#"{"window":-1,"does":"close"}"#,
             r#"{"start":""}"#,
+            r#"{"tray":{"window":65537,"icon":1}}"#,
+            r#"{"tray":{"window":65537,"does":"choose"}}"#,
             r#"{"start":7}"#,
         ] {
             assert!(FromBrowser::read(&Carried::Text(text.to_string())).is_err(), "{text}");

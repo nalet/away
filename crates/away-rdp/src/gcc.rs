@@ -62,18 +62,17 @@ pub(crate) fn millimetres(dots: u16, scale: u32) -> u32 {
 }
 
 /// The further channels a client asks for, beside the desktop's, in the order it asks
-/// for them: the one programs are started over, where a program is asked for; for a
-/// desktop, the one that carries the channels a machine opens later, over which the
-/// client says how its screen is now; the one of the clipboard, where that passes; and
+/// for them: the one programs are started over, where a program is asked for; the one
+/// that carries the channels a machine opens later, over which the client says how its
+/// screen is now; the one of the clipboard, where that passes; and
 /// the one its devices are reached over, where it has a smart card reader. With that one goes the channel of sound, without which
 /// a Windows machine says nothing about devices.
 pub fn channels(client: &Client, with_a_reader: bool) -> Vec<&'static str> {
     let mut channels = Vec::new();
     if client.program.is_some() {
         channels.push(crate::rail::CHANNEL);
-    } else {
-        channels.push(crate::dynamic::CHANNEL);
     }
+    channels.push(crate::dynamic::CHANNEL);
     if client.clipboard.at_all() {
         channels.push(crate::clipboard::CHANNEL);
     }
@@ -244,12 +243,14 @@ mod tests {
         assert_eq!(&request[277..289], &[b'd', b'r', b'd', b'y', b'n', b'v', b'c', 0, 0x00, 0x00, 0x00, 0xc0]);
         assert_eq!(&request[289..], &[0x04, 0xc0, 0x0c, 0x00, 0x0d, 0, 0, 0, 0, 0, 0, 0]);
 
-        // for a program it asks for the channel programs are started over, in its place
+        // for a program it asks for the channel programs are started over first, and then
+        // the same, so that the windows follow the screen too
         let program = crate::rail::Program { run: "||ledger".to_string(), arguments: String::new() };
         let request = super::request(&Client { program: Some(program), ..client() }, false);
-        assert_eq!(&request[269..277], &[0x03, 0xc0, 0x14, 0x00, 1, 0, 0, 0]);
+        assert_eq!(&request[269..277], &[0x03, 0xc0, 0x20, 0x00, 2, 0, 0, 0]);
         assert_eq!(&request[277..289], &[b'r', b'a', b'i', b'l', 0, 0, 0, 0, 0x00, 0x00, 0x20, 0xc0]);
-        assert_eq!(&request[289..293], &[0x04, 0xc0, 0x0c, 0x00]);
+        assert_eq!(&request[289..301], &[b'd', b'r', b'd', b'y', b'n', b'v', b'c', 0, 0x00, 0x00, 0x00, 0xc0]);
+        assert_eq!(&request[301..305], &[0x04, 0xc0, 0x0c, 0x00]);
 
         // on a screen with twice the dots each way the desktop has those dots, and the
         // machine draws twice as large: the screen before the person is as large as it was

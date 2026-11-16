@@ -713,6 +713,35 @@ impl Desktop {
         self.windows.icons()
     }
 
+    /// The icons of the tray, where it changed since this was last asked.
+    pub fn tray(&mut self) -> Option<Vec<away_wire::TrayIcon>> {
+        self.windows.tray()
+    }
+
+    /// The pictures of icons of the tray that changed since this was last asked.
+    pub fn tray_pictures(&mut self) -> Vec<(u32, u32, Vec<u8>)> {
+        self.windows.tray_pictures()
+    }
+
+    /// Tells the machine what the person does with an icon of the tray. The pointer goes
+    /// to the lower left corner first, beside where the page shows the tray: a menu the
+    /// program opens where the pointer is opens there. An icon that is gone is nothing.
+    pub async fn use_tray(&mut self, window: u32, icon: u32, does: away_wire::TrayDoes) -> Result<(), Failure> {
+        let Some(version) = self.windows.tray_version(window, icon) else { return Ok(()) };
+        let does = match does {
+            away_wire::TrayDoes::Choose => away_rdp::rail::TrayDoes::Choose,
+            away_wire::TrayDoes::Menu => away_rdp::rail::TrayDoes::Menu,
+        };
+        let (wide, high) = (self.picture().width, self.picture().height);
+        let corner = Input::Moved { x: 8.min(wide.saturating_sub(1)) as u16, y: high.saturating_sub(8) as u16 };
+        let mut told = self.open.input(&[corner]);
+        told.extend(self.open.tray(window, icon, does, version));
+        if told.is_empty() {
+            return Ok(());
+        }
+        self.write(&told).await
+    }
+
     /// How many windows of their own are open.
     pub fn windows_listed(&self) -> usize {
         self.windows.listed()

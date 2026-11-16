@@ -139,6 +139,9 @@ pub struct Connection {
     clipboard: Option<(Pieces, Clipboard)>,
     /// The windows the client hid, which it says nothing of to whoever holds it.
     hidden: Vec<u32>,
+    /// Whether the machine said it is ready for programs: from then on the windows are
+    /// told how much room they have whenever the desktop is offered anew.
+    programs_ready: bool,
 }
 
 impl Connection {
@@ -180,6 +183,7 @@ impl Connection {
             later,
             clipboard: passes,
             hidden: Vec::new(),
+            programs_ready: false,
         };
         (connection, first)
     }
@@ -308,6 +312,7 @@ impl Connection {
                 order.retain(|id| !hidden.contains(id));
                 true
             }
+            Change::Tray(_) | Change::TrayGone { .. } => true,
         });
         windows.extend(put_away.into_iter().map(Change::Gone));
         self.hidden.retain(|id| !closed.contains(id));
@@ -429,9 +434,12 @@ impl Connection {
                     size => size,
                 };
                 let mut says = vec![rail::ready(), rail::client(), rail::work_area(width, height)];
-                if let Some(program) = &self.client.program {
+                // the program is asked for once: a machine that says again that it is ready
+                // has it running already
+                if let (Some(program), false) = (&self.client.program, self.programs_ready) {
                     says.push(rail::start(program)?);
                 }
+                self.programs_ready = true;
                 (says.iter().flat_map(|message| self.about_programs(message)).collect(), vec![Happened::AskedForTheProgram])
             }
             rail::Said::Started => (Vec::new(), vec![Happened::Started]),
@@ -496,6 +504,12 @@ impl Connection {
                     if matches!(self.state, State::Finishes) {
                         self.state = State::Open;
                         happened.push(Happened::Open);
+                        // a desktop of programs offered anew, at the size the client's screen
+                        // has now: the windows have the room of it, and a window as large as
+                        // it gets grows with it
+                        if self.programs_ready {
+                            send.extend(self.about_programs(&rail::work_area(self.size.0, self.size.1)));
+                        }
                     }
                 }
                 FromMachine::Data(0x02, drawn) => {
@@ -550,6 +564,18 @@ impl Connection {
         }
     }
 
+    /// What to send to tell the machine what the person does with an icon of the tray, of
+    /// a program that speaks this version of the tray's ways. Nothing where the connection
+    /// is for no program, or not open.
+    pub fn tray(&self, window: u32, icon: u32, does: rail::TrayDoes, version: u32) -> Vec<u8> {
+        match self.state {
+            State::Open if self.client.program.is_some() => {
+                rail::tray(window, icon, does, version).iter().flat_map(|message| self.about_programs(message)).collect()
+            }
+            _ => Vec::new(),
+        }
+    }
+
     /// What to send to tell the machine what the person does with a window as a whole:
     /// make it small, make it large, bring it back, close it.
     pub fn command(&self, window: u32, command: Command) -> Vec<u8> {
@@ -577,9 +603,9 @@ mod tests {
     use crate::picture::Picture;
     use crate::rail::stand_in::Asked;
     use crate::rail::Program;
-    use crate::stand_in::desktop::{program_icon, Desktop, LANGUAGE_BAR, WINDOW, WINDOW_AT, WINDOW_SIZE};
+    use crate::stand_in::desktop::{program_icon, Desktop, LANGUAGE_BAR, TRAY_ICON, WINDOW, WINDOW_AT, WINDOW_SIZE};
     use crate::tpkt::Frames;
-    use crate::window::{Part, Shown, Window};
+    use crate::window::{Part, Shown, TrayIcon, Window};
 
     /// A picture whose every pixel says where it is.
     fn picture() -> Picture {
@@ -772,9 +798,13 @@ mod tests {
         }
         assert!(drawn == *machine.picture(), "the picture is the machine's new one");
 
-        // a connection for a program asks for no such channel, and says nothing of a screen
-        let (_, program, _) = run(Some("||ledger"), Desktop::new(picture()).that_publishes(&["||ledger"]));
-        assert!(!program.follows() && program.screen(640, 480, 100).is_empty());
+        // so does a connection for programs: offered anew, its windows are told the room they have
+        let (_, mut program, mut machine) = run(Some("||ledger"), Desktop::new(picture()).that_publishes(&["||ledger"]));
+        assert!(program.follows());
+        let said = program.screen(640, 480, 100);
+        let happened = talk(&mut program, &mut machine, said).expect("the desktop of programs is offered anew");
+        assert!(happened.contains(&Happened::Desktop { width: 640, height: 480, bits: 32 }));
+        assert_eq!(machine.seen().about_programs.last(), Some(&Asked::WorkArea(640, 480)));
     }
 
     /// Passes what one side says to the other, and back, until both are silent.
@@ -839,6 +869,16 @@ mod tests {
                 Change::Icon { id: WINDOW, large: true, icon: program_icon(), kept: Some((0, 0)) },
                 Change::InFront(WINDOW),
                 Change::Order(vec![WINDOW]),
+                Change::Tray(TrayIcon {
+                    window: WINDOW,
+                    icon: TRAY_ICON,
+                    is_new: true,
+                    version: Some(4),
+                    tip: Some("ledger".to_string()),
+                    hidden: Some(false),
+                    picture: Some((program_icon(), None)),
+                    kept_picture: None,
+                }),
             ]
         );
         // what is drawn is the window and nothing beside it
@@ -869,12 +909,15 @@ mod tests {
             ]
         );
 
-        // the person works in the window, and then closes it: the machine says it is gone
+        // the person works in the window, and then closes it: the machine says it is in
+        // front, and then that it is gone
         let mut machine = machine;
         let mut connection = connection;
         let says = [connection.activate(WINDOW, true), connection.command(WINDOW, Command::Close)].concat();
         let after = talk(&mut connection, &mut machine, says).unwrap();
-        assert_eq!(after, [Happened::Windows(vec![Change::Gone(WINDOW)])]);
+        let changes: Vec<Change> =
+            after.into_iter().flat_map(|happened| if let Happened::Windows(changes) = happened { changes } else { Vec::new() }).collect();
+        assert_eq!(changes, [Change::InFront(WINDOW), Change::Order(vec![WINDOW]), Change::Gone(WINDOW)]);
         assert_eq!(machine.seen().about_programs[4..], [Asked::Activate(WINDOW, true), Asked::Command(WINDOW, Command::Close)]);
     }
 
@@ -907,9 +950,21 @@ mod tests {
         assert_eq!(talk(&mut connection, &mut machine, said), Ok(vec![Happened::NotStarted { result: 3, raw: 2 }]));
         assert!(!connection.activate(WINDOW, true).is_empty());
 
-        // a connection for the desktop starts no program
+        // the person chooses the first program's icon in the tray, and asks for its menu
+        let said =
+            [connection.tray(WINDOW, TRAY_ICON, rail::TrayDoes::Choose, 4), connection.tray(WINDOW, TRAY_ICON, rail::TrayDoes::Menu, 4)]
+                .concat();
+        talk(&mut connection, &mut machine, said).expect("the machine takes it");
+        let told: Vec<&Asked> = machine.seen().about_programs.iter().filter(|asked| matches!(asked, Asked::Tray(..))).collect();
+        assert_eq!(
+            told,
+            [0x201, 0x202, 0x400, 0x204, 0x205, 0x7b].map(|message| Asked::Tray(WINDOW, TRAY_ICON, message)).iter().collect::<Vec<_>>()
+        );
+
+        // a connection for the desktop starts no program, and has no tray
         let (_, desktop, _) = run(None, Desktop::new(picture()).that_publishes(&["||ledger"]));
         assert_eq!(desktop.start(&books), Ok(Vec::new()));
+        assert!(desktop.tray(WINDOW, TRAY_ICON, rail::TrayDoes::Choose, 4).is_empty());
     }
 
     #[test]

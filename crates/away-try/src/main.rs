@@ -595,7 +595,7 @@ fn rdp(asked: &Asked, account: Option<Account>, on_the_card: Option<OnTheCard>) 
                             match change {
                                 Change::Window(window) => {
                                     let what = if window.is_new { "A new window" } else { "A window changed" };
-                                    let title = window.title.map(|title| format!(", “{title}”")).unwrap_or_default();
+                                    let title = window.title.as_ref().map(|title| format!(", “{title}”")).unwrap_or_default();
                                     let at = window.at.map(|(left, top)| format!(", at {left}, {top}")).unwrap_or_default();
                                     let size = window.size.map(|(wide, high)| format!(", {wide} by {high}")).unwrap_or_default();
                                     println!("   {what}: number {}{title}{at}{size}.", window.id);
@@ -626,6 +626,28 @@ fn rdp(asked: &Asked, account: Option<Account>, on_the_card: Option<OnTheCard>) 
                                 Change::KeptIcon { id, large, kept: (cache, entry) } => {
                                     let which = if large { "large" } else { "small" };
                                     println!("   The window number {id} shows its {which} icon, kept at {cache}.{entry}.");
+                                }
+                                Change::Tray(icon) => {
+                                    let what = if icon.is_new { "A new icon in the tray" } else { "An icon of the tray changed" };
+                                    let tip = icon.tip.as_ref().map(|tip| format!(", “{}”", tip.replace('\n', " / "))).unwrap_or_default();
+                                    let version = icon.version.map(|version| format!(", version {version}")).unwrap_or_default();
+                                    let hidden = match icon.hidden {
+                                        Some(true) => ", hidden",
+                                        Some(false) => ", shown",
+                                        None => "",
+                                    };
+                                    let picture = match (&icon.picture, icon.kept_picture) {
+                                        (Some((picture, _)), _) => format!(", a picture of {} by {}", picture.width, picture.height),
+                                        (None, Some((cache, entry))) => format!(", the picture kept at {cache}.{entry}"),
+                                        _ => String::new(),
+                                    };
+                                    println!(
+                                        "   {what}: of the window {}, number {}{tip}{version}{hidden}{picture}.",
+                                        icon.window, icon.icon
+                                    );
+                                }
+                                Change::TrayGone { window, icon } => {
+                                    println!("   An icon of the tray is gone: of the window {window}, number {icon}.")
                                 }
                             }
                         }

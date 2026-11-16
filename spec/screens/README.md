@@ -88,7 +88,7 @@ release holds for a person or an administrator and no figure shows.
 | 4 | [Machines](./machines.md) | 9 | 14 |
 | 5 | [Opening a machine](./opening.md) | 7 | 8 |
 | 6 | [A desktop](./desktop.md) | 9 | 12 |
-| 7 | [Programs](./programs.md) | 5 | 6 |
+| 7 | [Programs](./programs.md) | 6 | 6 |
 | 8 | [A shell](./shell.md) | 8 | 10 |
 | 9 | [Sessions](./sessions.md) | 4 | 6 |
 | 10 | [On a phone](./phone.md) | 5 | 10 |
@@ -98,7 +98,7 @@ release holds for a person or an administrator and no figure shows.
 | 14 | [Administration: sessions and records](./admin-records.md) | 4 | 7 |
 | 15 | [Administration: status](./admin-status.md) | 2 | 8 |
 | 16 | [When something goes wrong](./errors.md) | 6 | 8 |
-|  | all | 83 | 85 |
+|  | all | 84 | 85 |
 
 The first release holds 67 capabilities for a person or an administrator. A figure shows 61 of them.
 <!-- end: figures -->

@@ -4,7 +4,7 @@
 // its own but a handle. A program's windows show on Away's ground, where the machine
 // has them on its desktop.
 import { Button, Chevron, EmptyState, Field, IconButton, Input, Spinner } from '@nalet/design-system';
-import { AppWindow, Check, ClipboardList, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
+import { AppWindow, Check, ChevronUp, ClipboardList, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent as KeyOfReact, PointerEvent as PointerOfReact, ReactNode } from 'react';
 
@@ -15,8 +15,8 @@ import { texts } from '../texts';
 import { ClipboardPanel, useClipboard } from './Clipboard';
 import type { Passes } from './Clipboard';
 import { layoutName, layoutOf, placeOf } from './keys';
-import { begins, credentials, did, leaves, readIcon, readRectangle, readSaid, seen, sized, start, windowDoes } from './wire';
-import type { Did, Step, WindowOf } from './wire';
+import { begins, credentials, did, leaves, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } from './wire';
+import type { Did, Step, TrayOf, WindowOf } from './wire';
 
 const STEPS: Step[] = ['reaching', 'checking', 'signing-in', 'first-picture'];
 
@@ -48,6 +48,9 @@ function useSession(machine: string, program: string | null) {
   const [copied, setCopied] = useState<string | null>(null);
   // the icons of the windows, each as a picture the page holds
   const [icons, setIcons] = useState<Record<number, ImageBitmap>>({});
+  // the icons of the tray, and their pictures, each by its window and its number
+  const [tray, setTray] = useState<TrayOf[]>([]);
+  const [trayPictures, setTrayPictures] = useState<Record<string, ImageBitmap>>({});
   // the keyboard's layout the machine was told of, and what became of a program the
   // person asked for in the session, the last of them
   const [layout, setLayout] = useState<number | null>(null);
@@ -79,7 +82,10 @@ function useSession(machine: string, program: string | null) {
     setStarted(null);
     // the pictures of the icons are the page's until the session ends
     const pictures = new Map<number, ImageBitmap>();
+    const ofTheTray = new Map<string, ImageBitmap>();
     setIcons({});
+    setTray([]);
+    setTrayPictures({});
 
     // The desktop goes on at the machine: Away tries again, at once and then at longer
     // intervals, until it is back or the person leaves.
@@ -119,6 +125,22 @@ function useSession(machine: string, program: string | null) {
       opened.onopen = () => opened.send(begins(ticket, window.innerWidth - (docked(program) ? RAIL : 0), window.innerHeight, layout, Math.round(window.devicePixelRatio * 100)));
       opened.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
         if (typeof event.data !== 'string') {
+          const inTheTray = readTrayPicture(event.data);
+          if (inTheTray) {
+            createImageBitmap(new Blob([inTheTray.png], { type: 'image/png' }))
+              .then((picture) => {
+                if (over) {
+                  picture.close();
+                  return;
+                }
+                const key = `${inTheTray.window}:${inTheTray.icon}`;
+                ofTheTray.get(key)?.close();
+                ofTheTray.set(key, picture);
+                setTrayPictures(Object.fromEntries(ofTheTray));
+              })
+              .catch(() => undefined);
+            return;
+          }
           const icon = readIcon(event.data);
           if (icon) {
             // read as the rectangles are, so that the page loads no picture from anywhere
@@ -194,6 +216,7 @@ function useSession(machine: string, program: string | null) {
         else if ('clipboard' in said) setPasses(said.clipboard);
         else if ('copied' in said) setCopied(said.copied);
         else if ('started' in said) setStarted(said.started);
+        else if ('tray' in said) setTray(said.tray);
       };
       opened.onclose = () => {
         if (over || told || connection !== opened) return;
@@ -231,6 +254,7 @@ function useSession(machine: string, program: string | null) {
       connection?.close();
       socket.current = null;
       pictures.forEach((picture) => picture.close());
+      ofTheTray.forEach((picture) => picture.close());
     };
   }, [machine, program, attempt, canvas]);
 
@@ -242,6 +266,8 @@ function useSession(machine: string, program: string | null) {
     windows,
     inFront,
     icons,
+    tray,
+    trayPictures,
     layout,
     started,
     passes,
@@ -273,7 +299,7 @@ export function Session({ showMachine, ...session }: SessionProps & { showMachin
 
 // The page of a session with a machine's desktop, or with one of its programs.
 function BrowserSession({ name, program, go, contact, machine }: SessionProps & { machine: Machine | null }) {
-  const { state, windows, inFront, icons, layout, started, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program);
+  const { state, windows, inFront, icons, tray, trayPictures, layout, started, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program);
   const toMachines = () => go(machine ? pageOf(name) : addressOf.machines);
 
   useEffect(() => {
@@ -292,6 +318,8 @@ function BrowserSession({ name, program, go, contact, machine }: SessionProps & 
         windows={windows}
         inFront={inFront}
         icons={icons}
+        tray={tray}
+        trayPictures={trayPictures}
         programs={machine?.programs ?? []}
         layout={layout}
         started={started}
@@ -549,6 +577,8 @@ function Desktop({
   windows,
   inFront,
   icons,
+  tray,
+  trayPictures,
   programs,
   layout,
   started,
@@ -566,6 +596,8 @@ function Desktop({
   windows: WindowOf[];
   inFront: number | null;
   icons: Record<number, ImageBitmap>;
+  tray: TrayOf[];
+  trayPictures: Record<string, ImageBitmap>;
   programs: Program[];
   layout: number | null;
   started: { program: string; ok: boolean } | null;
@@ -591,6 +623,11 @@ function Desktop({
   const [launch, setLaunch] = useState(false);
   const [starting, setStarting] = useState<string | null>(null);
   const [notStarted, setNotStarted] = useState<string | null>(null);
+  // whether the icons of the tray are shown, under the button at the foot of the rail
+  const [trayOpen, setTrayOpen] = useState(false);
+  // the windows in the order they came, as a taskbar keeps them: one brought to the front
+  // keeps its place
+  const cameIn = useRef<number[]>([]);
   const clipboard = useClipboard(canvas, passes, copied, say);
   // the clock at the foot of the rail, and the first control, focused when a desktop's
   // rail opens. For a program the rail is always there, as a taskbar
@@ -801,7 +838,15 @@ function Desktop({
     setKeys(false);
     setClip(false);
     setLaunch(false);
+    setTrayOpen(false);
     setBar(false);
+    canvas.focus();
+  };
+  // an icon of the tray, chosen or asked for its menu: what opens, opens on the machine,
+  // where the keys and the pointer go again
+  const touchTray = (icon: TrayOf, does: 'choose' | 'menu') => {
+    say(trayDoes(icon.window, icon.icon, does));
+    setTrayOpen(false);
     canvas.focus();
   };
   // another program of the machine, in this session: the machine opens its window here
@@ -836,7 +881,9 @@ function Desktop({
   };
   // the parts of the windows that can be seen, as shares of the desktop's width and height
   const parts = windows.flatMap((window) => window.seen.map((part) => ({ of: window.id, part })));
-  const listed = windows.filter((window) => window.listed);
+  const shown = windows.filter((window) => window.listed);
+  cameIn.current = [...cameIn.current.filter((id) => shown.some((window) => window.id === id)), ...shown.map((window) => window.id).filter((id) => !cameIn.current.includes(id))];
+  const listed = cameIn.current.map((id) => shown.find((window) => window.id === id)).filter((window) => window !== undefined);
   const keyboard = layout === null ? null : layoutName(layout);
   // the controls a session has: the same on a desktop's bar and on a program's rail
   const controls = (
@@ -1066,18 +1113,13 @@ function Desktop({
                       aria-current={window.id === inFront ? 'true' : undefined}
                       aria-label={t.toFront(window.title)}
                       title={t.toFront(window.title)}
-                      onClick={() => say(windowDoes(window.id, 'front'))}
+                      onClick={() => {
+                        // the window comes to the front and has the keys; its icon keeps its place
+                        say(windowDoes(window.id, 'front'));
+                        canvas.focus();
+                      }}
                     >
                       {icons[window.id] ? <WindowIcon picture={icons[window.id]!} /> : <AppWindow size={20} aria-hidden="true" />}
-                    </button>
-                    <button
-                      type="button"
-                      className="x"
-                      aria-label={t.closeWindow(window.title)}
-                      title={t.closeWindow(window.title)}
-                      onClick={() => say(windowDoes(window.id, 'close'))}
-                    >
-                      <X size={12} aria-hidden="true" />
                     </button>
                   </li>
                 ))}
@@ -1092,6 +1134,70 @@ function Desktop({
             )}
             {/* the foot of the rail, as a taskbar has: the keyboard the machine types as, and the clock */}
             <div className="foot">
+              {/* the icons the programs put in the tray, behind a button, as Windows keeps them */}
+              {tray.length > 0 && (
+                <span
+                  className="menuof traymenu"
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) setTrayOpen(false);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape' && trayOpen) {
+                      event.stopPropagation();
+                      setTrayOpen(false);
+                      event.currentTarget.querySelector('button')?.focus();
+                    }
+                  }}
+                >
+                  <IconButton
+                    variant="ghost"
+                    label={t.tray}
+                    title={t.tray}
+                    className={trayOpen ? 'is-open' : undefined}
+                    aria-expanded={trayOpen}
+                    onClick={() => {
+                      setKeys(false);
+                      setClip(false);
+                      setLaunch(false);
+                      setTrayOpen(!trayOpen);
+                    }}
+                  >
+                    <ChevronUp size={16} aria-hidden="true" />
+                  </IconButton>
+                  {trayOpen && (
+                    <div className="sesspanel traypanel" role="group" aria-label={t.trayOf(name)}>
+                      <ul className="traygrid">
+                        {tray.map((icon) => {
+                          const picture = trayPictures[`${icon.window}:${icon.icon}`];
+                          return (
+                            <li key={`${icon.window}:${icon.icon}`}>
+                              <button
+                                type="button"
+                                className="ticon"
+                                aria-label={icon.tip.split('\n')[0] || t.trayIcon}
+                                title={icon.tip || t.trayIcon}
+                                onClick={() => touchTray(icon, 'choose')}
+                                onContextMenu={(event) => {
+                                  event.preventDefault();
+                                  touchTray(icon, 'menu');
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+                                    event.preventDefault();
+                                    touchTray(icon, 'menu');
+                                  }
+                                }}
+                              >
+                                {picture ? <WindowIcon picture={picture} /> : <AppWindow size={18} aria-hidden="true" />}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+                </span>
+              )}
               {keyboard && (
                 <span className="lang" title={t.typesAs(keyboard.name)}>
                   <span aria-hidden="true">{keyboard.short}</span>

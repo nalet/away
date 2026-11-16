@@ -1,6 +1,6 @@
 //! The windows of programs, as the machine tells of them along with what it draws
-//! (MS-RDPERP 2.2.1.3): a window that is new or changed, one that is gone, and which
-//! window is in front. The machine draws every window where it is on its desktop; these
+//! (MS-RDPERP 2.2.1.3): a window that is new or changed, one that is gone, which
+//! window is in front, and the icons of the taskbar's notification area, the tray. The machine draws every window where it is on its desktop; these
 //! words say where that is, and which parts of it can be seen.
 
 use crate::Error;
@@ -107,6 +107,37 @@ pub enum Change {
         /// Where the machine keeps it.
         kept: Kept,
     },
+    /// An icon of the tray is new, or something of it changed.
+    Tray(TrayIcon),
+    /// An icon of the tray is gone.
+    TrayGone {
+        /// The window the icon is of.
+        window: u32,
+        /// The icon, among those of its window.
+        icon: u32,
+    },
+}
+
+/// What the machine says of one icon of the tray: the icon, and of it only what changed.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TrayIcon {
+    /// The window of the program the icon is of, which is told when the person uses it.
+    pub window: u32,
+    /// The icon, among those of its window.
+    pub icon: u32,
+    /// Whether it is new.
+    pub is_new: bool,
+    /// Which version of the tray's ways the program speaks: from 3 on it is told of a
+    /// choice, and not of the buttons alone.
+    pub version: Option<u32>,
+    /// What it says when the pointer rests on it.
+    pub tip: Option<String>,
+    /// Whether the program hides it.
+    pub hidden: Option<bool>,
+    /// Its picture, and where the machine keeps it, where it does.
+    pub picture: Option<(Icon, Option<Kept>)>,
+    /// Its picture is one the machine sent before, and keeps.
+    pub kept_picture: Option<Kept>,
 }
 
 const OF_A_WINDOW: u32 = 0x0100_0000;
@@ -188,6 +219,13 @@ pub fn read(count: u16, mut orders: &[u8]) -> Result<Vec<Change>, Error> {
                 let count = reader.byte()?;
                 changes.push(Change::Order((0..count).map(|_| reader.number32()).collect::<Result<_, _>>()?));
             }
+        } else if has & OF_AN_ICON_IN_THE_BAR != 0 && has & OF_A_WINDOW == 0 {
+            let (window, icon) = (reader.number32()?, reader.number32()?);
+            if has & GONE != 0 {
+                changes.push(Change::TrayGone { window, icon });
+                continue;
+            }
+            changes.push(Change::Tray(tray_icon(window, icon, has, &mut reader)?));
         } else if has & OF_A_WINDOW != 0 && has & OF_AN_ICON_IN_THE_BAR == 0 {
             let id = reader.number32()?;
             let large = has & LARGE != 0;
@@ -209,6 +247,34 @@ pub fn read(count: u16, mut orders: &[u8]) -> Result<Vec<Change>, Error> {
         }
     }
     Ok(changes)
+}
+
+/// What is said of an icon of the tray that is new or changed (MS-RDPERP 2.2.1.3.2.2.1),
+/// each part where the word says it is there.
+fn tray_icon(window: u32, icon_of_it: u32, has: u32, reader: &mut Reader) -> Result<TrayIcon, Error> {
+    let mut said = TrayIcon { window, icon: icon_of_it, is_new: has & NEW != 0, ..TrayIcon::default() };
+    if has & 0x0000_0008 != 0 {
+        said.version = Some(reader.number32()?);
+    }
+    if has & 0x0000_0001 != 0 {
+        said.tip = Some(reader.text()?);
+    }
+    // a message that pops up from it for a while: how long, what kind, its text and its title
+    if has & 0x0000_0002 != 0 {
+        reader.bytes(8)?;
+        reader.text()?;
+        reader.text()?;
+    }
+    if has & 0x0000_0004 != 0 {
+        said.hidden = Some(reader.number32()? & 1 != 0);
+    }
+    if has & ITS_ICON != 0 {
+        said.picture = icon(reader);
+    } else if has & ITS_KEPT_ICON != 0 {
+        let entry = reader.number16()?;
+        said.kept_picture = Some((reader.byte()?, entry));
+    }
+    Ok(said)
 }
 
 /// What is said of a window that is new or changed, each part where the word says it is there.
@@ -418,6 +484,25 @@ pub mod stand_in {
         order(OF_A_WINDOW | ITS_ICON | if large { LARGE } else { 0 }, &holds)
     }
 
+    /// An icon of the tray, new, of a window, with its tip and its picture, of a program
+    /// that speaks this version of the tray's ways.
+    pub fn tray(window: u32, icon: u32, tip: &str, version: u32, picture: &Icon) -> Vec<u8> {
+        let tip: Vec<u8> = tip.encode_utf16().flat_map(u16::to_le_bytes).collect();
+        let mut holds = [window.to_le_bytes(), icon.to_le_bytes(), version.to_le_bytes()].concat();
+        holds.extend((tip.len() as u16).to_le_bytes());
+        holds.extend(tip);
+        holds.extend(0u32.to_le_bytes());
+        // the picture as a window's icon has it, after its window
+        let written = self::icon(0, false, None, picture);
+        holds.extend_from_slice(&written[11..]);
+        order(OF_AN_ICON_IN_THE_BAR | NEW | 0x08 | 0x01 | 0x04 | ITS_ICON, &holds)
+    }
+
+    /// An icon of the tray is gone.
+    pub fn tray_gone(window: u32, icon: u32) -> Vec<u8> {
+        order(OF_AN_ICON_IN_THE_BAR | GONE, &[window.to_le_bytes(), icon.to_le_bytes()].concat())
+    }
+
     /// A window shows an icon the client keeps.
     pub fn kept_icon(id: u32, large: bool, (cache, entry): Kept) -> Vec<u8> {
         let mut holds = id.to_le_bytes().to_vec();
@@ -506,6 +591,48 @@ mod tests {
         let bottom: Vec<[u8; 4]> = icon.pixels[32..].as_chunks::<4>().0.to_vec();
         assert_eq!(top, [[255, 255, 255, 0], white, white, white, black, black, black, black]);
         assert_eq!(bottom, [black, black, black, black, white, white, white, white]);
+    }
+
+    #[test]
+    fn the_icons_of_the_tray_are_read_with_their_tips_and_pictures() {
+        let picture = Icon { width: 2, height: 2, pixels: vec![9; 16] };
+        let orders = [stand_in::tray(0x1_0001, 7, "Ledger – 2 reminders", 4, &picture), stand_in::tray_gone(0x1_0001, 7)].concat();
+        assert_eq!(
+            read(2, &orders),
+            Ok(vec![
+                Change::Tray(TrayIcon {
+                    window: 0x1_0001,
+                    icon: 7,
+                    is_new: true,
+                    version: Some(4),
+                    tip: Some("Ledger – 2 reminders".to_string()),
+                    hidden: Some(false),
+                    picture: Some((picture, None)),
+                    kept_picture: None,
+                }),
+                Change::TrayGone { window: 0x1_0001, icon: 7 },
+            ])
+        );
+        // one that only shows another picture the machine keeps, and one hidden with a message popping up from it
+        let mut kept = vec![0x2e, 0, 0];
+        kept.extend((OF_AN_ICON_IN_THE_BAR | ITS_KEPT_ICON).to_le_bytes());
+        kept.extend([1, 0, 0, 0, 7, 0, 0, 0, 3, 0, 2]);
+        let mut hidden = vec![0x2e, 0, 0];
+        hidden.extend((OF_AN_ICON_IN_THE_BAR | 0x02 | 0x04).to_le_bytes());
+        hidden.extend([1, 0, 0, 0, 8, 0, 0, 0]);
+        hidden.extend([0; 8]);
+        hidden.extend([2, 0, b'!', 0, 0, 0, 1, 0, 0, 0]);
+        for order in [&mut kept, &mut hidden] {
+            let length = order.len() as u16;
+            order[1..3].copy_from_slice(&length.to_le_bytes());
+        }
+        assert_eq!(
+            read(2, &[kept, hidden].concat()),
+            Ok(vec![
+                Change::Tray(TrayIcon { window: 1, icon: 7, kept_picture: Some((2, 3)), ..TrayIcon::default() }),
+                Change::Tray(TrayIcon { window: 1, icon: 8, hidden: Some(true), ..TrayIcon::default() }),
+            ])
+        );
     }
 
     #[test]

@@ -37,7 +37,7 @@ every product shares. The specification doesn't repeat them.
 | Qualities | 35 | 35 with a target, 35 with a proposal |
 | Expectations | 99 | 20 there, 19 partly, 17 first release, 8 first release in part, 27 later, 8 not planned |
 | Capabilities | 202 | in 19 areas: 47 built, 10 partly built, 60 first release, 71 later, 14 not planned |
-| Figures | 83 | in 15 chapters; they show 61 of the 67 capabilities the first release holds for a person or an administrator |
+| Figures | 84 | in 15 chapters; they show 61 of the 67 capabilities the first release holds for a person or an administrator |
 | Components | 31 | in 6 layers: 11 there, 19 first release, 1 later |
 | Connections | 46 | of 16 kinds |
 | Decision records | 15 | 15 accepted |

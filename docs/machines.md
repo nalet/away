@@ -357,13 +357,20 @@ and the records are those of a desktop.
   mark at its top lists the machine's programs: one chosen there opens in the
   same session, in a window of its own, and the way to the other machines is
   under them. The program's windows stand under the mark, each as the icon the
-  machine gives it; a click on one brings it to the front, a small cross over
-  it closes it, and the one in front is marked. Then the keys, the clipboard,
-  filling the screen and ending; and at its foot the keyboard the machine types
-  as and the time. On a computer the rail stands always and the windows sit
-  beside it. On a phone it waits at the left edge: a swipe from the edge, or a
-  tap on it, brings it in over the picture, and a touch beside it puts it
-  away. Dialogues and menus belong to their window and are in no list.
+  machine gives it, in the order they opened; a click on one brings it to the
+  front and gives it the keys, and it keeps its place. The one in front is
+  marked. A window is closed as its program closes it. Then the keys, the
+  clipboard, filling the screen and ending; and at its foot the icons the
+  programs put in the tray, behind a button, then the keyboard the machine
+  types as and the time. A click on an icon of the tray chooses it; the second
+  button, or the menu key, asks for its menu, which opens on the machine. On a
+  computer the rail stands always and the windows sit beside it. On a phone it
+  waits at the left edge: a swipe from the edge, or a tap on it, brings it in
+  over the picture, and a touch beside it puts it away. Dialogues and menus
+  belong to their window and are in no list.
+- **The windows have the browser window's room.** When the window changes
+  size, or fills the screen, the machine is told, and a window as large as it
+  gets grows with it.
 - **Another program in the session is asked for like the first.** The server
   decides whether the person may open it on that machine, as their sign-in
   says at that moment, and keeps the record that it was asked for before the

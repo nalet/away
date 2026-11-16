@@ -605,6 +605,17 @@ where
                 return Ended::BrowserGone;
             }
         }
+        // the icons of the tray, and their pictures after them
+        if let Some(icons) = desktop.tray() {
+            if tell(browser, ToBrowser::Tray(&icons)).await.is_err() {
+                return Ended::BrowserGone;
+            }
+        }
+        for (window, icon, png) in desktop.tray_pictures() {
+            if tell(browser, ToBrowser::TrayPicture { window, icon, png: &png }).await.is_err() {
+                return Ended::BrowserGone;
+            }
+        }
         for started in desktop.started_later() {
             let program = asked_for.pop_front().unwrap_or_default();
             if tell(browser, ToBrowser::Started { program: &program, started }).await.is_err() {
@@ -686,6 +697,11 @@ where
                 Some(FromBrowser::Seen(number)) => seen = number,
                 Some(FromBrowser::Window { id, does }) => {
                     if let Err(failed) = desktop.window(id, does).await {
+                        return ended_by(failed);
+                    }
+                }
+                Some(FromBrowser::Tray { window, icon, does }) => {
+                    if let Err(failed) = desktop.use_tray(window, icon, does).await {
                         return ended_by(failed);
                     }
                 }

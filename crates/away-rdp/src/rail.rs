@@ -13,6 +13,7 @@ const START: u16 = 0x0001;
 const ACTIVATE: u16 = 0x0002;
 const SETTING: u16 = 0x0003;
 const COMMAND: u16 = 0x0004;
+const NOTIFY: u16 = 0x0006;
 const READY: u16 = 0x0005;
 const CLIENT: u16 = 0x000b;
 const READY_WITH_MORE: u16 = 0x0013;
@@ -105,6 +106,37 @@ pub fn activate(window: u32, active: bool) -> Vec<u8> {
     let mut holds = window.to_le_bytes().to_vec();
     holds.push(u8::from(active));
     message(ACTIVATE, &holds)
+}
+
+/// What a person does with an icon of the tray.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrayDoes {
+    /// Chooses it, with the main button or the keyboard.
+    Choose,
+    /// Asks for its menu, with the second button or the menu key.
+    Menu,
+}
+
+/// Tells the machine what the person does with an icon of the tray, as Windows' own
+/// taskbar tells the program: the button going down and coming up, and from the tray's
+/// version 3 on the choice it makes, after them.
+pub fn tray(window: u32, icon: u32, does: TrayDoes, version: u32) -> Vec<Vec<u8>> {
+    let (down, up, then) = match does {
+        TrayDoes::Choose => (0x0201u32, 0x0202u32, 0x0400u32),
+        TrayDoes::Menu => (0x0204, 0x0205, 0x007b),
+    };
+    let mut said = vec![down, up];
+    if version >= 3 {
+        said.push(then);
+    }
+    said.into_iter()
+        .map(|message| {
+            let mut holds = window.to_le_bytes().to_vec();
+            holds.extend(icon.to_le_bytes());
+            holds.extend(message.to_le_bytes());
+            self::message(NOTIFY, &holds)
+        })
+        .collect()
 }
 
 /// Asks the machine to hide a window: it is drawn no more, as long as it is open.
@@ -201,6 +233,9 @@ pub mod stand_in {
         Command(u32, Command),
         /// To hide a window.
         Cloak(u32),
+        /// What the person does with an icon of the tray: its window, the icon, and the
+        /// message the program is given.
+        Tray(u32, u32, u32),
         /// Something else: the message's kind.
         Other(u16),
     }
@@ -238,6 +273,7 @@ pub mod stand_in {
                 },
             ),
             CLOAK if message.get(8) == Some(&1) => Asked::Cloak(number32(4)?),
+            NOTIFY => Asked::Tray(number32(4)?, number32(8)?, number32(12)?),
             other => Asked::Other(other),
         })
     }
@@ -281,6 +317,14 @@ mod tests {
         assert_eq!(command(7, Command::Close), [0x04, 0x00, 0x0a, 0x00, 7, 0, 0, 0, 0x60, 0xf0]);
         assert_eq!(cloak(0x1_0001), [0x15, 0x00, 0x09, 0x00, 0x01, 0x00, 0x01, 0x00, 1]);
         assert_eq!(stand_in::read(&cloak(0x1_0001)), Ok(Asked::Cloak(0x1_0001)));
+        // a choice and a menu of an icon of the tray, as Windows' taskbar tells them
+        let told = |does, version| tray(0x1_0001, 7, does, version).iter().map(|said| stand_in::read(said)).collect::<Result<Vec<_>, _>>();
+        assert_eq!(
+            told(TrayDoes::Choose, 4),
+            Ok(vec![Asked::Tray(0x1_0001, 7, 0x201), Asked::Tray(0x1_0001, 7, 0x202), Asked::Tray(0x1_0001, 7, 0x400)])
+        );
+        assert_eq!(told(TrayDoes::Menu, 0), Ok(vec![Asked::Tray(0x1_0001, 7, 0x204), Asked::Tray(0x1_0001, 7, 0x205)]));
+        assert_eq!(&tray(0x1_0001, 7, TrayDoes::Menu, 4)[2][..4], &[0x06, 0x00, 0x10, 0x00]);
 
         // each is read as what it is
         assert_eq!(stand_in::read(&ready()), Ok(Asked::Ready));

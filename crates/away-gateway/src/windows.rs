@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use away_rdp::window::{Change, Icon, Kept, Part, Shown};
-use away_wire::Window;
+use away_wire::{TrayIcon, Window};
 
 /// What Windows calls a window that belongs in no list of windows: a bar, a tip, a
 /// window of the system's own.
@@ -25,6 +25,16 @@ struct Known {
 const STORES: u8 = 3;
 const IN_A_STORE: u16 = 12;
 
+/// An icon of the tray, as the gateway knows it.
+struct InTheTray {
+    window: u32,
+    icon: u32,
+    version: u32,
+    tip: String,
+    hidden: bool,
+    picture: Option<Icon>,
+}
+
 /// The windows that are open, and which is in front.
 #[derive(Default)]
 pub struct Windows {
@@ -38,6 +48,11 @@ pub struct Windows {
     kept: HashMap<Kept, Icon>,
     /// The windows whose icon changed since that was last asked.
     icons_changed: Vec<u32>,
+    /// The icons of the tray, in the order they came.
+    tray: Vec<InTheTray>,
+    /// Whether the tray changed since that was last asked, and whose pictures.
+    tray_changed: bool,
+    tray_pictures_changed: Vec<(u32, u32)>,
 }
 
 impl Windows {
@@ -102,6 +117,56 @@ impl Windows {
                         self.shows(id, large, icon);
                     }
                 }
+                Change::Tray(said) => {
+                    let at = match self.tray.iter().position(|known| (known.window, known.icon) == (said.window, said.icon)) {
+                        Some(at) => at,
+                        None => {
+                            self.tray.push(InTheTray {
+                                window: said.window,
+                                icon: said.icon,
+                                version: 0,
+                                tip: String::new(),
+                                hidden: false,
+                                picture: None,
+                            });
+                            self.tray.len() - 1
+                        }
+                    };
+                    let picture = match (said.picture, said.kept_picture) {
+                        (Some((picture, kept)), _) => {
+                            if let Some(kept) = kept.filter(|(store, at)| *store < STORES && *at < IN_A_STORE) {
+                                self.kept.insert(kept, picture.clone());
+                            }
+                            Some(picture)
+                        }
+                        (None, Some(kept)) => self.kept.get(&kept).cloned(),
+                        (None, None) => None,
+                    };
+                    let known = &mut self.tray[at];
+                    // of an icon only what changed is said
+                    if let Some(version) = said.version {
+                        known.version = version;
+                    }
+                    if let Some(tip) = said.tip {
+                        known.tip = tip;
+                    }
+                    if let Some(hidden) = said.hidden {
+                        known.hidden = hidden;
+                    }
+                    if let Some(picture) = picture.filter(|picture| known.picture.as_ref() != Some(picture)) {
+                        known.picture = Some(picture);
+                        let key = (known.window, known.icon);
+                        if !self.tray_pictures_changed.contains(&key) {
+                            self.tray_pictures_changed.push(key);
+                        }
+                    }
+                    self.tray_changed = true;
+                }
+                Change::TrayGone { window, icon } => {
+                    self.tray.retain(|known| (known.window, known.icon) != (window, icon));
+                    self.tray_pictures_changed.retain(|key| *key != (window, icon));
+                    self.tray_changed = true;
+                }
             }
         }
     }
@@ -118,6 +183,36 @@ impl Windows {
         if icons.0.as_ref().or(icons.1.as_ref()) != before.as_ref() && !self.icons_changed.contains(&id) {
             self.icons_changed.push(id);
         }
+    }
+
+    /// The icons of the tray that the programs show, in the order they came, where the
+    /// tray changed since this was last asked.
+    pub fn tray(&mut self) -> Option<Vec<TrayIcon>> {
+        std::mem::take(&mut self.tray_changed).then(|| {
+            self.tray
+                .iter()
+                .filter(|known| !known.hidden)
+                .map(|known| TrayIcon { window: known.window, icon: known.icon, tip: known.tip.clone() })
+                .collect()
+        })
+    }
+
+    /// The pictures of icons of the tray that changed since this was last asked, each with
+    /// its window and its number, as PNG pictures.
+    pub fn tray_pictures(&mut self) -> Vec<(u32, u32, Vec<u8>)> {
+        std::mem::take(&mut self.tray_pictures_changed)
+            .into_iter()
+            .filter_map(|(window, icon)| {
+                let known = self.tray.iter().find(|known| (known.window, known.icon) == (window, icon))?;
+                Some((window, icon, png(known.picture.as_ref()?)?))
+            })
+            .collect()
+    }
+
+    /// The version of the tray's ways the program of an icon of the tray speaks, where
+    /// the icon is there.
+    pub fn tray_version(&self, window: u32, icon: u32) -> Option<u32> {
+        self.tray.iter().find(|known| (known.window, known.icon) == (window, icon)).map(|known| known.version)
     }
 
     /// The icons that changed since this was last asked, each with its window, as PNG
@@ -314,5 +409,40 @@ mod tests {
         // a window that is gone takes its icon with it
         windows.take(vec![Change::Icon { id: 2, large: true, icon: icon(32, 2), kept: None }, Change::Gone(2)]);
         assert!(windows.icons().is_empty());
+    }
+
+    #[test]
+    fn the_icons_of_the_tray_are_told_in_the_order_they_came_without_the_hidden_ones() {
+        use away_rdp::window::TrayIcon as Said;
+        let picture = |colour: u8| Icon { width: 16, height: 16, pixels: vec![colour; 16 * 16 * 4] };
+        let mut windows = Windows::default();
+        assert_eq!(windows.tray(), None);
+        windows.take(vec![
+            Change::Tray(Said {
+                window: 9,
+                icon: 1,
+                version: Some(4),
+                tip: Some("Mail".to_string()),
+                picture: Some((picture(1), Some((2, 5)))),
+                ..Said::default()
+            }),
+            Change::Tray(Said { window: 7, icon: 3, tip: Some("Ledger".to_string()), kept_picture: Some((2, 5)), ..Said::default() }),
+            Change::Tray(Said { window: 8, icon: 1, tip: Some("Hidden".to_string()), hidden: Some(true), ..Said::default() }),
+        ]);
+        let tip = |window: u32, icon: u32, tip: &str| TrayIcon { window, icon, tip: tip.to_string() };
+        assert_eq!(windows.tray(), Some(vec![tip(9, 1, "Mail"), tip(7, 3, "Ledger")]));
+        assert_eq!(windows.tray(), None);
+        // the pictures, once each: the second icon shows the one the machine kept
+        assert_eq!(windows.tray_pictures().iter().map(|(window, icon, _)| (*window, *icon)).collect::<Vec<_>>(), [(9, 1), (7, 3)]);
+        assert!(windows.tray_pictures().is_empty());
+        assert_eq!((windows.tray_version(9, 1), windows.tray_version(7, 3), windows.tray_version(1, 1)), (Some(4), Some(0), None));
+
+        // a tip changes and one icon goes: the order stays
+        windows.take(vec![
+            Change::Tray(Said { window: 9, icon: 1, tip: Some("Mail – 3 new".to_string()), ..Said::default() }),
+            Change::TrayGone { window: 7, icon: 3 },
+        ]);
+        assert_eq!(windows.tray(), Some(vec![tip(9, 1, "Mail – 3 new")]));
+        assert!(windows.tray_pictures().is_empty());
     }
 }
