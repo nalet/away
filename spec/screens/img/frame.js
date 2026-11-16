@@ -129,13 +129,18 @@
         <div class="sgrp">${sbtn('kb', 'keyboard', 'keyboard', on)}${sbtn('more', 'more', 'ellipsis-vertical', on)}</div></div>`));
       continue;
     }
-    // a shell has its text and its find; a desktop has its picture's size; a program's windows have their own
+    // a rail down the left, in the design of Away's own rail: the mark opens another machine,
+    // the controls' menus open to the right, and the clock is at the foot. A shell has its
+    // text and its find; a desktop and a program have no size button of their own here
     const own = kind === 'shell' ? sbtn('look', 'text', 'a-large-small', on) + sbtn('find', 'find', 'text-search', on)
       : kind === 'programs' ? '' : sbtn('picture', 'picture', 'scaling', on);
-    s.appendChild(make(`<div class="sbar">${mark}<div class="stabs">${tabs.map(([k, n]) => `<span class="stab${n === cur ? ' on' : ''}">${icon(KIND[k])}${n}</span>`).join('')}<span class="stab add" aria-label="open another machine">${icon('plus')}</span></div>
-      <span class="sp"></span>${s.dataset.as ? `<span class="as">${s.dataset.as}</span>` : ''}
+    const clock = s.dataset.clock || '14:36';
+    s.appendChild(make(`<div class="sbar rail">
+      <button type="button" class="it mark" aria-label="open another machine" title="open another machine">${icon('house', 's18')}</button>
+      <span class="sp"></span>
       <div class="sgrp">${sbtn('keys', 'keys', 'keyboard', on)}${sbtn('clipboard', 'clipboard', 'clipboard', on)}${own}${sbtn('fill', 'fill the screen', 'fullscreen', on)}</div>
-      <div class="sgrp">${sbtn('end', 'end', 'power', on)}</div><div class="sgrp">${sbtn('close', 'close the bar', 'chevron-up', on)}</div></div>`));
+      <div class="sgrp">${sbtn('end', 'end', 'power', on)}</div><div class="sgrp">${sbtn('close', 'close the bar', 'chevron-left', on)}</div>
+      <time class="sclock" aria-label="the time on your device">${clock}</time></div>`));
   }
 
   // the list of windows of a session with programs: the rows are the drawing's; the head with the machine's
@@ -170,7 +175,7 @@
   const parts = { logo: '.tb .logo', rail: '.crail, .siderail', search: '.tb .search-field, .tb .search', avatar: '.tb .av', tabs: '.tabs',
                   back: '.tb.back .icon-b', settings: '.crail .it-settings', sessions: '.it-sessions', admin: '.it-administration',
                   current: '.crail .it.on, .tabs .on',
-                  handle: '.shandle', away: '.sbar .mark', stabs: '.sbar .stabs', stab: '.sbar .stab.on', add: '.sbar .stab.add', as: '.sbar .as',
+                  handle: '.shandle', away: '.sbar .mark', stabs: '.sbar .stabs', stab: '.sbar .stab.on', add: '.sbar .stab.add', as: '.sbar .as', clock: '.sbar .sclock',
                   keys: '.sb-keys', clipboard: '.sb-clipboard', picture: '.sb-picture', look: '.sb-look', find: '.sb-find', fill: '.sb-fill',
                   endsession: '.sb-end', closebar: '.sb-close', kb: '.sb-kb', more: '.sb-more',
                   whead: '.wl-head', wadd: '.wl-add', wsize: '.wl-size' };

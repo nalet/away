@@ -216,30 +216,38 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 
 /* ── a session: the machine's screen has the window ── */
 .sess { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
-.sess .holds { max-width: 100%; max-height: 100%; display: flex; }
+.sess .holds { flex: 1 1 auto; min-width: 0; max-width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
 .sess .screen { display: block; max-width: 100vw; max-height: 100vh; outline: none; cursor: default; touch-action: none; }
-/* a program's windows are on Away's ground, and nothing of a desktop is around them */
-.sess.prog { background: var(--bg); }
-/* the handle: the one thing of Away's that shows while a session is open */
-.sess .handle { position: absolute; top: 0; left: 50%; z-index: 2; width: 56px; height: 12px; margin-left: -28px; padding: 0; border: 1px solid var(--border-2); border-top: 0;
+/* a program's windows are on Away's ground, and nothing of a desktop is around them; the
+   rail stands at the left and the windows sit beside it, as against a taskbar */
+.sess.prog { background: var(--bg); justify-content: flex-start; }
+/* the rail: a column down the left, in the design of the product's own rail. On a program
+   it stands always, as a taskbar; on a full desktop it floats over the picture when opened */
+.sess .srail { z-index: 2; width: 56px; flex: none; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: 6px;
+               padding: 10px 0; background: var(--bg-2); border-right: 1px solid var(--border); }
+.sess:not(.prog) .srail { position: absolute; top: 0; left: 0; bottom: 0; }
+.sess .srail .it, .sess .srail .nc-iconbutton, .sess .srail .menuof > .nc-iconbutton { width: 44px; height: 44px; flex: none; display: inline-flex; align-items: center; justify-content: center; color: var(--fg-muted); }
+.sess .srail .nc-iconbutton:hover, .sess .srail .it:hover { color: var(--fg); }
+.sess .srail .nc-iconbutton:focus-visible, .sess .srail .it:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.sess .srail .mark { border: 0; background: none; cursor: pointer; color: var(--fg-2); }
+.sess .srail .mark:hover { color: var(--cloud-blue); }
+.sess .srail .gap { flex: 1; min-height: 8px; }
+/* the clock at the foot, as a taskbar has */
+.sess .srail .clock { font: 500 13px/1.2 var(--ff-mono); color: var(--fg-muted); padding-top: 2px; }
+/* the handle on a full desktop: a tab on the left edge that opens the rail */
+.sess .handle { position: absolute; top: 50%; left: 0; z-index: 2; width: 12px; height: 56px; margin-top: -28px; padding: 0; border: 1px solid var(--border-2); border-left: 0;
                 background: var(--surface-2); cursor: pointer; }
-.sess .handle::before { content: ""; display: block; width: 24px; height: 2px; margin: 4px auto 0; background: var(--fg-muted); }
+.sess .handle::before { content: ""; display: block; width: 2px; height: 24px; margin: 16px 0 0 4px; background: var(--fg-muted); }
 .sess .handle:hover::before, .sess .handle:focus-visible::before { background: var(--fg); }
 .sess .handle:focus-visible { outline: none; border-color: var(--cloud-blue); }
-/* the session's bar: over the top of the picture, taking nothing from the machine's screen */
-.sess .sbar { position: absolute; top: 0; left: 0; right: 0; z-index: 2; height: 48px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 4px;
-              background: var(--surface); border-bottom: 1px solid var(--border-2); }
-.sess .sbar .on { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/1 var(--ff-mono); color: var(--fg); }
-.sess .sbar .on svg { color: var(--cloud-blue); }
-.sess .sbar .grow { flex: 1; }
-/* a button of the bar with its menu: the menu hangs under the button, over the machine's screen */
-.sess .sbar .menuof { position: relative; display: inline-flex; }
-.sess .sbar .is-open { background: var(--surface-2); color: var(--cloud-blue); }
-.sess .sessmenu { position: absolute; z-index: 3; top: 44px; right: 0; min-width: 200px; display: flex; flex-direction: column; padding: 4px 0;
+/* a control with a menu or a panel: it opens to the right of the rail, over the picture */
+.sess .srail .menuof { position: relative; display: inline-flex; }
+.sess .srail .is-open { background: var(--surface-2); color: var(--cloud-blue); }
+.sess .sessmenu { position: absolute; z-index: 3; left: calc(100% + 6px); top: 0; min-width: 200px; display: flex; flex-direction: column; padding: 4px 0;
                   background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
 .sess .sessmenu .nc-actionmenu__item { display: flex; min-height: 40px; font-family: var(--ff-mono); }
-/* the panel of the clipboard: under its button, with what it says and its two fields */
-.sess .sesspanel { position: absolute; z-index: 3; top: 44px; right: 0; width: min(360px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 12px;
+/* the panel of the clipboard: to the right of its button, with what it says and its two fields */
+.sess .sesspanel { position: absolute; z-index: 3; left: calc(100% + 6px); top: 0; width: min(360px, calc(100vw - 80px)); display: flex; flex-direction: column; gap: 12px;
                    padding: 16px; background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; color: var(--fg); }
 .sess .sesspanel p { margin: 0; font-size: 14px; line-height: 1.45; }
 .sess .sesspanel p.off { color: var(--fg-muted); }
@@ -253,10 +261,13 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .sess .lostcard h2 { margin: 0; font: 600 16px/1.3 var(--ff-sans); }
 .sess .lostcard p { margin: 0; font-size: 14px; line-height: 1.45; }
 .sess .lostcard .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
-/* the windows of the programs, in the session's bar: each is brought to the front, or closed */
-.sess .sbar .wins { display: flex; align-items: center; gap: 4px; margin: 0 0 0 16px; padding: 0; list-style: none; min-width: 0; overflow: hidden; }
-.sess .sbar .wins li { display: inline-flex; align-items: center; min-width: 0; border: 1px solid var(--border-2); }
-.sess .sbar .win { max-width: 220px; height: 30px; padding: 0 8px; border: 0; background: none; color: var(--fg); font: 400 13px/1 var(--ff-sans);
-                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.sess .sbar .win:hover { background: var(--surface-2); }
-.sess .sbar .win:focus-visible { outline: 2px solid var(--cloud-blue); outline-offset: -2px; }
+/* the windows of the programs, as a column of icons in the rail: each is brought to the
+   front by a click, and a small cross over it closes it */
+.sess .srail .wins { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0; padding: 0; list-style: none; min-height: 0; overflow-y: auto; }
+.sess .srail .wins li { position: relative; display: flex; }
+.sess .srail .win { border: 1px solid transparent; background: none; cursor: pointer; }
+.sess .srail .win:hover { background: var(--surface-2); color: var(--fg); }
+.sess .srail .wins .x { position: absolute; top: -3px; right: -3px; width: 18px; height: 18px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+                        border: 1px solid var(--border-2); background: var(--surface); color: var(--fg); cursor: pointer; opacity: 0; transition: opacity 0.1s; }
+.sess .srail .wins li:hover .x, .sess .srail .wins li:focus-within .x { opacity: 1; }
+.sess .srail .wins .x:focus-visible { outline: 2px solid var(--cloud-blue); outline-offset: -2px; }

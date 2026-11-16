@@ -4,7 +4,7 @@
 // its own but a handle. A program's windows show on Away's ground, where the machine
 // has them on its desktop.
 import { Button, Chevron, EmptyState, Field, IconButton, Input, Spinner } from '@nalet/design-system';
-import { AppWindow, Check, ClipboardList, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
+import { AppWindow, Check, ClipboardList, House, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent as KeyOfReact, ReactNode } from 'react';
 
@@ -260,6 +260,7 @@ function BrowserSession({ name, program, go, contact, machine }: SessionProps & 
         lost={lost}
         tryNow={tryNow}
         leave={leave}
+        openAnother={() => go(addressOf.machines)}
       />
     );
   }
@@ -433,6 +434,11 @@ function Opening({
 }
 
 // A desktop that is open: the machine's screen has the window, and every key, every
+// The time on the person's own device, as a taskbar shows it.
+function timeNow(): string {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 // The key combinations a browser or a device keeps for itself, each as its keys in the
 // order they go down: the session's bar sends one with a click.
 const KEPT: { name: string; keys: string[] }[] = [
@@ -459,6 +465,7 @@ function Desktop({
   lost,
   tryNow,
   leave,
+  openAnother,
 }: {
   name: string;
   program: string | null;
@@ -470,6 +477,7 @@ function Desktop({
   lost: Lost | null;
   tryNow: () => void;
   leave: () => void;
+  openAnother: () => void;
 }) {
   const t = texts.session;
   const [bar, setBar] = useState(false);
@@ -480,6 +488,11 @@ function Desktop({
   // whether the panel of the clipboard is open
   const [clip, setClip] = useState(false);
   const clipboard = useClipboard(canvas, passes, copied, say);
+  // the clock at the foot of the rail, and the first control, focused when a desktop's
+  // rail opens. For a program the rail is always there, as a taskbar
+  const [clock, setClock] = useState(timeNow);
+  const firstControl = useRef<HTMLButtonElement | null>(null);
+  const railAlways = program !== null;
   // the card that says the connection is lost shows after two seconds without the
   // machine: a short gap shows nothing
   const isLost = lost !== null;
@@ -531,6 +544,17 @@ function Desktop({
   useEffect(() => {
     if (keys) keysOf.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
   }, [keys]);
+
+  // the clock keeps the time
+  useEffect(() => {
+    const tick = window.setInterval(() => setClock(timeNow()), 15000);
+    return () => window.clearInterval(tick);
+  }, []);
+
+  // a desktop's rail, opened from the handle, puts the focus on its first control
+  useEffect(() => {
+    if (!railAlways && bar) firstControl.current?.focus();
+  }, [railAlways, bar]);
 
   useEffect(() => {
     const holds = screen.current;
@@ -718,34 +742,47 @@ function Desktop({
           </clipPath>
         </svg>
       )}
-      {bar ? (
+      {railAlways || bar ? (
         <div
-          className="sbar"
+          className="srail"
           role="toolbar"
           aria-label={t.bar}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') close();
+            if (event.key === 'Escape' && !railAlways) close();
           }}
         >
-          <span className="on">
-            {program === null ? <Monitor size={16} aria-hidden="true" /> : <AppWindow size={16} aria-hidden="true" />}
-            {program ?? name}
-          </span>
-          {program !== null && (
+          {/* the top of the rail is the Away mark: it opens another machine */}
+          <button type="button" ref={firstControl} className="it mark" aria-label={t.another} title={t.another} onClick={openAnother}>
+            <House size={22} aria-hidden="true" />
+          </button>
+          {/* the session's open windows, as icons: a click brings one to the front */}
+          {program !== null && listed.length > 0 && (
             <ul className="wins" aria-label={t.windows}>
               {listed.map((window) => (
                 <li key={window.id}>
-                  <button type="button" className="win" title={t.toFront(window.title)} onClick={() => say(windowDoes(window.id, 'front'))}>
-                    {window.title}
+                  <button
+                    type="button"
+                    className="it win"
+                    aria-label={t.toFront(window.title)}
+                    title={t.toFront(window.title)}
+                    onClick={() => say(windowDoes(window.id, 'front'))}
+                  >
+                    <AppWindow size={20} aria-hidden="true" />
                   </button>
-                  <IconButton variant="ghost" size="sm" label={t.closeWindow(window.title)} title={t.closeWindow(window.title)} onClick={() => say(windowDoes(window.id, 'close'))}>
-                    <X size={14} aria-hidden="true" />
-                  </IconButton>
+                  <button
+                    type="button"
+                    className="x"
+                    aria-label={t.closeWindow(window.title)}
+                    title={t.closeWindow(window.title)}
+                    onClick={() => say(windowDoes(window.id, 'close'))}
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
                 </li>
               ))}
             </ul>
           )}
-          <span className="grow" />
+          <span className="gap" />
           <span
             className="menuof"
             ref={keysOf}
@@ -764,7 +801,6 @@ function Desktop({
                 setClip(false);
                 setKeys(!keys);
               }}
-              autoFocus
             >
               <Keyboard size={16} aria-hidden="true" />
             </IconButton>
@@ -804,9 +840,15 @@ function Desktop({
           <IconButton variant="ghost" label={t.end} title={t.end} onClick={() => say(leaves())}>
             <Power size={16} aria-hidden="true" />
           </IconButton>
-          <IconButton variant="ghost" label={t.closeBar} title={t.closeBar} onClick={close}>
-            <X size={16} aria-hidden="true" />
-          </IconButton>
+          {!railAlways && (
+            <IconButton variant="ghost" label={t.closeBar} title={t.closeBar} onClick={close}>
+              <X size={16} aria-hidden="true" />
+            </IconButton>
+          )}
+          {/* the foot of the rail is the clock, as a taskbar has */}
+          <time className="clock" aria-label={t.clockLabel}>
+            {clock}
+          </time>
         </div>
       ) : (
         <button type="button" className="handle" aria-label={t.openBar} title={t.openBar} onClick={() => setBar(true)} />

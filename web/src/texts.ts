@@ -176,6 +176,8 @@ export const texts = {
     closeWindow: (title: string) => `close: ${title}`,
     openBar: "open the session's bar",
     bar: "the session's bar",
+    another: 'open another machine',
+    clockLabel: 'the time on your device',
     keys: 'keys',
     // the key combinations a browser or a device keeps for itself
     kept: { ctrlAltDel: 'ctrl + alt + del', altTab: 'alt + tab', altF4: 'alt + f4', windows: 'windows key', ctrlW: 'ctrl + w' },

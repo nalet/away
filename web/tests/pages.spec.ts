@@ -917,8 +917,11 @@ test.describe('a session', () => {
     // the session's bar: by its handle, and by Ctrl + Alt + Shift pressed and let go alone
     await page.getByRole('button', { name: "open the session's bar" }).click();
     const bar = page.getByRole('toolbar', { name: "the session's bar" });
-    await expect(bar).toContainText('desk-01');
+    // the rail is a column: the Away mark on top, the controls, and the clock at the foot
+    await expect(bar.getByRole('button', { name: 'open another machine' })).toBeVisible();
+    await expect(bar.getByLabel('the time on your device')).toBeVisible();
     expect(await bar.getByRole('button').evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))).toEqual([
+      'open another machine',
       'keys',
       'clipboard',
       'fill the screen',
@@ -930,7 +933,8 @@ test.describe('a session', () => {
     // the keys a browser keeps for itself: a menu under their button, walked with the
     // arrows; Esc closes the menu and leaves the bar
     const keys = bar.getByRole('button', { name: 'keys' });
-    await expect(keys).toBeFocused();
+    // opening the rail puts the focus on its first control, the Away mark
+    await expect(bar.getByRole('button', { name: 'open another machine' })).toBeFocused();
     await expect(keys).toHaveAttribute('aria-expanded', 'false');
     await keys.click();
     const kept = page.getByRole('menu', { name: 'keys' });
@@ -1216,15 +1220,17 @@ test.describe('a session', () => {
     await screen.click({ position: { x: 50, y: 60 } });
     await expect.poll(() => pixel(page, 55, 65)).toEqual([224, 64, 32]);
 
-    // the session's bar names the program and lists its windows: each is brought to the front, or closed
-    await page.getByRole('button', { name: "open the session's bar" }).click();
+    // a program's rail stands always, as a taskbar: no handle to open, and it lists the
+    // windows as icons, each brought to the front or closed
     const bar = page.getByRole('toolbar', { name: "the session's bar" });
-    await expect(bar).toContainText('Books');
+    await expect(page.getByRole('button', { name: "open the session's bar" })).toHaveCount(0);
+    await expect(bar.getByRole('button', { name: 'open another machine' })).toBeVisible();
     const windows = bar.getByRole('list', { name: 'windows' }).getByRole('listitem');
     await expect(windows).toHaveCount(1);
-    await expect(windows.getByRole('button', { name: 'ledger', exact: true })).toHaveAttribute('title', 'bring to the front: ledger');
+    await expect(windows.getByRole('button', { name: 'bring to the front: ledger' })).toBeVisible();
     await accessible(page);
     // closing the program's last window ends the session, and leads back to the machine
+    await windows.hover();
     await windows.getByRole('button', { name: 'close: ledger' }).click();
     await expect(windows).toHaveCount(0);
     await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/apps-01`, { timeout: 15000 });

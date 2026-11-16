@@ -36,31 +36,33 @@ nothing of its own but the handle.
 
 ## 6.2 The session's bar
 
-![The same desktop with a bar across its top edge: the mark, two open sessions, who one is on the machine, and a row of buttons.](img/desktop-bar-computer.png)
+![The same desktop with a rail down its left edge: the Away mark at the top, a row of button icons, and the clock at the foot.](img/desktop-bar-computer.png)
 
-**Figure 6.2** The session's bar, open. It lies over the top of the picture and
-takes nothing from the machine's screen.
+**Figure 6.2** The session's bar: a rail down the left, in the design of Away's
+own rail ([chapter 2](./frame.md)). On a full desktop it opens from a handle and
+lies over the picture, which stays whole; a program's rail stands always, as a
+taskbar.
 
-1. **The mark** leads to Away's pages, to [home](./machines.md). The session
-   goes on meanwhile.
-2. **The open sessions**, each with its kind and its machine's name. The current
-   one stands on a lighter ground with a blue bar under it. A click goes to
-   another one.
-3. **Open another machine** shows home, to choose one.
-4. **Who one is on the machine**: the account's name there, after “as”.
-5. **Keys**: the key combinations a browser keeps for itself (6.3).
-6. **Clipboard** (6.4).
-7. **Picture**: the picture's size (6.5).
-8. **Fill the screen**, and leave it again.
-9. **End** (6.6).
-10. **Close the bar.** Esc closes it too, and so does a click on the machine's
-    screen.
+1. **The Away mark**, at the top, opens another machine: it shows
+   [home](./machines.md). The session goes on meanwhile.
+2. **Keys**: the key combinations a browser keeps for itself (6.3).
+3. **Clipboard** (6.4).
+4. **Picture**: the picture's size (6.5).
+5. **Fill the screen**, and leave it again.
+6. **End** (6.6): the connection ends and the desktop goes on at the machine.
+7. **Close the bar**, on a full desktop; a program's rail stays. Esc closes it
+   too, and so does a click on the machine's screen.
+8. **The clock**, at the foot, shows the time on one's own device.
 
+- A program's open windows stand between the mark and the controls, each an
+  icon: a click brings one to the front, and a small cross over it closes it. A
+  full desktop has one picture and shows its own taskbar inside it.
 - Every button is an icon with its name as a tooltip and for a screen reader.
-  The Tab key walks through them in this order.
+  The Tab key walks down them, and a control's menu or panel opens to the right
+  of the rail.
 - A button whose menu is open stands in blue on a lighter ground.
-- The bar shows the sessions open in this browser window. All of a person's
-  sessions are in [chapter 9](./sessions.md).
+- The rail shows the windows of this session. All of a person's sessions are in
+  [chapter 9](./sessions.md).
 
 ## 6.3 Keys a browser keeps for itself
 
@@ -198,8 +200,9 @@ A session that ends without the person asking for it always says why:
 | Where | Text |
 |---|---|
 | The handle's name | open the session's bar |
-| The bar's buttons, as tooltips | keys · clipboard · picture · fill the screen · end · close the bar |
-| The bar, before the account's name | as |
+| The rail's buttons, as tooltips | open another machine · keys · clipboard · picture · fill the screen · end · close the bar |
+| A program's window, as a tooltip | bring to the front: Ledger · close: Ledger |
+| The clock's name, for a screen reader | the time on your device |
 | The keys menu | ctrl + alt + del · alt + tab · alt + f4 · windows key · ctrl + w |
 | The clipboard panel | clipboard · To the machine · send · type it · From the machine · copy |
 | The clipboard panel, the clipboard passes by itself | Text you copy on one side can be pasted on the other. |
