@@ -492,10 +492,11 @@ fn a_program_is_asked_for_and_its_window_is_said_and_drawn() {
     let lines: Vec<&str> = said.lines().collect();
     let at = lines.iter().position(|line| *line == "   It is ready for programs, and was asked for ||ledger.").expect(&said);
     assert_eq!(
-        lines[at + 1..at + 4],
+        lines[at + 1..at + 5],
         [
             "   The program started.",
             "   A new window: number 65537, “ledger”, at 20, 10, 160 by 100.",
+            "   The window number 65537 has a large icon of 32 by 32, kept at 0.0.",
             "   In front is the window number 65537."
         ],
         "{said}"
