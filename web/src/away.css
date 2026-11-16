@@ -221,11 +221,20 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 /* a program's windows are on Away's ground, and nothing of a desktop is around them; the
    rail stands at the left and the windows sit beside it, as against a taskbar */
 .sess.prog { background: var(--bg); justify-content: flex-start; }
-/* the rail: a column down the left, in the design of the product's own rail. On a program
-   it stands always, as a taskbar; on a full desktop it floats over the picture when opened */
+/* a program's rail: a column down the left, in the design of the product's own rail. On a
+   computer it stands always, as a taskbar, and the windows sit beside it; on a phone it waits at
+   the left edge and is swiped in over the picture. A desktop has no rail: its bar is at the top */
 .sess .srail { z-index: 2; width: 56px; flex: none; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: 6px;
                padding: 10px 0; background: var(--bg-2); border-right: 1px solid var(--border); }
-.sess:not(.prog) .srail { position: absolute; top: 0; left: 0; bottom: 0; }
+.sess .srail.over { position: absolute; top: 0; left: 0; bottom: 0; z-index: 4; box-shadow: 8px 0 24px #00000073; animation: away-rail-in 0.18s ease-out; }
+@keyframes away-rail-in { from { transform: translateX(-100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sess .srail.over { animation: none; } }
+/* beside a swiped-in rail, a touch on the picture puts the rail away and reaches nothing else */
+.sess .scrim { position: absolute; inset: 0; z-index: 3; background: rgba(5, 7, 12, 0.35); }
+/* where a program's rail waits on a phone: a strip on the left edge, swiped or tapped */
+.sess .sedge { position: absolute; top: 0; bottom: 0; left: 0; z-index: 2; width: 16px; padding: 0; border: 0; background: none; cursor: pointer; touch-action: none; }
+.sess .sedge::before { content: ""; position: absolute; top: 50%; left: 5px; width: 3px; height: 40px; margin-top: -20px; border-radius: 2px; background: var(--fg-muted); opacity: 0.6; }
+.sess .sedge:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .sess .srail .it, .sess .srail .nc-iconbutton, .sess .srail .menuof > .nc-iconbutton { width: 44px; height: 44px; flex: none; display: inline-flex; align-items: center; justify-content: center; color: var(--fg-muted); }
 .sess .srail .nc-iconbutton:hover, .sess .srail .it:hover { color: var(--fg); }
 .sess .srail .nc-iconbutton:focus-visible, .sess .srail .it:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
@@ -233,21 +242,30 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .sess .srail .mark:hover { color: var(--cloud-blue); }
 .sess .srail .gap { flex: 1; min-height: 8px; }
 /* the clock at the foot, as a taskbar has */
-.sess .srail .clock { font: 500 13px/1.2 var(--ff-mono); color: var(--fg-muted); padding-top: 2px; }
-/* the handle on a full desktop: a tab on the left edge that opens the rail */
-.sess .handle { position: absolute; top: 50%; left: 0; z-index: 2; width: 12px; height: 56px; margin-top: -28px; padding: 0; border: 1px solid var(--border-2); border-left: 0;
+.sess .srail .clock { width: 100%; text-align: center; font: 500 13px/1.2 var(--ff-mono); color: var(--fg-muted); padding-top: 2px; }
+/* the handle: the one thing of Away's that shows while a desktop is open */
+.sess .handle { position: absolute; top: 0; left: 50%; z-index: 2; width: 56px; height: 12px; margin-left: -28px; padding: 0; border: 1px solid var(--border-2); border-top: 0;
                 background: var(--surface-2); cursor: pointer; }
-.sess .handle::before { content: ""; display: block; width: 2px; height: 24px; margin: 16px 0 0 4px; background: var(--fg-muted); }
+.sess .handle::before { content: ""; display: block; width: 24px; height: 2px; margin: 4px auto 0; background: var(--fg-muted); }
 .sess .handle:hover::before, .sess .handle:focus-visible::before { background: var(--fg); }
 .sess .handle:focus-visible { outline: none; border-color: var(--cloud-blue); }
-/* a control with a menu or a panel: it opens to the right of the rail, over the picture */
-.sess .srail .menuof { position: relative; display: inline-flex; }
-.sess .srail .is-open { background: var(--surface-2); color: var(--cloud-blue); }
-.sess .sessmenu { position: absolute; z-index: 3; left: calc(100% + 6px); top: 0; min-width: 200px; display: flex; flex-direction: column; padding: 4px 0;
+/* a desktop's bar: over the top of the picture, taking nothing from the machine's screen */
+.sess .sbar { position: absolute; top: 0; left: 0; right: 0; z-index: 2; height: 48px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 4px;
+              background: var(--surface); border-bottom: 1px solid var(--border-2); }
+.sess .sbar .on { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/1 var(--ff-mono); color: var(--fg); }
+.sess .sbar .on svg { color: var(--cloud-blue); }
+.sess .sbar .grow { flex: 1; }
+/* a control with a menu or a panel: under a desktop's bar it hangs down; beside a program's rail
+   it opens to the right, rising from its button, which stands low on the rail */
+.sess .menuof { position: relative; display: inline-flex; }
+.sess .is-open { background: var(--surface-2); color: var(--cloud-blue); }
+.sess .sbar .sessmenu, .sess .sbar .sesspanel { top: 44px; right: 0; }
+.sess .srail .sessmenu, .sess .srail .sesspanel { left: calc(100% + 6px); bottom: 0; }
+.sess .sessmenu { position: absolute; z-index: 5; min-width: 200px; display: flex; flex-direction: column; padding: 4px 0;
                   background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; }
 .sess .sessmenu .nc-actionmenu__item { display: flex; min-height: 40px; font-family: var(--ff-mono); }
 /* the panel of the clipboard: to the right of its button, with what it says and its two fields */
-.sess .sesspanel { position: absolute; z-index: 3; left: calc(100% + 6px); top: 0; width: min(360px, calc(100vw - 80px)); display: flex; flex-direction: column; gap: 12px;
+.sess .sesspanel { position: absolute; z-index: 5; width: min(360px, calc(100vw - 80px)); display: flex; flex-direction: column; gap: 12px;
                    padding: 16px; background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 8px 24px #00000073; color: var(--fg); }
 .sess .sesspanel p { margin: 0; font-size: 14px; line-height: 1.45; }
 .sess .sesspanel p.off { color: var(--fg-muted); }

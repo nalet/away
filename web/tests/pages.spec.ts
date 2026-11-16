@@ -917,11 +917,10 @@ test.describe('a session', () => {
     // the session's bar: by its handle, and by Ctrl + Alt + Shift pressed and let go alone
     await page.getByRole('button', { name: "open the session's bar" }).click();
     const bar = page.getByRole('toolbar', { name: "the session's bar" });
-    // the rail is a column: the Away mark on top, the controls, and the clock at the foot
-    await expect(bar.getByRole('button', { name: 'open another machine' })).toBeVisible();
-    await expect(bar.getByLabel('the time on your device')).toBeVisible();
+    // a desktop has the bar across its top, with no rail: the machine has its own taskbar
+    await expect(bar).toContainText('desk-01');
+    await expect(page.locator('.srail')).toHaveCount(0);
     expect(await bar.getByRole('button').evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))).toEqual([
-      'open another machine',
       'keys',
       'clipboard',
       'fill the screen',
@@ -933,8 +932,7 @@ test.describe('a session', () => {
     // the keys a browser keeps for itself: a menu under their button, walked with the
     // arrows; Esc closes the menu and leaves the bar
     const keys = bar.getByRole('button', { name: 'keys' });
-    // opening the rail puts the focus on its first control, the Away mark
-    await expect(bar.getByRole('button', { name: 'open another machine' })).toBeFocused();
+    await expect(keys).toBeFocused();
     await expect(keys).toHaveAttribute('aria-expanded', 'false');
     await keys.click();
     const kept = page.getByRole('menu', { name: 'keys' });
@@ -1252,6 +1250,46 @@ test.describe('a session', () => {
     await expect(page.locator('.dtl p')).toContainText('it is not among those it publishes');
     await accessible(page);
     expect(seen.complaints).toEqual([]);
+  });
+
+  test("on a phone a program's rail waits at the left edge, and is swiped in over the picture", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/apps-01/programs/Books`);
+    await page.getByLabel('Name').fill('CORP\\alex.urban');
+    await page.getByLabel('Password').fill('a password that exists for these tests alone');
+    await page.getByRole('button', { name: 'sign in' }).click();
+    const screen = page.getByRole('application', { name: 'the windows of Books' });
+    await expect(screen).toBeVisible();
+    // the picture has the whole width, and the rail is not there: only the strip at the edge
+    const bar = page.getByRole('toolbar', { name: "the session's bar" });
+    await expect(bar).toHaveCount(0);
+    const edge = page.getByRole('button', { name: "open the session's bar" });
+    await expect(edge).toBeVisible();
+    // nothing takes width from it: it sits in the middle of the whole width
+    const box = await screen.boundingBox();
+    expect(Math.abs(box!.x + box!.width / 2 - 195)).toBeLessThanOrEqual(2);
+    // a swipe from the edge brings the rail in, with the mark, the window, the controls and the clock
+    const at = await edge.boundingBox();
+    await page.mouse.move(at!.x + 4, at!.y + at!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(at!.x + 140, at!.y + at!.height / 2, { steps: 8 });
+    await page.mouse.up();
+    await expect(bar).toBeVisible();
+    await expect(bar.getByRole('button', { name: 'open another machine' })).toBeFocused();
+    await expect(bar.getByRole('list', { name: 'windows' }).getByRole('listitem')).toHaveCount(1);
+    await expect(bar.getByLabel('the time on your device')).toBeVisible();
+    await accessible(page);
+    // a touch beside it puts it away again, and so does Esc after a tap on the edge
+    await page.mouse.click(300, 400);
+    await expect(bar).toHaveCount(0);
+    await expect(edge).toBeVisible();
+    await edge.click();
+    await expect(bar).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(bar).toHaveCount(0);
+    await edge.click();
+    await bar.getByRole('button', { name: 'end' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/apps-01`, { timeout: 15000 });
   });
 
   test('a machine that is not there fails at its step and says why, and what Away does not open yet says so', async ({ page }) => {

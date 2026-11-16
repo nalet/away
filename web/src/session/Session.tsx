@@ -6,7 +6,7 @@
 import { Button, Chevron, EmptyState, Field, IconButton, Input, Spinner } from '@nalet/design-system';
 import { AppWindow, Check, ClipboardList, House, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FormEvent, KeyboardEvent as KeyOfReact, ReactNode } from 'react';
+import type { FormEvent, KeyboardEvent as KeyOfReact, PointerEvent as PointerOfReact, ReactNode } from 'react';
 
 import { pageOf, useMachines } from '../machines';
 import type { Machine } from '../machines';
@@ -104,7 +104,7 @@ function useSession(machine: string, program: string | null) {
       socket.current = opened;
       // whether this connection said how it ends: one that closes without a word is lost
       let told = false;
-      opened.onopen = () => opened.send(begins(ticket, window.innerWidth - (program === null ? 0 : RAIL), window.innerHeight, layout, Math.round(window.devicePixelRatio * 100)));
+      opened.onopen = () => opened.send(begins(ticket, window.innerWidth - (docked(program) ? RAIL : 0), window.innerHeight, layout, Math.round(window.devicePixelRatio * 100)));
       opened.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
         if (typeof event.data !== 'string') {
           const rectangle = readRectangle(event.data);
@@ -438,6 +438,28 @@ function Opening({
 // program's picture is the space beside it, so its windows never slip under the rail.
 const RAIL = 56;
 
+// A phone, held upright or sideways: the frame's own breakpoints (away.css). There a
+// program's rail is not docked: it waits at the left edge and is swiped in.
+const PHONE = '(max-width: 640px) and (orientation: portrait), (max-width: 480px), (max-height: 480px) and (orientation: landscape)';
+
+// Whether a program's rail stands beside its windows, taking its own width: on a
+// computer it does; a desktop has no rail, and on a phone the rail lies over the picture.
+function docked(program: string | null): boolean {
+  return program !== null && !window.matchMedia(PHONE).matches;
+}
+
+// Whether the page is on a phone, following the device as it is turned.
+function usePhone(): boolean {
+  const [phone, setPhone] = useState(() => window.matchMedia(PHONE).matches);
+  useEffect(() => {
+    const query = window.matchMedia(PHONE);
+    const changed = () => setPhone(query.matches);
+    query.addEventListener('change', changed);
+    return () => query.removeEventListener('change', changed);
+  }, []);
+  return phone;
+}
+
 // The time on the person's own device, as a taskbar shows it.
 function timeNow(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -496,7 +518,12 @@ function Desktop({
   // rail opens. For a program the rail is always there, as a taskbar
   const [clock, setClock] = useState(timeNow);
   const firstControl = useRef<HTMLButtonElement | null>(null);
-  const railAlways = program !== null;
+  // a program's rail stands always on a computer; on a phone it is swiped in, and a
+  // desktop has the bar across its top instead
+  const phone = usePhone();
+  const railAlways = program !== null && !phone;
+  // where a swipe began, on the left edge or on the rail
+  const swipe = useRef<number | null>(null);
   // the card that says the connection is lost shows after two seconds without the
   // machine: a short gap shows nothing
   const isLost = lost !== null;
@@ -535,7 +562,7 @@ function Desktop({
     let rests: number | undefined;
     const changed = () => {
       window.clearTimeout(rests);
-      rests = window.setTimeout(() => say(sized(window.innerWidth - (program === null ? 0 : RAIL), window.innerHeight, Math.round(window.devicePixelRatio * 100))), 300);
+      rests = window.setTimeout(() => say(sized(window.innerWidth - (docked(program) ? RAIL : 0), window.innerHeight, Math.round(window.devicePixelRatio * 100))), 300);
     };
     window.addEventListener('resize', changed);
     return () => {
@@ -557,8 +584,8 @@ function Desktop({
 
   // a desktop's rail, opened from the handle, puts the focus on its first control
   useEffect(() => {
-    if (!railAlways && bar) firstControl.current?.focus();
-  }, [railAlways, bar]);
+    if (program !== null && !railAlways && bar) firstControl.current?.focus();
+  }, [program, railAlways, bar]);
 
   useEffect(() => {
     const holds = screen.current;
@@ -714,6 +741,84 @@ function Desktop({
   // the parts of the windows that can be seen, as shares of the desktop's width and height
   const parts = windows.flatMap((window) => window.seen.map((part) => ({ of: window.id, part })));
   const listed = windows.filter((window) => window.listed);
+  // the controls a session has: the same on a desktop's bar and on a program's rail
+  const controls = (
+    <>
+      <span
+        className="menuof"
+        ref={keysOf}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setKeys(false);
+        }}
+      >
+        <IconButton
+          variant="ghost"
+          label={t.keys}
+          title={t.keys}
+          className={keys ? 'is-open' : undefined}
+          aria-haspopup="menu"
+          aria-expanded={keys}
+          onClick={() => {
+            setClip(false);
+            setKeys(!keys);
+          }}
+          autoFocus={program === null}
+        >
+          <Keyboard size={16} aria-hidden="true" />
+        </IconButton>
+        {keys && (
+          <div className="sessmenu" role="menu" aria-label={t.keys} onKeyDown={inKeysMenu}>
+            {KEPT.map((kept) => (
+              <button key={kept.name} type="button" role="menuitem" tabIndex={-1} className="nc-actionmenu__item" onClick={() => send(kept.keys)}>
+                <span className="nc-actionmenu__label">{kept.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </span>
+      {passes !== null && (
+        <span className="menuof">
+          <IconButton
+            variant="ghost"
+            label={t.clipboard.name}
+            title={t.clipboard.name}
+            className={clip ? 'is-open' : undefined}
+            aria-expanded={clip}
+            onClick={() => {
+              setKeys(false);
+              setClip(!clip);
+            }}
+          >
+            <ClipboardList size={16} aria-hidden="true" />
+          </IconButton>
+          {clip && <ClipboardPanel machine={program ?? name} passes={passes} byItself={clipboard.byItself} fromMachine={copied} send={clipboard.send} />}
+        </span>
+      )}
+      <IconButton variant="ghost" label={filled ? t.unfill : t.fill} title={filled ? t.unfill : t.fill} onClick={fill}>
+        {filled ? <Minimize size={16} aria-hidden="true" /> : <Maximize size={16} aria-hidden="true" />}
+      </IconButton>
+      <IconButton variant="ghost" label={t.end} title={t.end} onClick={() => say(leaves())}>
+        <Power size={16} aria-hidden="true" />
+      </IconButton>
+    </>
+  );
+  // on a phone the rail is swiped in from the left edge, and swiped out again
+  const swipeStart = (event: PointerOfReact<HTMLElement>, capture: boolean) => {
+    swipe.current = event.clientX;
+    if (capture) event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const swipeIn = (event: PointerOfReact<HTMLElement>) => {
+    if (swipe.current !== null && event.clientX - swipe.current > 24) {
+      swipe.current = null;
+      setBar(true);
+    }
+  };
+  const swipeOut = (event: PointerOfReact<HTMLElement>) => {
+    if (swipe.current !== null && swipe.current - event.clientX > 24) {
+      swipe.current = null;
+      close();
+    }
+  };
   return (
     <div className={`${program === null ? 'sess' : 'sess prog'}${gone ? ' is-lost' : ''}`}>
       <h1 className="unseen asis">{program ?? name}</h1>
@@ -746,116 +851,102 @@ function Desktop({
           </clipPath>
         </svg>
       )}
-      {railAlways || bar ? (
-        <div
-          className="srail"
-          role="toolbar"
-          aria-label={t.bar}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape' && !railAlways) close();
-          }}
-        >
-          {/* the top of the rail is the Away mark: it opens another machine */}
-          <button type="button" ref={firstControl} className="it mark" aria-label={t.another} title={t.another} onClick={openAnother}>
-            <House size={22} aria-hidden="true" />
-          </button>
-          {/* the session's open windows, as icons: a click brings one to the front */}
-          {program !== null && listed.length > 0 && (
-            <ul className="wins" aria-label={t.windows}>
-              {listed.map((window) => (
-                <li key={window.id}>
-                  <button
-                    type="button"
-                    className="it win"
-                    aria-label={t.toFront(window.title)}
-                    title={t.toFront(window.title)}
-                    onClick={() => say(windowDoes(window.id, 'front'))}
-                  >
-                    <AppWindow size={20} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="x"
-                    aria-label={t.closeWindow(window.title)}
-                    title={t.closeWindow(window.title)}
-                    onClick={() => say(windowDoes(window.id, 'close'))}
-                  >
-                    <X size={12} aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <span className="gap" />
-          <span
-            className="menuof"
-            ref={keysOf}
-            onBlur={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget)) setKeys(false);
+      {program === null ? (
+        // a desktop: the bar across the top, behind its handle; the desktop has its own taskbar
+        bar ? (
+          <div
+            className="sbar"
+            role="toolbar"
+            aria-label={t.bar}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') close();
             }}
           >
-            <IconButton
-              variant="ghost"
-              label={t.keys}
-              title={t.keys}
-              className={keys ? 'is-open' : undefined}
-              aria-haspopup="menu"
-              aria-expanded={keys}
-              onClick={() => {
-                setClip(false);
-                setKeys(!keys);
-              }}
-            >
-              <Keyboard size={16} aria-hidden="true" />
-            </IconButton>
-            {keys && (
-              <div className="sessmenu" role="menu" aria-label={t.keys} onKeyDown={inKeysMenu}>
-                {KEPT.map((kept) => (
-                  <button key={kept.name} type="button" role="menuitem" tabIndex={-1} className="nc-actionmenu__item" onClick={() => send(kept.keys)}>
-                    <span className="nc-actionmenu__label">{kept.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </span>
-          {passes !== null && (
-            <span className="menuof">
-              <IconButton
-                variant="ghost"
-                label={t.clipboard.name}
-                title={t.clipboard.name}
-                className={clip ? 'is-open' : undefined}
-                aria-expanded={clip}
-                onClick={() => {
-                  setKeys(false);
-                  setClip(!clip);
-                }}
-              >
-                <ClipboardList size={16} aria-hidden="true" />
-              </IconButton>
-              {clip && (
-                <ClipboardPanel machine={program ?? name} passes={passes} byItself={clipboard.byItself} fromMachine={copied} send={clipboard.send} />
-              )}
+            <span className="on">
+              <Monitor size={16} aria-hidden="true" />
+              {name}
             </span>
-          )}
-          <IconButton variant="ghost" label={filled ? t.unfill : t.fill} title={filled ? t.unfill : t.fill} onClick={fill}>
-            {filled ? <Minimize size={16} aria-hidden="true" /> : <Maximize size={16} aria-hidden="true" />}
-          </IconButton>
-          <IconButton variant="ghost" label={t.end} title={t.end} onClick={() => say(leaves())}>
-            <Power size={16} aria-hidden="true" />
-          </IconButton>
-          {!railAlways && (
+            <span className="grow" />
+            {controls}
             <IconButton variant="ghost" label={t.closeBar} title={t.closeBar} onClick={close}>
               <X size={16} aria-hidden="true" />
             </IconButton>
-          )}
-          {/* the foot of the rail is the clock, as a taskbar has */}
-          <time className="clock" aria-label={t.clockLabel}>
-            {clock}
-          </time>
-        </div>
+          </div>
+        ) : (
+          <button type="button" className="handle" aria-label={t.openBar} title={t.openBar} onClick={() => setBar(true)} />
+        )
+      ) : railAlways || bar ? (
+        // a program: the rail down the left, as a taskbar; on a phone it lies over the picture
+        <>
+          <div
+            className={`srail${railAlways ? '' : ' over'}`}
+            role="toolbar"
+            aria-label={t.bar}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && !railAlways) close();
+            }}
+            onPointerDown={railAlways ? undefined : (event) => swipeStart(event, false)}
+            onPointerMove={railAlways ? undefined : swipeOut}
+            onPointerUp={() => (swipe.current = null)}
+          >
+            {/* the top of the rail is the Away mark: it opens another machine */}
+            <button type="button" ref={firstControl} className="it mark" aria-label={t.another} title={t.another} onClick={openAnother}>
+              <House size={22} aria-hidden="true" />
+            </button>
+            {/* the program's open windows, as icons: a click brings one to the front */}
+            {listed.length > 0 && (
+              <ul className="wins" aria-label={t.windows}>
+                {listed.map((window) => (
+                  <li key={window.id}>
+                    <button
+                      type="button"
+                      className="it win"
+                      aria-label={t.toFront(window.title)}
+                      title={t.toFront(window.title)}
+                      onClick={() => say(windowDoes(window.id, 'front'))}
+                    >
+                      <AppWindow size={20} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="x"
+                      aria-label={t.closeWindow(window.title)}
+                      title={t.closeWindow(window.title)}
+                      onClick={() => say(windowDoes(window.id, 'close'))}
+                    >
+                      <X size={12} aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <span className="gap" />
+            {controls}
+            {!railAlways && (
+              <IconButton variant="ghost" label={t.closeBar} title={t.closeBar} onClick={close}>
+                <X size={16} aria-hidden="true" />
+              </IconButton>
+            )}
+            {/* the foot of the rail is the clock, as a taskbar has */}
+            <time className="clock" aria-label={t.clockLabel}>
+              {clock}
+            </time>
+          </div>
+          {/* on a phone, a touch beside the rail puts it away again */}
+          {!railAlways && <div className="scrim" aria-hidden="true" onPointerDown={close} />}
+        </>
       ) : (
-        <button type="button" className="handle" aria-label={t.openBar} title={t.openBar} onClick={() => setBar(true)} />
+        // a program on a phone: the rail waits at the left edge, and is swiped in
+        <button
+          type="button"
+          className="sedge"
+          aria-label={t.openBar}
+          title={t.openBar}
+          onClick={() => setBar(true)}
+          onPointerDown={(event) => swipeStart(event, true)}
+          onPointerMove={swipeIn}
+          onPointerUp={() => (swipe.current = null)}
+        />
       )}
       <div className="holds" ref={screen} />
     </div>

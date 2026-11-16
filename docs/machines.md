@@ -293,7 +293,7 @@ machine that offers more is opened from its own page, where each way in is.
   other machine it doesn't go, and says so. The broker and each machine behind
   it is known by what it showed the first time, and the record of the open
   desktop names the machine that served it.
-- **The machine has the whole window.** Every key, every click and the wheel go
+- **A desktop has the whole window.** Every key, every click and the wheel go
   to it. A small handle at the top edge opens the session's bar, and so does
   Ctrl + Alt + Shift, pressed and let go with no other key. The bar sends the
   key combinations a browser keeps for itself (Ctrl + Alt + Del, Alt + Tab,
@@ -353,15 +353,20 @@ and the records are those of a desktop.
 - **A program opens in windows of its own, and no desktop is around them.**
   The windows are where the machine has them, on Away's ground. Keys, clicks
   and the wheel go to the window they are over.
-- **The session's bar lists the program's windows.** A click on one brings it
-  to the front, and each can be closed there. Dialogues and menus belong to
-  their window and are in no list.
+- **A program's session has a rail down the left, as a taskbar.** The Away
+  mark at its top opens another machine; the program's windows stand under it
+  as icons, and a click on one brings it to the front, a small cross over it
+  closes it; then the keys, the clipboard, filling the screen and ending; and
+  the clock at its foot. On a computer the rail stands always and the windows
+  sit beside it. On a phone it waits at the left edge: a swipe from the edge,
+  or a tap on it, brings it in over the picture, and a touch beside it puts it
+  away. Dialogues and menus belong to their window and are in no list.
 - **Closing the program's last window ends the session**, and the person is
-  back on the machine's page. Ending the session from the bar leaves the
+  back on the machine's page. Ending the session from the rail leaves the
   program running on the machine, for the account to come back to.
 - **Programs of one machine share one sign-in there.** A program that is
   opened while another of the same machine still runs for the account shows
-  beside it, and the bar lists the windows of both.
+  beside it, and the rail holds the windows of both.
 - **The machine decides which programs it starts.** A Windows machine starts
   the programs that are published on it for remote use, each under the name
   it is published as; a farm's feed says those names itself. A program that
