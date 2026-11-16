@@ -104,7 +104,7 @@ function useSession(machine: string, program: string | null) {
       socket.current = opened;
       // whether this connection said how it ends: one that closes without a word is lost
       let told = false;
-      opened.onopen = () => opened.send(begins(ticket, window.innerWidth, window.innerHeight, layout, Math.round(window.devicePixelRatio * 100)));
+      opened.onopen = () => opened.send(begins(ticket, window.innerWidth - (program === null ? 0 : RAIL), window.innerHeight, layout, Math.round(window.devicePixelRatio * 100)));
       opened.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
         if (typeof event.data !== 'string') {
           const rectangle = readRectangle(event.data);
@@ -434,6 +434,10 @@ function Opening({
 }
 
 // A desktop that is open: the machine's screen has the window, and every key, every
+// How wide the always-on rail is, in CSS pixels (matches .srail in away.css): a
+// program's picture is the space beside it, so its windows never slip under the rail.
+const RAIL = 56;
+
 // The time on the person's own device, as a taskbar shows it.
 function timeNow(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -531,7 +535,7 @@ function Desktop({
     let rests: number | undefined;
     const changed = () => {
       window.clearTimeout(rests);
-      rests = window.setTimeout(() => say(sized(window.innerWidth, window.innerHeight, Math.round(window.devicePixelRatio * 100))), 300);
+      rests = window.setTimeout(() => say(sized(window.innerWidth - (program === null ? 0 : RAIL), window.innerHeight, Math.round(window.devicePixelRatio * 100))), 300);
     };
     window.addEventListener('resize', changed);
     return () => {

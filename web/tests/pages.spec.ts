@@ -1225,6 +1225,9 @@ test.describe('a session', () => {
     const bar = page.getByRole('toolbar', { name: "the session's bar" });
     await expect(page.getByRole('button', { name: "open the session's bar" })).toHaveCount(0);
     await expect(bar.getByRole('button', { name: 'open another machine' })).toBeVisible();
+    // the program's picture is the space beside the rail, not under it
+    const box = await screen.boundingBox();
+    expect(box && box.x).toBeGreaterThanOrEqual(56);
     const windows = bar.getByRole('list', { name: 'windows' }).getByRole('listitem');
     await expect(windows).toHaveCount(1);
     await expect(windows.getByRole('button', { name: 'bring to the front: ledger' })).toBeVisible();
