@@ -198,9 +198,9 @@ async fn a_machine_that_does_not_take_the_password_or_is_not_there_says_at_which
     assert_eq!((refused.step, refused.why), (Step::SigningIn, Why::SignInRefused), "{}", refused.details);
     assert!(machine.seen().is_empty(), "nobody came as far as the desktop");
 
-    // a port of this machine that nothing listens on
-    let free = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
-    let Err(nothing) = reach("127.0.0.1", free, None).await else { panic!("nothing listens there") };
+    // a port of this machine that nothing listens on: not one the system hands out, which
+    // would be another test's a moment later
+    let Err(nothing) = reach("127.0.0.1", 1, None).await else { panic!("nothing listens there") };
     assert_eq!((nothing.step, nothing.why), (Step::Reaching, Why::Refused), "{}", nothing.details);
     // a number in brackets is the number
     assert!(reach("[127.0.0.1]", port, None).await.is_ok());

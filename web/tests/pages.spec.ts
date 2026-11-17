@@ -2036,6 +2036,7 @@ test("the session's messages are written and read as the examples say that the g
   const {
     begins,
     copied,
+    copiedLong,
     copiedPicture,
     credentials,
     did,
@@ -2127,7 +2128,7 @@ test("the session's messages are written and read as the examples say that the g
     ),
     windowDoes(65537, 'close'),
     sized(1440, 900, 200),
-    copied('a text\nof two lines'),
+    ...copied('a text\nof two lines'),
     start('Wages'),
     trayDoes(65537, 1, 'menu'),
     hex(
@@ -2145,8 +2146,16 @@ test("the session's messages are written and read as the examples say that the g
     ]),
     ...ofTheirFile(new TextEncoder().encode('hello')).map(hex),
     givesNothing(),
-    copied('bold', '<b>bold</b>'),
+    ...copied('bold', '<b>bold</b>'),
+    ...copiedLong('{"copied":"long"}').map(hex),
   ];
+  // text that is longer than a message goes as the message that says it, in pieces
+  const long = copied('x'.repeat(100_000));
+  expect(long.map((piece) => (typeof piece === 'string' ? piece : [piece[0], piece[1], piece.byteLength]))).toEqual([
+    [0x12, 1, 49_154],
+    [0x12, 0, 49_154],
+    [0x12, 2, 1_711],
+  ]);
   // a picture that is longer than a message goes in pieces: the first, those between, the last
   const pieces = copiedPicture(new Uint8Array(100_000).fill(7));
   expect(pieces.map((piece) => [piece[0], piece[1], piece.byteLength])).toEqual([

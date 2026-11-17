@@ -118,7 +118,7 @@ export function useClipboard(
       const what = `text ${text}${formatted === undefined ? '' : `\nformatted ${formatted}`}`;
       if (!passes?.to || text === '' || what === told.current) return;
       told.current = what;
-      say(copiedToMachine(text, formatted));
+      for (const message of copiedToMachine(text, formatted)) say(message);
     },
     [passes, say],
   );

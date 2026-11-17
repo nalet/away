@@ -235,6 +235,9 @@ const THE_PERSONS_PICTURE: u8 = 0x10;
 /// The kind of bytes of the browser's that are a piece of what the machine wanted of
 /// a file the person copied.
 const OF_THE_PERSONS_FILE: u8 = 0x11;
+/// The kind of bytes of the browser's that are a piece of the message that says what
+/// text the person copied, where that is longer than a message of the browser's.
+const THE_PERSONS_TEXT: u8 = 0x12;
 /// Which piece of a picture it is: the first, the last, or both.
 const FIRST: u8 = 1;
 const LAST: u8 = 2;
@@ -533,6 +536,17 @@ pub enum FromBrowser {
         /// The piece.
         piece: Vec<u8>,
     },
+    /// A piece of the message that says what text the person copied on their own
+    /// device, where the text is longer than a message of the browser's: the pieces
+    /// together are that message, as it is written where the text is short.
+    CopiedText {
+        /// Whether it is the first piece.
+        first: bool,
+        /// Whether it is the last one.
+        last: bool,
+        /// The piece.
+        piece: Vec<u8>,
+    },
     /// The window has another size now, or is on another screen.
     Sized {
         /// How wide the window is, as a page measures it.
@@ -666,6 +680,12 @@ impl FromBrowser {
                         Ok(FromBrowser::OfTheirFile { first: which & FIRST != 0, last: which & LAST != 0, piece: piece.to_vec() })
                     }
                     _ => Err(NotThis("a piece of a file says which piece it is")),
+                },
+                Some((&THE_PERSONS_TEXT, rest)) => match rest.split_first() {
+                    Some((which, piece)) if *which & !(FIRST | LAST) == 0 => {
+                        Ok(FromBrowser::CopiedText { first: which & FIRST != 0, last: which & LAST != 0, piece: piece.to_vec() })
+                    }
+                    _ => Err(NotThis("a piece of a long text says which piece it is")),
                 },
                 _ => read_what_was_done(bytes).map(FromBrowser::Did),
             },
@@ -834,7 +854,15 @@ mod tests {
                 FromBrowser::read(&carried).unwrap_or_else(|NotThis(why)| panic!("{}: {why}", example.write()))
             })
             .collect();
-        assert_eq!(read.len(), 19);
+        assert_eq!(read.len(), 20);
+        // text that is longer than a message comes as the message that says it, in pieces
+        assert!(matches!(&read[19], FromBrowser::CopiedText { first: true, last: true, piece } if piece[..] == *br#"{"copied":"long"}"#));
+        assert!(matches!(
+            FromBrowser::read(&Carried::Bytes(vec![0x12, 0, b'a'])),
+            Ok(FromBrowser::CopiedText { first: false, last: false, .. })
+        ));
+        assert!(FromBrowser::read(&Carried::Bytes(vec![0x12])).is_err());
+        assert!(FromBrowser::read(&Carried::Bytes(vec![0x12, 4, b'a'])).is_err());
         assert!(matches!(&read[18], FromBrowser::CopiedFormatted { text, formatted } if text == "bold" && formatted == "<b>bold</b>"));
         assert!(matches!(&read[15], FromBrowser::Gives(files) if files[..] == [
             CopiedFile { name: "report.txt".to_string(), size: 8, folder: false },

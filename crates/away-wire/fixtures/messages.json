@@ -47,6 +47,7 @@
     {"says": "the person copied two files on their own device, the second of five thousand million bytes", "text": "{\"gives\":[{\"name\":\"report.txt\",\"size\":8},{\"name\":\"data.bin\",\"size\":5000000000}]}"},
     {"says": "what the machine wanted of a file the person copied: its first and last piece, the five bytes of hello", "bytes": "110368656c6c6f"},
     {"says": "the person's device has nothing to give of what the machine wanted", "text": "{\"gives\":\"nothing\"}"},
-    {"says": "the person copied a bold word on their own device, with its formatting", "text": "{\"copied\":\"bold\",\"formatted\":\"<b>bold</b>\"}"}
+    {"says": "the person copied a bold word on their own device, with its formatting", "text": "{\"copied\":\"bold\",\"formatted\":\"<b>bold</b>\"}"},
+    {"says": "the person copied a text that is longer than a message, which goes as the message that says it, in pieces: its first and last piece, of {\"copied\":\"long\"}", "bytes": "12037b22636f70696564223a226c6f6e67227d"}
   ]
 }

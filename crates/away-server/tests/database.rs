@@ -258,9 +258,9 @@ async fn a_wrong_password_an_unknown_account_and_a_database_that_is_not_there_sa
     let Err(Unusable::Database(Failed::NotSignedIn(why))) = store(&nowhere).begin().await else { panic!("no such database") };
     assert!(why.contains("does not exist"), "{why}");
 
-    // a port of this machine that nothing listens on: it says so each time, and holds nothing half open
-    let free = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
-    let absent = store(&Settings { host: "127.0.0.1".to_string(), port: free, ..settings });
+    // a port of this machine that nothing listens on: it says so each time, and holds nothing half open.
+    // Not a port the system hands out, which would be another test's a moment later
+    let absent = store(&Settings { host: "127.0.0.1".to_string(), port: 1, ..settings });
     for _ in 0..2 {
         let Err(Unusable::Database(Failed::NotReached(why))) = absent.favourites("alex").await else { panic!("nothing listens there") };
         assert!(why.to_lowercase().contains("refused"), "{why}");

@@ -81,6 +81,11 @@ async fn records(database: &Database) -> Vec<(String, Option<String>, Option<Str
     rows.iter().map(|row| (row.get(0), row.get(1), row.get(2), Json::read(&row.get::<_, String>(3)).expect("details as JSON"))).collect()
 }
 
+/// A port of this machine that nothing listens on. Not one the system hands out and
+/// takes back: such a port is another test's a moment later, and whoever reaches for
+/// it then finds something there.
+const NOTHING_LISTENS: u16 = 1;
+
 /// Everything of Away that a session takes, running on this machine.
 struct World {
     away: String,
@@ -195,7 +200,7 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
     let open_desk = stand_in::vnc::Machine::start_open(stand_in::vnc::desktop()).await;
     let ((_, mac_port), (_, open_port)) = (mac.address(), open_desk.address());
     // a port of this machine that nothing listens on, for a machine that is not there
-    let nothing = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let nothing = NOTHING_LISTENS;
     let folder = Folder(std::env::temp_dir().join(format!("away-session-{}-{name}", std::process::id())));
     let _ = std::fs::remove_dir_all(&folder.0);
     std::fs::create_dir_all(&folder.0).expect("a folder");
@@ -689,6 +694,19 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
     assert_eq!(session.until("copied").await.write(), r#"{"copied":"FROM THE PERSON'S DEVICE"}"#);
     let seen = world.machine.seen();
     assert_eq!(seen.last().expect("the client").pasted, ["from the person's device"]);
+
+    // text that is longer than a message of the browser's comes as the message that says
+    // it, in pieces: the machine pastes all of it, and copies it back in capitals
+    let long = "long text ".repeat(20_000);
+    let message = Json::object([("copied", long.as_str().into())]).write();
+    let pieces: Vec<&[u8]> = message.as_bytes().chunks(48 * 1024).collect();
+    for (nth, piece) in pieces.iter().enumerate() {
+        let which = u8::from(nth == 0) | (u8::from(nth + 1 == pieces.len()) << 1);
+        session.did(&[&[0x12, which][..], piece].concat()).await;
+    }
+    session.did(&[4, 0x2e, 0, 1, 4, 0x2e, 0, 0]).await;
+    assert!(session.until("copied").await.text_of("copied") == Some(long.to_uppercase().as_str()), "the long text came back whole");
+    assert_eq!(world.machine.seen().last().expect("the client").pasted.len(), 2);
 
     // text keeps its formatting: the key H copies some on the machine, and the
     // formatting comes after the text; what the person copied with formatting is the

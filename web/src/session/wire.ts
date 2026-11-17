@@ -117,10 +117,22 @@ export function sized(width: number, height: number, scale: number): string {
   return JSON.stringify({ sized: { width, height, scale } });
 }
 
+// The most that goes to the gateway at once: a message to it is short, and what is
+// longer goes in pieces of this size.
+const MOST = 48 * 1024;
+
 // The person copied this text on their own device: with its formatting, written as a
-// page of the web is, where it has some.
-export function copied(text: string, formatted?: string): string {
-  return JSON.stringify(formatted === undefined ? { copied: text } : { copied: text, formatted });
+// page of the web is, where it has some. Where that is longer than a message to the
+// gateway is, the message goes in pieces.
+export function copied(text: string, formatted?: string): (string | Uint8Array<ArrayBuffer>)[] {
+  const message = JSON.stringify(formatted === undefined ? { copied: text } : { copied: text, formatted });
+  return new TextEncoder().encode(message).byteLength <= MOST ? [message] : copiedLong(message);
+}
+
+// The message that says what text the person copied, where it is longer than a message
+// to the gateway is: it goes in pieces, as a picture does.
+export function copiedLong(message: string): Uint8Array<ArrayBuffer>[] {
+  return inPieces(0x12, new TextEncoder().encode(message));
 }
 
 // The person copied this picture on their own device: a PNG picture. A message to the
@@ -138,13 +150,12 @@ export function ofTheirFile(bytes: Uint8Array): Uint8Array<ArrayBuffer>[] {
 // Bytes of one kind in pieces that fit a message: each says its kind, and whether it is
 // the first and whether it is the last. Nothing at all is one piece, which is both.
 function inPieces(kind: number, whole: Uint8Array): Uint8Array<ArrayBuffer>[] {
-  const most = 48 * 1024;
   const pieces: Uint8Array<ArrayBuffer>[] = [];
-  for (let at = 0; at < whole.byteLength || at === 0; at += most) {
-    const piece = whole.subarray(at, at + most);
+  for (let at = 0; at < whole.byteLength || at === 0; at += MOST) {
+    const piece = whole.subarray(at, at + MOST);
     const bytes = new Uint8Array(2 + piece.byteLength);
     bytes[0] = kind;
-    bytes[1] = (at === 0 ? 1 : 0) | (at + most >= whole.byteLength ? 2 : 0);
+    bytes[1] = (at === 0 ? 1 : 0) | (at + MOST >= whole.byteLength ? 2 : 0);
     bytes.set(piece, 2);
     pieces.push(bytes);
   }

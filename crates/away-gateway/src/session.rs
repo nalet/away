@@ -689,6 +689,8 @@ where
     // the pieces of a picture the person copied, until its last one is there: nothing
     // while none is on its way, or once it turned out larger than a picture may be
     let mut arriving: Option<Vec<u8>> = None;
+    // the pieces of the message that says what long text they copied, the same way
+    let mut long: Option<Vec<u8>> = None;
     // the files that were last copied on the machine, the one the person is having, and
     // the one they asked for while a piece of another was still on its way
     let mut listed: Vec<CopiedFile> = Vec::new();
@@ -960,6 +962,26 @@ where
                         return ended_by(failed);
                     }
                 }
+                // text that is longer than a message comes as the message that says it, in
+                // pieces: once it is whole it is read as that message
+                Some(FromBrowser::CopiedText { first, last, piece }) => {
+                    if first {
+                        long = Some(Vec::new());
+                    }
+                    long = long.filter(|held| held.len() + piece.len() <= LONGEST_TEXT_FROM_A_BROWSER);
+                    if let Some(held) = long.as_mut() {
+                        held.extend_from_slice(&piece);
+                    }
+                    let whole = long.take_if(|_| last).and_then(|whole| String::from_utf8(whole).ok());
+                    let offered = match whole.and_then(|whole| FromBrowser::read(&Carried::Text(whole)).ok()) {
+                        Some(FromBrowser::Copied(text)) => desktop.offer(&text).await,
+                        Some(FromBrowser::CopiedFormatted { text, formatted }) => desktop.offer_formatted(&text, &formatted).await,
+                        _ => Ok(()),
+                    };
+                    if let Err(failed) = offered {
+                        return ended_by(failed);
+                    }
+                }
                 // a file that was copied on the machine, by its place among those listed:
                 // what is in it is asked for, a piece at a time. One at a time: while a
                 // piece of another is on its way, this one waits for it
@@ -1214,6 +1236,10 @@ async fn begin_having<Of: Shown>(desktop: &mut Of, listed: &[CopiedFile], at: u3
 
 /// The largest picture a person's device hands over, as the PNG picture it comes as.
 const LARGEST_FROM_A_BROWSER: usize = 16 * 1024 * 1024;
+
+/// The longest message that says what text the person copied, with its formatting: more
+/// than any machine takes of either.
+const LONGEST_TEXT_FROM_A_BROWSER: usize = 4 * 1024 * 1024;
 
 /// Packs a picture that was copied on the machine as one PNG picture. Nothing where
 /// that fails.
