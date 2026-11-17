@@ -22,7 +22,7 @@ use away_rdp::sign_in::{self, New, Next, SignIn};
 use away_rdp::tpkt::Frames;
 use away_rdp::{der, licence};
 use away_wire::{Did, Does};
-use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;
 use tokio_rustls::TlsConnector;
@@ -195,6 +195,15 @@ pub(crate) async fn connect(host: &str, port: u16) -> Result<TcpStream, Failure>
     Ok(connection)
 }
 
+/// Writes all of it to a machine, and has it leave. A secured connection takes what it
+/// is given and holds what the machine does not take at that moment: it would send that
+/// with whatever is written next, which may be much later, and the machine would wait
+/// that long for the end of what it was told.
+async fn written(to: &mut (impl AsyncWrite + Unpin), bytes: &[u8]) -> std::io::Result<()> {
+    to.write_all(bytes).await?;
+    to.flush().await
+}
+
 async fn reach_mode(host: &str, port: u16, says_first: Option<&[u8]>, restricted: bool) -> Result<Reached, Failure> {
     let reaching = async {
         let mut connection = connect(host, port).await?;
@@ -338,14 +347,14 @@ impl Secured {
                         new,
                     );
                     let not = |details: String| failure(Step::SigningIn, Why::NotThemselves, details);
-                    self.secured.write_all(&first).await.map_err(broken)?;
+                    written(&mut self.secured, &first).await.map_err(broken)?;
                     loop {
                         let message =
                             message(&mut self.secured).await.map_err(|error| not(format!("the machine ended the sign-in: {error}")))?;
                         match signing_in.receive(&message).map_err(|error| not(error.to_string()))? {
-                            Next::Send(bytes) => self.secured.write_all(&bytes).await.map_err(broken)?,
+                            Next::Send(bytes) => written(&mut self.secured, &bytes).await.map_err(broken)?,
                             Next::SendLast(bytes) => {
-                                self.secured.write_all(&bytes).await.map_err(broken)?;
+                                written(&mut self.secured, &bytes).await.map_err(broken)?;
                                 break;
                             }
                         }
@@ -379,14 +388,14 @@ impl Secured {
                         new,
                     );
                     let not = |details: String| failure(Step::SigningIn, Why::NotThemselves, details);
-                    self.secured.write_all(&first).await.map_err(broken)?;
+                    written(&mut self.secured, &first).await.map_err(broken)?;
                     loop {
                         let message =
                             message(&mut self.secured).await.map_err(|error| not(format!("the machine ended the sign-in: {error}")))?;
                         match signing_in.receive(&message).map_err(|error| not(error.to_string()))? {
-                            Next::Send(bytes) => self.secured.write_all(&bytes).await.map_err(broken)?,
+                            Next::Send(bytes) => written(&mut self.secured, &bytes).await.map_err(broken)?,
                             Next::SendLast(bytes) => {
-                                self.secured.write_all(&bytes).await.map_err(broken)?;
+                                written(&mut self.secured, &bytes).await.map_err(broken)?;
                                 break;
                             }
                         }
@@ -412,15 +421,15 @@ impl Secured {
                         number: fresh[24..].try_into().expect("32 bytes"),
                     };
                     let (mut signing_in, first) = SignIn::begin(account, &self.host, &self.identity.public_key, new, clock());
-                    self.secured.write_all(&first).await.map_err(broken)?;
+                    written(&mut self.secured, &first).await.map_err(broken)?;
                     loop {
                         // a machine that doesn't take the name or the password ends the connection here
                         let message =
                             message(&mut self.secured).await.map_err(|error| refused(format!("the machine ended the sign-in: {error}")))?;
                         match signing_in.receive(&message).map_err(|error| refused(error.to_string()))? {
-                            Next::Send(bytes) => self.secured.write_all(&bytes).await.map_err(broken)?,
+                            Next::Send(bytes) => written(&mut self.secured, &bytes).await.map_err(broken)?,
                             Next::SendLast(bytes) => {
-                                self.secured.write_all(&bytes).await.map_err(broken)?;
+                                written(&mut self.secured, &bytes).await.map_err(broken)?;
                                 break;
                             }
                         }
@@ -457,7 +466,7 @@ impl Secured {
             };
             let reads_a_card = reader.is_some();
             let (open, first) = Connection::begin(client, &domain, &name, password, for_a_licence, reader);
-            self.secured.write_all(&first).await.map_err(broken)?;
+            written(&mut self.secured, &first).await.map_err(broken)?;
             let (reader, writer) = tokio::io::split(self.secured);
             let mut desktop = Desktop {
                 reader,
@@ -629,7 +638,7 @@ impl Desktop {
     /// and said why just before: what it sent is read first, so that its reason is not
     /// lost to the write that failed.
     async fn write(&mut self, bytes: &[u8]) -> Result<(), Failure> {
-        let Err(error) = self.writer.write_all(bytes).await else { return Ok(()) };
+        let Err(error) = written(&mut self.writer, bytes).await else { return Ok(()) };
         // what is on its way from the machine, until it has said everything
         while let Ok(Ok(count)) = tokio::time::timeout(LAST_WORDS_WITHIN, self.reader.read(&mut self.scratch)).await {
             if count == 0 {
@@ -1150,6 +1159,44 @@ fn known_by() -> [u8; 16] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn what_is_written_to_a_machine_leaves_whole_however_long_it_is() {
+        use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
+        // a secured connection to a machine that takes a kilobyte at a time: far less
+        // than what is written, so that the end of it waits while the machine reads
+        let provider = Arc::new(rustls::crypto::ring::default_provider());
+        let machine = rustls::ServerConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .expect("versions")
+            .with_no_client_auth()
+            .with_single_cert(
+                vec![CertificateDer::from(include_bytes!("../../away-try/tests/fixtures/machine.der").to_vec())],
+                PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(include_bytes!("../../away-try/tests/fixtures/machine.key.der").to_vec())),
+            )
+            .expect("a certificate for the machine");
+        let client = away_part::client::encrypting_unchecked(b"").expect("what the gateway secures a connection with");
+        let (ours, theirs) = tokio::io::duplex(1024);
+        let name = rustls::pki_types::ServerName::try_from("machine.example.com").expect("a name");
+        let (ours, theirs) = tokio::join!(
+            TlsConnector::from(Arc::new(client)).connect(name, ours),
+            tokio_rustls::TlsAcceptor::from(Arc::new(machine)).accept(theirs)
+        );
+        let (mut ours, mut theirs) = (ours.expect("the gateway's end is secured"), theirs.expect("the machine's end is secured"));
+
+        // as long as a picture on a clipboard is
+        let message: Vec<u8> = (0..300_000u32).map(|at| (at % 251) as u8).collect();
+        let length = message.len();
+        let reads = tokio::spawn(async move {
+            let mut read = vec![0u8; length];
+            theirs.read_exact(&mut read).await.map(|_| read)
+        });
+        written(&mut ours, &message).await.expect("it is written");
+        // nothing is written after it, and the machine has all of it
+        let read = tokio::time::timeout(Duration::from_secs(10), reads).await.expect("all of it arrives");
+        assert!(read.expect("the machine reads").expect("what was written") == message, "the machine has what was written");
+        drop(ours);
+    }
 
     #[test]
     fn a_desktop_has_the_dots_of_the_screen_its_window_is_on() {

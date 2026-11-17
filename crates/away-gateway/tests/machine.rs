@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use away_gateway::machine::{reach, Area, Desktop, Opened, Screen, Step, Who, Why};
+use away_gateway::machine::{reach, Area, CopiedPicture, Desktop, Opened, Passes, Screen, Step, Who, Why};
 use away_gateway::stand_in::{self, Machine};
 use away_rdp::input::{Button, Input};
 use away_rdp::ntlm::Account;
@@ -94,6 +94,40 @@ async fn a_desktop_opens_shows_the_machines_picture_and_takes_keys_and_the_point
     assert_eq!(seen.input[1], Input::Button { button: Button::Left, down: true, x: 50, y: 60 });
     // a machine that is reached at its own address is told nothing of a farm
     assert_eq!((seen.sent_on_to, machine.said_first()), (None, vec![None]));
+}
+
+#[tokio::test]
+async fn a_picture_of_some_megabytes_that_the_person_copied_reaches_the_machine_whole() {
+    let machine = Machine::start(KNOWN, PASSWORD, stand_in::desktop()).await;
+    let (host, port) = machine.address();
+    let secured = reach(&host, port, None).await.expect("it is reached").secure().await.expect("the connection is secured");
+    let Ok(Opened::Desktop(mut desktop)) = secured
+        .passing(Passes::BOTH)
+        .sign_in(Who::Account(Account::named(KNOWN, Secret::new(PASSWORD))), Screen::of(1280, 800), 0x0807, None, None)
+        .await
+    else {
+        panic!("the account is signed in, and the machine shows its desktop")
+    };
+    let shows = stand_in::desktop();
+    until(&mut desktop, "the first picture", |desktop| desktop.picture() == &shows).await;
+
+    // a picture of some megabytes: far more than the connection takes at once
+    let picture = CopiedPicture { width: 1200, height: 900, pixels: (0..1200 * 900 * 3).map(|at| (at % 251) as u8).collect() };
+    desktop.offer_picture(picture.clone()).await.expect("the picture is offered");
+    // the machine pastes at once: it asks for the picture, and the answer is all the
+    // gateway writes from then on
+    let pasted = async {
+        while machine.seen().last().is_none_or(|seen| seen.pasted_pictures.is_empty()) {
+            if let Ok(arrived) = tokio::time::timeout(Duration::from_millis(50), desktop.arrives()).await {
+                arrived.expect("the machine stays");
+            }
+            desktop.take().await.expect("what the machine sends is read");
+        }
+    };
+    tokio::time::timeout(Duration::from_secs(30), pasted).await.expect("the machine has all of the picture");
+    let seen = machine.seen();
+    assert!(seen.last().expect("the client").pasted_pictures == [picture], "the picture is the one that was handed over");
+    desktop.leave().await;
 }
 
 #[tokio::test]
