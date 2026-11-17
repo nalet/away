@@ -86,6 +86,8 @@ pub enum Happened {
     AskedTheReader(smartcard::Asked),
     /// Text was copied on the machine, and is for the person's clipboard.
     Copied(String),
+    /// A picture was copied on the machine, and is for the person's clipboard.
+    CopiedPicture(clipboard::Picture),
 }
 
 /// The client's smart card reader, and how far the machine and the client are with it.
@@ -162,7 +164,8 @@ impl Connection {
         let first = tpkt::data_frame(&mcs::connect(&gcc::request(&client, reader.is_some())));
         let asked_for = gcc::channels(&client, reader.is_some());
         let later = asked_for.contains(&dynamic::CHANNEL).then(|| (Pieces::default(), Later::default()));
-        let passes = asked_for.contains(&clipboard::CHANNEL).then(|| (Pieces::default(), Clipboard::new(client.clipboard)));
+        let passes =
+            asked_for.contains(&clipboard::CHANNEL).then(|| (Pieces::up_to(clipboard::LARGEST + 1024), Clipboard::new(client.clipboard)));
         let connection = Connection {
             state: State::AwaitsMachine,
             client,
@@ -337,7 +340,21 @@ impl Connection {
         let Some(message) = pieces.take(piece)? else { return Ok((Vec::new(), Vec::new())) };
         let (answers, copied) = clipboard.receive(&message)?;
         let send = answers.iter().flat_map(|answer| self.on(clipboard::CHANNEL, answer)).collect();
-        Ok((send, copied.map(Happened::Copied).into_iter().collect()))
+        let copied = copied.map(|copied| match copied {
+            clipboard::Carried::Text(text) => Happened::Copied(text),
+            clipboard::Carried::Picture(picture) => Happened::CopiedPicture(picture),
+        });
+        Ok((send, copied.into_iter().collect()))
+    }
+
+    /// The person copied this picture. As for text: nothing where the clipboard doesn't
+    /// pass to the machine, and nothing before the machine is ready for it.
+    pub fn copied_picture(&mut self, picture: clipboard::Picture) -> Vec<u8> {
+        let told = match self.clipboard.as_mut() {
+            Some((_, clipboard)) => clipboard.copied_picture(picture),
+            None => Vec::new(),
+        };
+        told.iter().flat_map(|message| self.on(clipboard::CHANNEL, message)).collect()
     }
 
     /// The person copied this text. Gives what to send to tell the machine so: nothing
@@ -754,6 +771,29 @@ mod tests {
         let pressed = connection.input(&key_c);
         let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies");
         assert!(happened.contains(&Happened::Copied("FROM THE PERSON'S DEVICE\nIN TWO LINES".to_string())));
+
+        // the key P copies a picture on the machine: the client asks for it at once, and it is for the person
+        let key_p = [Input::Key { code: 0x19, extended: false, down: true }];
+        let pressed = connection.input(&key_p);
+        let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies a picture");
+        assert!(happened.contains(&Happened::CopiedPicture(crate::stand_in::desktop::copied_picture())));
+        // the person copies a picture, larger than a channel's other messages are: the
+        // machine is told, pastes, is handed it, and shows it on its screen
+        let (width, height) = (600, 500);
+        let theirs = clipboard::Picture { width, height, pixels: (0..width * height * 3).map(|nth| (nth % 251) as u8).collect() };
+        let told = connection.copied_picture(theirs.clone());
+        assert!(!told.is_empty());
+        talk(&mut connection, &mut machine, told).expect("the machine pastes a picture");
+        assert_eq!(machine.seen().pasted_pictures.as_slice(), std::slice::from_ref(&theirs));
+        let (left, top) = crate::stand_in::desktop::PASTED_AT;
+        assert_eq!(
+            machine.picture().pixels[(top * machine.picture().width + left) * 4..][..3],
+            [theirs.pixels[2], theirs.pixels[1], theirs.pixels[0]]
+        );
+        // and the stand-in copies what it was handed: that comes back to the person as it was
+        let pressed = connection.input(&key_p);
+        let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies a picture");
+        assert!(happened.contains(&Happened::CopiedPicture(theirs)));
 
         // what the person copied before the machine was ready is told once it is
         let client = Client { clipboard: clipboard::Passes::BOTH, ..connection.client().clone() };

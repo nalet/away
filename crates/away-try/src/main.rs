@@ -605,7 +605,7 @@ fn rdp(asked: &Asked, account: Option<Account>, on_the_card: Option<OnTheCard>) 
                         return Err(format!("The program did not start: {} (its own code {raw:#010x}).", away_rdp::rail::why(result)));
                     }
                     // the test program passes no clipboard
-                    Happened::Copied(_) => {}
+                    Happened::Copied(_) | Happened::CopiedPicture(_) => {}
                     Happened::Windows(changes) => {
                         for change in changes {
                             match change {

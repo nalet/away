@@ -1006,8 +1006,9 @@ async fn a_program_opens_in_a_window_of_its_own_and_closing_it_ends_the_session(
     let (steps, desktop) = session.steps().await;
     assert_eq!(steps, ["first-picture"]);
     assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120}}"#);
-    // which ways the clipboard passes is said first: both, where the files say nothing
-    assert_eq!(session.next().await.map(|says| says.write()).as_deref(), Some(r#"{"clipboard":{"to":true,"from":true}}"#));
+    // which ways the clipboard passes is said first: both, where the files say nothing,
+    // and with pictures, which a Windows machine carries
+    assert_eq!(session.next().await.map(|says| says.write()).as_deref(), Some(r#"{"clipboard":{"to":true,"from":true,"pictures":true}}"#));
     // where the window is comes before what is drawn in it
     let windows = session.next().await.expect("the windows");
     assert_eq!(
@@ -1151,6 +1152,7 @@ async fn a_desktop_over_vnc_opens_with_its_password_and_a_mac_scrolls_as_far_as_
     assert_eq!(steps, ["first-picture"]);
     // the machine is told of keys by what they write
     assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120,"keys":"written"}}"#);
+    // such a machine's clipboard carries text alone
     assert_eq!(session.next().await.map(|says| says.write()).as_deref(), Some(r#"{"clipboard":{"to":true,"from":true}}"#));
     // its picture arrives pixel for pixel
     let shows = stand_in::vnc::desktop();

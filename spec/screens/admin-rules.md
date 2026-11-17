@@ -40,9 +40,9 @@ What the clipboard column says:
 
 | It says | What passes |
 |---|---|
-| both ways | text copied on either side can be pasted on the other |
-| to the machine only | text from one's own device reaches the machine, and nothing comes back |
-| from the machine only | text from the machine reaches one's own device, and nothing goes the other way |
+| both ways | text or a picture copied on either side can be pasted on the other |
+| to the machine only | text or a picture from one's own device reaches the machine, and nothing comes back |
+| from the machine only | text or a picture from the machine reaches one's own device, and nothing goes the other way |
 | off | nothing |
 
 - Without a rule a machine is neither shown nor reached. Home shows a person

@@ -13,7 +13,7 @@ export type Said =
   | { failed: { step: Step; why: string; details: string } }
   | { ended: string }
   | { windows: WindowOf[]; in_front: number | null }
-  | { clipboard: { to: boolean; from: boolean } }
+  | { clipboard: { to: boolean; from: boolean; pictures?: boolean } }
   | { copied: string }
   | { started: { program: string; ok: boolean; details?: string } }
   | { tray: TrayOf[] };
@@ -113,6 +113,29 @@ export function sized(width: number, height: number, scale: number): string {
 // The person copied this text on their own device.
 export function copied(text: string): string {
   return JSON.stringify({ copied: text });
+}
+
+// The person copied this picture on their own device: a PNG picture. A message to the
+// gateway is short, so it goes in pieces, each of which says whether it is the first
+// and whether it is the last.
+export function copiedPicture(png: Uint8Array): Uint8Array<ArrayBuffer>[] {
+  const most = 48 * 1024;
+  const pieces: Uint8Array<ArrayBuffer>[] = [];
+  for (let at = 0; at < png.byteLength || at === 0; at += most) {
+    const piece = png.subarray(at, at + most);
+    const bytes = new Uint8Array(2 + piece.byteLength);
+    bytes[0] = 0x10;
+    bytes[1] = (at === 0 ? 1 : 0) | (at + most >= png.byteLength ? 2 : 0);
+    bytes.set(piece, 2);
+    pieces.push(bytes);
+  }
+  return pieces;
+}
+
+// A picture that was copied on the machine: a PNG picture.
+export function readCopiedPicture(bytes: ArrayBuffer): Uint8Array<ArrayBuffer> | null {
+  if (bytes.byteLength < 2 || new DataView(bytes).getUint8(0) !== 4) return null;
+  return new Uint8Array(bytes.slice(1));
 }
 
 export function credentials(name: string, password: string): string {

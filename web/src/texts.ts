@@ -215,7 +215,15 @@ export const texts = {
       pageDown: 'pg dn',
     },
     // the key combinations a browser or a device keeps for itself
-    kept: { ctrlAltDel: 'ctrl + alt + del', altTab: 'alt + tab', altF4: 'alt + f4', windows: 'windows key', ctrlW: 'ctrl + w' },
+    kept: {
+      ctrlAltDel: 'ctrl + alt + del',
+      altTab: 'alt + tab',
+      altF4: 'alt + f4',
+      windows: 'windows key',
+      ctrlW: 'ctrl + w',
+      printScreen: 'print screen',
+      snip: 'windows + shift + s',
+    },
     // the same on a Mac, whose command key a browser keeps most combinations of
     keptOnAMac: { cmdTab: 'cmd + tab', cmdSpace: 'cmd + space', cmdW: 'cmd + w', cmdQ: 'cmd + q', cmdOptEsc: 'cmd + opt + esc' },
     // a desktop whose connection dropped: the card over it while Away tries again
@@ -235,11 +243,19 @@ export const texts = {
     // the clipboard: the bar's button, and the panel under it
     clipboard: {
       name: 'clipboard',
-      passes: 'Text you copy on one side can be pasted on the other.',
-      passesTo: (machine: string) => `Text you copy here can be pasted on ${machine}.`,
-      passesFrom: (machine: string) => `Text you copy on ${machine} can be pasted here.`,
+      // a machine carries text alone, or pictures with it
+      passes: (pictures: boolean) => `${pictures ? 'Text or a picture' : 'Text'} you copy on one side can be pasted on the other.`,
+      passesTo: (machine: string, pictures: boolean) => `${pictures ? 'Text or a picture' : 'Text'} you copy here can be pasted on ${machine}.`,
+      passesFrom: (machine: string, pictures: boolean) => `${pictures ? 'Text or a picture' : 'Text'} you copy on ${machine} can be pasted here.`,
       notByItself: "This browser doesn't pass its clipboard on by itself.",
-      pasteHere: (machine: string) => `Paste here what ${machine} should have in its clipboard.`,
+      pasteHere: (machine: string, pictures: boolean) =>
+        `Paste here what ${machine} should have in its clipboard${pictures ? ': text, or a picture, which goes at once' : ''}.`,
+      pictureOf: (width: number, height: number) => `a picture of ${width} by ${height} pixels`,
+      pictureSent: (machine: string) => `The picture is in the clipboard of ${machine} now.`,
+      // a picture of what the session shows, taken by Away itself
+      shot: 'copy a picture of the screen',
+      shotTaken: 'A picture of the screen is in your clipboard now.',
+      tooLarge: 'That picture is too large to pass.',
       toMachine: 'To the machine',
       send: 'send',
       fromMachine: 'From the machine',

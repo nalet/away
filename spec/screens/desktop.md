@@ -70,7 +70,8 @@ takes nothing from the machine's screen.
 
 1. **The key combinations** a browser or a device keeps for itself, sent to the
    machine with one click: Ctrl + Alt + Del, Alt + Tab, Alt + F4, the Windows key
-   and Ctrl + W.
+   and Ctrl + W, and the two that take a picture of the machine's screen there:
+   Print Screen, and Windows + Shift + S for a part of it.
 
 - Every other key goes to the machine as it is pressed, in one's own keyboard
   layout, whatever the machine's layout is.
@@ -89,15 +90,25 @@ on by itself.
 
 1. **Why the panel is needed**, in one sentence.
 2. **To the machine**: what is pasted here and sent is in the machine's
-   clipboard.
+   clipboard. A picture that is pasted here goes at once, and the panel says
+   that the machine has it.
 3. **From the machine**: the last text copied there, to copy on one's own
-   device.
+   device. Where a picture was copied there, the panel shows it small in place
+   of the text, and copy takes the picture.
 
-- In a browser that passes its clipboard on, text copied on one side is pasted
-  on the other with nothing more to do. The browser asks once whether Away may
-  read the clipboard. The panel then says only that the clipboard passes both
-  ways.
-- The first release carries text. Pictures, formatted text and files come later.
+- In a browser that passes its clipboard on, what is copied on one side is
+  pasted on the other with nothing more to do. The browser asks once whether
+  Away may read the clipboard. The panel then says only that the clipboard
+  passes both ways.
+- Text passes, and a picture where the machine carries pictures, which a
+  Windows machine does: a screenshot taken there is in one's own clipboard, and
+  one taken here can be pasted there. Of a clipboard that holds both, the text
+  passes. A picture that is seen through in places lies on white at the
+  machine.
+- Text with its formatting and files come later.
+- **Copy a picture of the screen** takes one of what the session shows, as Away
+  has it, into one's own clipboard. The machine has no part in it, so it is
+  there for every kind of machine, where copying from the machine is let.
 - A machine's own sign-in screen, or a console, takes no clipboard. For a Mac or
   a Linux desktop the panel's first field has a second button, **type it**,
   which types the text into the machine key by key.
@@ -200,10 +211,12 @@ A session that ends without the person asking for it always says why:
 | The handle's name | open the session's bar |
 | The bar's buttons, as tooltips | keys · clipboard · picture · fill the screen · end · close the bar |
 | The bar, before the account's name | as |
-| The keys menu | ctrl + alt + del · alt + tab · alt + f4 · windows key · ctrl + w |
+| The keys menu | ctrl + alt + del · alt + tab · alt + f4 · windows key · ctrl + w · print screen · windows + shift + s |
 | The clipboard panel | clipboard · To the machine · send · type it · From the machine · copy |
-| The clipboard panel, the clipboard passes by itself | Text you copy on one side can be pasted on the other. |
-| The clipboard panel, the browser doesn't pass it on | This browser doesn't pass its clipboard on by itself. Paste here what fin-app-02 should have in its clipboard. |
+| The clipboard panel, the clipboard passes by itself | Text or a picture you copy on one side can be pasted on the other. · on a machine that carries text alone: Text you copy on one side can be pasted on the other. |
+| The clipboard panel, the browser doesn't pass it on | This browser doesn't pass its clipboard on by itself. Paste here what fin-app-02 should have in its clipboard: text, or a picture, which goes at once. |
+| The clipboard panel, a picture of the screen | copy a picture of the screen · A picture of the screen is in your clipboard now. |
+| The clipboard panel, a picture | a picture of 1920 by 1080 pixels · The picture is in the clipboard of fin-app-02 now. · That picture is too large to pass. |
 | The picture menu | fit the window · actual size |
 | The connection dropped | connection lost · Trying again, for the third time. Your desktop is still running on fin-app-02. · leave · try now |
 | Before a session ends unused | This session ends in 60 seconds, because nobody has used it for 29 minutes. · keep it open |

@@ -18,7 +18,9 @@
     {"says": "the icons of the tray: one, of the window 65537, its number 1, saying Ledger – 2 reminders", "text": "{\"tray\":[{\"window\":65537,\"icon\":1,\"tip\":\"Ledger – 2 reminders\"}]}"},
     {"says": "the picture of the icon 1 of the window 65537 in the tray, as a PNG picture that begins 89 50 4e 47", "bytes": "03000100010000000189504e47"},
     {"says": "the machine has a password of its desktop's own, did not take the one before, and asks for it again", "text": "{\"asks\":{\"again\":true,\"only\":\"password\"}}"},
-    {"says": "the desktop is open, 3024 by 1964, on a machine that is told of keys by what they write", "text": "{\"desktop\":{\"width\":3024,\"height\":1964,\"keys\":\"written\"}}"}
+    {"says": "the desktop is open, 3024 by 1964, on a machine that is told of keys by what they write", "text": "{\"desktop\":{\"width\":3024,\"height\":1964,\"keys\":\"written\"}}"},
+    {"says": "a picture was copied on the machine, as a PNG picture that begins 89 50 4e 47", "bytes": "0489504e47"},
+    {"says": "the clipboard passes both ways on a machine that carries pictures with the text", "text": "{\"clipboard\":{\"to\":true,\"from\":true,\"pictures\":true}}"}
   ],
   "from_browser": [
     {"says": "the session begins: its ticket, a window of 1280 by 800 on a screen with twice the dots each way (200), and a keyboard with the Swiss German layout (2055)", "text": "{\"ticket\":\"7f3a\",\"width\":1280,\"height\":800,\"layout\":2055,\"scale\":200}"},
@@ -32,6 +34,7 @@
     {"says": "the person copied a text of two lines on their own device", "text": "{\"copied\":\"a text\\nof two lines\"}"},
     {"says": "the person asks for the program Wages in the session", "text": "{\"start\":\"Wages\"}"},
     {"says": "the person asks for the menu of the icon 1 of the window 65537 in the tray", "text": "{\"tray\":{\"window\":65537,\"icon\":1,\"does\":\"menu\"}}"},
-    {"says": "the command key down, by what it does, and the key that writes the euro up, by what it writes", "bytes": "070000ffeb0107010020ac00"}
+    {"says": "the command key down, by what it does, and the key that writes the euro up, by what it writes", "bytes": "070000ffeb0107010020ac00"},
+    {"says": "the person copied a picture on their own device: its first and last piece, of a PNG picture that begins 89 50 4e 47", "bytes": "100389504e47"}
   ]
 }

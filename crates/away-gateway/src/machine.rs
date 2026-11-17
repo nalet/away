@@ -8,7 +8,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-pub use away_rdp::clipboard::Passes;
+pub use away_rdp::clipboard::{Passes, Picture as CopiedPicture};
 use away_rdp::connection::{Connection, Happened};
 use away_rdp::gcc::Client;
 use away_rdp::identity::Identity;
@@ -477,6 +477,7 @@ impl Secured {
                 ticked: tokio::time::Instant::now(),
                 resized: false,
                 copied: None,
+                copied_picture: None,
             };
             while !desktop.is_open {
                 // a machine that reads a card waits for the reader's word as time passes
@@ -554,6 +555,8 @@ pub struct Desktop {
     resized: bool,
     /// The text that was last copied on the machine, until it is taken.
     copied: Option<String>,
+    /// The picture that was last copied on the machine, until it is taken.
+    copied_picture: Option<CopiedPicture>,
 }
 
 impl Desktop {
@@ -667,8 +670,16 @@ impl Desktop {
                         }
                     }
                     Happened::SentOn(to) => self.sent_on = Some(to),
-                    // of what was copied on the machine, the newest is for the person
-                    Happened::Copied(text) => self.copied = Some(text),
+                    // of what was copied on the machine, the newest is for the person:
+                    // text, or a picture
+                    Happened::Copied(text) => {
+                        self.copied = Some(text);
+                        self.copied_picture = None;
+                    }
+                    Happened::CopiedPicture(picture) => {
+                        self.copied_picture = Some(picture);
+                        self.copied = None;
+                    }
                     Happened::Windows(changes) => {
                         self.windows.take(changes);
                         self.windows_changed = true;
@@ -805,6 +816,22 @@ impl Desktop {
         self.write(&told).await
     }
 
+    /// The picture that was copied on the machine since this was last asked, where the
+    /// clipboard passes from the machine.
+    pub fn copied_picture(&mut self) -> Option<CopiedPicture> {
+        self.copied_picture.take()
+    }
+
+    /// Tells the machine that the person copied this picture, so that it can be pasted
+    /// there: where the clipboard passes to the machine.
+    pub async fn offer_picture(&mut self, picture: CopiedPicture) -> Result<(), Failure> {
+        let told = self.open.copied_picture(picture);
+        if told.is_empty() {
+            return Ok(());
+        }
+        self.write(&told).await
+    }
+
     /// Whether the machine offered its desktop anew, at another size, since this was
     /// last asked: the picture is then a new one, of that size.
     pub fn resized(&mut self) -> bool {
@@ -881,6 +908,18 @@ impl Shown for Desktop {
 
     fn copied(&mut self) -> Option<String> {
         Desktop::copied(self)
+    }
+
+    fn carries_pictures(&self) -> bool {
+        true
+    }
+
+    fn copied_picture(&mut self) -> Option<CopiedPicture> {
+        Desktop::copied_picture(self)
+    }
+
+    async fn offer_picture(&mut self, picture: CopiedPicture) -> Result<(), Failure> {
+        Desktop::offer_picture(self, picture).await
     }
 
     async fn did(&mut self, did: &[Did]) -> Result<(), Failure> {

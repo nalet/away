@@ -13,12 +13,12 @@ import type { Machine, Program } from '../machines';
 import { addressOf } from '../place';
 import { texts } from '../texts';
 import { ClipboardPanel, useClipboard } from './Clipboard';
-import type { Passes } from './Clipboard';
+import type { Held, Passes } from './Clipboard';
 import { isHeld, layoutName, layoutOf, placeOf, symOf, symOfPlace } from './keys';
 import { PhoneKeys } from './PhoneKeys';
 import { fingers } from './touch';
 import { following, placed, settled, showing, whole, zoomed } from './view';
-import { begins, credentials, did, leaves, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } from './wire';
+import { begins, credentials, did, leaves, readCopiedPicture, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } from './wire';
 import type { Did, Step, TrayOf, WindowOf } from './wire';
 
 const STEPS: Step[] = ['reaching', 'checking', 'signing-in', 'first-picture'];
@@ -48,7 +48,7 @@ function useSession(machine: string, program: string | null, method?: string) {
   const [attempt, setAttempt] = useState(0);
   // which ways the clipboard passes, and the text that was last copied on the machine
   const [passes, setPasses] = useState<Passes | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied] = useState<Held | null>(null);
   // the icons of the windows, each as a picture the page holds
   const [icons, setIcons] = useState<Record<number, ImageBitmap>>({});
   // the icons of the tray, and their pictures, each by its window and its number
@@ -130,6 +130,12 @@ function useSession(machine: string, program: string | null, method?: string) {
       opened.onopen = () => opened.send(begins(ticket, window.innerWidth - (docked(program) ? RAIL : 0), window.innerHeight, layout, Math.round(window.devicePixelRatio * 100)));
       opened.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
         if (typeof event.data !== 'string') {
+          // a picture that was copied on the machine, for the person's clipboard
+          const picture = readCopiedPicture(event.data);
+          if (picture) {
+            setCopied({ picture });
+            return;
+          }
           const inTheTray = readTrayPicture(event.data);
           if (inTheTray) {
             createImageBitmap(new Blob([inTheTray.png], { type: 'image/png' }))
@@ -220,7 +226,7 @@ function useSession(machine: string, program: string | null, method?: string) {
           setInFront(said.in_front);
         }
         else if ('clipboard' in said) setPasses(said.clipboard);
-        else if ('copied' in said) setCopied(said.copied);
+        else if ('copied' in said) setCopied({ text: said.copied });
         else if ('started' in said) setStarted(said.started);
         else if ('tray' in said) setTray(said.tray);
       };
@@ -590,6 +596,9 @@ const KEPT: { name: string; keys: string[] }[] = [
   { name: texts.session.kept.altF4, keys: ['AltLeft', 'F4'] },
   { name: texts.session.kept.windows, keys: ['MetaLeft'] },
   { name: texts.session.kept.ctrlW, keys: ['ControlLeft', 'KeyW'] },
+  // a picture of the machine's screen, taken there: the whole of it, or a part chosen there
+  { name: texts.session.kept.printScreen, keys: ['PrintScreen'] },
+  { name: texts.session.kept.snip, keys: ['MetaLeft', 'ShiftLeft', 'KeyS'] },
 ];
 
 // The same for a Mac's desktop: the combinations of its command key, most of which a
@@ -664,7 +673,7 @@ function Desktop({
   kind: Machine['kind'] | null;
   started: { program: string; ok: boolean; details?: string } | null;
   passes: Passes | null;
-  copied: string | null;
+  copied: Held | null;
   canvas: HTMLCanvasElement;
   say: (message: string | Uint8Array<ArrayBuffer>) => void;
   lost: Lost | null;
@@ -1177,7 +1186,17 @@ function Desktop({
           >
             <ClipboardList size={16} aria-hidden="true" />
           </IconButton>
-          {clip && <ClipboardPanel machine={program ?? name} passes={passes} byItself={clipboard.byItself} fromMachine={copied} send={clipboard.send} />}
+          {clip && (
+            <ClipboardPanel
+              machine={program ?? name}
+              passes={passes}
+              byItself={clipboard.byItself}
+              fromMachine={copied}
+              send={clipboard.send}
+              sendPicture={clipboard.sendPicture}
+              screen={canvas}
+            />
+          )}
         </span>
       )}
       {canType && (

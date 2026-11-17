@@ -56,14 +56,27 @@ pub fn pieces(message: &[u8], shows_its_heads: bool) -> Vec<Vec<u8>> {
 }
 
 /// The pieces of a channel's messages as they arrive, put together.
-#[derive(Default)]
 pub struct Pieces {
     whole: Vec<u8>,
     length: usize,
     begun: bool,
+    /// The longest message that is taken.
+    most: usize,
+}
+
+impl Default for Pieces {
+    fn default() -> Pieces {
+        Pieces::up_to(LONGEST)
+    }
 }
 
 impl Pieces {
+    /// The pieces of a channel whose messages are this long at most: the clipboard's
+    /// carries pictures, which are longer than what the other channels say.
+    pub fn up_to(most: usize) -> Pieces {
+        Pieces { whole: Vec::new(), length: 0, begun: false, most }
+    }
+
     /// Takes one piece. Gives the message once its last piece is there.
     pub fn take(&mut self, piece: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         const WRONG: Error = Error::NotRdp("a piece of a channel's message is not built as one");
@@ -74,7 +87,7 @@ impl Pieces {
             return Err(Error::NotYet("compresses what travels on a further channel"));
         }
         if flags & FIRST != 0 {
-            if length > LONGEST {
+            if length > self.most {
                 return Err(Error::NotRdp("a message on a channel is longer than the client takes"));
             }
             self.whole.clear();

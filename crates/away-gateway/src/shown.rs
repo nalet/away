@@ -5,7 +5,7 @@
 use away_rdp::rail::Program;
 use away_wire::{Did, Does, TrayDoes, TrayIcon, Window};
 
-use crate::machine::{Area, Failure, Screen};
+use crate::machine::{Area, CopiedPicture, Failure, Screen};
 
 /// A desktop's picture as it is now: rows from the top down, four bytes a pixel, blue,
 /// green, red, and a fourth that is always full.
@@ -48,6 +48,23 @@ pub(crate) trait Shown {
 
     /// The text that was copied on the machine since this was last asked.
     fn copied(&mut self) -> Option<String>;
+
+    /// Whether the machine's clipboard carries pictures with the text.
+    fn carries_pictures(&self) -> bool {
+        false
+    }
+
+    /// The picture that was copied on the machine since this was last asked. A machine
+    /// whose clipboard carries text alone has none.
+    fn copied_picture(&mut self) -> Option<CopiedPicture> {
+        None
+    }
+
+    /// Tells the machine that the person copied this picture, so that it can be pasted
+    /// there. A machine whose clipboard carries text alone is told nothing.
+    async fn offer_picture(&mut self, _picture: CopiedPicture) -> Result<(), Failure> {
+        Ok(())
+    }
 
     /// Tells the machine of keys and of the pointer.
     async fn did(&mut self, did: &[Did]) -> Result<(), Failure>;

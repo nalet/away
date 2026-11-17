@@ -26,7 +26,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 
-use crate::machine::{self, Area, Desktop, Failure, Opened, Passes, Screen, Step, Who, Why};
+use crate::machine::{self, Area, CopiedPicture, Desktop, Failure, Opened, Passes, Screen, Step, Who, Why};
 use crate::shown::{Pixels, Shown};
 use crate::themselves::Domain;
 use crate::vnc;
@@ -665,7 +665,11 @@ where
         return Ended::BrowserGone;
     }
     // which ways the clipboard passes, for the page to say and to act on
-    let passes = ToBrowser::Passes { to_the_machine: clipboard.to_the_machine, from_the_machine: clipboard.from_the_machine };
+    let passes = ToBrowser::Passes {
+        to_the_machine: clipboard.to_the_machine,
+        from_the_machine: clipboard.from_the_machine,
+        pictures: desktop.carries_pictures() && clipboard.at_all(),
+    };
     if tell(browser, passes).await.is_err() {
         return Ended::BrowserGone;
     }
@@ -679,6 +683,9 @@ where
     let mut closed_since: Option<tokio::time::Instant> = None;
     // the programs asked for in the session, by their names, until the machine says whether they started
     let mut asked_for: VecDeque<String> = VecDeque::new();
+    // the pieces of a picture the person copied, until its last one is there: nothing
+    // while none is on its way, or once it turned out larger than a picture may be
+    let mut arriving: Option<Vec<u8>> = None;
     loop {
         // where the windows of the programs are goes out before what is drawn in them, and
         // with them the icons that changed
@@ -788,6 +795,15 @@ where
                         return Ended::BrowserGone;
                     }
                 }
+                // a picture goes as one a browser reads by itself, packed by the gateway:
+                // the browser gets nothing the machine wrote
+                if let Some(picture) = desktop.copied_picture() {
+                    if let Some(png) = packed_whole(picture).await {
+                        if tell(browser, ToBrowser::CopiedPicture { png: &png }).await.is_err() {
+                            return Ended::BrowserGone;
+                        }
+                    }
+                }
             }
             told = said(browser) => match told {
                 Some(FromBrowser::Did(did)) => {
@@ -840,6 +856,24 @@ where
                 Some(FromBrowser::Copied(text)) => {
                     if let Err(failed) = desktop.offer(&text).await {
                         return ended_by(failed);
+                    }
+                }
+                // a picture they copied comes in pieces: once it is whole, and is one,
+                // the machine is told that it can be pasted
+                Some(FromBrowser::CopiedPicture { first, last, piece }) => {
+                    if first {
+                        arriving = Some(Vec::new());
+                    }
+                    arriving = arriving.filter(|held| held.len() + piece.len() <= LARGEST_FROM_A_BROWSER);
+                    if let Some(held) = arriving.as_mut() {
+                        held.extend_from_slice(&piece);
+                    }
+                    if let (true, Some(png)) = (last, arriving.take()) {
+                        if let Some(picture) = unpacked(png).await {
+                            if let Err(failed) = desktop.offer_picture(picture).await {
+                                return ended_by(failed);
+                            }
+                        }
                     }
                 }
                 // the window has another size, or is on another screen: a machine that
@@ -960,6 +994,54 @@ async fn packed(picture: Pixels<'_>, areas: Vec<Area>) -> Vec<(Area, Vec<u8>)> {
     packing.await.unwrap_or_default()
 }
 
+/// The largest picture a person's device hands over, as the PNG picture it comes as.
+const LARGEST_FROM_A_BROWSER: usize = 16 * 1024 * 1024;
+
+/// Packs a picture that was copied on the machine as one PNG picture. Nothing where
+/// that fails.
+async fn packed_whole(picture: CopiedPicture) -> Option<Vec<u8>> {
+    let packing = tokio::task::spawn_blocking(move || {
+        let mut png = Vec::with_capacity(picture.pixels.len() / 4 + 128);
+        let mut encoder = png::Encoder::new(&mut png, picture.width as u32, picture.height as u32);
+        encoder.set_color(png::ColorType::Rgb);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_compression(png::Compression::Fast);
+        let mut writer = encoder.write_header().ok()?;
+        writer.write_image_data(&picture.pixels).ok()?;
+        writer.finish().ok()?;
+        Some(png)
+    });
+    packing.await.ok().flatten()
+}
+
+/// Unpacks a PNG picture a person copied. Nothing for what is no such picture, or one
+/// that is larger than a clipboard's picture may be. What is seen through in it lies
+/// on white, as a machine's clipboard has no such pixels.
+async fn unpacked(png: Vec<u8>) -> Option<CopiedPicture> {
+    let unpacking = tokio::task::spawn_blocking(move || {
+        let mut decoder = png::Decoder::new(std::io::Cursor::new(png));
+        decoder.set_limits(png::Limits { bytes: away_rdp::clipboard::LARGEST });
+        decoder.set_transformations(png::Transformations::normalize_to_color8());
+        let mut reader = decoder.read_info().ok()?;
+        let mut held = vec![0; reader.output_buffer_size().filter(|size| *size <= away_rdp::clipboard::LARGEST)?];
+        let frame = reader.next_frame(&mut held).ok()?;
+        let (width, height) = (frame.width as usize, frame.height as usize);
+        let on_white = |colour: u8, seen: u8| ((u32::from(colour) * u32::from(seen) + 255 * (255 - u32::from(seen)) + 127) / 255) as u8;
+        let held = &held[..frame.buffer_size()];
+        let pixels: Vec<u8> = match frame.color_type {
+            png::ColorType::Rgb => held.to_vec(),
+            png::ColorType::Rgba => {
+                held.as_chunks::<4>().0.iter().flat_map(|pixel| [0, 1, 2].map(|nth| on_white(pixel[nth], pixel[3]))).collect()
+            }
+            png::ColorType::Grayscale => held.iter().flat_map(|grey| [*grey; 3]).collect(),
+            png::ColorType::GrayscaleAlpha => held.as_chunks::<2>().0.iter().flat_map(|pixel| [on_white(pixel[0], pixel[1]); 3]).collect(),
+            png::ColorType::Indexed => return None,
+        };
+        (pixels.len() == width * height * 3).then_some(CopiedPicture { width, height, pixels })
+    });
+    unpacking.await.ok().flatten()
+}
+
 fn step_word(step: Step) -> &'static str {
     match step {
         Step::Reaching => "reaching",
@@ -1050,5 +1132,41 @@ mod tests {
         // an area of nothing changes nothing
         changed.add(Area { left: 5, top: 5, width: 0, height: 9 });
         assert!(changed.is_empty());
+    }
+
+    /// A PNG picture of these pixels, written the way named.
+    fn png_of(width: u32, height: u32, colours: png::ColorType, pixels: &[u8]) -> Vec<u8> {
+        let mut png = Vec::new();
+        let mut encoder = png::Encoder::new(&mut png, width, height);
+        encoder.set_color(colours);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().expect("a head");
+        writer.write_image_data(pixels).expect("the pixels");
+        writer.finish().expect("the end");
+        png
+    }
+
+    #[tokio::test]
+    async fn a_copied_picture_is_packed_for_the_browser_and_unpacked_for_the_machine() {
+        // what the machine copied goes as a PNG picture, and comes back as it was
+        let picture = CopiedPicture { width: 3, height: 2, pixels: (1..=18).map(|byte| byte * 10).collect() };
+        let png = packed_whole(picture.clone()).await.expect("a PNG picture");
+        assert_eq!(&png[..4], &[0x89, b'P', b'N', b'G']);
+        assert_eq!(unpacked(png).await, Some(picture));
+
+        // what a person copied may be seen through: it lies on white for the machine
+        let seen_through = png_of(2, 1, png::ColorType::Rgba, &[200, 100, 50, 255, 200, 100, 50, 0]);
+        assert_eq!(unpacked(seen_through).await, Some(CopiedPicture { width: 2, height: 1, pixels: vec![200, 100, 50, 255, 255, 255] }));
+        // and may be grey, with or without what is seen through
+        let grey = png_of(2, 1, png::ColorType::Grayscale, &[0, 128]);
+        assert_eq!(unpacked(grey).await, Some(CopiedPicture { width: 2, height: 1, pixels: vec![0, 0, 0, 128, 128, 128] }));
+        let grey_seen_through = png_of(1, 1, png::ColorType::GrayscaleAlpha, &[0, 128]);
+        assert_eq!(unpacked(grey_seen_through).await.map(|picture| picture.pixels), Some(vec![127, 127, 127]));
+
+        // what is no picture, or one that is cut, is none
+        assert_eq!(unpacked(b"no picture".to_vec()).await, None);
+        let whole = png_of(4, 4, png::ColorType::Rgb, &[7; 48]);
+        assert_eq!(unpacked(whole[..whole.len() - 20].to_vec()).await, None);
+        assert_eq!(unpacked(Vec::new()).await, None);
     }
 }

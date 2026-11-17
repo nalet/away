@@ -66,6 +66,7 @@ says which.
 | Capability | Carried by | Built in package | Key |
 |---|---|---|---|
 | Copy text on one side and paste it on the other | `session-view` `gateway` `rdp` `vnc` `shell-screen` | [6](../plan/README.md#6-a-desktop-over-rdp) (RDP), [8](../plan/README.md#8-a-shell) (SSH), [11](../plan/README.md#11-a-desktop-over-vnc) (VNC) | `copy-paste-text` |
+| Copy and paste a picture, or text with its formatting | `session-view` `gateway` `rdp` `wire` | [6](../plan/README.md#6-a-desktop-over-rdp) | `copy-paste-rich` |
 
 ### The shell
 

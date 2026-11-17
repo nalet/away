@@ -993,12 +993,12 @@ test.describe('a session', () => {
     await expect(keys).toHaveAttribute('aria-expanded', 'false');
     await keys.click();
     const kept = page.getByRole('menu', { name: 'keys' });
-    await expect(kept.getByRole('menuitem')).toHaveText(['ctrl + alt + del', 'alt + tab', 'alt + f4', 'windows key', 'ctrl + w']);
+    await expect(kept.getByRole('menuitem')).toHaveText(['ctrl + alt + del', 'alt + tab', 'alt + f4', 'windows key', 'ctrl + w', 'print screen', 'windows + shift + s']);
     await expect(keys).toHaveAttribute('aria-expanded', 'true');
     await expect(kept.getByRole('menuitem', { name: 'ctrl + alt + del' })).toBeFocused();
     await accessible(page);
     await page.keyboard.press('ArrowUp');
-    await expect(kept.getByRole('menuitem', { name: 'ctrl + w' })).toBeFocused();
+    await expect(kept.getByRole('menuitem', { name: 'windows + shift + s' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(kept).toHaveCount(0);
     await expect(bar).toBeVisible();
@@ -1014,7 +1014,7 @@ test.describe('a session', () => {
     await bar.getByRole('button', { name: 'keys' }).click();
     await page.keyboard.press('End');
     await page.keyboard.press('Enter');
-    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 238, 17]);
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 224, 31]);
 
     await page.getByRole('button', { name: "open the session's bar" }).click();
     await page.keyboard.press('Escape');
@@ -1026,9 +1026,11 @@ test.describe('a session', () => {
     await page.getByRole('button', { name: "open the session's bar" }).click();
     await bar.getByRole('button', { name: 'clipboard' }).click();
     const panel = page.getByRole('group', { name: 'clipboard' });
-    await expect(panel).toContainText("This browser doesn't pass its clipboard on by itself. Paste here what desk-01 should have in its clipboard.");
+    await expect(panel).toContainText(
+      "This browser doesn't pass its clipboard on by itself. Paste here what desk-01 should have in its clipboard: text, or a picture, which goes at once.",
+    );
     await expect(panel.getByRole('button', { name: 'send' })).toBeDisabled();
-    await expect(panel.getByRole('button', { name: 'copy' })).toBeDisabled();
+    await expect(panel.getByRole('button', { name: 'copy', exact: true })).toBeDisabled();
     await accessible(page);
     await panel.getByLabel('To the machine').fill('from the page');
     await panel.getByRole('button', { name: 'send' }).click();
@@ -1040,7 +1042,31 @@ test.describe('a session', () => {
     await page.getByRole('button', { name: "open the session's bar" }).click();
     await bar.getByRole('button', { name: 'clipboard' }).click();
     await expect(panel.getByLabel('From the machine')).toHaveValue('FROM THE PAGE');
-    await expect(panel.getByRole('button', { name: 'copy' })).toBeEnabled();
+    await expect(panel.getByRole('button', { name: 'copy', exact: true })).toBeEnabled();
+    await page.keyboard.press('Escape');
+    await expect(bar).toHaveCount(0);
+    // a picture that is copied on the machine, on the key P, is what the panel holds then:
+    // shown small, with its size said
+    await page.keyboard.press('p');
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await bar.getByRole('button', { name: 'clipboard' }).click();
+    await expect(panel.getByRole('img', { name: 'a picture of 3 by 2 pixels' })).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'copy', exact: true })).toBeEnabled();
+    await accessible(page);
+    // and a picture that is pasted into the field goes to the machine at once: the
+    // stand-in pastes it, and draws its corner on its screen
+    await panel.getByLabel('To the machine').evaluate(async (field) => {
+      const canvas = new OffscreenCanvas(8, 8);
+      const drawn = canvas.getContext('2d')!;
+      drawn.fillStyle = 'rgb(200, 100, 50)';
+      drawn.fillRect(0, 0, 8, 8);
+      const carried = new DataTransfer();
+      carried.items.add(new File([await canvas.convertToBlob({ type: 'image/png' })], 'picture.png', { type: 'image/png' }));
+      field.dispatchEvent(new ClipboardEvent('paste', { clipboardData: carried, bubbles: true, cancelable: true }));
+    });
+    await expect(panel.getByText('The picture is in the clipboard of desk-01 now.')).toBeVisible();
+    await expect.poll(() => pixel(page, 60, 40)).toEqual([200, 100, 50]);
+    await expect.poll(() => pixel(page, 67, 47)).toEqual([200, 100, 50]);
     await page.keyboard.press('Escape');
     await expect(bar).toHaveCount(0);
 
@@ -1090,7 +1116,7 @@ test.describe('a session', () => {
     await page.getByRole('button', { name: "open the session's bar" }).click();
     const bar = page.getByRole('toolbar', { name: "the session's bar" });
     await bar.getByRole('button', { name: 'clipboard' }).click();
-    await expect(page.getByRole('group', { name: 'clipboard' })).toHaveText('Text you copy on one side can be pasted on the other.');
+    await expect(page.getByRole('group', { name: 'clipboard' })).toContainText('Text or a picture you copy on one side can be pasted on the other.');
     await accessible(page);
     await page.evaluate(() => navigator.clipboard.writeText('copied by the person'));
     await page.keyboard.press('Escape');
@@ -1101,6 +1127,46 @@ test.describe('a session', () => {
         return page.evaluate(() => navigator.clipboard.readText());
       })
       .toBe('COPIED BY THE PERSON');
+
+    // a picture passes the same way: the key P copies one on the machine, of three by
+    // two pixels, and it is in the person's clipboard
+    const held = () =>
+      page.evaluate(async () => {
+        const item = (await navigator.clipboard.read()).find((one) => one.types.includes('image/png'));
+        if (!item) return null;
+        const picture = await createImageBitmap(await item.getType('image/png'));
+        const drawn = new OffscreenCanvas(picture.width, picture.height).getContext('2d')!;
+        drawn.drawImage(picture, 0, 0);
+        return [picture.width, picture.height, ...drawn.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+      });
+    await page.keyboard.press('p');
+    await expect.poll(held).toEqual([3, 2, 10, 20, 30]);
+    // what the person copies as a picture is handed to the machine when its screen gets
+    // the focus again: the stand-in pastes it at once, and draws its corner on its screen
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await page.evaluate(async () => {
+      const canvas = new OffscreenCanvas(8, 8);
+      const drawn = canvas.getContext('2d')!;
+      drawn.fillStyle = 'rgb(200, 100, 50)';
+      drawn.fillRect(0, 0, 8, 8);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': await canvas.convertToBlob({ type: 'image/png' }) })]);
+    });
+    await page.keyboard.press('Escape');
+    await expect(screen).toBeFocused();
+    await expect.poll(() => pixel(page, 60, 40)).toEqual([200, 100, 50]);
+    // the stand-in copies what it was handed: that picture is the person's again, and
+    // is not handed back to the machine a second time
+    await page.keyboard.press('p');
+    await expect.poll(held).toEqual([8, 8, 200, 100, 50]);
+    // a picture of what the session shows is taken by Away itself, with a button of the panel
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await bar.getByRole('button', { name: 'clipboard' }).click();
+    await page.getByRole('group', { name: 'clipboard' }).getByRole('button', { name: 'copy a picture of the screen' }).click();
+    await expect(page.getByText('A picture of the screen is in your clipboard now.')).toBeVisible();
+    // its corner holds the mark of the key that went down last on the machine
+    await expect.poll(held).toEqual([200, 120, 85, 230, 25]);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
 
     await page.getByRole('button', { name: "open the session's bar" }).click();
     await bar.getByRole('button', { name: 'end' }).click();
@@ -1779,7 +1845,8 @@ test('without a database no machine is opened, and the page says why', async ({ 
 });
 
 test("the session's messages are written and read as the examples say that the gateway is tried against too", async () => {
-  const { begins, copied, credentials, did, leaves, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } = await import(
+  const { begins, copied, copiedPicture, credentials, did, leaves, readCopiedPicture, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } =
+    await import(
     '../src/session/wire'
   );
   const examples = JSON.parse(readFileSync('../crates/away-wire/fixtures/messages.json', 'utf8')) as Record<string, { text?: string; bytes?: string }[]>;
@@ -1790,7 +1857,10 @@ test("the session's messages are written and read as the examples say that the g
   const said = (examples.to_browser ?? []).map((example) =>
     example.text
       ? readSaid(example.text)
-      : (readRectangle(bytes(example.bytes!).buffer) ?? readIcon(bytes(example.bytes!).buffer) ?? readTrayPicture(bytes(example.bytes!).buffer)),
+      : (readRectangle(bytes(example.bytes!).buffer) ??
+        readIcon(bytes(example.bytes!).buffer) ??
+        readTrayPicture(bytes(example.bytes!).buffer) ??
+        readCopiedPicture(bytes(example.bytes!).buffer)),
   );
   expect(said.slice(0, 5)).toEqual([{ step: 'reaching' }, { step: 'first-picture' }, { asks: { again: false } }, { asks: { again: true } }, { desktop: { width: 1280, height: 800 } }]);
   expect(said[5]).toEqual({ left: 64, top: 128, width: 200, height: 120, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) });
@@ -1806,6 +1876,8 @@ test("the session's messages are written and read as the examples say that the g
     { window: 65537, icon: 1, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) },
     { asks: { again: true, only: 'password' } },
     { desktop: { width: 3024, height: 1964, keys: 'written' } },
+    new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+    { clipboard: { to: true, from: true, pictures: true } },
   ]);
   expect([
     readSaid('no JSON'),
@@ -1814,7 +1886,9 @@ test("the session's messages are written and read as the examples say that the g
     readIcon(new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0, 0, 1]).buffer),
     readIcon(new Uint8Array([2, 0, 1]).buffer),
     readTrayPicture(new Uint8Array([2, 0, 1, 0, 1, 0, 0, 0, 1, 0x89]).buffer),
-  ]).toEqual([null, null, null, null, null, null]);
+    readCopiedPicture(new Uint8Array([1, 0x89, 0x50]).buffer),
+    readCopiedPicture(new Uint8Array([4]).buffer),
+  ]).toEqual([null, null, null, null, null, null, null, null]);
 
   // what the pages say
   const written = [
@@ -1846,7 +1920,15 @@ test("the session's messages are written and read as the examples say that the g
         { written: { sym: 0x010020ac, down: false } },
       ]),
     ),
+    ...copiedPicture(new Uint8Array([0x89, 0x50, 0x4e, 0x47])).map(hex),
   ];
+  // a picture that is longer than a message goes in pieces: the first, those between, the last
+  const pieces = copiedPicture(new Uint8Array(100_000).fill(7));
+  expect(pieces.map((piece) => [piece[0], piece[1], piece.byteLength])).toEqual([
+    [0x10, 1, 49_154],
+    [0x10, 0, 49_154],
+    [0x10, 2, 1_698],
+  ]);
   expect(written).toEqual((examples.from_browser ?? []).map((example) => example.text ?? example.bytes));
 });
 

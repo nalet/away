@@ -29,6 +29,16 @@ const CLIENT: u32 = 0x0000_0d0c;
 pub const COPIED: &str = "copied on the machine\nin two lines";
 /// The key C, by its place.
 const KEY_C: u8 = 0x2e;
+/// The key P, by its place: with it the stand-in copies a picture.
+const KEY_P: u8 = 0x19;
+/// Where the stand-in draws a picture it was handed when it pasted.
+pub const PASTED_AT: (usize, usize) = (60, 40);
+
+/// The picture the stand-in copies when the key P goes down and it was handed none:
+/// three by two pixels, each of another colour. One it was handed it copies as it is.
+pub fn copied_picture() -> clipboard::Picture {
+    clipboard::Picture { width: 3, height: 2, pixels: (1..=18).map(|byte| byte * 10).collect() }
+}
 
 /// The numbers it gives the channels it opens later: the one of the screen, and one
 /// that is not Away's.
@@ -110,6 +120,9 @@ pub struct Seen {
     /// The texts the client handed over when the stand-in pasted: it pastes as soon as
     /// the client says that it holds text.
     pub pasted: Vec<String>,
+    /// The pictures the client handed over when the stand-in pasted, which it does as
+    /// soon as the client says that it holds one.
+    pub pasted_pictures: Vec<clipboard::Picture>,
     /// The channels it opened later that the client took, by their numbers.
     pub took_later: Vec<u32>,
     /// What the client said its screen is, each time it said so: how wide, how high,
@@ -210,6 +223,8 @@ pub struct Desktop {
     speaks_of_later: bool,
     /// The pieces of a message about the clipboard that is not whole yet.
     clipboard_pieces: Pieces,
+    /// Whether it asked the client for its picture and waits for it.
+    asked_for_a_picture: bool,
     /// Whether it said that it is ready for the clipboard.
     speaks_of_the_clipboard: bool,
     /// The windows of the programs that are open, the front one first.
@@ -251,7 +266,8 @@ impl Desktop {
             reads: None,
             later_pieces: Pieces::default(),
             speaks_of_later: false,
-            clipboard_pieces: Pieces::default(),
+            clipboard_pieces: Pieces::up_to(clipboard::LARGEST + 1024),
+            asked_for_a_picture: false,
             speaks_of_the_clipboard: false,
             windows: Vec::new(),
             opened: 0,
@@ -545,7 +561,36 @@ impl Desktop {
         let Some(message) = self.clipboard_pieces.take(piece)? else { return Ok(Vec::new()) };
         let Some(on) = self.channel(clipboard::CHANNEL) else { return Ok(Vec::new()) };
         let says = |message: &[u8]| on_a_channel(on, message, true);
+        // the picture it asked for: kept, and its corner drawn on its screen, as a
+        // program that was pasted into shows it
+        if std::mem::take(&mut self.asked_for_a_picture) {
+            let Some(handed) = clipboard::stand_in::gave_picture(&message) else { return Ok(Vec::new()) };
+            let (left, top) = (PASTED_AT.0.min(self.picture.width - 1), PASTED_AT.1.min(self.picture.height - 1));
+            // as much of it as a mark is large: its corner says which picture it is
+            let (wide, high) =
+                (handed.width.min(MARK).min(self.picture.width - left), handed.height.min(MARK).min(self.picture.height - top));
+            for row in 0..high {
+                for column in 0..wide {
+                    let pixel = &handed.pixels[(row * handed.width + column) * 3..][..3];
+                    self.picture.pixels[((top + row) * self.picture.width + left + column) * 4..][..3]
+                        .copy_from_slice(&[pixel[2], pixel[1], pixel[0]]);
+                }
+            }
+            self.seen.pasted_pictures.push(handed);
+            let rectangle = self.rectangle(left, top, wide, high, if self.bits == 16 { 1 } else { 2 });
+            let mut update = vec![1, 0, 1, 0];
+            update.extend(rectangle);
+            return Ok(short_frame(0x01, &update));
+        }
         Ok(match clipboard::stand_in::read(&message) {
+            Said::HoldsPicture => {
+                self.asked_for_a_picture = true;
+                [says(&clipboard::stand_in::took()), says(&clipboard::stand_in::asks_for_picture())].concat()
+            }
+            // what it copies as a picture: the one it was last handed, or its own
+            Said::AsksForPicture => {
+                says(&clipboard::stand_in::gives_picture(&self.seen.pasted_pictures.last().cloned().unwrap_or_else(copied_picture)))
+            }
             Said::Holds { text: true } => [says(&clipboard::stand_in::took()), says(&clipboard::stand_in::asks())].concat(),
             Said::Holds { text: false } => says(&clipboard::stand_in::took()),
             Said::Gives(Some(text)) => {
@@ -764,6 +809,10 @@ impl Desktop {
             // the key C copies: the machine's clipboard holds text, which the client is told
             if let (Input::Key { code: KEY_C, down: true, .. }, Some(on)) = (event, self.channel(clipboard::CHANNEL)) {
                 send.extend(on_a_channel(on, &clipboard::stand_in::holds_text(true), true));
+            }
+            // the key P copies a picture
+            if let (Input::Key { code: KEY_P, down: true, .. }, Some(on)) = (event, self.channel(clipboard::CHANNEL)) {
+                send.extend(on_a_channel(on, &clipboard::stand_in::holds_picture(true), true));
             }
             let (left, top, colour) = match event {
                 Input::Button { button: Button::Left, down: true, x, y } => (usize::from(x), usize::from(y), CLICKED),

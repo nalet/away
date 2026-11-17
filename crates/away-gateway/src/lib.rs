@@ -44,8 +44,8 @@ pub const ADDRESS: &str = "0.0.0.0:8081";
 /// The cookie that names a browser's sign-in, which the server gave it.
 const SIGNED_IN: &str = "__Host-away";
 
-/// The longest message a browser may send: a name and a password, or what a person did
-/// with the keys and the pointer in a moment.
+/// The longest message a browser may send: a name and a password, what a person did
+/// with the keys and the pointer in a moment, or a piece of a picture they copied.
 const LONGEST_FROM_A_BROWSER: usize = 64 * 1024;
 
 /// What an installation tells the gateway.

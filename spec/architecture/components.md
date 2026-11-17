@@ -17,7 +17,7 @@ What a person's browser runs.
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
 | `web` | the web app: Away's pages around the sessions | web | first release | 44 |
-| `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | there | 38 |
+| `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | there | 39 |
 
 - `web`: Built from the design system's components; the frame is Away's own until the design system has it. Keeps: in the browser's own storage, which sessions this browser has open. Code: `web/`. Runs: served by the server. Governed by [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](./decisions/0011-the-web-app.md).
 - `session-view`: Drawn on a canvas, apart from the pages. Code: `web/src/session/`. Runs: part of the web app. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0011](./decisions/0011-the-web-app.md), [ADR‑0016](./decisions/0016-a-picture-that-moves.md).
@@ -29,7 +29,7 @@ What the chart runs from Away's one image.
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
 | `server` | the server: the pages, the requests, people's sign-ins, the rules, the records | service | there | 55 |
-| `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | there | 46 |
+| `gateway` | the gateway: the sessions, each with one connection to the browser and one to the machine | service | there | 47 |
 | `issuer` | the issuer: makes the sign-ins on machines | service | there | 15 |
 | `relay` | a relay placed in a network Away is not in | relay | later | — |
 
@@ -44,13 +44,13 @@ The libraries the parts and the session view are built from.
 
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
-| `rdp` | the RDP code | library | first release | 10 |
+| `rdp` | the RDP code | library | first release | 11 |
 | `windows-sign-in` | the Windows sign-in: Kerberos, the sign-in before the desktop, the smart card in memory | library | first release | 3 |
 | `vnc` | the VNC code | library | first release | 2 |
 | `ssh` | the SSH code | library | first release | 3 |
 | `shell-screen` | the shell's screen: turns what a shell writes into what it shows | library | first release | 7 |
 | `picture` | the picture: a desktop as the gateway keeps it, and the rectangles it sends | library | first release | 5 |
-| `wire` | the session's messages between the browser and the gateway | contract | there | 1 |
+| `wire` | the session's messages between the browser and the gateway | contract | there | 2 |
 
 - `rdp`: For a Windows desktop and its programs, and for desktops of other systems that speak RDP. Code: `crates/away-rdp/`. Runs: in the gateway. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0016](./decisions/0016-a-picture-that-moves.md).
 - `windows-sign-in`: Code: `crates/away-winauth/`. Runs: in the gateway. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0007](./decisions/0007-short-lived-certificates.md).

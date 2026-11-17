@@ -85,9 +85,16 @@ pub enum ToBrowser<'a> {
         to_the_machine: bool,
         /// What is copied on the machine reaches the person's device.
         from_the_machine: bool,
+        /// Whether pictures pass with the text: a machine may carry text alone.
+        pictures: bool,
     },
     /// This text was copied on the machine.
     Copied(&'a str),
+    /// This picture was copied on the machine.
+    CopiedPicture {
+        /// The picture, as a PNG picture.
+        png: &'a [u8],
+    },
     /// The windows of the programs that are open, from the front one back, and which of
     /// them is the one the person works in.
     Windows {
@@ -183,6 +190,14 @@ const RECTANGLE: u8 = 1;
 const ICON: u8 = 2;
 /// The kind of bytes that are the picture of an icon of the tray.
 const TRAY_PICTURE: u8 = 3;
+/// The kind of bytes that are a picture that was copied on the machine.
+const COPIED_PICTURE: u8 = 4;
+/// The kind of bytes of the browser's that are a piece of a picture the person copied.
+/// What a person did with the keys and the pointer begins with a lower number.
+const THE_PERSONS_PICTURE: u8 = 0x10;
+/// Which piece of a picture it is: the first, the last, or both.
+const FIRST: u8 = 1;
+const LAST: u8 = 2;
 /// The way a rectangle's pixels are written: as a PNG picture.
 const PNG: u8 = 1;
 
@@ -225,10 +240,21 @@ impl ToBrowser<'_> {
                 object(Json::object([("failed", Json::object([("step", step.into()), ("why", why.into()), ("details", details.into())]))]))
             }
             ToBrowser::Ended(why) => object(Json::object([("ended", why.into())])),
-            ToBrowser::Passes { to_the_machine, from_the_machine } => {
+            // that pictures pass is said only where they do
+            ToBrowser::Passes { to_the_machine, from_the_machine, pictures: false } => {
                 object(Json::object([("clipboard", Json::object([("to", to_the_machine.into()), ("from", from_the_machine.into())]))]))
             }
+            ToBrowser::Passes { to_the_machine, from_the_machine, pictures: true } => object(Json::object([(
+                "clipboard",
+                Json::object([("to", to_the_machine.into()), ("from", from_the_machine.into()), ("pictures", true.into())]),
+            )])),
             ToBrowser::Copied(text) => object(Json::object([("copied", text.into())])),
+            ToBrowser::CopiedPicture { png } => {
+                let mut bytes = Vec::with_capacity(1 + png.len());
+                bytes.push(COPIED_PICTURE);
+                bytes.extend_from_slice(png);
+                Carried::Bytes(bytes)
+            }
             ToBrowser::Icon { window, png } => {
                 let mut bytes = Vec::with_capacity(5 + png.len());
                 bytes.push(ICON);
@@ -404,6 +430,16 @@ pub enum FromBrowser {
     Leaves,
     /// The person copied this text on their own device.
     Copied(String),
+    /// A piece of a picture the person copied on their own device, which is a PNG
+    /// picture: a message of the browser's is short, so a picture comes in several.
+    CopiedPicture {
+        /// Whether it is the first piece.
+        first: bool,
+        /// Whether it is the last one.
+        last: bool,
+        /// The piece.
+        piece: Vec<u8>,
+    },
     /// The window has another size now, or is on another screen.
     Sized {
         /// How wide the window is, as a page measures it.
@@ -501,7 +537,15 @@ impl FromBrowser {
                 }
                 Err(NotThis("a message of the browser says nothing a session knows"))
             }
-            Carried::Bytes(bytes) => read_what_was_done(bytes).map(FromBrowser::Did),
+            Carried::Bytes(bytes) => match bytes.split_first() {
+                Some((&THE_PERSONS_PICTURE, rest)) => match rest.split_first() {
+                    Some((which, piece)) if *which & !(FIRST | LAST) == 0 => {
+                        Ok(FromBrowser::CopiedPicture { first: which & FIRST != 0, last: which & LAST != 0, piece: piece.to_vec() })
+                    }
+                    _ => Err(NotThis("a piece of a picture says which piece it is")),
+                },
+                _ => read_what_was_done(bytes).map(FromBrowser::Did),
+            },
         }
     }
 }
@@ -616,7 +660,7 @@ mod tests {
             }
             .write(),
             ToBrowser::Asks { again: false, instead: true, password_alone: false }.write(),
-            ToBrowser::Passes { to_the_machine: true, from_the_machine: false }.write(),
+            ToBrowser::Passes { to_the_machine: true, from_the_machine: false, pictures: false }.write(),
             ToBrowser::Copied("two\nlines").write(),
             ToBrowser::Icon { window: 65537, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
             ToBrowser::Started {
@@ -629,6 +673,8 @@ mod tests {
             ToBrowser::TrayPicture { window: 65537, icon: 1, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
             ToBrowser::Asks { again: true, instead: false, password_alone: true }.write(),
             ToBrowser::Desktop { width: 3024, height: 1964, written: true }.write(),
+            ToBrowser::CopiedPicture { png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
+            ToBrowser::Passes { to_the_machine: true, from_the_machine: true, pictures: true }.write(),
         ];
         assert_eq!(written.len(), to_browser.len());
         for (written, example) in written.iter().zip(to_browser) {
@@ -654,7 +700,17 @@ mod tests {
                 FromBrowser::read(&carried).unwrap_or_else(|NotThis(why)| panic!("{}: {why}", example.write()))
             })
             .collect();
-        assert_eq!(read.len(), 12);
+        assert_eq!(read.len(), 13);
+        assert!(
+            matches!(&read[12], FromBrowser::CopiedPicture { first: true, last: true, piece } if piece[..] == [0x89, 0x50, 0x4e, 0x47])
+        );
+        // a piece in the middle, and one that doesn't say which it is
+        assert!(matches!(
+            FromBrowser::read(&Carried::Bytes(vec![0x10, 0, 7])),
+            Ok(FromBrowser::CopiedPicture { first: false, last: false, .. })
+        ));
+        assert!(FromBrowser::read(&Carried::Bytes(vec![0x10])).is_err());
+        assert!(FromBrowser::read(&Carried::Bytes(vec![0x10, 4, 7])).is_err());
         assert!(
             matches!(&read[11], FromBrowser::Did(did) if did[..] == [Did::Written { sym: 0xffeb, down: true }, Did::Written { sym: 0x0100_20ac, down: false }])
         );
