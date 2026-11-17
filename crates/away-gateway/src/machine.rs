@@ -816,6 +816,11 @@ impl Desktop {
         // leaving is a courtesy: the machine notices a closed connection as well
         let _ = self.writer.write_all(&self.open.leave()).await;
         let _ = self.writer.shutdown().await;
+        // what the machine was still saying is read to its end, for a moment: a connection
+        // that is closed over words nobody read is reset, and a reset that overtakes the
+        // leaving takes it away before the machine has read it
+        let read_out = async { while matches!(self.reader.read(&mut self.scratch).await, Ok(count) if count > 0) {} };
+        let _ = tokio::time::timeout(LAST_WORDS_WITHIN, read_out).await;
     }
 }
 
