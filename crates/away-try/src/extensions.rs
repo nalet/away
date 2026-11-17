@@ -255,7 +255,14 @@ impl Heard {
                 None => return Step::Waits,
             },
             LIGHTS => (1, Some(String::new())),
-            way => return Step::Stops(format!("It wrote a rectangle in a way numbered {way}, which this program doesn't read.")),
+            way => {
+                let (left, top) = (number16(head), number16(&head[2..]));
+                let shown: String = after.iter().take(16).map(|byte| format!("{byte:02x}")).collect::<Vec<_>>().join(" ");
+                return Step::Stops(format!(
+                    "It wrote a rectangle in a way numbered {way}, which this program doesn't read: \
+                     {width} by {height} pixels at {left}, {top}. It begins: {shown}"
+                ));
+            }
         };
         if follow > LONGEST {
             return Step::Stops(format!("It sent a rectangle of {follow} bytes, which is more than this program reads."));
@@ -436,7 +443,7 @@ mod tests {
 
         let mut other = Heard::default();
         other.receive(&update(&[rectangle(4, 4, 1011, &[])]));
-        assert!(other.stopped.as_deref().is_some_and(|why| why.contains("numbered 1011")));
+        assert!(other.stopped.as_deref().is_some_and(|why| why.contains("numbered 1011") && why.contains("4 by 4 pixels at 0, 0")));
     }
 
     #[test]
