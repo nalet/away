@@ -86,6 +86,9 @@ pub enum Happened {
     AskedTheReader(smartcard::Asked),
     /// Text was copied on the machine, and is for the person's clipboard.
     Copied(String),
+    /// The text that was copied on the machine has formatting, written as a page of the
+    /// web is: it comes after the text.
+    CopiedFormatting(String),
     /// A picture was copied on the machine, and is for the person's clipboard.
     CopiedPicture(clipboard::Picture),
     /// Files were copied on the machine: which they are, for the person to choose from.
@@ -364,12 +367,23 @@ impl Connection {
         let copied = copied.map(|copied| match copied {
             clipboard::Carried::Text(text) => Happened::Copied(text),
             clipboard::Carried::Picture(picture) => Happened::CopiedPicture(picture),
+            clipboard::Carried::Formatting(formatted) => Happened::CopiedFormatting(formatted),
             clipboard::Carried::Files(files) => Happened::CopiedFiles(files),
             clipboard::Carried::Piece(piece) => Happened::PieceOfAFile(piece),
             clipboard::Carried::NoPiece => Happened::NoPieceOfAFile,
             clipboard::Carried::Wants { number, file, from, length } => Happened::WantsPieceOfTheirs { number, file, from, length },
         });
         Ok((send, copied.into_iter().collect()))
+    }
+
+    /// The person copied this text, which has formatting, written as a page of the web
+    /// is. As for text: nothing where the clipboard doesn't pass to the machine.
+    pub fn copied_formatted(&mut self, text: &str, formatted: &str) -> Vec<u8> {
+        let told = match self.clipboard.as_mut() {
+            Some((_, clipboard)) => clipboard.copied_formatted(text, formatted),
+            None => Vec::new(),
+        };
+        told.iter().flat_map(|message| self.on(clipboard::CHANNEL, message)).collect()
     }
 
     /// The person copied these files, for the machine to paste: their names and their
@@ -829,6 +843,27 @@ mod tests {
         let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies");
         assert!(happened.contains(&Happened::Copied("FROM THE PERSON'S DEVICE\nIN TWO LINES".to_string())));
 
+        // the key H copies text with its formatting on the machine: the text comes, and then its formatting
+        let key_h = [Input::Key { code: 0x23, extended: false, down: true }];
+        let pressed = connection.input(&key_h);
+        let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies formatted text");
+        let copied: Vec<_> =
+            happened.into_iter().filter(|happened| matches!(happened, Happened::Copied(_) | Happened::CopiedFormatting(_))).collect();
+        assert_eq!(
+            copied,
+            [
+                Happened::Copied("FROM THE PERSON'S DEVICE\nIN TWO LINES".to_string()),
+                Happened::CopiedFormatting(crate::stand_in::desktop::COPIED_FORMATTING.to_string())
+            ]
+        );
+        // the person copies text with formatting: the machine pastes both, and copies the formatting back as it was
+        let told = connection.copied_formatted("the person's", "<u>the person's</u>");
+        talk(&mut connection, &mut machine, told).expect("the machine pastes formatted text");
+        assert_eq!(machine.seen().pasted.last().map(String::as_str), Some("the person's"));
+        assert_eq!(machine.seen().pasted_formatting, ["<u>the person's</u>"]);
+        let pressed = connection.input(&key_h);
+        let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies formatted text");
+        assert!(happened.contains(&Happened::CopiedFormatting("<u>the person's</u>".to_string())));
         // the key P copies a picture on the machine: the client asks for it at once, and it is for the person
         let key_p = [Input::Key { code: 0x19, extended: false, down: true }];
         let pressed = connection.input(&key_p);

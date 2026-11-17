@@ -49,6 +49,18 @@ pub(crate) trait Shown {
     /// The text that was copied on the machine since this was last asked.
     fn copied(&mut self) -> Option<String>;
 
+    /// The formatting of the text that was copied on the machine, since this was last
+    /// asked. A machine whose clipboard carries plain text alone has none.
+    fn copied_formatting(&mut self) -> Option<String> {
+        None
+    }
+
+    /// Tells the machine that the person copied this text, with its formatting. A
+    /// machine whose clipboard carries plain text alone is told the text.
+    async fn offer_formatted(&mut self, text: &str, _formatted: &str) -> Result<(), Failure> {
+        self.offer(text).await
+    }
+
     /// Whether the machine's clipboard carries pictures with the text.
     fn carries_pictures(&self) -> bool {
         false

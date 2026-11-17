@@ -391,6 +391,7 @@ fn it_signs_an_account_in_opens_the_desktop_and_keeps_its_picture() {
             pasted: Vec::new(),
             pasted_pictures: Vec::new(),
             pasted_files: Vec::new(),
+            pasted_formatting: Vec::new(),
             took_later: Vec::new(),
             screens: Vec::new(),
         }

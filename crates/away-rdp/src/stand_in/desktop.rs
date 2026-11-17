@@ -33,6 +33,11 @@ const KEY_C: u8 = 0x2e;
 const KEY_P: u8 = 0x19;
 /// The key F, by its place: with it the stand-in copies files.
 const KEY_F: u8 = 0x21;
+/// The key H, by its place: with it the stand-in copies text with its formatting.
+const KEY_H: u8 = 0x23;
+/// The formatting the stand-in copies with its text when it was handed none: what it
+/// was last handed it copies as it is.
+pub const COPIED_FORMATTING: &str = "<b>copied</b> on the machine";
 
 /// How much of a file the stand-in asks for at once when it pastes one.
 const PASTES_BY: u32 = 100_000;
@@ -159,6 +164,8 @@ pub struct Seen {
     /// The files the client handed over when the stand-in pasted, which it does as soon
     /// as the client says that it holds some: each with its name and what is in it.
     pub pasted_files: Vec<(String, Vec<u8>)>,
+    /// The formatting the client handed over when the stand-in pasted text that has some.
+    pub pasted_formatting: Vec<String>,
     /// The channels it opened later that the client took, by their numbers.
     pub took_later: Vec<u32>,
     /// What the client said its screen is, each time it said so: how wide, how high,
@@ -263,6 +270,9 @@ pub struct Desktop {
     asked_for_a_picture: bool,
     /// The files it is pasting, from the list on, where it is.
     pasting: Option<Pasting>,
+    /// Whether it asked the client for the formatting of its text, and whether the text
+    /// itself, which it asked for first, has come.
+    awaits_formatting: Option<bool>,
     /// Whether it said that it is ready for the clipboard.
     speaks_of_the_clipboard: bool,
     /// The windows of the programs that are open, the front one first.
@@ -307,6 +317,7 @@ impl Desktop {
             clipboard_pieces: Pieces::up_to(clipboard::LARGEST + 1024),
             asked_for_a_picture: false,
             pasting: None,
+            awaits_formatting: None,
             speaks_of_the_clipboard: false,
             windows: Vec::new(),
             opened: 0,
@@ -623,6 +634,12 @@ impl Desktop {
             update.extend(rectangle);
             return Ok(short_frame(0x01, &update));
         }
+        // the formatting it asked for after the text: the second thing the client gives
+        if self.awaits_formatting == Some(true) && message.starts_with(&[5, 0]) {
+            self.awaits_formatting = None;
+            self.seen.pasted_formatting.extend(clipboard::stand_in::gave_formatting(&message));
+            return Ok(Vec::new());
+        }
         // the list of the files it pastes: it asks how large the first one is, and then
         // for each file a piece at a time, until all of it came
         if self.pasting.as_ref().is_some_and(|pasting| pasting.asked == 0) && message.starts_with(&[5, 0]) {
@@ -700,11 +717,24 @@ impl Desktop {
             Said::AsksForPicture => {
                 says(&clipboard::stand_in::gives_picture(&self.seen.pasted_pictures.last().cloned().unwrap_or_else(copied_picture)))
             }
-            Said::Holds { text: true } => [says(&clipboard::stand_in::took()), says(&clipboard::stand_in::asks())].concat(),
+            // the client holds text: it pastes at once, and where the text has
+            // formatting, it asks for that after the text
+            Said::Holds { text: true } => {
+                let formatting = clipboard::stand_in::held_formatting(&message);
+                self.awaits_formatting = formatting.map(|_| false);
+                let mut asks = vec![says(&clipboard::stand_in::took()), says(&clipboard::stand_in::asks())];
+                asks.extend(formatting.map(|formatting| says(&clipboard::stand_in::asks_for_their_formatting(formatting))));
+                asks.concat()
+            }
             Said::Holds { text: false } => says(&clipboard::stand_in::took()),
             Said::Gives(Some(text)) => {
                 self.seen.pasted.push(text);
+                self.awaits_formatting = self.awaits_formatting.map(|_| true);
                 Vec::new()
+            }
+            // the formatting it copies with its text: what it was last handed, or its own
+            Said::AsksForFormatting => {
+                says(&clipboard::stand_in::gives_formatting(self.seen.pasted_formatting.last().map_or(COPIED_FORMATTING, String::as_str)))
             }
             // what it copies: the text it was last handed, in capitals, or its own
             Said::Asks => {
@@ -922,6 +952,10 @@ impl Desktop {
             // the key P copies a picture
             if let (Input::Key { code: KEY_P, down: true, .. }, Some(on)) = (event, self.channel(clipboard::CHANNEL)) {
                 send.extend(on_a_channel(on, &clipboard::stand_in::holds_picture(true), true));
+            }
+            // the key H copies text with its formatting
+            if let (Input::Key { code: KEY_H, down: true, .. }, Some(on)) = (event, self.channel(clipboard::CHANNEL)) {
+                send.extend(on_a_channel(on, &clipboard::stand_in::holds_formatted(), true));
             }
             // the key F copies files
             if let (Input::Key { code: KEY_F, down: true, .. }, Some(on)) = (event, self.channel(clipboard::CHANNEL)) {

@@ -261,7 +261,11 @@ function useSession(machine: string, program: string | null, method?: string) {
         }
         else if ('clipboard' in said) setPasses(said.clipboard);
         else if ('copied' in said) setCopied({ text: said.copied });
-        else if ('files' in said) setCopied({ files: said.files });
+        else if ('formatted' in said) {
+          // the formatting of the text that came just before
+          const { formatted } = said;
+          setCopied((before) => (before !== null && 'text' in before ? { text: before.text, formatted } : before));
+        } else if ('files' in said) setCopied({ files: said.files });
         else if ('wants' in said) {
           // the machine pastes one of the files the person gave: the piece it wants is
           // read off their device now, and goes on in pieces

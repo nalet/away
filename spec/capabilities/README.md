@@ -123,7 +123,7 @@ has the steps.
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
-| a session over RDP | 7 | 9 | 24 | 22 | 5 | 138 |
+| a session over RDP | 8 | 8 | 24 | 22 | 5 | 138 |
 | a session over VNC | 9 | 7 | 11 | 11 | 15 | 152 |
 | a session over SSH | 0 | 0 | 27 | 12 | 2 | 164 |
 | Away itself | 44 | 5 | 26 | 44 | 9 | 77 |

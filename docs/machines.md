@@ -316,7 +316,11 @@ machine that offers more is opened from its own page, where each way in is.
   its clipboard on, the bar's clipboard panel has a field for what goes to the
   machine, which takes text and a pasted picture, and shows what came from it,
   with a button that copies it. Of a clipboard that holds text and a picture,
-  the text passes. Text passes up to about a quarter of a million characters,
+  the text passes. Text keeps its formatting where it has some, such as bold,
+  a table or a link: it passes as the plain text and, with it, the text with
+  its formatting, and a program that pastes it takes whichever it reads; in a
+  browser that doesn't pass its clipboard on, the panel's own fields hold the
+  plain text. Text passes up to about a quarter of a million characters,
   and a picture up to a screen of 3840 by 2160 pixels; one that is larger does
   not pass, and the session goes on. The gateway packs each picture anew, so
   the browser is given nothing the machine wrote. The panel's **copy a picture
@@ -342,7 +346,7 @@ machine that offers more is opened from its own page, where each way in is.
   device then. Nothing of a file is kept by Away, so the session has to stay
   open until the machine has it, and a file may be as large as the device
   holds. Each file the machine had to its end is a record. Folders of one's
-  own don't pass yet, and neither does text with its formatting.
+  own don't pass yet.
 - **A Windows desktop follows its window.** Once the window has rested at
   another size, the machine is told and offers its desktop anew at that size,
   so nothing is scaled and text keeps its size. A machine that doesn't take a

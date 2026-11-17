@@ -15,6 +15,8 @@ export type Said =
   | { windows: WindowOf[]; in_front: number | null }
   | { clipboard: { to: boolean; from: boolean; pictures?: boolean } }
   | { copied: string }
+  // the formatting of the text that was copied on the machine, written as a page of the web is
+  | { formatted: string }
   // the files that were copied on the machine, and what became of the one that was asked for
   | { files: { name: string; size?: number; folder?: boolean }[] }
   | { file: 'whole' | 'failed' }
@@ -115,9 +117,10 @@ export function sized(width: number, height: number, scale: number): string {
   return JSON.stringify({ sized: { width, height, scale } });
 }
 
-// The person copied this text on their own device.
-export function copied(text: string): string {
-  return JSON.stringify({ copied: text });
+// The person copied this text on their own device: with its formatting, written as a
+// page of the web is, where it has some.
+export function copied(text: string, formatted?: string): string {
+  return JSON.stringify(formatted === undefined ? { copied: text } : { copied: text, formatted });
 }
 
 // The person copied this picture on their own device: a PNG picture. A message to the

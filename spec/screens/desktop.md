@@ -121,7 +121,12 @@ on by itself.
   session has to stay open until the machine has it. The panel lists what was
   given, and **take them back** withdraws it. Each file the machine had to its
   end is a record. Folders of one's own don't pass yet.
-- Text with its formatting comes later.
+- Text keeps its formatting on a Windows machine, where it has some: bold, a
+  table, a link. It passes as the plain text and, with it, the same text with
+  its formatting, and a program that pastes it takes whichever it reads. In a
+  browser that doesn't pass its clipboard on, the panel's fields hold the plain
+  text; what comes from the machine is copied with its formatting by the
+  panel's button.
 - **Copy a picture of the screen** takes one of what the session shows, as Away
   has it, into one's own clipboard. The machine has no part in it, so it is
   there for every kind of machine, where copying from the machine is let.

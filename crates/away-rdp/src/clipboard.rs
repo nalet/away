@@ -65,6 +65,10 @@ const LIST_OF_FILES: &str = "FileGroupDescriptorW";
 const WHAT_IS_IN_FILES: &str = "FileContents";
 const THEIR_LIST: u32 = 0xc0f1;
 const WHAT_IS_IN_THEIRS: u32 = 0xc0f2;
+/// The name of the kind that is text with its formatting, written as a page of the web
+/// is, and the number the client gives it where it holds such text itself.
+const FORMATTING: &str = "HTML Format";
+const THEIR_FORMATTING: u32 = 0xc0f3;
 /// How long the entry of one file in that list is, where its name begins in it, and
 /// the mark of a folder among what a file is.
 const ONE_FILE: usize = 592;
@@ -140,6 +144,9 @@ pub enum Carried {
     Piece(Vec<u8>),
     /// The machine did not give the piece that was asked for.
     NoPiece,
+    /// The formatting of the text that was copied on the machine, written as a page of
+    /// the web is: it comes after the text itself, where the machine holds both.
+    Formatting(String),
     /// The machine pastes a file the person copied, and wants a piece of it: the file by
     /// its place among those the person copied, the piece by where it begins and how
     /// long it is. The answer is given under the number.
@@ -193,6 +200,10 @@ pub struct Clipboard {
     pieces: u32,
     /// The piece of a file the client asked for and waits for, by its number.
     asked_for_a_piece: Option<u32>,
+    /// The number the machine gives the formatting of the text it holds now.
+    formatting: Option<u32>,
+    /// The formatting of the text the person copied, where it has some.
+    their_formatting: Option<String>,
 }
 
 /// A message of the clipboard's channel: its kind, how it went, and what it holds.
@@ -294,6 +305,39 @@ fn picture_for_the_person(held: &[u8]) -> Option<Picture> {
     Some(Picture { width, height, pixels })
 }
 
+/// What is written before and after formatted text, for a machine to know it as a page.
+const BEFORE_IT: &str = "<html>\r\n<body>\r\n<!--StartFragment-->";
+const AFTER_IT: &str = "<!--EndFragment-->\r\n</body>\r\n</html>";
+
+/// Formatted text as a machine holds it: a head that says where the page and the text
+/// in it begin and end, counted in bytes from the head's first, and then the page. Each
+/// number is ten digits long, so that the head's length doesn't depend on them.
+fn formatting_for_the_machine(formatted: &str) -> Vec<u8> {
+    let head = |page: usize, ends: usize, text: usize, text_ends: usize| {
+        format!("Version:0.9\r\nStartHTML:{page:010}\r\nEndHTML:{ends:010}\r\nStartFragment:{text:010}\r\nEndFragment:{text_ends:010}\r\n")
+    };
+    let page = head(0, 0, 0, 0).len();
+    let text = page + BEFORE_IT.len();
+    let text_ends = text + formatted.len();
+    let mut held = head(page, text_ends + AFTER_IT.len(), text, text_ends).into_bytes();
+    held.extend([BEFORE_IT, formatted, AFTER_IT].concat().as_bytes());
+    held.push(0);
+    held
+}
+
+/// Formatted text a machine holds, as the person's device takes it: the part of the
+/// page that the head says is the text. Nothing where the head doesn't say so.
+fn formatting_for_the_person(held: &[u8]) -> Option<String> {
+    let head = &held[..held.len().min(1024)];
+    let number = |name: &[u8]| {
+        let at = head.windows(name.len()).position(|here| here == name)? + name.len();
+        let digits: String = head[at..].iter().take_while(|digit| digit.is_ascii_digit()).map(|digit| char::from(*digit)).collect();
+        digits.parse::<usize>().ok()
+    };
+    let (from, to) = (number(b"StartFragment:")?, number(b"EndFragment:")?);
+    Some(String::from_utf8_lossy(held.get(from..to)?).into_owned())
+}
+
 /// The files the person copied, as a machine takes their list: each by its own name,
 /// with nothing in it that a machine reads as a folder or a drive, and its size.
 fn files_for_the_machine(files: &[File]) -> Vec<u8> {
@@ -355,6 +399,8 @@ impl Clipboard {
             keeps: 0,
             pieces: 0,
             asked_for_a_piece: None,
+            formatting: None,
+            their_formatting: None,
         }
     }
 
@@ -369,6 +415,13 @@ impl Clipboard {
     fn holds(&self) -> Vec<u8> {
         let mut kinds = Vec::new();
         let kind = match (&self.theirs, self.passes.to_the_machine) {
+            // text with its formatting is held as both: the formatting by its name
+            (Some(Carried::Text(_)), true) if self.their_formatting.is_some() && self.long_names => {
+                kinds.extend(THEIR_FORMATTING.to_le_bytes());
+                kinds.extend(FORMATTING.encode_utf16().flat_map(u16::to_le_bytes));
+                kinds.extend([0, 0]);
+                Some(TEXT)
+            }
             (Some(Carried::Text(_)), true) => Some(TEXT),
             (Some(Carried::Picture(_)), true) => Some(PICTURE),
             // files are held as their list and as what is in them, each kind by its name
@@ -431,7 +484,7 @@ impl Clipboard {
             HOLDS => {
                 let mut answers = vec![message(TOOK, WORKED, &[])];
                 let mut kinds = holds;
-                let (mut text, mut picture, mut list) = (false, false, None);
+                let (mut text, mut picture, mut list, mut formatting) = (false, false, None, None);
                 while kinds.len() >= 4 {
                     text |= four(kinds, 0) == Some(TEXT);
                     picture |= four(kinds, 0) == Some(PICTURE);
@@ -439,9 +492,13 @@ impl Clipboard {
                     let name = match self.long_names {
                         true => {
                             let units = kinds[4..].as_chunks::<2>().0.iter().position(|unit| *unit == [0, 0]).ok_or(WRONG)?;
-                            let named = LIST_OF_FILES.encode_utf16().flat_map(u16::to_le_bytes).eq(kinds[4..4 + units * 2].iter().copied());
-                            if named {
+                            let is =
+                                |name: &str| name.encode_utf16().flat_map(u16::to_le_bytes).eq(kinds[4..4 + units * 2].iter().copied());
+                            if is(LIST_OF_FILES) {
                                 list = four(kinds, 0);
+                            }
+                            if is(FORMATTING) {
+                                formatting = four(kinds, 0);
                             }
                             units * 2 + 2
                         }
@@ -469,6 +526,12 @@ impl Clipboard {
                     self.asked.push_back(Some(kind));
                     answers.push(message(ASKS, 0, &kind.to_le_bytes()));
                 }
+                // text that has formatting too: the formatting is asked for after the text
+                self.formatting = formatting.filter(|_| wanted == Some(TEXT));
+                if let Some(kind) = self.formatting {
+                    self.asked.push_back(Some(kind));
+                    answers.push(message(ASKS, 0, &kind.to_le_bytes()));
+                }
                 Ok((answers, None))
             }
             // the machine pastes: it is handed what the person copied, in the kind the
@@ -478,6 +541,9 @@ impl Clipboard {
                     (Some(TEXT), Some(Carried::Text(theirs))) if self.passes.to_the_machine => Some(for_the_machine(theirs)),
                     (Some(PICTURE), Some(Carried::Picture(theirs))) if self.passes.to_the_machine => Some(picture_for_the_machine(theirs)),
                     (Some(THEIR_LIST), Some(Carried::Files(theirs))) if self.passes.to_the_machine => Some(files_for_the_machine(theirs)),
+                    (Some(THEIR_FORMATTING), Some(Carried::Text(_))) if self.passes.to_the_machine => {
+                        self.their_formatting.as_deref().map(formatting_for_the_machine)
+                    }
                     _ => None,
                 };
                 Ok((vec![handed.map(|handed| message(GIVES, WORKED, &handed)).unwrap_or_else(|| message(GIVES, FAILED, &[]))], None))
@@ -488,6 +554,9 @@ impl Clipboard {
                 let copied = match self.asked.pop_front().flatten() {
                     Some(TEXT) if how & WORKED != 0 && holds.len() <= LONGEST => Some(Carried::Text(for_the_person(holds))),
                     Some(PICTURE) if how & WORKED != 0 && holds.len() <= LARGEST => picture_for_the_person(holds).map(Carried::Picture),
+                    Some(formatting) if Some(formatting) == self.formatting && how & WORKED != 0 && holds.len() <= LONGEST => {
+                        formatting_for_the_person(holds).map(Carried::Formatting)
+                    }
                     // the list of the files: the machine is told to keep them, where it
                     // does, so that they can be had after something else was copied there
                     Some(list) if Some(list) == self.list && how & WORKED != 0 => {
@@ -610,10 +679,25 @@ impl Clipboard {
         vec![message(ASKS_FOR_A_FILE, 0, &asks)]
     }
 
+    /// The person copied this text, which has formatting, written as a page of the web
+    /// is. As for text: the machine pastes whichever of the two it takes.
+    pub fn copied_formatted(&mut self, text: &str, formatted: &str) -> Vec<Vec<u8>> {
+        if text.len() * 2 > LONGEST {
+            return Vec::new();
+        }
+        let formatted = (formatted.len() <= LONGEST).then(|| formatted.to_string());
+        self.holds_with(Carried::Text(text.to_string()), formatted)
+    }
+
     fn holds_now(&mut self, theirs: Carried) -> Vec<Vec<u8>> {
+        self.holds_with(theirs, None)
+    }
+
+    fn holds_with(&mut self, theirs: Carried, formatting: Option<String>) -> Vec<Vec<u8>> {
         if !self.passes.to_the_machine {
             return Vec::new();
         }
+        self.their_formatting = formatting;
         self.theirs = Some(theirs);
         // what the client asked the machine for is no longer the newest
         self.asked.iter_mut().for_each(|asked| *asked = None);
@@ -770,6 +854,43 @@ pub mod stand_in {
         (kind == GIVES_A_FILE).then(|| (number, worked.then(|| arrived[12..].to_vec())))
     }
 
+    /// The number the stand-in gives the formatting of the text it holds.
+    pub const ITS_FORMATTING: u32 = 0xc0b1;
+
+    /// The machine's clipboard holds text with its formatting, and a kind that is not Away's.
+    pub fn holds_formatted() -> Vec<u8> {
+        let mut kinds = Vec::new();
+        for (kind, name) in [(0xc004u32, "Native"), (ITS_FORMATTING, FORMATTING), (TEXT, "")] {
+            kinds.extend(kind.to_le_bytes());
+            kinds.extend(name.encode_utf16().flat_map(u16::to_le_bytes));
+            kinds.extend([0, 0]);
+        }
+        message(HOLDS, 0, &kinds)
+    }
+
+    /// The machine gives the formatting the client asked for, as a machine writes it.
+    pub fn gives_formatting(formatted: &str) -> Vec<u8> {
+        message(GIVES, WORKED, &formatting_for_the_machine(formatted))
+    }
+
+    /// The number a client gives the formatting of the text it says it holds, where it holds some.
+    pub fn held_formatting(arrived: &[u8]) -> Option<u32> {
+        let name: Vec<u8> = FORMATTING.encode_utf16().flat_map(u16::to_le_bytes).collect();
+        let at = arrived.get(8..)?.windows(name.len()).position(|here| here == name)?;
+        arrived.get(8 + at - 4..8 + at).map(|four| u32::from_le_bytes([four[0], four[1], four[2], four[3]]))
+    }
+
+    /// The machine pastes formatted text: it asks for the client's formatting, by its number.
+    pub fn asks_for_their_formatting(formatting: u32) -> Vec<u8> {
+        message(ASKS, 0, &formatting.to_le_bytes())
+    }
+
+    /// The formatting a client gave, where it gave some.
+    pub fn gave_formatting(arrived: &[u8]) -> Option<String> {
+        let worked = arrived.get(2..4).is_some_and(|how| u16::from_le_bytes([how[0], how[1]]) & WORKED != 0);
+        arrived.get(8..).filter(|_| worked).and_then(formatting_for_the_person)
+    }
+
     /// The machine took what the client says it holds.
     pub fn took() -> Vec<u8> {
         message(TOOK, WORKED, &[])
@@ -803,6 +924,8 @@ pub mod stand_in {
         AsksForPicture,
         /// That it asks for the list of the machine's files.
         AsksForFiles,
+        /// That it asks for the formatting of the machine's text.
+        AsksForFormatting,
         /// That it asks for a piece of a file.
         AsksForAPiece {
             /// The number the answer is given under.
@@ -846,11 +969,15 @@ pub mod stand_in {
             {
                 Said::HoldsFiles(u32::from_le_bytes([holds[0], holds[1], holds[2], holds[3]]))
             }
-            (Some(HOLDS), _) => Said::Holds { text: holds.len() >= 4 && holds[..4] == TEXT.to_le_bytes() },
+            // text, also where the formatting it has is named before it
+            (Some(HOLDS), _) => {
+                Said::Holds { text: holds.len() >= 4 && (holds[..4] == TEXT.to_le_bytes() || holds[..4] == THEIR_FORMATTING.to_le_bytes()) }
+            }
             (Some(TOOK), _) => Said::Took,
             (Some(ASKS), _) if holds == TEXT.to_le_bytes() => Said::Asks,
             (Some(ASKS), _) if holds == PICTURE.to_le_bytes() => Said::AsksForPicture,
             (Some(ASKS), _) if holds == LIST.to_le_bytes() => Said::AsksForFiles,
+            (Some(ASKS), _) if holds == ITS_FORMATTING.to_le_bytes() => Said::AsksForFormatting,
             (Some(ASKS_FOR_A_FILE), _) if holds.len() >= 24 => {
                 let four = |at: usize| u32::from_le_bytes([holds[at], holds[at + 1], holds[at + 2], holds[at + 3]]);
                 Said::AsksForAPiece {
@@ -1149,6 +1276,46 @@ mod tests {
         assert!(clipboard.copied_files(Vec::new()).is_empty());
         let mut short = ready(Passes::BOTH, false);
         assert!(short.copied_files(vec![file("notes.txt", 11)]).is_empty());
+    }
+
+    #[test]
+    fn text_keeps_its_formatting_both_ways_where_it_has_some() {
+        let mut clipboard = ready(Passes::BOTH, true);
+        // the machine copies text that has formatting: the client asks for the text, and
+        // then for the formatting, and is given each
+        let (answers, copied) = clipboard.receive(&stand_in::holds_formatted()).unwrap();
+        assert_eq!((said(&answers), copied), (vec![Said::Took, Said::Asks, Said::AsksForFormatting], None));
+        assert_eq!(clipboard.receive(&stand_in::gives("bold and plain")).unwrap().1, Some(Carried::Text("bold and plain".to_string())));
+        assert_eq!(
+            clipboard.receive(&stand_in::gives_formatting("<b>bold</b> and plain: €")).unwrap().1,
+            Some(Carried::Formatting("<b>bold</b> and plain: €".to_string()))
+        );
+        // as a machine writes it: a head with where the page and the text begin and end, then the page
+        let written = String::from_utf8(formatting_for_the_machine("<i>x</i>")).unwrap();
+        assert!(written.starts_with(
+            "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000000185\r\nStartFragment:0000000141\r\nEndFragment:0000000149\r\n<html>"
+        ));
+        assert_eq!(&written[141..149], "<i>x</i>");
+        assert!(written.ends_with("<!--EndFragment-->\r\n</body>\r\n</html>\0"));
+        // a head that doesn't say where the text is, or says it is beyond the end, gives none
+        assert_eq!(formatting_for_the_person(b"Version:0.9\r\n<html></html>"), None);
+        assert_eq!(formatting_for_the_person(b"StartFragment:0000000900\r\nEndFragment:0000000990\r\n<p>short</p>"), None);
+        assert_eq!(formatting_for_the_person(b"StartFragment:0000000060\r\nEndFragment:0000000050\r\n<p>turned round</p>"), None);
+
+        // the person copies text with formatting: the machine is told of both, and is
+        // handed whichever it asks for
+        let told = clipboard.copied_formatted("the person's", "<u>the person's</u>");
+        assert_eq!(said(&told), [Said::Holds { text: true }]);
+        assert_eq!(stand_in::held_formatting(&told[0]), Some(THEIR_FORMATTING));
+        let (answers, _) = clipboard.receive(&stand_in::asks()).unwrap();
+        assert_eq!(said(&answers), [Said::Gives(Some("the person's".to_string()))]);
+        let (answers, _) = clipboard.receive(&stand_in::asks_for_their_formatting(THEIR_FORMATTING)).unwrap();
+        assert_eq!(stand_in::gave_formatting(&answers[0]), Some("<u>the person's</u>".to_string()));
+        // plain text after it has no formatting to give
+        let told = clipboard.copied("plain now");
+        assert_eq!(stand_in::held_formatting(&told[0]), None);
+        let (answers, _) = clipboard.receive(&stand_in::asks_for_their_formatting(THEIR_FORMATTING)).unwrap();
+        assert_eq!(stand_in::gave_formatting(&answers[0]), None);
     }
 
     #[test]

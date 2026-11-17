@@ -26,7 +26,15 @@ export interface Passes {
 
 // What a clipboard holds for the other side: text, a picture as a PNG picture, or the
 // files that were copied on the machine, of which the person has the ones they choose.
-export type Held = { text: string } | { picture: Uint8Array<ArrayBuffer> } | { files: FileOf[] };
+// Text may have its formatting with it, written as a page of the web is.
+export type Held = { text: string; formatted?: string } | { picture: Uint8Array<ArrayBuffer> } | { files: FileOf[] };
+
+// Text for a clipboard, with its formatting where it has some: a program that pastes it
+// takes whichever of the two it reads.
+function both(text: string, formatted: string | undefined): ClipboardItem {
+  const plain = { 'text/plain': new Blob([text], { type: 'text/plain' }) };
+  return new ClipboardItem(formatted === undefined ? plain : { ...plain, 'text/html': new Blob([formatted], { type: 'text/html' }) });
+}
 
 // Who takes a file that is had from the machine: its pieces in their order, and then
 // whether all of it came.
@@ -75,7 +83,7 @@ export function useClipboard(
   passes: Passes | null,
   fromMachine: Held | null,
   say: (message: string | Uint8Array<ArrayBuffer>) => void,
-): { byItself: boolean; send: (text: string) => void; sendPicture: (picture: Blob) => Promise<'sent' | 'too large' | 'no picture'> } {
+): { byItself: boolean; send: (text: string, formatted?: string) => void; sendPicture: (picture: Blob) => Promise<'sent' | 'too large' | 'no picture'> } {
   // a browser passes its clipboard on once it lets the page read it, which it says
   // itself where it can be asked; a read that it refuses says the opposite
   const [byItself, setByItself] = useState(false);
@@ -83,6 +91,9 @@ export function useClipboard(
   // Text is known by itself, and a picture by what it shows
   const told = useRef<string | null>(null);
   const came = useRef<string | null>(null);
+  // the text that last came from the machine: a browser writes formatting anew when it
+  // takes it into its clipboard, so what came is known by its text
+  const cameText = useRef<string | null>(null);
 
   useEffect(() => {
     let over = false;
@@ -103,10 +114,11 @@ export function useClipboard(
   }, []);
 
   const send = useCallback(
-    (text: string) => {
-      if (!passes?.to || text === '' || `text ${text}` === told.current) return;
-      told.current = `text ${text}`;
-      say(copiedToMachine(text));
+    (text: string, formatted?: string) => {
+      const what = `text ${text}${formatted === undefined ? '' : `\nformatted ${formatted}`}`;
+      if (!passes?.to || text === '' || what === told.current) return;
+      told.current = what;
+      say(copiedToMachine(text, formatted));
     },
     [passes, say],
   );
@@ -143,7 +155,7 @@ export function useClipboard(
         navigator.clipboard
           .readText()
           .then((text) => {
-            if (`text ${text}` !== came.current) send(text);
+            if (text !== cameText.current) send(text);
           })
           .catch(refused);
         return;
@@ -155,7 +167,9 @@ export function useClipboard(
           const picture = items.find((item) => item.types.includes('image/png'));
           if (text) {
             const held = await (await text.getType('text/plain')).text();
-            if (`text ${held}` !== came.current) send(held);
+            // with its formatting, where the clipboard holds it with some
+            const formatted = text.types.includes('text/html') ? await (await text.getType('text/html')).text() : undefined;
+            if (held !== cameText.current) send(held, formatted);
           } else if (picture) await sendPicture(await picture.getType('image/png'));
         })
         .catch(refused);
@@ -173,9 +187,15 @@ export function useClipboard(
   useEffect(() => {
     if (!passes?.from || fromMachine === null) return;
     if ('text' in fromMachine) {
-      if (`text ${fromMachine.text}` === came.current) return;
-      came.current = `text ${fromMachine.text}`;
-      if (byItself) navigator.clipboard.writeText(fromMachine.text).catch(() => undefined);
+      // the formatting comes after the text: the clipboard then holds the text again, with it
+      const { text, formatted } = fromMachine;
+      const what = `text ${text}${formatted === undefined ? '' : `\nformatted ${formatted}`}`;
+      if (what === came.current) return;
+      came.current = what;
+      cameText.current = text;
+      if (!byItself) return;
+      if (formatted === undefined || typeof ClipboardItem === 'undefined') navigator.clipboard.writeText(text).catch(() => undefined);
+      else navigator.clipboard.write([both(text, formatted)]).catch(() => undefined);
       return;
     }
     // files reach no clipboard a browser has: the panel lists them, to download
@@ -470,9 +490,12 @@ export function ClipboardPanel({
   };
   const copy = () => {
     if (fromMachine === null || 'files' in fromMachine) return;
+    const formatted = 'text' in fromMachine && fromMachine.formatted !== undefined && typeof ClipboardItem !== 'undefined';
     const written =
       'text' in fromMachine
-        ? navigator.clipboard?.writeText(fromMachine.text)
+        ? formatted
+          ? navigator.clipboard?.write([both(fromMachine.text, fromMachine.formatted)])
+          : navigator.clipboard?.writeText(fromMachine.text)
         : navigator.clipboard?.write([new ClipboardItem({ 'image/png': new Blob([fromMachine.picture], { type: 'image/png' }) })]);
     written?.then(() => setTaken(true)).catch(() => undefined);
   };

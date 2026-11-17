@@ -1041,7 +1041,7 @@ test.describe('a session', () => {
     await page.keyboard.press('c');
     await page.getByRole('button', { name: "open the session's bar" }).click();
     await bar.getByRole('button', { name: 'clipboard' }).click();
-    await expect(panel.getByLabel('From the machine')).toHaveValue('FROM THE PAGE');
+    await expect(panel.getByRole('textbox', { name: 'From the machine' })).toHaveValue('FROM THE PAGE');
     await expect(panel.getByRole('button', { name: 'copy', exact: true })).toBeEnabled();
     await page.keyboard.press('Escape');
     await expect(bar).toHaveCount(0);
@@ -1127,6 +1127,37 @@ test.describe('a session', () => {
         return page.evaluate(() => navigator.clipboard.readText());
       })
       .toBe('COPIED BY THE PERSON');
+
+    // text keeps its formatting: the key H copies some on the machine, and the person's
+    // clipboard holds the text and, with it, the text with its formatting
+    const formatted = () =>
+      page.evaluate(async () => {
+        const item = (await navigator.clipboard.read()).find((one) => one.types.includes('text/html'));
+        return item ? [await (await item.getType('text/plain')).text(), await (await item.getType('text/html')).text()] : null;
+      });
+    await page.keyboard.press('h');
+    await expect.poll(async () => (await formatted())?.[0]).toBe('COPIED BY THE PERSON');
+    expect((await formatted())?.[1]).toContain('<b>copied</b> on the machine');
+    // and what the person copies with formatting is the machine's to paste with it: the
+    // stand-in copies the formatting it was handed back as it was
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await page.evaluate(() =>
+      navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': new Blob(['slanted by the person'], { type: 'text/plain' }),
+          'text/html': new Blob(['<i>slanted</i> by the person'], { type: 'text/html' }),
+        }),
+      ]),
+    );
+    await page.keyboard.press('Escape');
+    await expect(screen).toBeFocused();
+    await expect
+      .poll(async () => {
+        await page.keyboard.press('h');
+        return (await formatted())?.[0] ?? '';
+      })
+      .toBe('SLANTED BY THE PERSON');
+    expect((await formatted())?.[1]).toContain('<i>slanted</i> by the person');
 
     // a picture passes the same way: the key P copies one on the machine, of three by
     // two pixels, and it is in the person's clipboard
@@ -1256,8 +1287,9 @@ test.describe('a session', () => {
     await page.getByRole('button', { name: "open the session's bar" }).click();
     const bar = page.getByRole('toolbar', { name: "the session's bar" });
     await bar.getByRole('button', { name: 'clipboard' }).click();
-    await expect(panel.getByLabel('From the machine')).toHaveValue('copied on the machine\nin two lines');
+    // the list of the files goes first, and the field for text is there in its place
     await expect(files).toHaveCount(0);
+    await expect(panel.getByRole('textbox', { name: 'From the machine' })).toHaveValue('copied on the machine\nin two lines');
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: "open the session's bar" }).click();
     await bar.getByRole('button', { name: 'end' }).click();
@@ -2061,6 +2093,7 @@ test("the session's messages are written and read as the examples say that the g
     { file: 'whole' },
     { file: 'failed' },
     { wants: { file: 1, from: 5_000_000_000, length: 100_000 } },
+    { formatted: '<b>two</b>\nlines' },
   ]);
   expect([
     readSaid('no JSON'),
@@ -2112,6 +2145,7 @@ test("the session's messages are written and read as the examples say that the g
     ]),
     ...ofTheirFile(new TextEncoder().encode('hello')).map(hex),
     givesNothing(),
+    copied('bold', '<b>bold</b>'),
   ];
   // a picture that is longer than a message goes in pieces: the first, those between, the last
   const pieces = copiedPicture(new Uint8Array(100_000).fill(7));

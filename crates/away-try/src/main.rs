@@ -610,6 +610,7 @@ fn rdp(asked: &Asked, account: Option<Account>, on_the_card: Option<OnTheCard>) 
                     | Happened::CopiedFiles(_)
                     | Happened::PieceOfAFile(_)
                     | Happened::NoPieceOfAFile
+                    | Happened::CopiedFormatting(_)
                     | Happened::WantsPieceOfTheirs { .. } => {}
                     Happened::Windows(changes) => {
                         for change in changes {

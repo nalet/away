@@ -690,6 +690,25 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
     let seen = world.machine.seen();
     assert_eq!(seen.last().expect("the client").pasted, ["from the person's device"]);
 
+    // text keeps its formatting: the key H copies some on the machine, and the
+    // formatting comes after the text; what the person copied with formatting is the
+    // machine's to paste with it
+    session.did(&[4, 0x23, 0, 1, 4, 0x23, 0, 0]).await;
+    assert_eq!(session.until("formatted").await.write(), r#"{"formatted":"<b>copied</b> on the machine"}"#);
+    session.say(Json::object([("copied", "slanted".into()), ("formatted", "<i>slanted</i>".into())])).await;
+    let pasted = async {
+        while world.machine.seen().last().is_none_or(|seen| seen.pasted_formatting.is_empty()) {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    };
+    tokio::time::timeout(Duration::from_secs(10), pasted).await.expect("the machine pastes the formatted text");
+    let seen = world.machine.seen();
+    let client = seen.last().expect("the client");
+    assert_eq!(
+        (client.pasted.last().map(String::as_str), client.pasted_formatting.as_slice()),
+        (Some("slanted"), &["<i>slanted</i>".to_string()][..])
+    );
+
     // a picture passes the same way: the key P copies one on the machine, which comes
     // as a PNG picture; the key F copies files, which are listed with nothing of what
     // is in them

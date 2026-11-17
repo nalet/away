@@ -811,6 +811,12 @@ where
                         return Ended::BrowserGone;
                     }
                 }
+                // its formatting comes after it, where the text has some
+                if let Some(formatted) = desktop.copied_formatting() {
+                    if tell(browser, ToBrowser::Formatted(&formatted)).await.is_err() {
+                        return Ended::BrowserGone;
+                    }
+                }
                 // what the machine wants of the files the person copied, as it pastes
                 // them: the browser is asked for it, a piece at a time
                 wants.extend(desktop.wanted());
@@ -946,6 +952,11 @@ where
                 // what the person copied on their own device can be pasted on the machine
                 Some(FromBrowser::Copied(text)) => {
                     if let Err(failed) = desktop.offer(&text).await {
+                        return ended_by(failed);
+                    }
+                }
+                Some(FromBrowser::CopiedFormatted { text, formatted }) => {
+                    if let Err(failed) = desktop.offer_formatted(&text, &formatted).await {
                         return ended_by(failed);
                     }
                 }

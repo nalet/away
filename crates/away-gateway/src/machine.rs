@@ -477,6 +477,7 @@ impl Secured {
                 ticked: tokio::time::Instant::now(),
                 resized: false,
                 copied: None,
+                copied_formatting: None,
                 copied_picture: None,
                 copied_files: None,
                 piece: None,
@@ -558,6 +559,8 @@ pub struct Desktop {
     resized: bool,
     /// The text that was last copied on the machine, until it is taken.
     copied: Option<String>,
+    /// The formatting of the text that was last copied on the machine, until it is taken.
+    copied_formatting: Option<String>,
     /// The picture that was last copied on the machine, until it is taken.
     copied_picture: Option<CopiedPicture>,
     /// The files that were last copied on the machine, until they are taken.
@@ -700,6 +703,7 @@ impl Desktop {
                         self.copied = Some(text);
                         self.copied_picture = None;
                     }
+                    Happened::CopiedFormatting(formatted) => self.copied_formatting = Some(formatted),
                     Happened::CopiedPicture(picture) => {
                         self.copied_picture = Some(picture);
                         self.copied = None;
@@ -840,6 +844,22 @@ impl Desktop {
     /// there: where the clipboard passes to the machine.
     pub async fn offer(&mut self, text: &str) -> Result<(), Failure> {
         let told = self.open.copied(text);
+        if told.is_empty() {
+            return Ok(());
+        }
+        self.write(&told).await
+    }
+
+    /// The formatting of the text that was copied on the machine, since this was last
+    /// asked: it comes after the text, where the machine holds both.
+    pub fn copied_formatting(&mut self) -> Option<String> {
+        self.copied_formatting.take()
+    }
+
+    /// Tells the machine that the person copied this text, with its formatting, so that
+    /// either can be pasted there: where the clipboard passes to the machine.
+    pub async fn offer_formatted(&mut self, text: &str, formatted: &str) -> Result<(), Failure> {
+        let told = self.open.copied_formatted(text, formatted);
         if told.is_empty() {
             return Ok(());
         }
@@ -988,6 +1008,14 @@ impl Shown for Desktop {
 
     fn carries_pictures(&self) -> bool {
         true
+    }
+
+    fn copied_formatting(&mut self) -> Option<String> {
+        Desktop::copied_formatting(self)
+    }
+
+    async fn offer_formatted(&mut self, text: &str, formatted: &str) -> Result<(), Failure> {
+        Desktop::offer_formatted(self, text, formatted).await
     }
 
     fn copied_picture(&mut self) -> Option<CopiedPicture> {

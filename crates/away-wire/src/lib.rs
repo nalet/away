@@ -90,6 +90,9 @@ pub enum ToBrowser<'a> {
     },
     /// This text was copied on the machine.
     Copied(&'a str),
+    /// The text that was copied on the machine has this formatting, written as a page of
+    /// the web is: it comes after the text.
+    Formatted(&'a str),
     /// This picture was copied on the machine.
     CopiedPicture {
         /// The picture, as a PNG picture.
@@ -286,6 +289,7 @@ impl ToBrowser<'_> {
                 Json::object([("to", to_the_machine.into()), ("from", from_the_machine.into()), ("pictures", true.into())]),
             )])),
             ToBrowser::Copied(text) => object(Json::object([("copied", text.into())])),
+            ToBrowser::Formatted(formatted) => object(Json::object([("formatted", formatted.into())])),
             // a folder is said to be one and has no size; a file has its size
             ToBrowser::CopiedFiles(files) => object(Json::object([(
                 "files",
@@ -491,6 +495,14 @@ pub enum FromBrowser {
     Leaves,
     /// The person copied this text on their own device.
     Copied(String),
+    /// The person copied this text on their own device, with its formatting, written
+    /// as a page of the web is.
+    CopiedFormatted {
+        /// The text.
+        text: String,
+        /// The same with its formatting.
+        formatted: String,
+    },
     /// The person asks for a file that was copied on the machine, by its place among
     /// those that were listed: what is in it comes in pieces.
     File(u32),
@@ -577,7 +589,10 @@ impl FromBrowser {
                     return Ok(FromBrowser::Leaves);
                 }
                 if let Some(text) = said.text_of("copied") {
-                    return Ok(FromBrowser::Copied(text.to_string()));
+                    return Ok(match said.text_of("formatted") {
+                        Some(formatted) => FromBrowser::CopiedFormatted { text: text.to_string(), formatted: formatted.to_string() },
+                        None => FromBrowser::Copied(text.to_string()),
+                    });
                 }
                 if let Some(tray) = said.get("tray") {
                     let number = |name: &str| tray.get(name).and_then(Json::count).and_then(|number| u32::try_from(number).ok());
@@ -793,6 +808,7 @@ mod tests {
             ToBrowser::File { whole: true }.write(),
             ToBrowser::File { whole: false }.write(),
             ToBrowser::Wants { file: 1, from: 5_000_000_000, length: 100_000 }.write(),
+            ToBrowser::Formatted("<b>two</b>\nlines").write(),
         ];
         assert_eq!(written.len(), to_browser.len());
         for (written, example) in written.iter().zip(to_browser) {
@@ -818,7 +834,8 @@ mod tests {
                 FromBrowser::read(&carried).unwrap_or_else(|NotThis(why)| panic!("{}: {why}", example.write()))
             })
             .collect();
-        assert_eq!(read.len(), 18);
+        assert_eq!(read.len(), 19);
+        assert!(matches!(&read[18], FromBrowser::CopiedFormatted { text, formatted } if text == "bold" && formatted == "<b>bold</b>"));
         assert!(matches!(&read[15], FromBrowser::Gives(files) if files[..] == [
             CopiedFile { name: "report.txt".to_string(), size: 8, folder: false },
             CopiedFile { name: "data.bin".to_string(), size: 5_000_000_000, folder: false },
