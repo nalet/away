@@ -1,7 +1,8 @@
 #!/bin/sh
 # Tries Away's own VNC code against a VNC server on Linux: starts the server in a
 # container, signs in with its password, takes the desktop's picture, and checks that
-# it is the server's screen, pixel for pixel. A wrong password has to be refused.
+# it is the server's screen, pixel for pixel. A wrong password has to be refused, and the
+# server has to answer the extension for a clipboard of more than western text.
 #
 #   cargo build --package away-try
 #   tests/machines/vnc/vnc.sh
@@ -77,3 +78,13 @@ if "$try" vnc "127.0.0.1:$port" --password-file "$work/wrong" > "$work/refused" 
 fi
 grep -q "did not take the password" "$work/refused" || { cat "$work/refused" >&2; echo "It was refused for another reason." >&2; exit 1; }
 echo "   It was refused."
+
+# a server of this kind carries a clipboard with more than western text, and says so
+# when it is named the extension
+echo "What it knows beyond the protocol's core"
+"$try" vnc "127.0.0.1:$port" --password-file "$work/password" --extensions | tee "$work/knows"
+if ! awk '/It answered these/ { on = 1 } /It said nothing to these/ { on = 0 } on' "$work/knows" | grep -q "ExtendedClipboard"; then
+  echo "The server did not answer the clipboard's extension." >&2
+  exit 1
+fi
+echo "It answered the clipboard's extension."

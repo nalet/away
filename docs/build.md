@@ -206,6 +206,34 @@ tests/machines/linux/rdp.sh
 
 The pipeline runs it on every change.
 
+### A machine over VNC, and what it knows
+
+`away-try vnc` does the same over VNC: it says the version a machine speaks,
+signs in with the desktop's password from a file where the machine asks for
+one, and takes the desktop's picture.
+
+```sh
+cargo run --package away-try -- vnc desk-07.example.com --password-file ~/.config/away/vnc-password
+cargo run --package away-try -- vnc desk-07.example.com --password-file ~/.config/away/vnc-password --extensions
+```
+
+With `--extensions` it says what the machine knows beyond the protocol's core.
+The ways of signing in a machine offers are said before anyone is signed in.
+Its extensions are not: a machine lists none of them. A client names the ones
+it reads, and a machine that knows one answers in that extension's own way.
+So `away-try` signs in, names them all, and says which the machine answered:
+a clipboard with more than western text, the pointer's shape, the machine's
+screens, and others. One that a machine didn't answer may still be known to
+it where it says something only when there is something to say, and
+`away-try` says which those are. A machine with ways of writing a rectangle
+of its own is named them by their numbers, with `--also 1000,1011`. What it
+then sends that `away-try` doesn't read is said with its number, and ends the
+reading.
+
+`tests/machines/vnc/vnc.sh` starts a VNC server on Linux in a container, checks
+the picture against the server's screen, pixel for pixel, and checks that the
+server answers the clipboard's extension. It needs docker.
+
 ## Against a real database
 
 What the server keeps is tried against a real PostgreSQL. A script starts one

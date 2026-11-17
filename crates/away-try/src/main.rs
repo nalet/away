@@ -12,6 +12,7 @@
 //! image.
 
 mod certificate;
+mod extensions;
 mod kerberos;
 mod vnc;
 

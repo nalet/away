@@ -8,8 +8,11 @@ use away_secret::Secret;
 use away_vnc::connection::{Connection, Happened, Input, Passes};
 use sha2::{Digest, Sha256};
 
+use crate::extensions::{self, Heard, KNOWN};
+
 pub const USAGE: &str = "\
 away-try vnc <address> [--password-file <file>] [--save <file>] [--wheel <turn> --at <x>,<y>]
+away-try vnc <address> [--password-file <file>] --extensions [--also <number>,<number>…]
 
   Reaches a machine over VNC with Away's own code and says what it shows, step by step.
   The address is a name or a number, with a port after a colon where it is not 5900.
@@ -21,6 +24,12 @@ away-try vnc <address> [--password-file <file>] [--save <file>] [--wheel <turn> 
   With --wheel the pointer goes to the place named with --at and the wheel is turned
   there once the desktop rests: 120 is one notch away from the person, -120 one
   towards them. It says how many steps of the wheel that is for this machine.
+
+  With --extensions it says what the machine knows beyond the protocol's core: the ways
+  of signing in it offers and, once its desktop is open, which extensions it answers
+  when they are named to it. A machine lists none of them by itself. --also names
+  further ways of writing a rectangle by their numbers, for a machine with ways of its
+  own.
 ";
 
 /// How long a machine gets to answer, at each step on the way to its desktop.
@@ -29,6 +38,10 @@ const WITHIN: Duration = Duration::from_secs(10);
 const QUIET_FOR: Duration = Duration::from_secs(3);
 /// How long the picture is waited for at most, on a desktop that never rests.
 const DRAWS_AT_MOST: Duration = Duration::from_secs(45);
+/// How long a machine may say nothing new before its answers to the extensions count as all.
+const ANSWERS_WITHIN: Duration = Duration::from_secs(4);
+/// How long its answers are waited for at most.
+const ANSWERS_AT_MOST: Duration = Duration::from_secs(20);
 
 struct Asked {
     address: String,
@@ -36,6 +49,8 @@ struct Asked {
     save: Option<String>,
     wheel: Option<i16>,
     at: Option<(u16, u16)>,
+    extensions: bool,
+    also: Vec<i32>,
 }
 
 fn asked(words: &[String]) -> Option<Asked> {
@@ -43,8 +58,16 @@ fn asked(words: &[String]) -> Option<Asked> {
     if address.starts_with('-') {
         return None;
     }
-    let mut asked = Asked { address: address.clone(), password_file: None, save: None, wheel: None, at: None };
-    let mut rest = rest;
+    let mut asked =
+        Asked { address: address.clone(), password_file: None, save: None, wheel: None, at: None, extensions: false, also: Vec::new() };
+    // the one option that takes no word after it
+    let named = rest.iter().filter(|word| *word == "--extensions").count();
+    if named > 1 {
+        return None;
+    }
+    asked.extensions = named == 1;
+    let rest: Vec<String> = rest.iter().filter(|word| *word != "--extensions").cloned().collect();
+    let mut rest = rest.as_slice();
     while let [option, value, after @ ..] = rest {
         match option.as_str() {
             "--password-file" if asked.password_file.is_none() => asked.password_file = Some(value.clone()),
@@ -54,12 +77,17 @@ fn asked(words: &[String]) -> Option<Asked> {
                 let (x, y) = value.split_once(',')?;
                 asked.at = Some((x.parse().ok()?, y.parse().ok()?));
             }
+            "--also" if asked.also.is_empty() => {
+                asked.also = value.split(',').map(|number| number.parse().ok()).collect::<Option<Vec<i32>>>()?;
+            }
             _ => return None,
         }
         rest = after;
     }
-    // a wheel is turned at a place
-    (rest.is_empty() && asked.wheel.is_some() == asked.at.is_some()).then_some(asked)
+    // a wheel is turned at a place, and what a machine knows is asked by itself
+    let by_itself = asked.save.is_none() && asked.wheel.is_none();
+    (rest.is_empty() && asked.wheel.is_some() == asked.at.is_some() && if asked.extensions { by_itself } else { asked.also.is_empty() })
+        .then_some(asked)
 }
 
 pub fn run(words: &[String]) -> Option<Result<(), String>> {
@@ -99,6 +127,9 @@ fn tried(asked: &Asked) -> Result<(), String> {
     let (mut opened, mut last_drawn): (Option<Instant>, Option<Instant>) = (None, None);
     let (mut rectangles, mut pixels) = (0usize, 0usize);
     let mut turned = false;
+    // the machine's first bytes, in which it says how it signs people in
+    let mut first: Vec<u8> = Vec::new();
+    let mut said_ways = !asked.extensions;
     let waits_since = Instant::now();
     loop {
         let mut bytes = [0u8; 65_536];
@@ -108,6 +139,9 @@ fn tried(asked: &Asked) -> Result<(), String> {
             Err(error) if matches!(error.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => &bytes[..0],
             Err(error) => return Err(format!("The connection broke: {error}.")),
         };
+        if !said_ways {
+            first.extend_from_slice(&arrived[..arrived.len().min(300 - first.len().min(300))]);
+        }
         let (send, happened) = connection.receive(arrived).map_err(|error| {
             let mut says = error.to_string();
             if let Some(first) = says.get_mut(..1) {
@@ -119,6 +153,16 @@ fn tried(asked: &Asked) -> Result<(), String> {
             machine.write_all(&send).map_err(|error| format!("It couldn't be sent: {error}."))?;
         }
         for happened in happened {
+            // how it signs people in is said once it is known, before what came of it
+            if !said_ways && !matches!(happened, Happened::Speaks(_)) {
+                said_ways = true;
+                if let Some(ways) = extensions::ways_of_signing_in(&first) {
+                    println!("   It offers {} of signing in:", if ways.len() == 1 { "one way" } else { "these ways" });
+                    for way in ways {
+                        println!("      {way}: {}", extensions::way_of_signing_in(way));
+                    }
+                }
+            }
             match happened {
                 Happened::Speaks(version) => {
                     println!("What it speaks");
@@ -136,6 +180,9 @@ fn tried(asked: &Asked) -> Result<(), String> {
                 Happened::Open { width, height, name } => {
                     println!("Its desktop");
                     println!("   {width} by {height} pixels, called “{name}”.");
+                    if asked.extensions {
+                        return knows(&mut machine, width, height, &asked.also);
+                    }
                     println!("Taking what it draws, until it has drawn nothing for {} seconds", QUIET_FOR.as_secs());
                     opened = Some(Instant::now());
                 }
@@ -185,6 +232,86 @@ fn tried(asked: &Asked) -> Result<(), String> {
             println!("   It is in {file}.");
         }
         None => println!("   To keep it, name a file: --save <file>."),
+    }
+    Ok(())
+}
+
+/// Names every extension to a machine whose desktop is open, and says which it answered.
+fn knows(machine: &mut TcpStream, width: u16, height: u16, also: &[i32]) -> Result<(), String> {
+    println!("Its extensions");
+    match also.len() {
+        0 => println!("   Naming it the {} this program reads, and waiting for what it answers", KNOWN.len()),
+        more => println!("   Naming it the {} this program reads and {more} more by number, and waiting for what it answers", KNOWN.len()),
+    }
+    machine.write_all(&extensions::asks(also, width, height)).map_err(|error| format!("It couldn't be sent: {error}."))?;
+    let mut heard = Heard::default();
+    let began = Instant::now();
+    let (mut last_new, mut known) = (began, 0);
+    let mut closed = false;
+    while heard.stopped.is_none() && last_new.elapsed() < ANSWERS_WITHIN && began.elapsed() < ANSWERS_AT_MOST {
+        let mut bytes = [0u8; 65_536];
+        match machine.read(&mut bytes) {
+            Ok(0) => {
+                closed = true;
+                break;
+            }
+            Ok(count) => heard.receive(&bytes[..count]),
+            Err(error) if matches!(error.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {}
+            Err(error) => return Err(format!("The connection broke: {error}.")),
+        }
+        if heard.answered.len() != known {
+            (last_new, known) = (Instant::now(), heard.answered.len());
+        }
+    }
+    let answered = |number: &i32| heard.answered.contains_key(number);
+    if KNOWN.iter().any(|known| answered(&known.number)) {
+        println!("   It answered these:");
+        for known in KNOWN.iter().filter(|known| answered(&known.number)) {
+            let said = &heard.answered[&known.number];
+            println!(
+                "      {} ({}): it {}.{}",
+                known.name,
+                known.number,
+                known.does,
+                if said.is_empty() { String::new() } else { format!(" It said: {said}.") }
+            );
+        }
+    } else {
+        println!("   It answered none of them.");
+    }
+    let silent: Vec<_> = KNOWN.iter().filter(|known| !answered(&known.number)).collect();
+    if !silent.is_empty() {
+        println!("   It said nothing to these:");
+        for known in silent {
+            let another_way = extensions::POINTERS.contains(&known.number) && extensions::POINTERS.iter().any(answered);
+            let (name, number) = (known.name, known.number);
+            match (another_way, known.only) {
+                (true, _) => {
+                    println!("      {name} ({number}): it sent the pointer's shape in another of these ways, so this is no answer.")
+                }
+                (false, Some(only)) => {
+                    println!("      {name} ({number}): a machine that knows it says so only {only}, so this is no answer.")
+                }
+                (false, None) => println!("      {name} ({number}): it gave no answer, where a machine that knows it answers at once."),
+            }
+        }
+    }
+    for (number, said) in heard.answered.iter().filter(|(number, _)| KNOWN.iter().all(|known| known.number != **number)) {
+        println!("   It also answered one numbered {number}{}.", if said.is_empty() { String::new() } else { format!(": {said}") });
+    }
+    if !heard.drew_as.is_empty() {
+        let ways: Vec<String> = heard.drew_as.iter().map(i32::to_string).collect();
+        println!("   It wrote its pixels in the ways numbered {}.", ways.join(", "));
+    }
+    if let Some(length) = heard.plain_text {
+        println!("   It sent what its clipboard holds the plain way, as western text: {length} bytes.");
+    }
+    if let Some(why) = &heard.stopped {
+        println!("   {why}");
+        println!("   Nothing after that was read.");
+    }
+    if closed {
+        println!("   It closed the connection.");
     }
     Ok(())
 }

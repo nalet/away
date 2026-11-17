@@ -991,6 +991,11 @@ fn it_says_what_it_takes() {
         &["vnc", "fin-app-02", "--anything", "else"],
         &["vnc", "fin-app-02", "--wheel", "120"],
         &["vnc", "fin-app-02", "--wheel", "far", "--at", "10,10"],
+        // what a machine knows is asked once, by itself, and further numbers only with it
+        &["vnc", "fin-app-02", "--extensions", "--extensions"],
+        &["vnc", "fin-app-02", "--extensions", "--save", "desktop.bmp"],
+        &["vnc", "fin-app-02", "--also", "1000,1011"],
+        &["vnc", "fin-app-02", "--extensions", "--also", "1000,eleven"],
     ] {
         let refused = Command::new(env!("CARGO_BIN_EXE_away-try")).args(words).output().expect("the test program runs");
         assert_eq!(refused.status.code(), Some(2), "{words:?}");
