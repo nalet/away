@@ -135,7 +135,7 @@
     s.appendChild(make(`<div class="sbar">${mark}<div class="stabs">${tabs.map(([k, n]) => `<span class="stab${n === cur ? ' on' : ''}">${icon(KIND[k])}${n}</span>`).join('')}<span class="stab add" aria-label="open another machine">${icon('plus')}</span></div>
       <span class="sp"></span>${s.dataset.as ? `<span class="as">${s.dataset.as}</span>` : ''}
       <div class="sgrp">${sbtn('keys', 'keys', 'keyboard', on)}${sbtn('clipboard', 'clipboard', 'clipboard', on)}${own}${sbtn('fill', 'fill the screen', 'fullscreen', on)}</div>
-      <div class="sgrp">${sbtn('end', 'end', 'power', on)}</div><div class="sgrp">${sbtn('close', 'close the bar', 'chevron-up', on)}</div></div>`));
+      <div class="sgrp">${sbtn('end', 'end', 'unplug', on)}</div><div class="sgrp">${sbtn('close', 'close the bar', 'chevron-up', on)}</div></div>`));
   }
 
   // the rail of a session with programs: the windows are the drawing's; the mark at the top, the
@@ -151,7 +151,7 @@
     r.append(make('<span class="pr-gap"></span>'));
     // over the picture on a phone, the rail has a button that puts it away
     const close = r.classList.contains('over') ? [btn('close', 'close the bar', 'x')] : [];
-    for (const b of [btn('keys', 'keys', 'keyboard'), btn('clip', 'clipboard', 'clipboard'), btn('fill', 'fill the screen', 'fullscreen'), btn('end', 'end', 'power'), ...close]) r.append(make(b));
+    for (const b of [btn('keys', 'keys', 'keyboard'), btn('clip', 'clipboard', 'clipboard'), btn('fill', 'fill the screen', 'fullscreen'), btn('end', 'end', 'unplug'), ...close]) r.append(make(b));
     const tray = r.dataset.tray !== undefined ? `<span class="pr-btn pr-tray${r.dataset.on === 'tray' ? ' on' : ''}" aria-label="the tray" title="the tray">${icon('chevron-up')}</span>` : '';
     r.append(make(`<span class="pr-foot">${tray}<span class="pr-lang" title="the keyboard">${r.dataset.lang || 'DE'}</span>
       <span class="pr-clock" aria-label="the time on your device"><span>${r.dataset.time || '14:32'}</span><span class="day">${r.dataset.day || '16.11.'}</span></span></span>`));

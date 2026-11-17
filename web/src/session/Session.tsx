@@ -4,7 +4,7 @@
 // its own but a handle. A program's windows show on Away's ground, where the machine
 // has them on its desktop.
 import { Button, Chevron, EmptyState, Field, IconButton, Input, Spinner } from '@nalet/design-system';
-import { AppWindow, Check, ChevronUp, ClipboardList, Keyboard, Maximize, Minimize, Monitor, Power, X } from 'lucide-react';
+import { AppWindow, Check, ChevronUp, ClipboardList, Keyboard, Maximize, Minimize, Monitor, Unplug, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent as KeyOfReact, PointerEvent as PointerOfReact, ReactNode } from 'react';
 
@@ -1049,7 +1049,7 @@ function Desktop({
         {filled ? <Minimize size={16} aria-hidden="true" /> : <Maximize size={16} aria-hidden="true" />}
       </IconButton>
       <IconButton variant="ghost" label={t.end} title={t.end} onClick={() => say(leaves())}>
-        <Power size={16} aria-hidden="true" />
+        <Unplug size={16} aria-hidden="true" />
       </IconButton>
     </>
   );
