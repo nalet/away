@@ -84,7 +84,7 @@ switched to.
 
 ## 7.3 Opening a further program
 
-![Beside the rail, under the pressed mark, a list headed programs of fin-app-02: Ledger, Mail, Payroll and Reports, each with an icon; under them the line Payroll didn't start on fin-app-02., and under a line the row other machines.](img/programs-open-computer.png)
+![Beside the rail, under the pressed mark, a list headed programs of fin-app-02: Ledger, Mail, Payroll and Reports, each with an icon; under them the line Payroll didn't start on fin-app-02., with the machine's reason open under the word details: the machine does not find the program (its own code 0x00000003); and under a line the row other machines.](img/programs-open-computer.png)
 
 **Figure 7.3** The machine's programs, from the mark.
 
@@ -92,7 +92,9 @@ switched to.
    window comes to the front. A program that is already open gets a further
    window, where the program allows more than one.
 2. **A program the machine didn't start** says so here, and the session goes
-   on.
+   on. Why not, in the machine's own words, is behind “details”: most often
+   the machine doesn't find the program where it is published. The same
+   words are in the gateway's log, for whoever looks after the machine.
 3. **The other machines**: the machines' page. The programs keep running at the
    machine.
 
@@ -160,7 +162,8 @@ switched to.
 | State | What shows |
 |---|---|
 | A further program is starting | a loader in its row of the list, which takes no other choice, until the machine says whether it started |
-| The machine can't start a further program | the windows stay as they are, and the list says which one: “Payroll didn't start on fin-app-02.” |
+| The machine can't start a further program | the windows stay as they are, and the list says which one: “Payroll didn't start on fin-app-02.”, with the machine's reason behind “details” |
+| The machine has more programs than the window is high | the list of programs turns within the window; its head, a program that didn't start and “other machines” stay in view |
 | The last window was closed | the session ends, and the machine's page shows |
 | The connection drops | as for a desktop, in the words of [chapter 6](./desktop.md), with “Your programs are still running on fin-app-02.” |
 
@@ -173,6 +176,7 @@ switched to.
 | A row of the list | the program's name, as the files give it |
 | The list's last row | other machines |
 | A program didn't start | Payroll didn't start on fin-app-02. |
+| Its reason, behind “details” | the machine's words, as the gateway reads them: the machine does not find the program (its own code 0x00000003) |
 | A window's icon, for a screen reader and as a tooltip | bring to the front: Ledger – November |
 | The button of the tray, as a tooltip | the tray |
 | The panel of the tray, for a screen reader | the tray of fin-app-02 |

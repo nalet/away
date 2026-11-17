@@ -56,7 +56,7 @@ function useSession(machine: string, program: string | null, method?: string) {
   const [layout, setLayout] = useState<number | null>(null);
   // whether the machine is told of keys by what they write, and not by their places
   const [written, setWritten] = useState(false);
-  const [started, setStarted] = useState<{ program: string; ok: boolean } | null>(null);
+  const [started, setStarted] = useState<{ program: string; ok: boolean; details?: string } | null>(null);
   // the picture is drawn on a canvas of the session's own, which a page shows once it is open
   const [canvas] = useState(() => document.createElement('canvas'));
   const socket = useRef<WebSocket | null>(null);
@@ -640,7 +640,7 @@ function Desktop({
   layout: number | null;
   written: boolean;
   kind: Machine['kind'] | null;
-  started: { program: string; ok: boolean } | null;
+  started: { program: string; ok: boolean; details?: string } | null;
   passes: Passes | null;
   copied: string | null;
   canvas: HTMLCanvasElement;
@@ -662,7 +662,7 @@ function Desktop({
   // program asked for that is on its way, and the last one that didn't start
   const [launch, setLaunch] = useState(false);
   const [starting, setStarting] = useState<string | null>(null);
-  const [notStarted, setNotStarted] = useState<string | null>(null);
+  const [notStarted, setNotStarted] = useState<{ program: string; details: string } | null>(null);
   // whether the icons of the tray are shown, under the button at the foot of the rail
   const [trayOpen, setTrayOpen] = useState(false);
   // the windows in the order they came, as a taskbar keeps them: one brought to the front
@@ -739,7 +739,7 @@ function Desktop({
     if (started.ok) {
       setLaunch(false);
       setNotStarted(null);
-    } else setNotStarted(started.program);
+    } else setNotStarted({ program: started.program, details: started.details ?? '' });
   }, [started]);
 
   // the clock keeps the time
@@ -1195,10 +1195,19 @@ function Desktop({
                       ))}
                     </ul>
                   )}
+                  {/* one that didn't start says so here, with the machine's own reason behind "details" */}
                   {notStarted !== null && (
-                    <p className="off" role="alert">
-                      {t.notStarted(notStarted, name)}
-                    </p>
+                    <div className="didnt">
+                      <p className="off" role="alert">
+                        {t.notStarted(notStarted.program, name)}
+                      </p>
+                      {notStarted.details && (
+                        <details className="dtl">
+                          <summary>{t.details}</summary>
+                          <p>{notStarted.details}</p>
+                        </details>
+                      )}
+                    </div>
                   )}
                   <button type="button" className="prog more" onClick={otherMachines}>
                     <Monitor size={20} aria-hidden="true" />

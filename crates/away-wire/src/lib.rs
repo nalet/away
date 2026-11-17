@@ -120,6 +120,8 @@ pub enum ToBrowser<'a> {
         program: &'a str,
         /// Whether it started.
         started: bool,
+        /// Why it didn't, in the machine's words, where the machine said so.
+        details: &'a str,
     },
 }
 
@@ -257,8 +259,13 @@ impl ToBrowser<'_> {
                 bytes.extend_from_slice(png);
                 Carried::Bytes(bytes)
             }
-            ToBrowser::Started { program, started } => {
-                object(Json::object([("started", Json::object([("program", program.into()), ("ok", started.into())]))]))
+            ToBrowser::Started { program, started, details } => {
+                let said = if details.is_empty() {
+                    Json::object([("program", program.into()), ("ok", started.into())])
+                } else {
+                    Json::object([("program", program.into()), ("ok", started.into()), ("details", details.into())])
+                };
+                object(Json::object([("started", said)]))
             }
             ToBrowser::Windows { windows, in_front } => {
                 let window = |window: &Window| {
@@ -612,7 +619,12 @@ mod tests {
             ToBrowser::Passes { to_the_machine: true, from_the_machine: false }.write(),
             ToBrowser::Copied("two\nlines").write(),
             ToBrowser::Icon { window: 65537, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
-            ToBrowser::Started { program: "Wages", started: false }.write(),
+            ToBrowser::Started {
+                program: "Wages",
+                started: false,
+                details: "the machine does not find the program (its own code 0x00000003)",
+            }
+            .write(),
             ToBrowser::Tray(&[TrayIcon { window: 65537, icon: 1, tip: "Ledger – 2 reminders".to_string() }]).write(),
             ToBrowser::TrayPicture { window: 65537, icon: 1, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
             ToBrowser::Asks { again: true, instead: false, password_alone: true }.write(),

@@ -87,8 +87,9 @@ pub(crate) trait Shown {
         Vec::new()
     }
 
-    /// Whether each program asked for since the first started, in the order they were asked for.
-    fn started_later(&mut self) -> Vec<bool> {
+    /// Whether each program asked for since the first started, in the order they were asked
+    /// for: one that didn't comes with why, in the machine's words.
+    fn started_later(&mut self) -> Vec<Result<(), String>> {
         Vec::new()
     }
 

@@ -408,8 +408,10 @@ and the records are those of a desktop.
 - **Another program in the session is asked for like the first.** The server
   decides whether the person may open it on that machine, as their sign-in
   says at that moment, and keeps the record that it was asked for before the
-  machine is asked. One the machine doesn't start is said in the list, and the
-  session goes on.
+  machine is asked. One the machine doesn't start is said in the list, with
+  the machine's reason behind *details*, and the session goes on. A machine
+  with more programs than the window is high has a list that turns; what
+  didn't start and the way to the other machines stay in view.
 - **Windows' own language bar is not shown over a program's windows.** The
   machine's floating bar is hidden; the rail says which keyboard the machine
   was told of.
@@ -424,6 +426,13 @@ and the records are those of a desktop.
   it is published as; a farm's feed says those names itself. A program that
   the machine doesn't let be started fails at its step, with the machine's
   reason behind *details*.
+- **A program the machine doesn't find is published at a place where it no
+  longer is.** The machine's reason then reads `the machine does not find the
+  program`, and the gateway's log has the line `a program did not start in a
+  session` with the program and that reason. It happens to programs that are
+  installed in a folder named after their version, which an update of the
+  program replaces: publish such a program by a path that stays, and it
+  starts again without a change to Away.
 
 In the files a program is its name, or its name with its icon and with what
 the machine is asked to start:

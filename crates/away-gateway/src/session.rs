@@ -710,7 +710,17 @@ where
         }
         for started in desktop.started_later() {
             let program = asked_for.pop_front().unwrap_or_default();
-            if tell(browser, ToBrowser::Started { program: &program, started }).await.is_err() {
+            let details = started.as_ref().err().map_or("", String::as_str);
+            // why a machine didn't start a program is for whoever looks after it, too: most often
+            // the program is published at a place where it no longer is
+            if let (Some(starts), false) = (&starts, started.is_ok()) {
+                starts.lines.warn(
+                    "a program did not start in a session",
+                    &[("session", starts.session.into()), ("program", program.as_str().into()), ("details", details.into())],
+                );
+            }
+            let started = started.is_ok();
+            if tell(browser, ToBrowser::Started { program: &program, started, details }).await.is_err() {
                 return Ended::BrowserGone;
             }
             if !started && had_windows && desktop.windows_listed() == 0 {
@@ -819,7 +829,7 @@ where
                             asked_for.push_back(program);
                         }
                         None => {
-                            if tell(browser, ToBrowser::Started { program: &program, started: false }).await.is_err() {
+                            if tell(browser, ToBrowser::Started { program: &program, started: false, details: "" }).await.is_err() {
                                 return Ended::BrowserGone;
                             }
                         }

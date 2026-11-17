@@ -15,7 +15,7 @@ export type Said =
   | { windows: WindowOf[]; in_front: number | null }
   | { clipboard: { to: boolean; from: boolean } }
   | { copied: string }
-  | { started: { program: string; ok: boolean } }
+  | { started: { program: string; ok: boolean; details?: string } }
   | { tray: TrayOf[] };
 
 // An icon of the tray: the window it is of, its number among that window's icons, and

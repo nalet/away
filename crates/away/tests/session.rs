@@ -1076,7 +1076,10 @@ async fn a_program_opens_in_a_window_of_its_own_and_closing_it_ends_the_session(
     // one the machine doesn't start, and one the person may not open there, are said not to
     // have started, and the session goes on
     session.say(Json::object([("start", "Payroll".into())])).await;
-    assert_eq!(session.until("started").await.write(), r#"{"started":{"program":"Payroll","ok":false}}"#);
+    assert_eq!(
+        session.until("started").await.write(),
+        r#"{"started":{"program":"Payroll","ok":false,"details":"the machine does not let this program be started: it is not among those it publishes (its own code 0x00000002)"}}"#
+    );
     session.say(Json::object([("start", "Nothing".into())])).await;
     assert_eq!(session.until("started").await.write(), r#"{"started":{"program":"Nothing","ok":false}}"#);
     let last = world.machine.seen().last().expect("a client came").about_programs.clone();

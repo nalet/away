@@ -1,7 +1,7 @@
 // Getting in and the frame, as a person meets them in a browser.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import type { Page, Request } from '@playwright/test';
+import type { Locator, Page, Request } from '@playwright/test';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -1316,7 +1316,29 @@ test.describe('a session', () => {
     await mark.click();
     await launcher.getByRole('button', { name: 'Wages' }).click();
     await expect(launcher.getByRole('alert')).toHaveText("Wages didn't start on apps-01.");
+    // why not, as the machine says it, is behind "details"
+    const why = launcher.getByText('the machine does not let this program be started: it is not among those it publishes (its own code 0x00000002)');
+    await expect(why).toBeHidden();
+    await launcher.getByText('details').click();
+    await expect(why).toBeVisible();
+    await accessible(page);
     await expect(screen).toBeVisible();
+    // in a low window the list turns within the window's height: what didn't start and the way to
+    // the other machines stay in view, and nothing runs past the bottom
+    await launcher.getByText('details').click();
+    await expect(why).toBeHidden();
+    const size = page.viewportSize()!;
+    await page.setViewportSize({ width: size.width, height: 260 });
+    const inView = async (part: Locator) => {
+      const box = (await part.boundingBox())!;
+      return box.y >= 0 && box.y + box.height <= 260;
+    };
+    await expect.poll(() => inView(launcher)).toBe(true);
+    expect(await inView(launcher.getByRole('alert'))).toBe(true);
+    expect(await inView(launcher.getByRole('button', { name: 'other machines' }))).toBe(true);
+    expect(await launcher.getByRole('list').evaluate((list) => list.scrollHeight > list.clientHeight)).toBe(true);
+    await page.setViewportSize(size);
+    await expect.poll(() => launcher.getByRole('list').evaluate((list) => list.scrollHeight > list.clientHeight)).toBe(false);
     await page.keyboard.press('Escape');
     await expect(launcher).toHaveCount(0);
     await expect(mark).toBeFocused();
@@ -1545,7 +1567,7 @@ test("the session's messages are written and read as the examples say that the g
     { clipboard: { to: true, from: false } },
     { copied: 'two\nlines' },
     { window: 65537, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) },
-    { started: { program: 'Wages', ok: false } },
+    { started: { program: 'Wages', ok: false, details: 'the machine does not find the program (its own code 0x00000003)' } },
     { tray: [{ window: 65537, icon: 1, tip: 'Ledger – 2 reminders' }] },
     { window: 65537, icon: 1, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) },
     { asks: { again: true, only: 'password' } },

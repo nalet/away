@@ -14,7 +14,7 @@
     {"says": "the clipboard passes to the machine, and not from it", "text": "{\"clipboard\":{\"to\":true,\"from\":false}}"},
     {"says": "a text of two lines was copied on the machine", "text": "{\"copied\":\"two\\nlines\"}"},
     {"says": "the icon of the window 65537, as a PNG picture that begins 89 50 4e 47", "bytes": "020001000189504e47"},
-    {"says": "the program Wages that the person asked for did not start", "text": "{\"started\":{\"program\":\"Wages\",\"ok\":false}}"},
+    {"says": "the program Wages that the person asked for did not start, and why the machine says so", "text": "{\"started\":{\"program\":\"Wages\",\"ok\":false,\"details\":\"the machine does not find the program (its own code 0x00000003)\"}}"},
     {"says": "the icons of the tray: one, of the window 65537, its number 1, saying Ledger – 2 reminders", "text": "{\"tray\":[{\"window\":65537,\"icon\":1,\"tip\":\"Ledger – 2 reminders\"}]}"},
     {"says": "the picture of the icon 1 of the window 65537 in the tray, as a PNG picture that begins 89 50 4e 47", "bytes": "03000100010000000189504e47"},
     {"says": "the machine has a password of its desktop's own, did not take the one before, and asks for it again", "text": "{\"asks\":{\"again\":true,\"only\":\"password\"}}"},

@@ -272,9 +272,17 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 .sess .sbar .sessmenu, .sess .sbar .sesspanel { top: 44px; right: 0; }
 .sess .srail .sessmenu, .sess .srail .sesspanel { left: calc(100% + 6px); bottom: 0; }
 /* the machine's programs hang from the mark, at the top of the rail */
-.sess .srail .launch .sesspanel { top: 0; bottom: auto; }
+.sess .srail .launch .sesspanel { top: 0; bottom: auto; max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); overflow-y: auto; }
 .sess .launcher h2 { margin: 0; font: 600 14px/1.3 var(--ff-mono); text-transform: lowercase; }
-.sess .launcher .progs { padding: 0; list-style: none; display: flex; flex-direction: column; }
+/* a machine with many programs: the list turns within the window's height, and what is
+   around it (whose programs these are, what didn't start, the way out) stays in view. In a
+   window too low even for that, a row of the list stays and the panel as a whole turns */
+.sess .launcher > * { flex: none; }
+.sess .launcher .progs { flex: 0 1 auto; min-height: 40px; padding: 0; list-style: none; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
+                         scrollbar-width: thin; scrollbar-color: var(--border-2) transparent; }
+.sess .launcher .progs li { flex: none; }
+.sess .launcher .dtl { margin: 0; }
+.sess .launcher .dtl p { margin-top: 6px; font-size: 13px; }
 .sess .launcher .progs, .sess .launcher .more { width: calc(100% + 16px); margin: 0 -8px; }
 .sess .launcher .prog { width: 100%; min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border: 0; background: none; color: var(--fg);
                         font: 14px/1.3 var(--ff-sans); text-align: left; cursor: pointer; }

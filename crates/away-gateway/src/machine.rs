@@ -544,7 +544,7 @@ pub struct Desktop {
     /// Whether the machine said that the program started.
     started: bool,
     /// Whether each program asked for since the first started, in the order they were asked for.
-    started_later: Vec<bool>,
+    started_later: Vec<Result<(), String>>,
     scratch: Vec<u8>,
     /// Whether the machine was handed a smart card, which it reads over the connection.
     reads_a_card: bool,
@@ -675,12 +675,15 @@ impl Desktop {
                     }
                     // a program asked for in a session that runs already is said not to
                     // have started, and the session goes on
-                    Happened::NotStarted { .. } if self.started => self.started_later.push(false),
                     Happened::NotStarted { result, raw } => {
                         let details = format!("{} (its own code {raw:#010x})", away_rdp::rail::why(result));
-                        return Err(failure(Step::FirstPicture, Why::ProgramNotStarted, details));
+                        if self.started {
+                            self.started_later.push(Err(details));
+                        } else {
+                            return Err(failure(Step::FirstPicture, Why::ProgramNotStarted, details));
+                        }
                     }
-                    Happened::Started if self.started => self.started_later.push(true),
+                    Happened::Started if self.started => self.started_later.push(Ok(())),
                     Happened::Started => self.started = true,
                     Happened::Channels { .. } | Happened::Licensed | Happened::AsksToTakeALicence { .. } | Happened::LicenceTaken(_) => {}
                     Happened::AskedForTheProgram => {}
@@ -711,7 +714,7 @@ impl Desktop {
 
     /// Whether each program asked for since the first started, in the order they were
     /// asked for, where the machine said so since this was last asked.
-    pub fn started_later(&mut self) -> Vec<bool> {
+    pub fn started_later(&mut self) -> Vec<Result<(), String>> {
         std::mem::take(&mut self.started_later)
     }
 
@@ -909,7 +912,7 @@ impl Shown for Desktop {
         Desktop::tray_pictures(self)
     }
 
-    fn started_later(&mut self) -> Vec<bool> {
+    fn started_later(&mut self) -> Vec<Result<(), String>> {
         Desktop::started_later(self)
     }
 
