@@ -13,12 +13,29 @@ import type { Machine, Program } from '../machines';
 import { addressOf } from '../place';
 import { texts } from '../texts';
 import { ClipboardPanel, useClipboard } from './Clipboard';
-import type { Held, Passes } from './Clipboard';
+import type { Held, Passes, Takes } from './Clipboard';
 import { isHeld, layoutName, layoutOf, placeOf, symOf, symOfPlace } from './keys';
 import { PhoneKeys } from './PhoneKeys';
 import { fingers } from './touch';
 import { following, placed, settled, showing, whole, zoomed } from './view';
-import { begins, credentials, did, leaves, readCopiedPicture, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } from './wire';
+import {
+  begins,
+  credentials,
+  did,
+  file as asksForFile,
+  leaves,
+  readCopiedPicture,
+  readIcon,
+  readPieceOfAFile,
+  readRectangle,
+  readSaid,
+  readTrayPicture,
+  seen,
+  sized,
+  start,
+  trayDoes,
+  windowDoes,
+} from './wire';
 import type { Did, Step, TrayOf, WindowOf } from './wire';
 
 const STEPS: Step[] = ['reaching', 'checking', 'signing-in', 'first-picture'];
@@ -49,6 +66,8 @@ function useSession(machine: string, program: string | null, method?: string) {
   // which ways the clipboard passes, and the text that was last copied on the machine
   const [passes, setPasses] = useState<Passes | null>(null);
   const [copied, setCopied] = useState<Held | null>(null);
+  // who takes the pieces of the file that is being had from the machine
+  const taking = useRef<Takes | null>(null);
   // the icons of the windows, each as a picture the page holds
   const [icons, setIcons] = useState<Record<number, ImageBitmap>>({});
   // the icons of the tray, and their pictures, each by its window and its number
@@ -134,6 +153,12 @@ function useSession(machine: string, program: string | null, method?: string) {
           const picture = readCopiedPicture(event.data);
           if (picture) {
             setCopied({ picture });
+            return;
+          }
+          // a piece of the file the person is having from the machine
+          const piece = readPieceOfAFile(event.data);
+          if (piece) {
+            taking.current?.piece(piece);
             return;
           }
           const inTheTray = readTrayPicture(event.data);
@@ -227,6 +252,13 @@ function useSession(machine: string, program: string | null, method?: string) {
         }
         else if ('clipboard' in said) setPasses(said.clipboard);
         else if ('copied' in said) setCopied({ text: said.copied });
+        else if ('files' in said) setCopied({ files: said.files });
+        else if ('file' in said) {
+          // all of the file came, or the machine gave no more of it
+          const took = taking.current;
+          taking.current = null;
+          took?.ended(said.file === 'whole');
+        }
         else if ('started' in said) setStarted(said.started);
         else if ('tray' in said) setTray(said.tray);
       };
@@ -285,6 +317,19 @@ function useSession(machine: string, program: string | null, method?: string) {
     started,
     passes,
     copied,
+    // a file that was copied on the machine is had by its place among those listed:
+    // its pieces go to whoever asked, one file at a time
+    have: (at: number, takes: Takes) => {
+      taking.current?.ended(false);
+      taking.current = takes;
+      say(asksForFile(at));
+    },
+    giveUp: () => {
+      const took = taking.current;
+      taking.current = null;
+      if (took) say(asksForFile('none'));
+      took?.ended(false);
+    },
     canvas,
     say,
     lost,
@@ -313,7 +358,11 @@ export function Session({ showMachine, ...session }: SessionProps & { showMachin
 
 // The page of a session with a machine's desktop, or with one of its programs.
 function BrowserSession({ name, program, method, go, contact, machine }: SessionProps & { machine: Machine | null }) {
-  const { state, windows, inFront, icons, tray, trayPictures, layout, written, started, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program, method);
+  const { state, windows, inFront, icons, tray, trayPictures, layout, written, started, passes, copied, have, giveUp, canvas, say, lost, tryNow, leave, again } = useSession(
+    name,
+    program,
+    method,
+  );
   const toMachines = () => go(machine ? pageOf(name) : addressOf.machines);
 
   useEffect(() => {
@@ -341,6 +390,8 @@ function BrowserSession({ name, program, method, go, contact, machine }: Session
         started={started}
         passes={passes}
         copied={copied}
+        have={have}
+        giveUp={giveUp}
         canvas={canvas}
         say={say}
         lost={lost}
@@ -653,6 +704,8 @@ function Desktop({
   started,
   passes,
   copied,
+  have,
+  giveUp,
   canvas,
   say,
   lost,
@@ -674,6 +727,8 @@ function Desktop({
   started: { program: string; ok: boolean; details?: string } | null;
   passes: Passes | null;
   copied: Held | null;
+  have: (at: number, takes: Takes) => void;
+  giveUp: () => void;
   canvas: HTMLCanvasElement;
   say: (message: string | Uint8Array<ArrayBuffer>) => void;
   lost: Lost | null;
@@ -700,6 +755,16 @@ function Desktop({
   // keeps its place
   const cameIn = useRef<number[]>([]);
   const clipboard = useClipboard(canvas, passes, copied, say);
+  // files that were copied on the machine reach no clipboard of a browser's: a line at
+  // the foot says that they are there, for a while, and leads to the panel that lists them
+  const [noticed, setNoticed] = useState<number | null>(null);
+  useEffect(() => {
+    const files = copied !== null && 'files' in copied && passes?.from ? copied.files.filter((file) => !file.folder).length : 0;
+    setNoticed(files > 0 ? files : null);
+    if (files === 0) return undefined;
+    const goes = window.setTimeout(() => setNoticed(null), 12_000);
+    return () => window.clearTimeout(goes);
+  }, [copied, passes]);
   // the clock at the foot of the rail, and the first control, focused when a desktop's
   // rail opens. For a program the rail is always there, as a taskbar
   const [clock, setClock] = useState(timeNow);
@@ -865,7 +930,10 @@ function Desktop({
       if (event.pointerType === 'touch') return;
       event.preventDefault();
       if (down) {
+        // the bar goes, with what was open under it
         setBar(false);
+        setKeys(false);
+        setClip(false);
         canvas.focus();
         canvas.setPointerCapture(event.pointerId);
       }
@@ -923,6 +991,8 @@ function Desktop({
       button: (button, isDown) => {
         if (isDown) {
           setBar(false);
+          setKeys(false);
+          setClip(false);
           // while the phone's keyboard is up it keeps the keys: the picture takes none from it
           if (!typingNow.current) canvas.focus();
         }
@@ -1195,6 +1265,8 @@ function Desktop({
               send={clipboard.send}
               sendPicture={clipboard.sendPicture}
               screen={canvas}
+              have={have}
+              giveUp={giveUp}
             />
           )}
         </span>
@@ -1517,6 +1589,23 @@ function Desktop({
           onPointerMove={swipeIn}
           onPointerUp={() => (swipe.current = null)}
         />
+      )}
+      {noticed !== null && !clip && (
+        <div className="snotice" role="status">
+          <span>{t.clipboard.filesCopied(noticed, program ?? name)}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              setNoticed(null);
+              setKeys(false);
+              setLaunch(false);
+              setBar(true);
+              setClip(true);
+            }}
+          >
+            {t.clipboard.showFiles}
+          </Button>
+        </div>
       )}
       <div className="holds" ref={screen} />
       {canType && <PhoneKeys shown={typing} machine={program ?? name} mac={kind === 'mac'} written={written} say={say} field={typed} onGone={() => setTyping(false)} />}

@@ -115,18 +115,18 @@ has the steps.
 <!-- generated: overview -->
 | Part | Areas | Capabilities | built | partly built | first release | later | not planned |
 |---|---|---|---|---|---|---|---|
-| [in a session](./session.md) | 7 | 67 | 4 | 17 | 19 | 22 | 5 |
+| [in a session](./session.md) | 7 | 67 | 4 | 18 | 19 | 21 | 5 |
 | [around the sessions](./app.md) | 5 | 49 | 16 | 3 | 9 | 17 | 4 |
-| [administration](./admin.md) | 4 | 56 | 12 | 2 | 13 | 26 | 3 |
+| [administration](./admin.md) | 4 | 56 | 12 | 3 | 13 | 25 | 3 |
 | [the platform](./platform.md) | 3 | 33 | 15 | 1 | 8 | 7 | 2 |
-| all | 19 | 205 | 47 | 23 | 49 | 72 | 14 |
+| all | 19 | 205 | 47 | 25 | 49 | 70 | 14 |
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
-| a session over RDP | 6 | 8 | 24 | 24 | 5 | 138 |
+| a session over RDP | 6 | 9 | 24 | 23 | 5 | 138 |
 | a session over VNC | 9 | 7 | 11 | 11 | 15 | 152 |
 | a session over SSH | 0 | 0 | 27 | 12 | 2 | 164 |
-| Away itself | 44 | 4 | 26 | 45 | 9 | 77 |
+| Away itself | 44 | 5 | 26 | 44 | 9 | 77 |
 
 An expectation names 166 of the 205 capabilities; no expectation names the other 39.
 <!-- end: overview -->
@@ -145,10 +145,10 @@ the capabilities that meet it, and says how the states are worked out.
 | [Look at a machine together](./expectations.md#look-at-a-machine-together) | 4 | 0 | 0 | 0 | 0 | 3 | 1 |
 | [Know the machines](./expectations.md#know-the-machines) | 13 | 3 | 2 | 1 | 0 | 6 | 1 |
 | [Decide who reaches what](./expectations.md#decide-who-reaches-what) | 13 | 3 | 0 | 4 | 2 | 4 | 0 |
-| [Know what happened](./expectations.md#know-what-happened) | 9 | 1 | 1 | 1 | 1 | 5 | 0 |
+| [Know what happened](./expectations.md#know-what-happened) | 9 | 1 | 2 | 1 | 1 | 4 | 0 |
 | [Run it oneself](./expectations.md#run-it-oneself) | 16 | 4 | 5 | 1 | 1 | 2 | 3 |
 | [Trust it](./expectations.md#trust-it) | 4 | 3 | 1 | 0 | 0 | 0 | 0 |
-| all | 99 | 20 | 23 | 16 | 5 | 27 | 8 |
+| all | 99 | 20 | 24 | 16 | 5 | 26 | 8 |
 <!-- end: expected -->
 
 ## Pages

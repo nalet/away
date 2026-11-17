@@ -12,6 +12,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ClipboardEvent } from 'react';
 
 import { texts } from '../texts';
+import { LARGEST_FILE, Zip, nameOf, save, sizeOf } from './files';
+import type { FileOf } from './files';
 import { copied as copiedToMachine, copiedPicture as pictureToMachine } from './wire';
 
 // Which ways the clipboard passes, as the gateway says, and whether pictures pass with
@@ -22,8 +24,13 @@ export interface Passes {
   pictures?: boolean;
 }
 
-// What a clipboard holds for the other side: text, or a picture as a PNG picture.
-export type Held = { text: string } | { picture: Uint8Array<ArrayBuffer> };
+// What a clipboard holds for the other side: text, a picture as a PNG picture, or the
+// files that were copied on the machine, of which the person has the ones they choose.
+export type Held = { text: string } | { picture: Uint8Array<ArrayBuffer> } | { files: FileOf[] };
+
+// Who takes a file that is had from the machine: its pieces in their order, and then
+// whether all of it came.
+export type Takes = { piece: (piece: Uint8Array<ArrayBuffer>) => void; ended: (whole: boolean) => void };
 
 // The largest picture that is handed to the gateway, as the PNG picture it is.
 const LARGEST = 16 * 1024 * 1024;
@@ -171,6 +178,8 @@ export function useClipboard(
       if (byItself) navigator.clipboard.writeText(fromMachine.text).catch(() => undefined);
       return;
     }
+    // files reach no clipboard a browser has: the panel lists them, to download
+    if ('files' in fromMachine) return;
     const png = fromMachine.picture;
     shows(png)
       .then((what) => {
@@ -208,6 +217,114 @@ function PictureFromMachine({ png, label }: { png: Uint8Array<ArrayBuffer>; labe
   return <canvas ref={drawn} className="copied" role="img" aria-label={size ? label(size[0], size[1]) : undefined} />;
 }
 
+// The files that were copied on the machine: each to download, and all of them as one
+// ZIP file. One is had at a time, in pieces, and the browser saves it once it is whole.
+function FilesFromMachine({
+  machine,
+  files,
+  have,
+  giveUp,
+}: {
+  machine: string;
+  files: FileOf[];
+  have: (at: number, takes: Takes) => void;
+  giveUp: () => void;
+}) {
+  const t = texts.session.clipboard;
+  // the file that is being had, how much of it came, and what became of the last one
+  const [having, setHaving] = useState<{ name: string; came: number; of: number } | null>(null);
+  const [said, setSaid] = useState('');
+  useEffect(() => {
+    setHaving(null);
+    setSaid('');
+  }, [files]);
+  // a file, whole, as its pieces: nothing where the machine gave no more of it
+  const had = (at: number, file: FileOf, before: number, of: number) =>
+    new Promise<Uint8Array<ArrayBuffer>[] | null>((whole) => {
+      const pieces: Uint8Array<ArrayBuffer>[] = [];
+      let came = 0;
+      have(at, {
+        piece: (piece) => {
+          pieces.push(piece);
+          came += piece.byteLength;
+          setHaving({ name: nameOf(file), came: before + came, of });
+        },
+        ended: (all) => whole(all ? pieces : null),
+      });
+    });
+  const one = async (at: number, file: FileOf) => {
+    setSaid('');
+    setHaving({ name: nameOf(file), came: 0, of: file.size ?? 0 });
+    const pieces = await had(at, file, 0, file.size ?? 0);
+    setHaving(null);
+    if (pieces === null) setSaid(t.noMore(machine, nameOf(file)));
+    else {
+      save(new Blob(pieces), nameOf(file));
+      setSaid(t.saved(nameOf(file)));
+    }
+  };
+  const total = files.reduce((sum, file) => sum + (file.size ?? 0), 0);
+  const all = async () => {
+    setSaid('');
+    const zip = new Zip();
+    let came = 0;
+    for (const [at, file] of files.entries()) {
+      if (file.folder) {
+        zip.add(file, []);
+        continue;
+      }
+      setHaving({ name: nameOf(file), came, of: total });
+      const pieces = await had(at, file, came, total);
+      if (pieces === null) {
+        setHaving(null);
+        setSaid(t.noMore(machine, nameOf(file)));
+        return;
+      }
+      came += pieces.reduce((sum, piece) => sum + piece.byteLength, 0);
+      zip.add(file, pieces);
+    }
+    setHaving(null);
+    const name = t.zipName(machine);
+    save(zip.whole(), name);
+    setSaid(t.saved(name));
+  };
+  const busy = having !== null;
+  return (
+    <div className="held">
+      <span className="nc-field__label" id="files-from-the-machine">
+        {t.fromMachine}
+      </span>
+      <ul className="files" aria-labelledby="files-from-the-machine">
+        {files.map((file, at) => (
+          <li key={file.name}>
+            <span className="grow">{file.folder ? `${file.name}/` : file.name}</span>
+            {!file.folder && <span className="size">{sizeOf(file.size ?? 0)}</span>}
+            {!file.folder && (
+              <Button size="sm" disabled={busy || (file.size ?? 0) > LARGEST_FILE} aria-label={t.download(nameOf(file))} onClick={() => void one(at, file)}>
+                {t.downloadShort}
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {files.length > 1 && (
+        <Button size="sm" disabled={busy || total > LARGEST_FILE} onClick={() => void all()}>
+          {t.downloadAll}
+        </Button>
+      )}
+      {(total > LARGEST_FILE || files.some((file) => (file.size ?? 0) > LARGEST_FILE)) && <p className="off">{t.tooLargeFile}</p>}
+      {busy && (
+        <Button size="sm" onClick={giveUp}>
+          {t.stop}
+        </Button>
+      )}
+      <span className="said" role="status">
+        {having ? t.having(having.name, having.of > 0 ? Math.min(100, Math.floor((having.came * 100) / having.of)) : null) : said}
+      </span>
+    </div>
+  );
+}
+
 // The panel under the bar's clipboard button.
 export function ClipboardPanel({
   machine,
@@ -217,6 +334,8 @@ export function ClipboardPanel({
   send,
   sendPicture,
   screen,
+  have,
+  giveUp,
 }: {
   machine: string;
   passes: Passes;
@@ -225,6 +344,8 @@ export function ClipboardPanel({
   send: (text: string) => void;
   sendPicture: (picture: Blob) => Promise<'sent' | 'too large' | 'no picture'>;
   screen: HTMLCanvasElement;
+  have: (at: number, takes: Takes) => void;
+  giveUp: () => void;
 }) {
   const t = texts.session.clipboard;
   const pictures = passes.pictures === true;
@@ -258,6 +379,11 @@ export function ClipboardPanel({
   // what became of a picture that was pasted into the field
   const [sent, setSent] = useState<'sent' | 'too large' | null>(null);
   useEffect(() => setTaken(false), [fromMachine]);
+  // the files that were copied on the machine are listed whatever the browser does
+  // with its clipboard: no browser's clipboard takes a file from a page
+  const files = passes.from && fromMachine !== null && 'files' in fromMachine && (
+    <FilesFromMachine machine={machine} files={fromMachine.files} have={have} giveUp={giveUp} />
+  );
   const off = (
     <>
       {!passes.to && <p className="off">{t.noPasting(machine)}</p>}
@@ -270,6 +396,7 @@ export function ClipboardPanel({
         {(passes.to || passes.from) && (
           <p>{passes.to && passes.from ? t.passes(pictures) : passes.to ? t.passesTo(machine, pictures) : t.passesFrom(machine, pictures)}</p>
         )}
+        {files}
         {takesAShot}
         {off}
       </div>
@@ -286,7 +413,7 @@ export function ClipboardPanel({
       .catch(() => undefined);
   };
   const copy = () => {
-    if (fromMachine === null) return;
+    if (fromMachine === null || 'files' in fromMachine) return;
     const written =
       'text' in fromMachine
         ? navigator.clipboard?.writeText(fromMachine.text)
@@ -320,7 +447,8 @@ export function ClipboardPanel({
           </span>
         </form>
       )}
-      {passes.from && (
+      {files}
+      {passes.from && !files && (
         <div>
           {fromMachine !== null && 'picture' in fromMachine ? (
             <div className="held">
@@ -329,7 +457,7 @@ export function ClipboardPanel({
             </div>
           ) : (
             <Field label={t.fromMachine}>
-              <Textarea rows={3} readOnly value={fromMachine?.text ?? ''} />
+              <Textarea rows={3} readOnly value={fromMachine !== null && 'text' in fromMachine ? fromMachine.text : ''} />
             </Field>
           )}
           <Button size="sm" disabled={fromMachine === null} onClick={copy}>

@@ -107,12 +107,12 @@ flowchart TD
 <!-- generated: goals -->
 | Goal | Is | Needs | Expected of it | Capabilities | Qualities |
 |---|---|---|---|---|---|
-| [Work on a machine that is somewhere else](#work-on-a-machine-that-is-somewhere-else) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself) | 24: 3 there, 10 partly, 4 first release, 5 later, 2 not planned | 82 in 9 areas: 8 built, 18 partly built, 22 first release, 28 later, 6 not planned | 9, 9 with a target |
+| [Work on a machine that is somewhere else](#work-on-a-machine-that-is-somewhere-else) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself) | 24: 3 there, 10 partly, 4 first release, 5 later, 2 not planned | 82 in 9 areas: 8 built, 19 partly built, 22 first release, 27 later, 6 not planned | 9, 9 with a target |
 | [Get in without another password](#get-in-without-another-password) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself), [Know what happened](#know-what-happened) | 16: 3 there, 4 partly, 5 first release, 1 first release in part, 2 later, 1 not planned | 15 in 1 area: 4 built, 2 partly built, 4 first release, 3 later, 2 not planned | 5, 5 with a target |
 | [Look at a machine together](#look-at-a-machine-together) | what people want | [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself) | 4: 3 later, 1 not planned | 6 in 1 area: 5 later, 1 not planned | 1, 1 with a target |
 | [Know the machines](#know-the-machines) | what that takes | [Run it oneself](#run-it-oneself) | 13: 3 there, 2 partly, 1 first release, 6 later, 1 not planned | 32 in 2 areas: 15 built, 1 partly built, 6 first release, 7 later, 3 not planned | 2, 2 with a target |
 | [Decide who reaches what](#decide-who-reaches-what) | what that takes | [Run it oneself](#run-it-oneself) | 13: 3 there, 4 first release, 2 first release in part, 4 later | 24 in 2 areas: 4 built, 6 first release, 14 later | 2, 2 with a target |
-| [Know what happened](#know-what-happened) | what that takes | [Run it oneself](#run-it-oneself) | 9: 1 there, 1 partly, 1 first release, 1 first release in part, 5 later | 13 in 1 area: 1 built, 1 partly built, 3 first release, 8 later | 3, 3 with a target |
+| [Know what happened](#know-what-happened) | what that takes | [Run it oneself](#run-it-oneself) | 9: 1 there, 2 partly, 1 first release, 1 first release in part, 4 later | 13 in 1 area: 1 built, 2 partly built, 3 first release, 7 later | 3, 3 with a target |
 | [Run it oneself](#run-it-oneself) | what that takes | [Trust it](#trust-it) | 16: 4 there, 5 partly, 1 first release, 1 first release in part, 2 later, 3 not planned | 26 in 2 areas: 9 built, 1 partly built, 7 first release, 7 later, 2 not planned | 7, 7 with a target |
 | [Trust it](#trust-it) | what being open adds | — | 4: 3 there, 1 partly | 7 in 1 area: 6 built, 1 first release | 6, 6 with a target |
 <!-- end: goals -->
@@ -123,7 +123,7 @@ flowchart TD
 A person opens a desktop, a single program or a shell of a machine that is somewhere else, in a browser, and works there as if sitting at it. It needs: [Know the machines](#know-the-machines), [Decide who reaches what](#decide-who-reaches-what), [Run it oneself](#run-it-oneself).
 
 - **Expected of it:** [24 expectations](../capabilities/expectations.md#work-on-a-machine-that-is-somewhere-else): 3 there, 10 partly, 4 first release, 5 later, 2 not planned.
-- **Capabilities:** [Opening a machine](../capabilities/session.md#opening-a-machine) (20), [The picture](../capabilities/session.md#the-picture) (14), [Keyboard and pointer](../capabilities/session.md#keyboard-and-pointer) (9), [Clipboard, files and printing](../capabilities/session.md#clipboard-files-and-printing) (6), [Sound and devices](../capabilities/session.md#sound-and-devices) (4), [The shell](../capabilities/session.md#the-shell) (7), [On a phone or a tablet](../capabilities/session.md#on-a-phone-or-a-tablet) (7), [The frame](../capabilities/app.md#the-frame) (10), [One's own settings](../capabilities/app.md#ones-own-settings) (5). Of the 82: 8 built, 18 partly built, 22 first release, 28 later, 6 not planned.
+- **Capabilities:** [Opening a machine](../capabilities/session.md#opening-a-machine) (20), [The picture](../capabilities/session.md#the-picture) (14), [Keyboard and pointer](../capabilities/session.md#keyboard-and-pointer) (9), [Clipboard, files and printing](../capabilities/session.md#clipboard-files-and-printing) (6), [Sound and devices](../capabilities/session.md#sound-and-devices) (4), [The shell](../capabilities/session.md#the-shell) (7), [On a phone or a tablet](../capabilities/session.md#on-a-phone-or-a-tablet) (7), [The frame](../capabilities/app.md#the-frame) (10), [One's own settings](../capabilities/app.md#ones-own-settings) (5). Of the 82: 8 built, 19 partly built, 22 first release, 27 later, 6 not planned.
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|
@@ -191,8 +191,8 @@ An organisation is many people and many machines: each person sees and reaches o
 
 Whoever answers for the machines can say afterwards who was on which one, when, as whom, and what was done there. It needs: [Run it oneself](#run-it-oneself). Needed by: [Get in without another password](#get-in-without-another-password).
 
-- **Expected of it:** [9 expectations](../capabilities/expectations.md#know-what-happened): 1 there, 1 partly, 1 first release, 1 first release in part, 5 later.
-- **Capabilities:** [What happened](../capabilities/admin.md#what-happened) (13). Of the 13: 1 built, 1 partly built, 3 first release, 8 later.
+- **Expected of it:** [9 expectations](../capabilities/expectations.md#know-what-happened): 1 there, 2 partly, 1 first release, 1 first release in part, 4 later.
+- **Capabilities:** [What happened](../capabilities/admin.md#what-happened) (13). Of the 13: 1 built, 2 partly built, 3 first release, 7 later.
 
 | It has to | Kind | Measured by | Target | Proposed |
 |---|---|---|---|---|

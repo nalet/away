@@ -1,11 +1,16 @@
 //! The clipboard, shared between the person's device and the machine (MS-RDPECLIP), as
-//! far as text and pictures go. It travels on a further channel of its own.
+//! far as text, pictures and the machine's files go. It travels on a further channel of
+//! its own.
 //!
 //! Each side says when its clipboard holds something new, by the kinds it holds it in,
-//! and the other side asks for it in the kind it wants. Away takes text, and a picture
-//! where there is no text: what the machine copies is asked for at once, and what the
-//! person copied is handed over when the machine asks for it. Each direction passes
-//! only where the installation lets it.
+//! and the other side asks for it in the kind it wants. Away takes text, files where
+//! there is no text, and a picture where there is neither: what the machine copies is
+//! asked for at once, and what the person copied is handed over when the machine asks
+//! for it. Of files that were copied on the machine their names and sizes are asked for
+//! at once, and what is in one is asked for a piece at a time, when the person wants
+//! it. Each direction passes only where the installation lets it.
+
+use std::collections::VecDeque;
 
 use crate::Error;
 
@@ -28,6 +33,8 @@ const GIVES: u16 = 0x0005;
 const CAN_DO: u16 = 0x0007;
 const ASKS_FOR_A_FILE: u16 = 0x0008;
 const GIVES_A_FILE: u16 = 0x0009;
+const KEEPS: u16 = 0x000a;
+const LETS_GO: u16 = 0x000b;
 
 const WORKED: u16 = 0x0001;
 const FAILED: u16 = 0x0002;
@@ -43,6 +50,25 @@ const AS_THEY_ARE: u32 = 0;
 const BY_MASKS: u32 = 3;
 /// What a side says it can do: that it writes the kinds' names at their full length.
 const LONG_NAMES: u32 = 0x0000_0002;
+/// That it hands files over as what is in them, a piece at a time, and names none by
+/// where it lies on its own disk.
+const FILES_IN_PIECES: u32 = 0x0000_0004 | 0x0000_0008;
+/// That it keeps what was copied for as long as the other side says, also once
+/// something else was copied.
+const KEEPS_WHAT_WAS_COPIED: u32 = 0x0000_0010;
+/// That files of more than four thousand million bytes pass.
+const LARGE_FILES: u32 = 0x0000_0020;
+/// The name of the kind that lists the files that were copied.
+const LIST_OF_FILES: &str = "FileGroupDescriptorW";
+/// How long the entry of one file in that list is, where its name begins in it, and
+/// the mark of a folder among what a file is.
+const ONE_FILE: usize = 592;
+const NAME_AT: usize = 72;
+const A_FOLDER: u32 = 0x0000_0010;
+/// The most files of one copy that are listed.
+pub const MOST_FILES: usize = 4096;
+/// The longest piece of a file that is asked for at once.
+pub const LONGEST_PIECE: u32 = 256 * 1024;
 
 /// Which ways the clipboard passes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -83,6 +109,18 @@ impl std::fmt::Debug for Picture {
     }
 }
 
+/// A file that was copied on the machine.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct File {
+    /// Its name, after the folders it lies in among what was copied, each followed by a
+    /// slash. Nothing in it leads out of what was copied.
+    pub name: String,
+    /// How many bytes it holds, as the machine says.
+    pub size: u64,
+    /// Whether it is a folder, which holds nothing itself.
+    pub folder: bool,
+}
+
 /// What a clipboard carries from one side to the other.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Carried {
@@ -90,6 +128,13 @@ pub enum Carried {
     Text(String),
     /// A picture.
     Picture(Picture),
+    /// The files that were copied on the machine: which they are, and nothing of what
+    /// is in them.
+    Files(Vec<File>),
+    /// A piece of a file that was asked for. An empty one: the file ends before there.
+    Piece(Vec<u8>),
+    /// The machine did not give the piece that was asked for.
+    NoPiece,
 }
 
 impl Carried {
@@ -97,7 +142,7 @@ impl Carried {
     pub fn text(&self) -> Option<&str> {
         match self {
             Carried::Text(text) => Some(text),
-            Carried::Picture(_) => None,
+            _ => None,
         }
     }
 }
@@ -112,8 +157,24 @@ pub struct Clipboard {
     ready: bool,
     /// What the person copied, for the machine to ask for.
     theirs: Option<Carried>,
-    /// The kind the client asked the machine for and waits for, where it did.
-    asked: Option<u32>,
+    /// The kinds the client asked the machine for and waits for, in the order it asked:
+    /// the machine answers in that order. One that is no longer wanted, because
+    /// something newer was copied on either side since, waits there as nothing, so that
+    /// its answer is taken for no other.
+    asked: VecDeque<Option<u32>>,
+    /// Whether the files that are copied on the machine pass to the person.
+    files: bool,
+    /// Whether the machine keeps what was copied for as long as it is told to.
+    machine_keeps: bool,
+    /// The number the machine's list of files has in what it holds now.
+    list: Option<u32>,
+    /// The number under which the machine keeps the files that were listed last.
+    kept: Option<u32>,
+    /// How many times the machine was told to keep files, and how many pieces were asked for.
+    keeps: u32,
+    pieces: u32,
+    /// The piece of a file the client asked for and waits for, by its number.
+    asked_for_a_piece: Option<u32>,
 }
 
 /// A message of the clipboard's channel: its kind, how it went, and what it holds.
@@ -215,21 +276,67 @@ fn picture_for_the_person(held: &[u8]) -> Option<Picture> {
     Some(Picture { width, height, pixels })
 }
 
+/// The files a machine lists, as the person's device takes them. An entry whose name
+/// says nothing is left out, and so is what is beyond the most files that are listed.
+fn files_for_the_person(held: &[u8]) -> Option<Vec<File>> {
+    let four = |from: &[u8], at: usize| from.get(at..at + 4).map(|four| u32::from_le_bytes([four[0], four[1], four[2], four[3]]));
+    let count = four(held, 0)? as usize;
+    let entries = held.get(4..4usize.checked_add(count.checked_mul(ONE_FILE)?)?)?;
+    let mut files = Vec::new();
+    for entry in entries.as_chunks::<ONE_FILE>().0.iter().take(MOST_FILES) {
+        let units: Vec<u16> =
+            entry[NAME_AT..].as_chunks::<2>().0.iter().map(|pair| u16::from_le_bytes(*pair)).take_while(|unit| *unit != 0).collect();
+        // the folders a file lies in, and its name: nothing that leads elsewhere
+        let parts: Vec<String> = String::from_utf16_lossy(&units)
+            .split(['\\', '/'])
+            .filter(|part| !part.is_empty() && *part != "." && *part != ".." && !part.contains(':'))
+            .map(str::to_string)
+            .collect();
+        if parts.is_empty() {
+            continue;
+        }
+        let size = (u64::from(four(entry, 64)?) << 32) | u64::from(four(entry, 68)?);
+        files.push(File { name: parts.join("/"), size, folder: four(entry, 36)? & A_FOLDER != 0 });
+    }
+    Some(files)
+}
+
 impl Clipboard {
     /// A clipboard that passes these ways.
     pub fn new(passes: Passes) -> Clipboard {
-        Clipboard { passes, long_names: false, ready: false, theirs: None, asked: None }
+        Clipboard {
+            passes,
+            long_names: false,
+            ready: false,
+            theirs: None,
+            asked: VecDeque::new(),
+            files: false,
+            machine_keeps: false,
+            list: None,
+            kept: None,
+            keeps: 0,
+            pieces: 0,
+            asked_for_a_piece: None,
+        }
+    }
+
+    /// The same, with the files that are copied on the machine passing to the person,
+    /// where the clipboard passes from the machine at all.
+    pub fn with_files(self) -> Clipboard {
+        Clipboard { files: self.passes.from_the_machine, ..self }
     }
 
     /// What the client says it holds: text or a picture, where the person copied one
     /// that may pass to the machine, and nothing otherwise.
     fn holds(&self) -> Vec<u8> {
         let mut kinds = Vec::new();
-        if let (Some(theirs), true) = (&self.theirs, self.passes.to_the_machine) {
-            kinds.extend(match theirs {
-                Carried::Text(_) => TEXT.to_le_bytes(),
-                Carried::Picture(_) => PICTURE.to_le_bytes(),
-            });
+        let kind = match (&self.theirs, self.passes.to_the_machine) {
+            (Some(Carried::Text(_)), true) => Some(TEXT),
+            (Some(Carried::Picture(_)), true) => Some(PICTURE),
+            _ => None,
+        };
+        if let Some(kind) = kind {
+            kinds.extend(kind.to_le_bytes());
             // the kind has no name: at full length that is one zero, otherwise 32 bytes of them
             kinds.extend(if self.long_names { vec![0; 2] } else { vec![0; 32] });
         }
@@ -252,7 +359,9 @@ impl Clipboard {
                     let (set, length) = (u16::from_le_bytes([sets[0], sets[1]]), usize::from(u16::from_le_bytes([sets[2], sets[3]])));
                     let whole = sets.get(..length).filter(|whole| whole.len() >= 4).ok_or(WRONG)?;
                     if set == 1 {
-                        self.long_names = four(whole, 8).ok_or(WRONG)? & LONG_NAMES != 0;
+                        let can = four(whole, 8).ok_or(WRONG)?;
+                        self.long_names = can & LONG_NAMES != 0;
+                        self.machine_keeps = can & KEEPS_WHAT_WAS_COPIED != 0;
                     }
                     sets = &sets[length..];
                 }
@@ -263,7 +372,10 @@ impl Clipboard {
             READY => {
                 self.ready = true;
                 let mut can = vec![1, 0, 0, 0, 1, 0, 12, 0, 2, 0, 0, 0];
-                can.extend(if self.long_names { LONG_NAMES } else { 0 }.to_le_bytes());
+                // files pass where the machine names its kinds at full length: the list
+                // of files has a name that is longer than a short one
+                let of_files = if self.files && self.long_names { FILES_IN_PIECES | KEEPS_WHAT_WAS_COPIED | LARGE_FILES } else { 0 };
+                can.extend((if self.long_names { LONG_NAMES } else { 0 } | of_files).to_le_bytes());
                 Ok((vec![message(CAN_DO, 0, &can), self.holds()], None))
             }
             // the machine's clipboard holds something new: the client confirms, and asks
@@ -272,26 +384,42 @@ impl Clipboard {
             HOLDS => {
                 let mut answers = vec![message(TOOK, WORKED, &[])];
                 let mut kinds = holds;
-                let (mut text, mut picture) = (false, false);
+                let (mut text, mut picture, mut list) = (false, false, None);
                 while kinds.len() >= 4 {
                     text |= four(kinds, 0) == Some(TEXT);
                     picture |= four(kinds, 0) == Some(PICTURE);
                     // past the kind's name: at full length up to its zero, otherwise 32 bytes
                     let name = match self.long_names {
                         true => {
-                            kinds[4..].as_chunks::<2>().0.iter().position(|unit| *unit == [0, 0]).map(|units| units * 2 + 2).ok_or(WRONG)?
+                            let units = kinds[4..].as_chunks::<2>().0.iter().position(|unit| *unit == [0, 0]).ok_or(WRONG)?;
+                            let named = LIST_OF_FILES.encode_utf16().flat_map(u16::to_le_bytes).eq(kinds[4..4 + units * 2].iter().copied());
+                            if named {
+                                list = four(kinds, 0);
+                            }
+                            units * 2 + 2
                         }
                         false => 32,
                     };
                     kinds = kinds.get(4 + name..).ok_or(WRONG)?;
                 }
-                self.asked = match (text, picture) {
+                // the files that were listed before are no longer what the machine holds:
+                // it need not keep them, and no piece of them is waited for
+                if let Some(kept) = self.kept.take() {
+                    answers.push(message(LETS_GO, 0, &kept.to_le_bytes()));
+                }
+                self.asked_for_a_piece = None;
+                self.list = list.filter(|_| self.files);
+                // what was asked for before is of what the machine held before
+                self.asked.iter_mut().for_each(|asked| *asked = None);
+                let wanted = match (text, self.list, picture) {
                     _ if !self.passes.from_the_machine => None,
-                    (true, _) => Some(TEXT),
-                    (false, true) => Some(PICTURE),
-                    (false, false) => None,
+                    (true, ..) => Some(TEXT),
+                    (false, Some(list), _) => Some(list),
+                    (false, None, true) => Some(PICTURE),
+                    (false, None, false) => None,
                 };
-                if let Some(kind) = self.asked {
+                if let Some(kind) = wanted {
+                    self.asked.push_back(Some(kind));
                     answers.push(message(ASKS, 0, &kind.to_le_bytes()));
                 }
                 Ok((answers, None))
@@ -308,12 +436,35 @@ impl Clipboard {
             }
             // what the client asked for: what was copied on the machine
             GIVES => {
-                let copied = match self.asked.take() {
+                let mut answers = Vec::new();
+                let copied = match self.asked.pop_front().flatten() {
                     Some(TEXT) if how & WORKED != 0 && holds.len() <= LONGEST => Some(Carried::Text(for_the_person(holds))),
                     Some(PICTURE) if how & WORKED != 0 && holds.len() <= LARGEST => picture_for_the_person(holds).map(Carried::Picture),
+                    // the list of the files: the machine is told to keep them, where it
+                    // does, so that they can be had after something else was copied there
+                    Some(list) if Some(list) == self.list && how & WORKED != 0 => {
+                        let files = files_for_the_person(holds).filter(|files| !files.is_empty());
+                        if files.is_some() && self.machine_keeps {
+                            self.keeps += 1;
+                            self.kept = Some(self.keeps);
+                            answers.push(message(KEEPS, 0, &self.keeps.to_le_bytes()));
+                        }
+                        files.map(Carried::Files)
+                    }
                     _ => None,
                 };
-                Ok((Vec::new(), copied))
+                Ok((answers, copied))
+            }
+            // a piece of a file that the client asked for
+            GIVES_A_FILE => {
+                let piece = match (four(holds, 0), self.asked_for_a_piece) {
+                    (Some(number), Some(asked)) if number == asked => {
+                        self.asked_for_a_piece = None;
+                        Some(if how & WORKED != 0 { Carried::Piece(holds[4..].to_vec()) } else { Carried::NoPiece })
+                    }
+                    _ => None,
+                };
+                Ok((Vec::new(), piece))
             }
             // a file is never offered, so one that is asked for is not given
             ASKS_FOR_A_FILE => {
@@ -346,13 +497,34 @@ impl Clipboard {
         self.holds_now(Carried::Picture(picture))
     }
 
+    /// Asks the machine for a piece of a file it listed: the file by its place in the
+    /// list, the piece by where it begins and how long it is at most. Nothing where no
+    /// files are listed, or while another piece is waited for.
+    pub fn asks_for_a_piece(&mut self, file: u32, from: u64, length: u32) -> Vec<Vec<u8>> {
+        if self.list.is_none() || self.asked_for_a_piece.is_some() {
+            return Vec::new();
+        }
+        self.pieces += 1;
+        self.asked_for_a_piece = Some(self.pieces);
+        let mut asks = Vec::with_capacity(28);
+        asks.extend(self.pieces.to_le_bytes());
+        asks.extend(file.to_le_bytes());
+        // a range of the file, and not its size
+        asks.extend(2u32.to_le_bytes());
+        asks.extend((from as u32).to_le_bytes());
+        asks.extend(((from >> 32) as u32).to_le_bytes());
+        asks.extend(length.min(LONGEST_PIECE).to_le_bytes());
+        asks.extend(self.kept.into_iter().flat_map(u32::to_le_bytes));
+        vec![message(ASKS_FOR_A_FILE, 0, &asks)]
+    }
+
     fn holds_now(&mut self, theirs: Carried) -> Vec<Vec<u8>> {
         if !self.passes.to_the_machine {
             return Vec::new();
         }
         self.theirs = Some(theirs);
         // what the client asked the machine for is no longer the newest
-        self.asked = None;
+        self.asked.iter_mut().for_each(|asked| *asked = None);
         match self.ready {
             true => vec![self.holds()],
             false => Vec::new(),
@@ -427,6 +599,54 @@ pub mod stand_in {
         arrived.get(8..).filter(|_| worked).and_then(picture_for_the_person)
     }
 
+    /// The number the stand-in gives its list of files among the kinds it holds.
+    pub const LIST: u32 = 0xc0a1;
+
+    /// What the machine can do where it hands files over, and that it is ready.
+    pub fn ready_with_files() -> Vec<Vec<u8>> {
+        let mut can = vec![1, 0, 0, 0, 1, 0, 12, 0, 2, 0, 0, 0];
+        can.extend((LONG_NAMES | FILES_IN_PIECES | KEEPS_WHAT_WAS_COPIED | LARGE_FILES).to_le_bytes());
+        vec![message(CAN_DO, 0, &can), message(READY, 0, &[])]
+    }
+
+    /// The machine's clipboard holds files: their list, what is in them, and a kind
+    /// that is not Away's.
+    pub fn holds_files() -> Vec<u8> {
+        let mut kinds = Vec::new();
+        for (kind, name) in [(LIST, LIST_OF_FILES), (0xc0a2, "FileContents"), (0xc004, "Preferred DropEffect")] {
+            kinds.extend(kind.to_le_bytes());
+            kinds.extend(name.encode_utf16().flat_map(u16::to_le_bytes));
+            kinds.extend([0, 0]);
+        }
+        message(HOLDS, 0, &kinds)
+    }
+
+    /// The machine gives the list of its files: each by its name as a machine writes
+    /// it, its size, and whether it is a folder.
+    pub fn gives_files(files: &[(&str, u64, bool)]) -> Vec<u8> {
+        let mut held = (files.len() as u32).to_le_bytes().to_vec();
+        for (name, size, folder) in files {
+            let mut entry = vec![0u8; ONE_FILE];
+            entry[..4].copy_from_slice(&0x0000_4044u32.to_le_bytes());
+            entry[36..40].copy_from_slice(&if *folder { A_FOLDER } else { 0x80 }.to_le_bytes());
+            entry[64..68].copy_from_slice(&((size >> 32) as u32).to_le_bytes());
+            entry[68..72].copy_from_slice(&(*size as u32).to_le_bytes());
+            for (at, unit) in name.encode_utf16().take(259).enumerate() {
+                entry[NAME_AT + at * 2..][..2].copy_from_slice(&unit.to_le_bytes());
+            }
+            held.extend(entry);
+        }
+        message(GIVES, WORKED, &held)
+    }
+
+    /// The machine gives the piece of a file that was asked for under this number, or
+    /// says that it gives none.
+    pub fn gives_a_piece(number: u32, piece: Option<&[u8]>) -> Vec<u8> {
+        let mut held = number.to_le_bytes().to_vec();
+        held.extend_from_slice(piece.unwrap_or_default());
+        message(GIVES_A_FILE, if piece.is_some() { WORKED } else { FAILED }, &held)
+    }
+
     /// The machine took what the client says it holds.
     pub fn took() -> Vec<u8> {
         message(TOOK, WORKED, &[])
@@ -456,6 +676,25 @@ pub mod stand_in {
         HoldsPicture,
         /// That it asks for the machine's picture.
         AsksForPicture,
+        /// That it asks for the list of the machine's files.
+        AsksForFiles,
+        /// That it asks for a piece of a file.
+        AsksForAPiece {
+            /// The number the answer is given under.
+            number: u32,
+            /// The file, by its place in the list.
+            file: u32,
+            /// Where the piece begins.
+            from: u64,
+            /// How long it is at most.
+            length: u32,
+            /// The number the machine keeps the files under, where the client named it.
+            kept: Option<u32>,
+        },
+        /// That the machine is to keep what it holds, under this number.
+        Keeps(u32),
+        /// That it need not keep it any longer.
+        LetsGo(u32),
         /// That it took what the machine holds.
         Took,
         /// That it asks for the machine's text.
@@ -477,6 +716,19 @@ pub mod stand_in {
             (Some(TOOK), _) => Said::Took,
             (Some(ASKS), _) if holds == TEXT.to_le_bytes() => Said::Asks,
             (Some(ASKS), _) if holds == PICTURE.to_le_bytes() => Said::AsksForPicture,
+            (Some(ASKS), _) if holds == LIST.to_le_bytes() => Said::AsksForFiles,
+            (Some(ASKS_FOR_A_FILE), _) if holds.len() >= 24 => {
+                let four = |at: usize| u32::from_le_bytes([holds[at], holds[at + 1], holds[at + 2], holds[at + 3]]);
+                Said::AsksForAPiece {
+                    number: four(0),
+                    file: four(4),
+                    from: u64::from(four(12)) | (u64::from(four(16)) << 32),
+                    length: four(20),
+                    kept: (holds.len() >= 28).then(|| four(24)),
+                }
+            }
+            (Some(KEEPS), _) if holds.len() >= 4 => Said::Keeps(u32::from_le_bytes([holds[0], holds[1], holds[2], holds[3]])),
+            (Some(LETS_GO), _) if holds.len() >= 4 => Said::LetsGo(u32::from_le_bytes([holds[0], holds[1], holds[2], holds[3]])),
             (Some(GIVES), Some(how)) => Said::Gives((how & WORKED != 0).then(|| for_the_person(holds))),
             _ => Said::Other,
         }
@@ -567,6 +819,14 @@ mod tests {
         assert_eq!((said(&answers), copied), (vec![Said::Took, Said::AsksForPicture], None));
         let (answers, copied) = clipboard.receive(&stand_in::gives_picture(&six_pixels())).unwrap();
         assert_eq!((answers.len(), copied), (0, Some(Carried::Picture(six_pixels()))));
+        // the machine copies twice before it answered: it answers in the order it was
+        // asked, and what it gives of the first copy is taken for nothing
+        clipboard.receive(&stand_in::holds_picture(true)).unwrap();
+        clipboard.receive(&stand_in::holds_text(true)).unwrap();
+        assert_eq!(clipboard.receive(&stand_in::gives_picture(&six_pixels())).unwrap(), (Vec::new(), None));
+        assert_eq!(clipboard.receive(&stand_in::gives("the newer one")).unwrap().1, Some(Carried::Text("the newer one".to_string())));
+        clipboard.receive(&stand_in::holds_picture(true)).unwrap();
+        assert_eq!(clipboard.receive(&stand_in::gives_picture(&six_pixels())).unwrap().1, Some(Carried::Picture(six_pixels())));
         // one nobody asked for is not taken, and where the machine holds text too, the text is asked for
         assert_eq!(clipboard.receive(&stand_in::gives_picture(&six_pixels())).unwrap(), (Vec::new(), None));
         let mut both = stand_in::holds_text(true);
@@ -630,6 +890,90 @@ mod tests {
         let mut too_wide = whole;
         too_wide[4..8].copy_from_slice(&(MOST_ACROSS as u32 + 1).to_le_bytes());
         assert_eq!(picture_for_the_person(&too_wide), None);
+    }
+
+    #[test]
+    fn the_files_that_are_copied_on_the_machine_are_listed_and_had_a_piece_at_a_time() {
+        let mut clipboard = Clipboard::new(Passes::BOTH).with_files();
+        let [can_do, is_ready] = <[Vec<u8>; 2]>::try_from(stand_in::ready_with_files()).unwrap();
+        clipboard.receive(&can_do).unwrap();
+        // the client says that files pass in pieces, that it keeps and is kept for, and that large ones pass
+        let (answers, _) = clipboard.receive(&is_ready).unwrap();
+        assert_eq!(&answers[0][8..], &[1, 0, 0, 0, 1, 0, 12, 0, 2, 0, 0, 0, 0x3e, 0, 0, 0]);
+        // no piece is asked for while no files are listed
+        assert!(clipboard.asks_for_a_piece(0, 0, 100).is_empty());
+
+        // the machine copies files: the client asks for their list, and tells the
+        // machine to keep them
+        let (answers, copied) = clipboard.receive(&stand_in::holds_files()).unwrap();
+        assert_eq!((said(&answers), copied), (vec![Said::Took, Said::AsksForFiles], None));
+        let listed = stand_in::gives_files(&[
+            ("notes.txt", 11, false),
+            ("folder", 0, true),
+            ("folder\\data.bin", 5_000_000_000, false),
+            ("..\\..\\C:\\elsewhere\\.\\secret.txt", 3, false),
+            ("\\", 1, false),
+        ]);
+        let (answers, copied) = clipboard.receive(&listed).unwrap();
+        assert_eq!(said(&answers), [Said::Keeps(1)]);
+        assert_eq!(
+            copied,
+            Some(Carried::Files(vec![
+                File { name: "notes.txt".to_string(), size: 11, folder: false },
+                File { name: "folder".to_string(), size: 0, folder: true },
+                File { name: "folder/data.bin".to_string(), size: 5_000_000_000, folder: false },
+                // a name that leads elsewhere is its last parts alone, and one that says nothing is left out
+                File { name: "elsewhere/secret.txt".to_string(), size: 3, folder: false },
+            ]))
+        );
+
+        // a piece is asked for by the file's place, where it begins and how long it is,
+        // under the number the machine keeps the files by; one at a time
+        let asks = clipboard.asks_for_a_piece(2, 4_294_967_296 + 7, 1_000_000);
+        assert_eq!(said(&asks), [Said::AsksForAPiece { number: 1, file: 2, from: 4_294_967_303, length: LONGEST_PIECE, kept: Some(1) }]);
+        assert!(clipboard.asks_for_a_piece(0, 0, 100).is_empty());
+        // a piece under another number is not taken; the one that was asked for is
+        assert_eq!(clipboard.receive(&stand_in::gives_a_piece(9, Some(b"other"))).unwrap(), (Vec::new(), None));
+        assert_eq!(
+            clipboard.receive(&stand_in::gives_a_piece(1, Some(b"a piece"))).unwrap(),
+            (Vec::new(), Some(Carried::Piece(b"a piece".to_vec())))
+        );
+        assert_eq!(clipboard.receive(&stand_in::gives_a_piece(1, Some(b"twice"))).unwrap(), (Vec::new(), None));
+        // one the machine doesn't give, and the end of a file, which is a piece of nothing
+        let asks = clipboard.asks_for_a_piece(0, 11, 100);
+        assert_eq!(said(&asks), [Said::AsksForAPiece { number: 2, file: 0, from: 11, length: 100, kept: Some(1) }]);
+        assert_eq!(clipboard.receive(&stand_in::gives_a_piece(2, Some(b""))).unwrap().1, Some(Carried::Piece(Vec::new())));
+        clipboard.asks_for_a_piece(1, 0, 100);
+        assert_eq!(clipboard.receive(&stand_in::gives_a_piece(3, None)).unwrap().1, Some(Carried::NoPiece));
+
+        // the machine copies text: it need not keep the files any longer, and none is had
+        let (answers, _) = clipboard.receive(&stand_in::holds_text(true)).unwrap();
+        assert_eq!(said(&answers), [Said::Took, Said::LetsGo(1), Said::Asks]);
+        assert!(clipboard.asks_for_a_piece(0, 0, 100).is_empty());
+
+        // where files don't pass, the client says nothing of them, and asks for no list
+        let mut without = Clipboard::new(Passes::BOTH);
+        let [can_do, is_ready] = <[Vec<u8>; 2]>::try_from(stand_in::ready_with_files()).unwrap();
+        without.receive(&can_do).unwrap();
+        assert_eq!(&without.receive(&is_ready).unwrap().0[0][20..], &[2, 0, 0, 0]);
+        assert_eq!(said(&without.receive(&stand_in::holds_files()).unwrap().0), [Said::Took]);
+        // nor where nothing passes from the machine
+        let mut to_it = Clipboard::new(Passes { to_the_machine: true, from_the_machine: false }).with_files();
+        for message in stand_in::ready_with_files() {
+            to_it.receive(&message).unwrap();
+        }
+        assert_eq!(said(&to_it.receive(&stand_in::holds_files()).unwrap().0), [Said::Took]);
+        // a list that is cut is none
+        let mut cut = Clipboard::new(Passes::BOTH).with_files();
+        for message in stand_in::ready_with_files() {
+            cut.receive(&message).unwrap();
+        }
+        cut.receive(&stand_in::holds_files()).unwrap();
+        let mut short = listed.clone();
+        short.truncate(listed.len() - 5);
+        let length = (short.len() - 8) as u32;
+        short[4..8].copy_from_slice(&length.to_le_bytes());
+        assert_eq!(cut.receive(&short).unwrap(), (Vec::new(), None));
     }
 
     #[test]

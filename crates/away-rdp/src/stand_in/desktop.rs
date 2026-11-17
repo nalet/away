@@ -31,6 +31,19 @@ pub const COPIED: &str = "copied on the machine\nin two lines";
 const KEY_C: u8 = 0x2e;
 /// The key P, by its place: with it the stand-in copies a picture.
 const KEY_P: u8 = 0x19;
+/// The key F, by its place: with it the stand-in copies files.
+const KEY_F: u8 = 0x21;
+
+/// The files the stand-in copies when the key F goes down: a small one, a folder, and
+/// in the folder one that is longer than a piece. Each with its name as a machine
+/// writes it, what is in it, and whether it is a folder.
+pub fn copied_files() -> Vec<(&'static str, Vec<u8>, bool)> {
+    vec![
+        ("notes.txt", b"hello files".to_vec(), false),
+        ("folder", Vec::new(), true),
+        ("folder\\data.bin", (0..300_000u32).map(|nth| (nth % 251) as u8).collect(), false),
+    ]
+}
 /// Where the stand-in draws a picture it was handed when it pasted.
 pub const PASTED_AT: (usize, usize) = (60, 40);
 
@@ -534,7 +547,7 @@ impl Desktop {
                         // once what it can do and that it is ready
                         if let (Some(on), false) = (self.channel(clipboard::CHANNEL), self.speaks_of_the_clipboard) {
                             self.speaks_of_the_clipboard = true;
-                            for message in clipboard::stand_in::ready(true) {
+                            for message in clipboard::stand_in::ready_with_files() {
                                 send.extend(on_a_channel(on, &message, true));
                             }
                         }
@@ -563,7 +576,9 @@ impl Desktop {
         let says = |message: &[u8]| on_a_channel(on, message, true);
         // the picture it asked for: kept, and its corner drawn on its screen, as a
         // program that was pasted into shows it
-        if std::mem::take(&mut self.asked_for_a_picture) {
+        // it is what the client gives, and nothing else the client says meanwhile
+        if self.asked_for_a_picture && message.starts_with(&[5, 0]) {
+            self.asked_for_a_picture = false;
             let Some(handed) = clipboard::stand_in::gave_picture(&message) else { return Ok(Vec::new()) };
             let (left, top) = (PASTED_AT.0.min(self.picture.width - 1), PASTED_AT.1.min(self.picture.height - 1));
             // as much of it as a mark is large: its corner says which picture it is
@@ -583,6 +598,22 @@ impl Desktop {
             return Ok(short_frame(0x01, &update));
         }
         Ok(match clipboard::stand_in::read(&message) {
+            // the files it copies: their list, and of each the piece that is asked for.
+            // A folder holds nothing, and a file that is not listed is not given
+            Said::AsksForFiles => {
+                let files = copied_files();
+                let listed: Vec<(&str, u64, bool)> =
+                    files.iter().map(|(name, holds, folder)| (*name, holds.len() as u64, *folder)).collect();
+                says(&clipboard::stand_in::gives_files(&listed))
+            }
+            Said::AsksForAPiece { number, file, from, length, .. } => {
+                let files = copied_files();
+                let piece = files.get(file as usize).filter(|(.., folder)| !folder).map(|(_, holds, _)| {
+                    let from = usize::try_from(from).unwrap_or(usize::MAX).min(holds.len());
+                    &holds[from..holds.len().min(from.saturating_add(length as usize))]
+                });
+                says(&clipboard::stand_in::gives_a_piece(number, piece))
+            }
             Said::HoldsPicture => {
                 self.asked_for_a_picture = true;
                 [says(&clipboard::stand_in::took()), says(&clipboard::stand_in::asks_for_picture())].concat()
@@ -813,6 +844,10 @@ impl Desktop {
             // the key P copies a picture
             if let (Input::Key { code: KEY_P, down: true, .. }, Some(on)) = (event, self.channel(clipboard::CHANNEL)) {
                 send.extend(on_a_channel(on, &clipboard::stand_in::holds_picture(true), true));
+            }
+            // the key F copies files
+            if let (Input::Key { code: KEY_F, down: true, .. }, Some(on)) = (event, self.channel(clipboard::CHANNEL)) {
+                send.extend(on_a_channel(on, &clipboard::stand_in::holds_files(), true));
             }
             let (left, top, colour) = match event {
                 Input::Button { button: Button::Left, down: true, x, y } => (usize::from(x), usize::from(y), CLICKED),

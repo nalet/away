@@ -15,6 +15,9 @@ export type Said =
   | { windows: WindowOf[]; in_front: number | null }
   | { clipboard: { to: boolean; from: boolean; pictures?: boolean } }
   | { copied: string }
+  // the files that were copied on the machine, and what became of the one that was asked for
+  | { files: { name: string; size?: number; folder?: boolean }[] }
+  | { file: 'whole' | 'failed' }
   | { started: { program: string; ok: boolean; details?: string } }
   | { tray: TrayOf[] };
 
@@ -130,6 +133,18 @@ export function copiedPicture(png: Uint8Array): Uint8Array<ArrayBuffer>[] {
     pieces.push(bytes);
   }
   return pieces;
+}
+
+// A piece of the file that was asked for: the pieces come in their order.
+export function readPieceOfAFile(bytes: ArrayBuffer): Uint8Array<ArrayBuffer> | null {
+  if (bytes.byteLength < 1 || new DataView(bytes).getUint8(0) !== 5) return null;
+  return new Uint8Array(bytes.slice(1));
+}
+
+// The person asks for a file that was copied on the machine, by its place among those
+// that were listed, or gives up on the one they asked for.
+export function file(at: number | 'none'): string {
+  return JSON.stringify({ file: at });
 }
 
 // A picture that was copied on the machine: a PNG picture.

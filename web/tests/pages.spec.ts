@@ -1154,10 +1154,31 @@ test.describe('a session', () => {
     await page.keyboard.press('Escape');
     await expect(screen).toBeFocused();
     await expect.poll(() => pixel(page, 60, 40)).toEqual([200, 100, 50]);
+    // a picture that is longer than one message to the gateway goes in pieces, and is
+    // whole on the machine: one of 200 by 200 pixels in which no two neighbours are alike
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    const corner = await page.evaluate(async () => {
+      const canvas = new OffscreenCanvas(200, 200);
+      const drawn = canvas.getContext('2d')!;
+      const pixels = drawn.createImageData(200, 200);
+      let now = 12345;
+      for (let nth = 0; nth < pixels.data.length; nth += 1) {
+        now = (Math.imul(now, 1103515245) + 12345) >>> 0;
+        pixels.data[nth] = nth % 4 === 3 ? 255 : now >>> 24;
+      }
+      drawn.putImageData(pixels, 0, 0);
+      const picture = await canvas.convertToBlob({ type: 'image/png' });
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': picture })]);
+      return [picture.size > 100_000, ...pixels.data.slice(0, 3)];
+    });
+    expect(corner[0]).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(screen).toBeFocused();
+    await expect.poll(() => pixel(page, 60, 40)).toEqual(corner.slice(1));
     // the stand-in copies what it was handed: that picture is the person's again, and
     // is not handed back to the machine a second time
     await page.keyboard.press('p');
-    await expect.poll(held).toEqual([8, 8, 200, 100, 50]);
+    await expect.poll(async () => (await held())?.slice(0, 2)).toEqual([200, 200]);
     // a picture of what the session shows is taken by Away itself, with a button of the panel
     await page.getByRole('button', { name: "open the session's bar" }).click();
     await bar.getByRole('button', { name: 'clipboard' }).click();
@@ -1171,6 +1192,77 @@ test.describe('a session', () => {
     await page.getByRole('button', { name: "open the session's bar" }).click();
     await bar.getByRole('button', { name: 'end' }).click();
     await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/desk-01`);
+  });
+
+  test('files that are copied on the machine are listed in the clipboard panel, and are downloaded one by one or all as one zip', async ({ page }) => {
+    const seen = watch(page);
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/desk-01/desktop`);
+    await page.getByLabel('Name').fill('CORP\\alex.urban');
+    await page.getByLabel('Password').fill('a password that exists for these tests alone');
+    await page.getByRole('button', { name: 'sign in' }).click();
+    const screen = page.getByRole('application', { name: 'the desktop of desk-01' });
+    await expect(screen).toBeFocused();
+    await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
+
+    // the key F copies files on the machine. They reach no clipboard of a browser's: a
+    // line at the foot says that they are there, and leads to the panel that lists them
+    await page.keyboard.press('f');
+    const notice = page.getByRole('status').filter({ hasText: '2 files were copied on desk-01.' });
+    await expect(notice).toBeVisible();
+    await notice.getByRole('button', { name: 'show' }).click();
+    await expect(notice).toHaveCount(0);
+    const panel = page.getByRole('group', { name: 'clipboard' });
+    const files = panel.getByRole('list', { name: 'From the machine' }).getByRole('listitem');
+    await expect(files).toHaveText([/^notes\.txt11 bytes/, 'folder/', /^folder\/data\.bin300 KB/]);
+    await accessible(page);
+
+    // one file is downloaded as it is, under its own name
+    const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
+    const [one] = await Promise.all([page.waitForEvent('download'), panel.getByRole('button', { name: 'download notes.txt' }).click()]);
+    expect(one.suggestedFilename()).toBe('notes.txt');
+    expect(text(readFileSync(await one.path()))).toBe('hello files');
+    await expect(panel.getByText('notes.txt is in your downloads now.')).toBeVisible();
+    // one that is longer than a piece comes in several, and is whole
+    const [large] = await Promise.all([page.waitForEvent('download'), panel.getByRole('button', { name: 'download data.bin' }).click()]);
+    expect(large.suggestedFilename()).toBe('data.bin');
+    const held = readFileSync(await large.path());
+    expect(held.byteLength).toBe(300_000);
+    expect(held.every((byte, nth) => byte === nth % 251)).toBe(true);
+
+    // all of them go into one ZIP file, as they are, with the folder they lie in
+    const [all] = await Promise.all([page.waitForEvent('download'), panel.getByRole('button', { name: 'download all as one zip' }).click()]);
+    expect(all.suggestedFilename()).toBe('files from desk-01.zip');
+    const zip = readFileSync(await all.path());
+    expect(zip.byteLength).toBe(300_323);
+    expect([text(zip.subarray(30, 39)), text(zip.subarray(39, 50)), text(zip.subarray(80, 87)), text(zip.subarray(117, 132))]).toEqual([
+      'notes.txt',
+      'hello files',
+      'folder/',
+      'folder/data.bin',
+    ]);
+    expect(zip.subarray(132, 300_132).every((byte, nth) => byte === nth % 251)).toBe(true);
+    // its end says how many files it holds, how long their list is, and where it begins
+    const end = new DataView(zip.buffer, zip.byteOffset + zip.byteLength - 22, 22);
+    expect([end.getUint32(0, true), end.getUint16(10, true), end.getUint32(12, true), end.getUint32(16, true)]).toEqual([0x06054b50, 3, 169, 300_132]);
+    // and the sum it keeps of the first file is the one such a file has of these bytes
+    expect(new DataView(zip.buffer, zip.byteOffset).getUint32(14, true)).toBe(0x3108409f);
+    await expect(panel.getByText('files from desk-01.zip is in your downloads now.')).toBeVisible();
+
+    // text that is copied on the machine afterwards is what the panel holds then: a
+    // click on the machine's screen puts the bar away, and the keys are the machine's again
+    await screen.click({ position: await placeOn(screen, 150, 100) });
+    await expect(screen).toBeFocused();
+    await page.keyboard.press('c');
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    const bar = page.getByRole('toolbar', { name: "the session's bar" });
+    await bar.getByRole('button', { name: 'clipboard' }).click();
+    await expect(panel.getByLabel('From the machine')).toHaveValue('copied on the machine\nin two lines');
+    await expect(files).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await bar.getByRole('button', { name: 'end' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/desk-01`);
+    expect(seen.complaints).toEqual([]);
   });
 
   test('a desktop whose connection drops is opened again by itself, and a card says so after two seconds', async ({ page }) => {
@@ -1845,8 +1937,26 @@ test('without a database no machine is opened, and the page says why', async ({ 
 });
 
 test("the session's messages are written and read as the examples say that the gateway is tried against too", async () => {
-  const { begins, copied, copiedPicture, credentials, did, leaves, readCopiedPicture, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } =
-    await import(
+  const {
+    begins,
+    copied,
+    copiedPicture,
+    credentials,
+    did,
+    file,
+    leaves,
+    readCopiedPicture,
+    readIcon,
+    readPieceOfAFile,
+    readRectangle,
+    readSaid,
+    readTrayPicture,
+    seen,
+    sized,
+    start,
+    trayDoes,
+    windowDoes,
+  } = await import(
     '../src/session/wire'
   );
   const examples = JSON.parse(readFileSync('../crates/away-wire/fixtures/messages.json', 'utf8')) as Record<string, { text?: string; bytes?: string }[]>;
@@ -1860,7 +1970,8 @@ test("the session's messages are written and read as the examples say that the g
       : (readRectangle(bytes(example.bytes!).buffer) ??
         readIcon(bytes(example.bytes!).buffer) ??
         readTrayPicture(bytes(example.bytes!).buffer) ??
-        readCopiedPicture(bytes(example.bytes!).buffer)),
+        readCopiedPicture(bytes(example.bytes!).buffer) ??
+        readPieceOfAFile(bytes(example.bytes!).buffer)),
   );
   expect(said.slice(0, 5)).toEqual([{ step: 'reaching' }, { step: 'first-picture' }, { asks: { again: false } }, { asks: { again: true } }, { desktop: { width: 1280, height: 800 } }]);
   expect(said[5]).toEqual({ left: 64, top: 128, width: 200, height: 120, png: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) });
@@ -1878,6 +1989,10 @@ test("the session's messages are written and read as the examples say that the g
     { desktop: { width: 3024, height: 1964, keys: 'written' } },
     new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
     { clipboard: { to: true, from: true, pictures: true } },
+    { files: [{ name: 'notes.txt', size: 11 }, { name: 'folder', folder: true }, { name: 'folder/data.bin', size: 5_000_000_000 }] },
+    new Uint8Array([0x68, 0x65, 0x6c, 0x6c, 0x6f]),
+    { file: 'whole' },
+    { file: 'failed' },
   ]);
   expect([
     readSaid('no JSON'),
@@ -1921,6 +2036,8 @@ test("the session's messages are written and read as the examples say that the g
       ]),
     ),
     ...copiedPicture(new Uint8Array([0x89, 0x50, 0x4e, 0x47])).map(hex),
+    file(2),
+    file('none'),
   ];
   // a picture that is longer than a message goes in pieces: the first, those between, the last
   const pieces = copiedPicture(new Uint8Array(100_000).fill(7));

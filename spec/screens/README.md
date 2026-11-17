@@ -100,7 +100,7 @@ release holds for a person or an administrator and no figure shows.
 | 16 | [When something goes wrong](./errors.md) | 6 | 8 |
 |  | all | 84 | 85 |
 
-The first release holds 69 capabilities for a person or an administrator. A figure shows 61 of them.
+The first release holds 70 capabilities for a person or an administrator. A figure shows 61 of them.
 <!-- end: figures -->
 
 A capability with nothing to see is in no figure: typing in one's own keyboard
@@ -111,7 +111,7 @@ rules.
 | Area | In a figure | In no figure |
 |---|---|---|
 | [Keyboard and pointer](../capabilities/session.md#keyboard-and-pointer) | 4 of 8 | Give every key to the machine while a session fills the screen `give-all-keys`; Use every mouse button and the wheel, in both directions `use-mouse-fully`; Type the clipboard's text into the machine key by key `type-clipboard`; Type in a language whose characters are composed of several keys `compose-characters` |
-| [Clipboard, files and printing](../capabilities/session.md#clipboard-files-and-printing) | 1 of 2 | Copy and paste a picture, or text with its formatting `copy-paste-rich` |
+| [Clipboard, files and printing](../capabilities/session.md#clipboard-files-and-printing) | 1 of 3 | Copy and paste a picture, or text with its formatting `copy-paste-rich`; Copy files on one side and paste them on the other `copy-paste-files` |
 | [On a phone or a tablet](../capabilities/session.md#on-a-phone-or-a-tablet) | 3 of 5 | Work by touch: tap to click, hold for the other button, two fingers to scroll `work-by-touch`; Move the pointer as on a trackpad, for small targets `touch-as-trackpad` |
 | [Signing in](../capabilities/app.md#signing-in) | 4 of 5 | Open a locked desktop again with nothing asked `unlock-without-password` |
 <!-- end: not-drawn -->

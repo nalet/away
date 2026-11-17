@@ -67,6 +67,7 @@ says which.
 |---|---|---|---|
 | Copy text on one side and paste it on the other | `session-view` `gateway` `rdp` `vnc` `shell-screen` | [6](../plan/README.md#6-a-desktop-over-rdp) (RDP), [8](../plan/README.md#8-a-shell) (SSH), [11](../plan/README.md#11-a-desktop-over-vnc) (VNC) | `copy-paste-text` |
 | Copy and paste a picture, or text with its formatting | `session-view` `gateway` `rdp` `wire` | [6](../plan/README.md#6-a-desktop-over-rdp) | `copy-paste-rich` |
+| Copy files on one side and paste them on the other | `session-view` `gateway` `rdp` `wire` | [6](../plan/README.md#6-a-desktop-over-rdp) | `copy-paste-files` |
 
 ### The shell
 
@@ -185,6 +186,7 @@ says which.
 | Keep a record of every change to machines, rules and settings | `server` | [5](../plan/README.md#5-the-register-the-rules-and-home) | `record-changes` |
 | Read the records and search them | `web` `server` | [9](../plan/README.md#9-sessions-as-they-run) | `read-records` |
 | Send every record on to the organisation's own log system as it is written | `server` | [9](../plan/README.md#9-sessions-as-they-run) | `send-records-on` |
+| Keep a record of every file moved and of what the clipboard carried | `server` `gateway` | [6](../plan/README.md#6-a-desktop-over-rdp) | `record-moved-content` |
 
 ## The platform
 

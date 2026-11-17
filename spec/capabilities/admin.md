@@ -91,7 +91,7 @@ The records of every connection and change, and the recordings of sessions. For 
 | Keep a record of every change to machines, rules and settings | system | — | — | — | built | `record-changes` |
 | Read the records and search them | admin | — | — | — | v1 | `read-records` |
 | Send every record on to the organisation's own log system as it is written | system | — | — | — | v1 | `send-records-on` |
-| Keep a record of every file moved and of what the clipboard carried | system | — | — | — | later | `record-moved-content` |
+| Keep a record of every file moved and of what the clipboard carried | system | — | — | — | partial | `record-moved-content` |
 | Record a session to play it back later | system | later | later | later | — | `record-session` |
 | Play a recording back, at any speed and from any point | admin | later | later | later | — | `play-recording` |
 | Find a moment in a recording by what was typed or shown | admin | no | no | later | — | `search-recording` |
@@ -101,5 +101,6 @@ The records of every connection and change, and the recordings of sessions. For 
 | See how Away is used over time: by whom, which machines, for how long | admin | — | — | — | later | `see-use-over-time` |
 
 - *Send every record on to the organisation's own log system as it is written*: as lines a log collector reads.
+- *Keep a record of every file moved and of what the clipboard carried*: each file that passed, with its name and its size; what the clipboard carried later.
 - *Find a moment in a recording by what was typed or shown*: a shell is recorded as text, a desktop as pictures.
 <!-- end: areas -->

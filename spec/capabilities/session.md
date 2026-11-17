@@ -108,13 +108,13 @@ What passes between one's own device and the machine. For the goal [Work on a ma
 |---|---|---|---|---|---|
 | Copy text on one side and paste it on the other | person | v1 | partial | v1 | `copy-paste-text` |
 | Copy and paste a picture, or text with its formatting | person | partial | no | — | `copy-paste-rich` |
-| Copy files on one side and paste them on the other | person | later | no | — | `copy-paste-files` |
+| Copy files on one side and paste them on the other | person | partial | no | — | `copy-paste-files` |
 | Move files between one's own device and the machine | person | later | no | later | `move-files` |
 | Drop a file onto a session to send it to the machine | person | later | no | later | `drop-file` |
 | Print from the machine to a printer or a file of one's own | person | later | no | — | `print-to-own-device` |
 
 - *Copy and paste a picture, or text with its formatting*: a picture passes, both ways; text keeps its formatting later; VNC carries text alone.
-- *Copy files on one side and paste them on the other*: VNC carries text alone.
+- *Copy files on one side and paste them on the other*: files copied on the machine are listed, to download; to the machine later; VNC carries text alone.
 - *Move files between one's own device and the machine*: a shell: in a panel beside it; a Windows machine: as a drive the machine sees; VNC moves no files.
 - *Drop a file onto a session to send it to the machine*: VNC moves no files.
 - *Print from the machine to a printer or a file of one's own*: VNC carries no printing.

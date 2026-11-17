@@ -88,6 +88,12 @@ pub enum Happened {
     Copied(String),
     /// A picture was copied on the machine, and is for the person's clipboard.
     CopiedPicture(clipboard::Picture),
+    /// Files were copied on the machine: which they are, for the person to choose from.
+    CopiedFiles(Vec<clipboard::File>),
+    /// A piece of a file that was asked for. An empty one: the file ends before there.
+    PieceOfAFile(Vec<u8>),
+    /// The machine did not give the piece of a file that was asked for.
+    NoPieceOfAFile,
 }
 
 /// The client's smart card reader, and how far the machine and the client are with it.
@@ -164,8 +170,10 @@ impl Connection {
         let first = tpkt::data_frame(&mcs::connect(&gcc::request(&client, reader.is_some())));
         let asked_for = gcc::channels(&client, reader.is_some());
         let later = asked_for.contains(&dynamic::CHANNEL).then(|| (Pieces::default(), Later::default()));
-        let passes =
-            asked_for.contains(&clipboard::CHANNEL).then(|| (Pieces::up_to(clipboard::LARGEST + 1024), Clipboard::new(client.clipboard)));
+        // the files that are copied on the machine pass where its clipboard passes to the person
+        let passes = asked_for
+            .contains(&clipboard::CHANNEL)
+            .then(|| (Pieces::up_to(clipboard::LARGEST + 1024), Clipboard::new(client.clipboard).with_files()));
         let connection = Connection {
             state: State::AwaitsMachine,
             client,
@@ -343,8 +351,22 @@ impl Connection {
         let copied = copied.map(|copied| match copied {
             clipboard::Carried::Text(text) => Happened::Copied(text),
             clipboard::Carried::Picture(picture) => Happened::CopiedPicture(picture),
+            clipboard::Carried::Files(files) => Happened::CopiedFiles(files),
+            clipboard::Carried::Piece(piece) => Happened::PieceOfAFile(piece),
+            clipboard::Carried::NoPiece => Happened::NoPieceOfAFile,
         });
         Ok((send, copied.into_iter().collect()))
+    }
+
+    /// Asks the machine for a piece of a file that was copied there: the file by its
+    /// place among those it listed, the piece by where it begins and how long it is at
+    /// most. Nothing where no files are listed, or while a piece is waited for.
+    pub fn ask_for_a_piece(&mut self, file: u32, from: u64, length: u32) -> Vec<u8> {
+        let asks = match self.clipboard.as_mut() {
+            Some((_, clipboard)) => clipboard.asks_for_a_piece(file, from, length),
+            None => Vec::new(),
+        };
+        asks.iter().flat_map(|message| self.on(clipboard::CHANNEL, message)).collect()
     }
 
     /// The person copied this picture. As for text: nothing where the clipboard doesn't
@@ -794,6 +816,38 @@ mod tests {
         let pressed = connection.input(&key_p);
         let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies a picture");
         assert!(happened.contains(&Happened::CopiedPicture(theirs)));
+
+        // the key F copies files on the machine: the client asks for their list at once,
+        // and they are for the person to choose from, with nothing of what is in them
+        let key_f = [Input::Key { code: 0x21, extended: false, down: true }];
+        let pressed = connection.input(&key_f);
+        let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies files");
+        let file = |name: &str, size: u64, folder: bool| clipboard::File { name: name.to_string(), size, folder };
+        assert!(happened.contains(&Happened::CopiedFiles(vec![
+            file("notes.txt", 11, false),
+            file("folder", 0, true),
+            file("folder/data.bin", 300_000, false),
+        ])));
+        // what is in a file is had a piece at a time, until a piece of nothing says that it ends
+        let mut had = Vec::new();
+        loop {
+            let asks = connection.ask_for_a_piece(2, had.len() as u64, clipboard::LONGEST_PIECE);
+            assert!(!asks.is_empty());
+            let happened = talk(&mut connection, &mut machine, asks).expect("the machine gives a piece");
+            let Some(Happened::PieceOfAFile(piece)) = happened.into_iter().find(|happened| matches!(happened, Happened::PieceOfAFile(_)))
+            else {
+                panic!("no piece came")
+            };
+            if piece.is_empty() {
+                break;
+            }
+            assert!(piece.len() <= clipboard::LONGEST_PIECE as usize);
+            had.extend(piece);
+        }
+        assert_eq!(had, crate::stand_in::desktop::copied_files()[2].1);
+        // a folder holds nothing to give
+        let asks = connection.ask_for_a_piece(1, 0, 100);
+        assert!(talk(&mut connection, &mut machine, asks).expect("the machine answers").contains(&Happened::NoPieceOfAFile));
 
         // what the person copied before the machine was ready is told once it is
         let client = Client { clipboard: clipboard::Passes::BOTH, ..connection.client().clone() };

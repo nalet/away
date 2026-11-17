@@ -20,7 +20,11 @@
     {"says": "the machine has a password of its desktop's own, did not take the one before, and asks for it again", "text": "{\"asks\":{\"again\":true,\"only\":\"password\"}}"},
     {"says": "the desktop is open, 3024 by 1964, on a machine that is told of keys by what they write", "text": "{\"desktop\":{\"width\":3024,\"height\":1964,\"keys\":\"written\"}}"},
     {"says": "a picture was copied on the machine, as a PNG picture that begins 89 50 4e 47", "bytes": "0489504e47"},
-    {"says": "the clipboard passes both ways on a machine that carries pictures with the text", "text": "{\"clipboard\":{\"to\":true,\"from\":true,\"pictures\":true}}"}
+    {"says": "the clipboard passes both ways on a machine that carries pictures with the text", "text": "{\"clipboard\":{\"to\":true,\"from\":true,\"pictures\":true}}"},
+    {"says": "three files were copied on the machine: a file, a folder, and a file in that folder of five thousand million bytes", "text": "{\"files\":[{\"name\":\"notes.txt\",\"size\":11},{\"name\":\"folder\",\"folder\":true},{\"name\":\"folder/data.bin\",\"size\":5000000000}]}"},
+    {"says": "a piece of the file the person asked for: the five bytes of hello", "bytes": "0568656c6c6f"},
+    {"says": "all of the file the person asked for came", "text": "{\"file\":\"whole\"}"},
+    {"says": "the machine gave no more of the file the person asked for", "text": "{\"file\":\"failed\"}"}
   ],
   "from_browser": [
     {"says": "the session begins: its ticket, a window of 1280 by 800 on a screen with twice the dots each way (200), and a keyboard with the Swiss German layout (2055)", "text": "{\"ticket\":\"7f3a\",\"width\":1280,\"height\":800,\"layout\":2055,\"scale\":200}"},
@@ -35,6 +39,8 @@
     {"says": "the person asks for the program Wages in the session", "text": "{\"start\":\"Wages\"}"},
     {"says": "the person asks for the menu of the icon 1 of the window 65537 in the tray", "text": "{\"tray\":{\"window\":65537,\"icon\":1,\"does\":\"menu\"}}"},
     {"says": "the command key down, by what it does, and the key that writes the euro up, by what it writes", "bytes": "070000ffeb0107010020ac00"},
-    {"says": "the person copied a picture on their own device: its first and last piece, of a PNG picture that begins 89 50 4e 47", "bytes": "100389504e47"}
+    {"says": "the person copied a picture on their own device: its first and last piece, of a PNG picture that begins 89 50 4e 47", "bytes": "100389504e47"},
+    {"says": "the person asks for the third of the files that were copied on the machine", "text": "{\"file\":2}"},
+    {"says": "the person gives up on the file they asked for", "text": "{\"file\":\"none\"}"}
   ]
 }

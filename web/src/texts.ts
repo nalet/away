@@ -252,6 +252,18 @@ export const texts = {
         `Paste here what ${machine} should have in its clipboard${pictures ? ': text, or a picture, which goes at once' : ''}.`,
       pictureOf: (width: number, height: number) => `a picture of ${width} by ${height} pixels`,
       pictureSent: (machine: string) => `The picture is in the clipboard of ${machine} now.`,
+      // the files that were copied on the machine, to download
+      download: (name: string) => `download ${name}`,
+      downloadShort: 'download',
+      downloadAll: 'download all as one zip',
+      zipName: (machine: string) => `files from ${machine}.zip`,
+      having: (name: string, percent: number | null) => (percent === null ? `Getting ${name}.` : `Getting ${name}: ${percent} %.`),
+      stop: 'stop',
+      saved: (name: string) => `${name} is in your downloads now.`,
+      noMore: (machine: string, name: string) => `${machine} gave no more of ${name}.`,
+      tooLargeFile: "Files of more than 1 GB don't pass yet.",
+      filesCopied: (count: number, machine: string) => (count === 1 ? `A file was copied on ${machine}.` : `${count} files were copied on ${machine}.`),
+      showFiles: 'show',
       // a picture of what the session shows, taken by Away itself
       shot: 'copy a picture of the screen',
       shotTaken: 'A picture of the screen is in your clipboard now.',

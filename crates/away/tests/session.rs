@@ -465,6 +465,10 @@ struct Session {
     /// What the tray was last said to hold, and the pictures of its icons that arrived.
     tray: Option<Json>,
     tray_pictures: Vec<(u32, u32, Vec<u8>)>,
+    /// The pictures that were copied on the machine, as PNG pictures, and the pieces of
+    /// the files that were asked for.
+    copied_pictures: Vec<Vec<u8>>,
+    pieces: Vec<Vec<u8>>,
 }
 
 impl Session {
@@ -479,7 +483,15 @@ impl Session {
         let begins =
             Json::object([("ticket", ticket.into()), ("width", 1280u64.into()), ("height", 800u64.into()), ("scale", 200u64.into())]);
         connection.send(Message::text(begins.write())).await.expect("the first message goes out");
-        Session { connection, picture: None, icons: Vec::new(), tray: None, tray_pictures: Vec::new() }
+        Session {
+            connection,
+            picture: None,
+            icons: Vec::new(),
+            tray: None,
+            tray_pictures: Vec::new(),
+            copied_pictures: Vec::new(),
+            pieces: Vec::new(),
+        }
     }
 
     async fn say(&mut self, says: Json) {
@@ -527,6 +539,15 @@ impl Session {
             self.tray_pictures.push((number(1), number(5), bytes[9..].to_vec()));
             return;
         }
+        // a picture that was copied on the machine, and a piece of a file that was asked for
+        if bytes[0] == 4 {
+            self.copied_pictures.push(bytes[1..].to_vec());
+            return;
+        }
+        if bytes[0] == 5 {
+            self.pieces.push(bytes[1..].to_vec());
+            return;
+        }
         assert_eq!((bytes[0], bytes[9]), (1, 1), "a rectangle, as a PNG picture");
         let number = |at: usize| usize::from(u16::from_be_bytes([bytes[at], bytes[at + 1]]));
         let (left, top, width, height) = (number(1), number(3), number(5), number(7));
@@ -542,6 +563,17 @@ impl Session {
                 let to = ((top + row) * picture.width + left + column) * 4;
                 // blue, green, red, as the gateway's own picture has them
                 picture.pixels[to..to + 3].copy_from_slice(&[pixels[from + 2], pixels[from + 1], pixels[from]]);
+            }
+        }
+    }
+
+    /// Takes what the gateway says until a picture that was copied on the machine came.
+    async fn until_a_picture(&mut self) {
+        while self.copied_pictures.is_empty() {
+            let message =
+                tokio::time::timeout(Duration::from_secs(40), self.connection.next()).await.expect("the gateway says something in time");
+            if let Some(Ok(Message::Binary(bytes))) = message {
+                self.draw(&bytes);
             }
         }
     }
@@ -658,6 +690,55 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
     let seen = world.machine.seen();
     assert_eq!(seen.last().expect("the client").pasted, ["from the person's device"]);
 
+    // a picture passes the same way: the key P copies one on the machine, which comes
+    // as a PNG picture; the key F copies files, which are listed with nothing of what
+    // is in them
+    session.did(&[4, 0x19, 0, 1, 4, 0x19, 0, 0]).await;
+    session.until_a_picture().await;
+    session.did(&[4, 0x21, 0, 1, 4, 0x21, 0, 0]).await;
+    assert_eq!(
+        session.until("files").await.write(),
+        r#"{"files":[{"name":"notes.txt","size":11},{"name":"folder","folder":true},{"name":"folder/data.bin","size":300000}]}"#
+    );
+    let came = session.copied_pictures.last().expect("the picture that was copied on the machine").clone();
+    let mut reader = png::Decoder::new(std::io::Cursor::new(came)).read_info().expect("a PNG picture");
+    let mut pixels = vec![0u8; reader.output_buffer_size().expect("a size")];
+    let info = reader.next_frame(&mut pixels).expect("its pixels");
+    assert_eq!((info.width, info.height, &pixels[..3]), (3, 2, &[10u8, 20, 30][..]));
+    // a picture the person copied comes in pieces, and is handed to the machine once it is whole
+    let mut theirs = Vec::new();
+    let mut encoder = png::Encoder::new(&mut theirs, 2, 1);
+    encoder.set_color(png::ColorType::Rgb);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().expect("a head");
+    writer.write_image_data(&[200, 100, 50, 1, 2, 3]).expect("the pixels");
+    writer.finish().expect("the end");
+    let (first, rest) = theirs.split_at(20);
+    session.did(&[&[0x10, 1], first].concat()).await;
+    session.did(&[&[0x10, 2], rest].concat()).await;
+
+    // a file is had by its place in the list: it comes in pieces, in their order, and
+    // then that all of it came
+    session.say(Json::object([("file", 0u64.into())])).await;
+    assert_eq!(session.until("file").await.write(), r#"{"file":"whole"}"#);
+    assert_eq!(session.pieces.concat(), b"hello files");
+    session.pieces.clear();
+    session.say(Json::object([("file", 2u64.into())])).await;
+    assert_eq!(session.until("file").await.write(), r#"{"file":"whole"}"#);
+    assert_eq!(session.pieces.iter().map(Vec::len).collect::<Vec<_>>(), [262_144, 37_856]);
+    assert_eq!(session.pieces.concat(), away_rdp::stand_in::desktop::copied_files()[2].1);
+    // a folder holds nothing to have, and neither does what is not listed
+    for nothing in [1u64, 9] {
+        session.say(Json::object([("file", nothing.into())])).await;
+        assert_eq!(session.until("file").await.write(), r#"{"file":"failed"}"#);
+    }
+    let seen = world.machine.seen();
+    let pasted = &seen.last().expect("the client").pasted_pictures;
+    assert_eq!(
+        pasted.iter().map(|picture| (picture.width, picture.height, picture.pixels.clone())).collect::<Vec<_>>(),
+        [(2, 1, vec![200, 100, 50, 1, 2, 3])]
+    );
+
     // the person leaves: the session says so and ends, and the machine was told
     session.say(Json::object([("leaves", true.into())])).await;
     assert_eq!(session.until("ended").await.write(), r#"{"ended":"left"}"#);
@@ -668,7 +749,7 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
     let of_sessions: Vec<_> = kept.iter().filter(|(kind, ..)| kind.starts_with("session-")).collect();
     assert_eq!(
         of_sessions.iter().map(|(kind, ..)| kind.as_str()).collect::<Vec<_>>(),
-        ["session-asked", "session-opened", "session-ended"]
+        ["session-asked", "session-opened", "session-file", "session-file", "session-ended"]
     );
     for (_, person, machine, _) in &of_sessions {
         assert_eq!((person.as_deref(), machine.as_deref()), (Some("Alex Urban"), Some("desk-01")));
@@ -678,7 +759,16 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
         (of_sessions[1].3.get("width").and_then(Json::count), of_sessions[1].3.get("height").and_then(Json::count)),
         (Some(200), Some(120))
     );
-    assert_eq!(of_sessions[2].3.text_of("why"), Some("left"));
+    // each file that passed, with its name, its size and which way it went, and nothing of what is in it
+    let passed: Vec<_> = of_sessions[2..4]
+        .iter()
+        .map(|(.., details)| (details.text_of("name"), details.get("size").and_then(Json::count), details.text_of("direction")))
+        .collect();
+    assert_eq!(
+        passed,
+        [(Some("notes.txt"), Some(11), Some("from-the-machine")), (Some("folder/data.bin"), Some(300_000), Some("from-the-machine"))]
+    );
+    assert_eq!(of_sessions[4].3.text_of("why"), Some("left"));
     // and each is a line on the server's output
     let lines = world.server_lines.kept();
     for kind in ["session-asked", "session-opened", "session-ended"] {

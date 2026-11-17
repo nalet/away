@@ -26,7 +26,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 
-use crate::machine::{self, Area, CopiedPicture, Desktop, Failure, Opened, Passes, Screen, Step, Who, Why};
+use crate::machine::{self, Area, CopiedFile, CopiedPicture, Desktop, Failure, Opened, Passes, Screen, Step, Who, Why};
 use crate::shown::{Pixels, Shown};
 use crate::themselves::Domain;
 use crate::vnc;
@@ -308,7 +308,9 @@ where
             // in a session for a program, the person may ask for others of the machine
             let starts = taken.program.is_some().then_some(Starts { server, session: &taken.session, lines: &around.lines });
             let ended = match recorded {
-                Ok(200) => show(browser, &mut desktop, screen, taken.clipboard, starts, around.stop.clone()).await,
+                Ok(200) => {
+                    show(browser, &mut desktop, screen, taken.clipboard, starts, Some((server, &taken.session)), around.stop.clone()).await
+                }
                 Ok(status) => Ended::Machine(format!("the server did not take the record that the desktop is open: status {status}")),
                 Err(why) => Ended::Machine(why),
             };
@@ -654,6 +656,7 @@ async fn show<Connection, Of: Shown>(
     mut screen: Screen,
     clipboard: Passes,
     starts: Option<Starts<'_>>,
+    records: Option<(&Server, &str)>,
     mut stop: Stop,
 ) -> Ended
 where
@@ -686,6 +689,12 @@ where
     // the pieces of a picture the person copied, until its last one is there: nothing
     // while none is on its way, or once it turned out larger than a picture may be
     let mut arriving: Option<Vec<u8>> = None;
+    // the files that were last copied on the machine, the one the person is having, and
+    // the one they asked for while a piece of another was still on its way
+    let mut listed: Vec<CopiedFile> = Vec::new();
+    let mut having: Option<Having> = None;
+    let mut next: Option<u32> = None;
+    let mut had = 0u32;
     loop {
         // where the windows of the programs are goes out before what is drawn in them, and
         // with them the icons that changed
@@ -795,6 +804,75 @@ where
                         return Ended::BrowserGone;
                     }
                 }
+                // the files that were copied: which they are. What the person was having
+                // of the ones before is given up
+                if let Some(files) = desktop.copied_files() {
+                    let told: Vec<away_wire::CopiedFile> =
+                        files.iter().map(|file| away_wire::CopiedFile { name: file.name.clone(), size: file.size, folder: file.folder }).collect();
+                    listed = files;
+                    next = None;
+                    if having.take().is_some() && tell(browser, ToBrowser::File { whole: false }).await.is_err() {
+                        return Ended::BrowserGone;
+                    }
+                    if tell(browser, ToBrowser::CopiedFiles(&told)).await.is_err() {
+                        return Ended::BrowserGone;
+                    }
+                }
+                // a piece of the file the person is having goes on to them, and the next
+                // one is asked for: the machine is asked no faster than the browser takes
+                if let Some(piece) = desktop.piece() {
+                    let mut ends = None;
+                    match (having.as_mut(), piece) {
+                        // given up meanwhile: the piece is dropped
+                        (Some(file), _) if file.given_up => having = None,
+                        (Some(file), Some(piece)) if !piece.is_empty() => {
+                            file.came += piece.len() as u64;
+                            if tell(browser, ToBrowser::PieceOfAFile(&piece)).await.is_err() {
+                                return Ended::BrowserGone;
+                            }
+                            // all of it, by the size the machine named, or more to come
+                            let whole = file.size > 0 && file.came >= file.size;
+                            match whole {
+                                true => ends = Some(true),
+                                false => match desktop.ask_for_a_piece(file.at, file.came).await {
+                                    Ok(true) => {}
+                                    Ok(false) => ends = Some(false),
+                                    Err(failed) => return ended_by(failed),
+                                },
+                            }
+                        }
+                        // a piece of nothing: the file ends there
+                        (Some(_), Some(_)) => ends = Some(true),
+                        (Some(_), None) => ends = Some(false),
+                        (None, _) => {}
+                    }
+                    // the file is at its end, one way or the other: only then is it no longer had
+                    if let (Some(whole), Some(file)) = (ends, having.take_if(|_| ends.is_some())) {
+                        if tell(browser, ToBrowser::File { whole }).await.is_err() {
+                            return Ended::BrowserGone;
+                        }
+                        // a file that passed is a record: its name and its size, and no more of it
+                        if let (true, Some((server, session))) = (whole, records) {
+                            had += 1;
+                            let (number, size) = (had.to_string(), file.came.to_string());
+                            let _ = server
+                                .told(session, "file", &[("number", &number), ("name", &file.name), ("size", &size), ("direction", "from-the-machine")])
+                                .await;
+                        }
+                    }
+                    // the file they asked for meanwhile is begun
+                    if let (None, Some(at)) = (&having, next.take()) {
+                        match begin_having(desktop, &listed, at).await {
+                            Ok(Some(file)) => having = Some(file),
+                            Ok(None) => {
+                                if tell(browser, ToBrowser::File { whole: false }).await.is_err() {
+                                    return Ended::BrowserGone;
+                                }
+                            }
+                            Err(failed) => return ended_by(failed),
+                        }
+                    }
+                }
                 // a picture goes as one a browser reads by itself, packed by the gateway:
                 // the browser gets nothing the machine wrote
                 if let Some(picture) = desktop.copied_picture() {
@@ -858,6 +936,31 @@ where
                         return ended_by(failed);
                     }
                 }
+                // a file that was copied on the machine, by its place among those listed:
+                // what is in it is asked for, a piece at a time. One at a time: while a
+                // piece of another is on its way, this one waits for it
+                Some(FromBrowser::File(at)) => match having.as_mut() {
+                    Some(file) => {
+                        file.given_up = true;
+                        next = Some(at);
+                    }
+                    None => match begin_having(desktop, &listed, at).await {
+                        Ok(Some(file)) => having = Some(file),
+                        Ok(None) => {
+                            if tell(browser, ToBrowser::File { whole: false }).await.is_err() {
+                                return Ended::BrowserGone;
+                            }
+                        }
+                        Err(failed) => return ended_by(failed),
+                    },
+                },
+                // they give up on it: the piece that is on its way is dropped when it comes
+                Some(FromBrowser::NoFile) => {
+                    next = None;
+                    if let Some(file) = having.as_mut() {
+                        file.given_up = true;
+                    }
+                }
                 // a picture they copied comes in pieces: once it is whole, and is one,
                 // the machine is told that it can be pasted
                 Some(FromBrowser::CopiedPicture { first, last, piece }) => {
@@ -868,7 +971,8 @@ where
                     if let Some(held) = arriving.as_mut() {
                         held.extend_from_slice(&piece);
                     }
-                    if let (true, Some(png)) = (last, arriving.take()) {
+                    // only its last piece makes it whole: until then it goes on arriving
+                    if let Some(png) = arriving.take_if(|_| last) {
                         if let Some(picture) = unpacked(png).await {
                             if let Err(failed) = desktop.offer_picture(picture).await {
                                 return ended_by(failed);
@@ -992,6 +1096,23 @@ async fn packed(picture: Pixels<'_>, areas: Vec<Area>) -> Vec<(Area, Vec<u8>)> {
             .collect::<Vec<_>>()
     });
     packing.await.unwrap_or_default()
+}
+
+/// A file the person is having from the machine: its place among those listed, its name
+/// and the size the machine named, how much of it came, and whether they gave up on it.
+struct Having {
+    at: u32,
+    name: String,
+    size: u64,
+    came: u64,
+    given_up: bool,
+}
+
+/// Begins having a file: asks the machine for its first piece. Nothing where it is not
+/// among those listed, is a folder, or the machine can't be asked now.
+async fn begin_having<Of: Shown>(desktop: &mut Of, listed: &[CopiedFile], at: u32) -> Result<Option<Having>, Failure> {
+    let Some(file) = listed.get(at as usize).filter(|file| !file.folder) else { return Ok(None) };
+    Ok(desktop.ask_for_a_piece(at, 0).await?.then(|| Having { at, name: file.name.clone(), size: file.size, came: 0, given_up: false }))
 }
 
 /// The largest picture a person's device hands over, as the PNG picture it comes as.

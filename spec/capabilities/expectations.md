@@ -44,7 +44,7 @@ For the goal [Work on a machine that is somewhere else](../goals/README.md#work-
 | Several programs side by side, with a way to switch between them | partly | [`switch-programs`](./session.md#opening-a-machine) first release, [`list-open-windows`](./session.md#opening-a-machine) partly built | — |
 | A Mac or a Linux desktop in the browser | partly | [`open-desktop`](./session.md#opening-a-machine) partly built, [`fit-to-window`](./session.md#the-picture) partly built, [`pointer-without-delay`](./session.md#the-picture) first release | — |
 | A shell in the browser | first release | [`open-shell`](./session.md#opening-a-machine) first release, [`run-full-screen-programs`](./session.md#the-shell) first release, [`scroll-back`](./session.md#the-shell) first release, [`select-shell-text`](./session.md#the-shell) first release | — |
-| Copy and paste between the machine and one's own device | partly | [`copy-paste-text`](./session.md#clipboard-files-and-printing) partly built, [`copy-paste-rich`](./session.md#clipboard-files-and-printing) partly built, [`copy-paste-files`](./session.md#clipboard-files-and-printing) later | — |
+| Copy and paste between the machine and one's own device | partly | [`copy-paste-text`](./session.md#clipboard-files-and-printing) partly built, [`copy-paste-rich`](./session.md#clipboard-files-and-printing) partly built, [`copy-paste-files`](./session.md#clipboard-files-and-printing) partly built | — |
 | Move files to and from the machine | later | [`move-files`](./session.md#clipboard-files-and-printing) later, [`drop-file`](./session.md#clipboard-files-and-printing) later | — |
 | Hear the machine and speak to it | later | [`hear-sound`](./session.md#sound-and-devices) later, [`use-microphone`](./session.md#sound-and-devices) later | — |
 | Print from the machine | later | [`print-to-own-device`](./session.md#clipboard-files-and-printing) later | — |
@@ -151,7 +151,7 @@ For the goal [Know what happened](../goals/README.md#know-what-happened).
 | Records sent on to the organisation's own log system | first release | [`send-records-on`](./admin.md#what-happened) first release | — |
 | Watch a running session | later | [`watch-session`](./admin.md#sessions-as-they-run) later | — |
 | Records kept for a set time, then removed | later | [`keep-for-set-time`](./admin.md#what-happened) later | — |
-| A record of the files moved and of what was copied across | later | [`record-moved-content`](./admin.md#what-happened) later | — |
+| A record of the files moved and of what was copied across | partly | [`record-moved-content`](./admin.md#what-happened) partly built | — |
 | Records nobody can change unnoticed | first release in part | [`show-tampering`](./admin.md#what-happened) later, [`send-records-on`](./admin.md#what-happened) first release | — |
 
 ## Run it oneself

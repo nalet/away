@@ -905,6 +905,21 @@ impl GettingIn {
                     Err(unusable) => self.kept_nothing(&unusable),
                 }
             }
+            // a file that passed between the person's device and the machine: which one,
+            // how large, and which way, and nothing of what is in it
+            Some("file") => {
+                let details = Json::object([
+                    ("session", session.into()),
+                    ("name", text("name")),
+                    ("size", count("size")),
+                    ("direction", text("direction")),
+                ]);
+                let record = Record { key: format!("{session}-file-{}", said("number").unwrap_or_default()), ..record("file", details) };
+                match self.records.add(&record).await {
+                    Ok(()) => answer(StatusCode::OK, "application/json", "{}"),
+                    Err(unusable) => self.kept_nothing(&unusable),
+                }
+            }
             Some(what @ ("failed" | "ended")) => {
                 self.sessions.end(session);
                 self.count_sessions();
@@ -929,7 +944,7 @@ impl GettingIn {
                 }
                 answer(StatusCode::OK, "application/json", "{}")
             }
-            _ => plain(StatusCode::BAD_REQUEST, "What became of a session is one of: identity, opened, signed-in, failed, ended.\n"),
+            _ => plain(StatusCode::BAD_REQUEST, "What became of a session is one of: identity, opened, signed-in, file, failed, ended.\n"),
         }
     }
 

@@ -44,7 +44,7 @@ compose-characters,input,Type in a language whose characters are composed of sev
 hold-pointer,input,Hold the pointer inside the session for a program that needs it,person,later,later,—,—,
 copy-paste-text,exchange,Copy text on one side and paste it on the other,person,v1,partial,v1,—,
 copy-paste-rich,exchange,"Copy and paste a picture, or text with its formatting",person,partial,no,—,—,"a picture passes, both ways; text keeps its formatting later; VNC carries text alone"
-copy-paste-files,exchange,Copy files on one side and paste them on the other,person,later,no,—,—,VNC carries text alone
+copy-paste-files,exchange,Copy files on one side and paste them on the other,person,partial,no,—,—,"files copied on the machine are listed, to download; to the machine later; VNC carries text alone"
 move-files,exchange,Move files between one's own device and the machine,person,later,no,later,—,a shell: in a panel beside it; a Windows machine: as a drive the machine sees; VNC moves no files
 drop-file,exchange,Drop a file onto a session to send it to the machine,person,later,no,later,—,VNC moves no files
 print-to-own-device,exchange,Print from the machine to a printer or a file of one's own,person,later,no,—,—,VNC carries no printing
@@ -163,7 +163,7 @@ record-sign-ins-made,records,Keep a record of every sign-in Away made on a machi
 record-changes,records,"Keep a record of every change to machines, rules and settings",system,—,—,—,built,
 read-records,records,Read the records and search them,admin,—,—,—,v1,
 send-records-on,records,Send every record on to the organisation's own log system as it is written,system,—,—,—,v1,as lines a log collector reads
-record-moved-content,records,Keep a record of every file moved and of what the clipboard carried,system,—,—,—,later,
+record-moved-content,records,Keep a record of every file moved and of what the clipboard carried,system,—,—,—,partial,"each file that passed, with its name and its size; what the clipboard carried later"
 record-session,records,Record a session to play it back later,system,later,later,later,—,
 play-recording,records,"Play a recording back, at any speed and from any point",admin,later,later,later,—,
 search-recording,records,Find a moment in a recording by what was typed or shown,admin,no,no,later,—,"a shell is recorded as text, a desktop as pictures"

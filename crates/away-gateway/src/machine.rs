@@ -8,7 +8,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-pub use away_rdp::clipboard::{Passes, Picture as CopiedPicture};
+pub use away_rdp::clipboard::{File as CopiedFile, Passes, Picture as CopiedPicture, LONGEST_PIECE};
 use away_rdp::connection::{Connection, Happened};
 use away_rdp::gcc::Client;
 use away_rdp::identity::Identity;
@@ -478,6 +478,8 @@ impl Secured {
                 resized: false,
                 copied: None,
                 copied_picture: None,
+                copied_files: None,
+                piece: None,
             };
             while !desktop.is_open {
                 // a machine that reads a card waits for the reader's word as time passes
@@ -557,6 +559,10 @@ pub struct Desktop {
     copied: Option<String>,
     /// The picture that was last copied on the machine, until it is taken.
     copied_picture: Option<CopiedPicture>,
+    /// The files that were last copied on the machine, until they are taken.
+    copied_files: Option<Vec<CopiedFile>>,
+    /// The piece of a file that arrived, until it is taken: none where the machine gave none.
+    piece: Option<Option<Vec<u8>>>,
 }
 
 impl Desktop {
@@ -680,6 +686,10 @@ impl Desktop {
                         self.copied_picture = Some(picture);
                         self.copied = None;
                     }
+                    Happened::CopiedFiles(files) => self.copied_files = Some(files),
+                    // a piece of the file that is being had, or that the machine gave none
+                    Happened::PieceOfAFile(piece) => self.piece = Some(Some(piece)),
+                    Happened::NoPieceOfAFile => self.piece = Some(None),
                     Happened::Windows(changes) => {
                         self.windows.take(changes);
                         self.windows_changed = true;
@@ -822,6 +832,28 @@ impl Desktop {
         self.copied_picture.take()
     }
 
+    /// The files that were copied on the machine since this was last asked: which they
+    /// are, and nothing of what is in them.
+    pub fn copied_files(&mut self) -> Option<Vec<CopiedFile>> {
+        self.copied_files.take()
+    }
+
+    /// The piece of a file that arrived since this was last asked: nothing in it where
+    /// the file ends before there, and none where the machine gave none.
+    pub fn piece(&mut self) -> Option<Option<Vec<u8>>> {
+        self.piece.take()
+    }
+
+    /// Asks the machine for the next piece of a file it listed, from this place on.
+    /// Whether it was asked: it is not where no files are listed, or a piece is on its way.
+    pub async fn ask_for_a_piece(&mut self, file: u32, from: u64) -> Result<bool, Failure> {
+        let asks = self.open.ask_for_a_piece(file, from, LONGEST_PIECE);
+        if asks.is_empty() {
+            return Ok(false);
+        }
+        self.write(&asks).await.map(|()| true)
+    }
+
     /// Tells the machine that the person copied this picture, so that it can be pasted
     /// there: where the clipboard passes to the machine.
     pub async fn offer_picture(&mut self, picture: CopiedPicture) -> Result<(), Failure> {
@@ -920,6 +952,18 @@ impl Shown for Desktop {
 
     async fn offer_picture(&mut self, picture: CopiedPicture) -> Result<(), Failure> {
         Desktop::offer_picture(self, picture).await
+    }
+
+    fn copied_files(&mut self) -> Option<Vec<CopiedFile>> {
+        Desktop::copied_files(self)
+    }
+
+    fn piece(&mut self) -> Option<Option<Vec<u8>>> {
+        Desktop::piece(self)
+    }
+
+    async fn ask_for_a_piece(&mut self, file: u32, from: u64) -> Result<bool, Failure> {
+        Desktop::ask_for_a_piece(self, file, from).await
     }
 
     async fn did(&mut self, did: &[Did]) -> Result<(), Failure> {
