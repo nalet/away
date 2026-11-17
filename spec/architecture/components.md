@@ -17,7 +17,7 @@ What a person's browser runs.
 | Component | Is | Kind | Comes | Carries |
 |---|---|---|---|---|
 | `web` | the web app: Away's pages around the sessions | web | first release | 44 |
-| `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | there | 37 |
+| `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | there | 38 |
 
 - `web`: Built from the design system's components; the frame is Away's own until the design system has it. Keeps: in the browser's own storage, which sessions this browser has open. Code: `web/`. Runs: served by the server. Governed by [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](./decisions/0011-the-web-app.md).
 - `session-view`: Drawn on a canvas, apart from the pages. Code: `web/src/session/`. Runs: part of the web app. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0011](./decisions/0011-the-web-app.md), [ADR‑0016](./decisions/0016-a-picture-that-moves.md).

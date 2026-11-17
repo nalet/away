@@ -316,7 +316,18 @@ machine that offers more is opened from its own page, where each way in is.
 - **A Windows desktop follows its window.** Once the window has rested at
   another size, the machine is told and offers its desktop anew at that size,
   so nothing is scaled and text keeps its size. A machine that doesn't take a
-  new size keeps the one it opened with, and so do the windows of a program.
+  new size keeps the one it opened with: its picture is then fitted to the
+  window, larger or smaller than it is, and keeps its shape. The windows of a
+  program keep their size, and are only made smaller where the window has no
+  room for them.
+- **Fingers work a desktop as a trackpad does**, on a phone or a tablet. The
+  whole screen is the pad: a finger that moves carries the pointer along from
+  where it was, a tap clicks where the pointer is, and a tap followed at once
+  by a finger that moves drags. A hold or a tap with two fingers is the other
+  mouse button, and a tap with three the middle one. Two fingers that move
+  together scroll the way they go, and two that spread or close zoom into the
+  picture and out of it; zoomed in, the part that shows follows the pointer.
+  Away draws the pointer itself, as an arrow.
 - **A key writes what it writes at home.** The session is given the layout of
   the person's keyboard: where the browser says what the keys write, by that;
   elsewhere by the language the browser is set to.
@@ -375,7 +386,9 @@ desktop opens like any other, with what the protocol makes different:
 - **Text that is copied passes both ways**, where the files let it, in the
   characters of the western alphabet, which is what the protocol carries.
 - **The desktop has the size the machine gives it**, and is fitted to the
-  window. Others who look at the same desktop, and whoever sits at the
+  window: larger or smaller than it is, in its own shape, with what the window
+  has left over empty. VNC has no way to ask a machine such as a Mac for
+  another size. Others who look at the same desktop, and whoever sits at the
   machine, stay where they are.
 
 ## Opening a program

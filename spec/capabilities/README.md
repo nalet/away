@@ -115,16 +115,16 @@ has the steps.
 <!-- generated: overview -->
 | Part | Areas | Capabilities | built | partly built | first release | later | not planned |
 |---|---|---|---|---|---|---|---|
-| [in a session](./session.md) | 7 | 67 | 4 | 12 | 22 | 24 | 5 |
+| [in a session](./session.md) | 7 | 67 | 4 | 15 | 20 | 23 | 5 |
 | [around the sessions](./app.md) | 5 | 49 | 16 | 3 | 9 | 17 | 4 |
 | [administration](./admin.md) | 4 | 56 | 12 | 2 | 13 | 26 | 3 |
 | [the platform](./platform.md) | 3 | 33 | 15 | 1 | 8 | 7 | 2 |
-| all | 19 | 205 | 47 | 18 | 52 | 74 | 14 |
+| all | 19 | 205 | 47 | 21 | 50 | 73 | 14 |
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
-| a session over RDP | 6 | 3 | 27 | 26 | 5 | 138 |
-| a session over VNC | 8 | 4 | 14 | 12 | 15 | 152 |
+| a session over RDP | 6 | 6 | 25 | 25 | 5 | 138 |
+| a session over VNC | 9 | 6 | 12 | 11 | 15 | 152 |
 | a session over SSH | 0 | 0 | 27 | 12 | 2 | 164 |
 | Away itself | 44 | 4 | 26 | 45 | 9 | 77 |
 

@@ -216,8 +216,13 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 
 /* ── a session: the machine's screen has the window ── */
 .sess { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
-.sess .holds { flex: 1 1 auto; min-width: 0; max-width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-.sess .screen { display: block; max-width: 100%; max-height: 100%; outline: none; cursor: default; touch-action: none; }
+/* the picture is fitted to what the window has for it, larger or smaller than it is, and
+   keeps its shape: the page says where it lies. Fingers on it are a trackpad's, so the
+   browser makes nothing of them itself */
+.sess .holds { position: relative; flex: 1 1 auto; min-width: 0; max-width: 100%; height: 100%; overflow: hidden; touch-action: none; }
+.sess .screen { position: absolute; left: 0; top: 0; display: block; outline: none; cursor: default; touch-action: none; }
+/* the pointer that fingers move: Away's own arrow, with its tip where the pointer is */
+.sess .spointer { position: absolute; left: 0; top: 0; z-index: 1; width: 20px; height: 20px; overflow: visible; pointer-events: none; }
 /* a program's windows are on Away's ground, and nothing of a desktop is around them; the
    rail stands at the left and the windows sit beside it, as against a taskbar */
 .sess.prog { background: var(--bg); justify-content: flex-start; }

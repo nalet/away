@@ -37,20 +37,30 @@ with the parts of [The picture](../capabilities/session.md#the-picture) and of
 - The phone's keyboard doesn't come by itself: Away can't see where the machine
   expects text. The keyboard button brings it.
 
-Touch works the machine's pointer:
+Touch works the machine's pointer as a trackpad does. The whole screen is the
+pad, beside the picture too, and the pointer is where it was left, not under
+the finger:
 
 | On the phone | On the machine |
 |---|---|
-| A tap | a click, where the finger is |
-| A double tap | a double click |
-| A hold | a click with the other mouse button |
-| A hold, then a move | a drag |
-| Two fingers moved together | scrolling, up, down and sideways |
+| A finger that moves | the pointer moves with it, and further the faster the finger moves |
+| A tap | a click, where the pointer is |
+| Two taps | a double click |
+| A tap, then a finger that comes down again and moves | a drag |
+| A hold, or a tap with two fingers | a click with the other mouse button |
+| A tap with three fingers | a click with the middle mouse button |
+| Two fingers moved together | scrolling, the way the fingers go: up, down and sideways |
 | A pinch | nothing: it zooms the picture in and out, and the picture moves with the pinch |
 
-- The picture zooms from the whole screen in view up to four times that. Zooming
-  changes what one sees, and nothing at the machine.
-- While zoomed in, the picture moves on by itself when a drag nears its edge.
+- Away draws the pointer itself, as an arrow where the machine has it: a finger
+  would cover what it points at. The arrow shows with the first finger, and goes
+  when a mouse is used.
+- The picture opens with the whole of the machine's screen in view, and zooms
+  from there up to four times that, or until a pixel of the machine's is two of
+  the phone's where that is more. Zooming changes what one sees, and nothing at
+  the machine.
+- While zoomed in, the part that shows follows the pointer.
+- A program's windows are worked the same way.
 
 ## 10.2 Held sideways
 

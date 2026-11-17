@@ -15,6 +15,8 @@ import { texts } from '../texts';
 import { ClipboardPanel, useClipboard } from './Clipboard';
 import type { Passes } from './Clipboard';
 import { isHeld, layoutName, layoutOf, placeOf, symOf, symOfPlace } from './keys';
+import { fingers } from './touch';
+import { following, placed, settled, showing, whole, zoomed } from './view';
 import { begins, credentials, did, leaves, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } from './wire';
 import type { Did, Step, TrayOf, WindowOf } from './wire';
 
@@ -599,6 +601,25 @@ const KEPT_ON_A_MAC: { name: string; keys: string[] }[] = [
   { name: texts.session.keptOnAMac.cmdOptEsc, keys: ['MetaLeft', 'AltLeft', 'Escape'] },
 ];
 
+// The pointer that fingers move, drawn as an arrow with its tip at its corner. It is
+// hidden until a finger is used: a mouse has the browser's own pointer.
+function arrowOfThePointer(): SVGSVGElement {
+  const of = 'http://www.w3.org/2000/svg';
+  const arrow = document.createElementNS(of, 'svg');
+  arrow.setAttribute('class', 'spointer');
+  arrow.setAttribute('viewBox', '0 0 20 20');
+  arrow.setAttribute('aria-hidden', 'true');
+  arrow.style.display = 'none';
+  const shape = document.createElementNS(of, 'path');
+  shape.setAttribute('d', 'M1 1v14.5l4-3.6 2.9 6.6 2.4-1-2.9-6.5H13z');
+  shape.setAttribute('fill', '#fff');
+  shape.setAttribute('stroke', '#0b0e14');
+  shape.setAttribute('stroke-width', '1.2');
+  shape.setAttribute('stroke-linejoin', 'round');
+  arrow.append(shape);
+  return arrow;
+}
+
 // Whether the person's own device is a Mac, whose browser tells of some keys in its own way.
 const ON_A_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -762,10 +783,42 @@ function Desktop({
     canvas.setAttribute('aria-label', program === null ? t.screenOf(name) : t.windowsOf(program));
     // of a program only the windows show: the parts of them that can be seen
     canvas.style.clipPath = program === null ? '' : 'url(#seen-parts)';
-    holds.replaceChildren(canvas);
+    // the pointer that fingers move, as an arrow of Away's own: it shows once a finger is used
+    const arrow = arrowOfThePointer();
+    holds.replaceChildren(canvas, arrow);
     canvas.focus();
 
     const tell = (events: Did[]) => say(did(events));
+    // where the picture lies: fitted to what the window has for it, and from there
+    // zoomed into by two fingers. The pointer that fingers move starts in its middle
+    const picture = () => ({ width: canvas.width, height: canvas.height });
+    const room = () => ({ width: holds.clientWidth, height: holds.clientHeight });
+    // a desktop is enlarged as far as the window has room; a program's windows keep the
+    // size the machine draws them in, and are only ever made smaller
+    const upTo = program === null ? Infinity : 1;
+    let view = whole(picture());
+    let pointer = { x: canvas.width / 2, y: canvas.height / 2 };
+    const lay = () => {
+      view = settled(picture(), room(), view, upTo);
+      const lies = placed(picture(), room(), view, upTo);
+      canvas.style.left = `${lies.left}px`;
+      canvas.style.top = `${lies.top}px`;
+      canvas.style.width = `${lies.width}px`;
+      canvas.style.height = `${lies.height}px`;
+      arrow.style.transform = `translate(${lies.left + pointer.x * lies.scale}px, ${lies.top + pointer.y * lies.scale}px)`;
+      arrow.dataset.at = `${Math.round(pointer.x)},${Math.round(pointer.y)}`;
+    };
+    lay();
+    // the window changes, or the machine's screen gets another size: the picture is
+    // fitted anew, and a screen of another size is looked at whole again
+    const windowChanges = new ResizeObserver(lay);
+    windowChanges.observe(holds);
+    const screenChanges = new MutationObserver(() => {
+      view = whole(picture());
+      pointer = { x: Math.min(pointer.x, canvas.width - 1), y: Math.min(pointer.y, canvas.height - 1) };
+      lay();
+    });
+    screenChanges.observe(canvas, { attributes: true, attributeFilter: ['width', 'height'] });
     // where the pointer is, in the desktop's own pixels
     const at = (event: MouseEvent) => {
       const shown = canvas.getBoundingClientRect();
@@ -784,10 +837,15 @@ function Desktop({
       moved = null;
     };
     const onMove = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') return;
       moved = at(event);
+      // a mouse has the browser's own pointer: Away's arrow goes, and fingers go on from here
+      pointer = moved;
+      arrow.style.display = 'none';
       if (!waiting) waiting = window.requestAnimationFrame(flush);
     };
     const onButton = (down: boolean) => (event: PointerEvent) => {
+      if (event.pointerType === 'touch') return;
       event.preventDefault();
       if (down) {
         setBar(false);
@@ -802,6 +860,21 @@ function Desktop({
     const onUp = onButton(false);
     // what the wheel turned and was less than the machine is told at once: up and down, and sideways
     const rest = [0, 0];
+    const turned = (turn: number, sideways: boolean, place: { x: number; y: number }): Did[] => {
+      const nth = sideways ? 1 : 0;
+      // counted in tenths, which are whole numbers: nothing of a turn is lost to rounding
+      const tenths = (rest[nth] ?? 0) + Math.round(turn * 10);
+      const whole = Math.trunc(tenths / 10);
+      rest[nth] = tenths - whole * 10;
+      const told: Did[] = [];
+      // more than one message holds goes out as several
+      for (let left = whole; left !== 0; ) {
+        const by = Math.max(-255, Math.min(255, left));
+        told.push({ wheel: { by, sideways, ...place } });
+        left -= by;
+      }
+      return told;
+    };
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       // a browser counts in pixels, lines or pages: a notch of a wheel is 120 to a machine,
@@ -809,25 +882,64 @@ function Desktop({
       // is less than one part adds up, so that a slow turn is as far as a fast one
       const scale = event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 800 : 1.2;
       const place = at(event);
-      const turned = (turn: number, sideways: boolean): Did[] => {
-        const nth = sideways ? 1 : 0;
-        // counted in tenths, which are whole numbers: nothing of a turn is lost to rounding
-        const tenths = (rest[nth] ?? 0) + Math.round(turn * 10);
-        const whole = Math.trunc(tenths / 10);
-        rest[nth] = tenths - whole * 10;
-        const told: Did[] = [];
-        // more than one message holds goes out as several
-        for (let left = whole; left !== 0; ) {
-          const by = Math.max(-255, Math.min(255, left));
-          told.push({ wheel: { by, sideways, ...place } });
-          left -= by;
-        }
-        return told;
-      };
-      const events = [...turned(-event.deltaY * scale, false), ...turned(event.deltaX * scale, true)];
+      const events = [...turned(-event.deltaY * scale, false, place), ...turned(event.deltaX * scale, true, place)];
       if (events.length > 0) tell(events);
     };
     const onMenu = (event: Event) => event.preventDefault();
+
+    // fingers: the screen is a trackpad, and the pointer is where it was left. What two
+    // fingers turn goes the way the fingers go, as a page under a finger does
+    const pointed = () => ({ x: Math.round(pointer.x), y: Math.round(pointer.y) });
+    const pad = fingers({
+      moved: (by) => {
+        const { scale } = placed(picture(), room(), view, upTo);
+        pointer = {
+          x: Math.max(0, Math.min(canvas.width - 1, pointer.x + by.x / scale)),
+          y: Math.max(0, Math.min(canvas.height - 1, pointer.y + by.y / scale)),
+        };
+        moved = pointed();
+        if (!waiting) waiting = window.requestAnimationFrame(flush);
+        // zoomed into, the part that shows follows the pointer
+        view = following(picture(), room(), view, pointer, upTo);
+        lay();
+      },
+      button: (button, isDown) => {
+        if (isDown) {
+          setBar(false);
+          canvas.focus();
+        }
+        const place = pointed();
+        moved = null;
+        tell([{ moved: place }, { button: { button, down: isDown, ...place } }]);
+      },
+      turned: (by) => {
+        const place = pointed();
+        const events = [...turned(by.y * 1.2, false, place), ...turned(-by.x * 1.2, true, place)];
+        if (events.length > 0) tell(events);
+      },
+      zoomed: (by, from, to) => {
+        const box = holds.getBoundingClientRect();
+        const within = (point: { x: number; y: number }) => ({ x: point.x - box.left, y: point.y - box.top });
+        view = zoomed(picture(), room(), view, by, within(from), within(to), upTo);
+        // the pointer comes along into what shows, so that it is there for the next finger
+        const comes = showing(picture(), room(), view, pointer, upTo);
+        if (comes.x !== pointer.x || comes.y !== pointer.y) {
+          pointer = comes;
+          moved = pointed();
+          if (!waiting) waiting = window.requestAnimationFrame(flush);
+        }
+        lay();
+      },
+    });
+    const onFinger = (does: 'down' | 'move' | 'up') => (event: PointerEvent) => {
+      if (event.pointerType !== 'touch') return;
+      event.preventDefault();
+      arrow.style.display = '';
+      pad[does](event);
+    };
+    const onFingerDown = onFinger('down');
+    const onFingerMove = onFinger('move');
+    const onFingerUp = onFinger('up');
 
     // the keys that are down, so that none stays down on the machine when the window is left
     const down = new Map<string, { code: number; extended: boolean }>();
@@ -911,11 +1023,25 @@ function Desktop({
     canvas.addEventListener('pointerup', onUp);
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('contextmenu', onMenu);
+    // a finger counts wherever it is in what the window has for the picture, beside it too
+    holds.addEventListener('pointerdown', onFingerDown);
+    holds.addEventListener('pointermove', onFingerMove);
+    holds.addEventListener('pointerup', onFingerUp);
+    holds.addEventListener('pointercancel', onFingerUp);
+    holds.addEventListener('contextmenu', onMenu);
     canvas.addEventListener('keydown', onKeyDown);
     canvas.addEventListener('keyup', onKeyUp);
     canvas.addEventListener('blur', onBlur);
     return () => {
       onBlur();
+      pad.ends();
+      windowChanges.disconnect();
+      screenChanges.disconnect();
+      holds.removeEventListener('pointerdown', onFingerDown);
+      holds.removeEventListener('pointermove', onFingerMove);
+      holds.removeEventListener('pointerup', onFingerUp);
+      holds.removeEventListener('pointercancel', onFingerUp);
+      holds.removeEventListener('contextmenu', onMenu);
       if (waiting) window.cancelAnimationFrame(waiting);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerdown', onDown);

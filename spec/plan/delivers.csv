@@ -158,6 +158,7 @@ p13,connect-domain-authority,,With Away's own authority
 p13,certify-domain-controllers,,
 p14,work-by-touch,,
 p14,zoom-by-touch,,
+p14,touch-as-trackpad,,
 p14,use-extra-keys,,
 p15,see-health,,
 p15,check-setup,,

@@ -54,7 +54,7 @@ How the machine's screen reaches one's own: its size, its sharpness, how smoothl
 
 | Capability | Who | RDP | VNC | SSH | Key |
 |---|---|---|---|---|---|
-| Fit the machine's screen to the window, and follow when its size changes | person | v1 | partial | v1 | `fit-to-window` |
+| Fit the machine's screen to the window, and follow when its size changes | person | v1 | built | v1 | `fit-to-window` |
 | Fill the whole screen with a session | person | v1 | built | v1 | `fill-screen` |
 | Show a sharp picture on a high-density screen | system | v1 | later | v1 | `sharp-on-dense-screen` |
 | Show a screen at rest exactly, pixel for pixel | system | v1 | built | — | `exact-at-rest` |
@@ -158,12 +158,15 @@ Working without a keyboard and a mouse: touch, the keys a phone lacks, a small s
 | Capability | Who | RDP | VNC | SSH | Away | Key |
 |---|---|---|---|---|---|---|
 | Find a machine and open it on a phone, with every page fitted to it | person | — | — | — | built | `use-on-phone` |
-| Work by touch: tap to click, hold for the other button, two fingers to scroll | person | v1 | v1 | v1 | — | `work-by-touch` |
-| Zoom into the picture with two fingers and move around it | person | v1 | v1 | v1 | — | `zoom-by-touch` |
+| Work by touch: tap to click, hold for the other button, two fingers to scroll | person | partial | partial | v1 | — | `work-by-touch` |
+| Zoom into the picture with two fingers and move around it | person | partial | partial | v1 | — | `zoom-by-touch` |
 | Use the keys a phone's keyboard lacks: Ctrl, Alt, Esc, Tab, the arrows, the function keys | person | v1 | v1 | v1 | — | `use-extra-keys` |
-| Move the pointer as on a trackpad, for small targets | person | later | later | — | — | `touch-as-trackpad` |
+| Move the pointer as on a trackpad, for small targets | person | partial | partial | — | — | `touch-as-trackpad` |
 | Send touches to the machine as touches | person | later | — | — | — | `send-real-touch` |
 | Add Away to a phone's home screen and open it like an app | person | — | — | — | later | `add-to-home-screen` |
 
+- *Work by touch: tap to click, hold for the other button, two fingers to scroll*: a desktop is worked as on a trackpad; tried with a browser's stand-in for fingers, not yet on a phone.
+- *Zoom into the picture with two fingers and move around it*: the part that shows follows the pointer; tried with a browser's stand-in for fingers, not yet on a phone.
+- *Move the pointer as on a trackpad, for small targets*: how a desktop is worked by touch; tried with a browser's stand-in for fingers, not yet on a phone.
 - *Send touches to the machine as touches*: for a Windows machine's own touch gestures.
 <!-- end: areas -->

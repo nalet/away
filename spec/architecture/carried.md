@@ -84,6 +84,7 @@ says which.
 | Work by touch: tap to click, hold for the other button, two fingers to scroll | `session-view` | [14](../plan/README.md#14-by-touch) | `work-by-touch` |
 | Zoom into the picture with two fingers and move around it | `session-view` | [14](../plan/README.md#14-by-touch) | `zoom-by-touch` |
 | Use the keys a phone's keyboard lacks: Ctrl, Alt, Esc, Tab, the arrows, the function keys | `session-view` | [14](../plan/README.md#14-by-touch) | `use-extra-keys` |
+| Move the pointer as on a trackpad, for small targets | `session-view` | [14](../plan/README.md#14-by-touch) | `touch-as-trackpad` |
 
 ## Around the sessions
 

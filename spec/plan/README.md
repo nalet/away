@@ -113,11 +113,11 @@ Package 2 met its gate, and the owner said that the RDP code stays Away's own
 | 11 | [A desktop over VNC](#11-a-desktop-over-vnc) | build | agreed | 9 | [ADR‑0001](../architecture/decisions/0001-own-protocol-code.md), [ADR‑0004](../architecture/decisions/0004-the-session-and-its-picture.md) | 24 capabilities |
 | 12 | [Windows as oneself](#12-windows-as-oneself) | build | agreed | 3, 6 | [ADR‑0007](../architecture/decisions/0007-short-lived-certificates.md), [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 5 capabilities |
 | 13 | [Away's own authority](#13-aways-own-authority) | build | agreed | 12 | [ADR‑0008](../architecture/decisions/0008-the-authority-for-windows-sign-ins.md) | 2 capabilities |
-| 14 | [By touch](#14-by-touch) | build | agreed | 6, 8 | [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 3 capabilities |
+| 14 | [By touch](#14-by-touch) | build | agreed | 6, 8 | [ADR‑0011](../architecture/decisions/0011-the-web-app.md) | 4 capabilities |
 | 15 | [Status, and the check of the setup](#15-status-and-the-check-of-the-setup) | build | agreed | 12 | [ADR‑0012](../architecture/decisions/0012-one-chart-no-special-rights.md) | 2 capabilities |
 | 16 | [Ready to release](#16-ready-to-release) | build | agreed | 7, 13, 14, 15 | [ADR‑0013](../architecture/decisions/0013-built-tested-signed-by-the-pipelines.md) | 1 capability |
 
-16 packages: 2 proofs and 14 builds. Together the builds deliver 117 of the 117 capabilities of the first release.
+16 packages: 2 proofs and 14 builds. Together the builds deliver 118 of the 118 capabilities of the first release.
 <!-- end: packages -->
 
 ## What the build needs first
@@ -310,7 +310,7 @@ A build, after package 6 and package 8. It rests on [ADR‑0011](../architecture
 
 | Area | What it delivers |
 |---|---|
-| [On a phone or a tablet](../capabilities/session.md#on-a-phone-or-a-tablet) | Work by touch: tap to click, hold for the other button, two fingers to scroll; Zoom into the picture with two fingers and move around it; Use the keys a phone's keyboard lacks: Ctrl, Alt, Esc, Tab, the arrows, the function keys |
+| [On a phone or a tablet](../capabilities/session.md#on-a-phone-or-a-tablet) | Work by touch: tap to click, hold for the other button, two fingers to scroll; Zoom into the picture with two fingers and move around it; Move the pointer as on a trackpad, for small targets; Use the keys a phone's keyboard lacks: Ctrl, Alt, Esc, Tab, the arrows, the function keys |
 
 ### 15 Status, and the check of the setup
 

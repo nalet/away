@@ -1,7 +1,7 @@
 // Getting in and the frame, as a person meets them in a browser.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import type { Page, Request } from '@playwright/test';
+import type { Locator, Page, Request } from '@playwright/test';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -899,6 +899,25 @@ async function pixel(page: Page, x: number, y: number): Promise<number[]> {
   );
 }
 
+// A place of a machine's screen as a place of its picture in the window. The picture is
+// fitted to the window, so a pixel of the screen is seldom a pixel of the window.
+async function placeOn(screen: Locator, x: number, y: number): Promise<{ x: number; y: number }> {
+  return screen.evaluate(
+    (canvas: HTMLCanvasElement, [left, top]) => {
+      const shown = canvas.getBoundingClientRect();
+      return { x: (left * shown.width) / canvas.width, y: (top * shown.height) / canvas.height };
+    },
+    [x, y] as const,
+  );
+}
+
+// A finger on the window, as a browser tells of one.
+function finger(on: Locator, id: number) {
+  const says = (what: string) => (x: number, y: number) =>
+    on.dispatchEvent(what, { pointerType: 'touch', pointerId: id, isPrimary: id === 1, clientX: x, clientY: y, bubbles: true, cancelable: true });
+  return { down: says('pointerdown'), move: says('pointermove'), up: says('pointerup') };
+}
+
 test.describe('a session', () => {
   test.skip(!DATABASE, 'no database to test against: AWAY_TEST_DATABASE is not set');
 
@@ -947,7 +966,7 @@ test.describe('a session', () => {
     await accessible(page);
 
     // a click and a key go to the machine, and what the machine draws for them shows
-    await screen.click({ position: { x: 50, y: 60 } });
+    await screen.click({ position: await placeOn(screen, 50, 60) });
     await expect.poll(() => pixel(page, 55, 65)).toEqual([224, 64, 32]);
     await page.keyboard.press('a');
     await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 225, 30]);
@@ -1196,7 +1215,7 @@ test.describe('a session', () => {
     await expect(screen).toBeVisible();
     await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
     await expect.poll(() => pixel(page, 60, 20)).toEqual([80, 60, 40]);
-    await screen.click({ position: { x: 50, y: 60 } });
+    await screen.click({ position: await placeOn(screen, 50, 60) });
     await expect.poll(() => pixel(page, 55, 65)).toEqual([224, 64, 32]);
     await page.getByRole('button', { name: "open the session's bar" }).click();
     await page.getByRole('toolbar', { name: "the session's bar" }).getByRole('button', { name: 'end' }).click();
@@ -1253,7 +1272,7 @@ test.describe('a session', () => {
         return document.elementFromPoint(shown.left + x!, shown.top + y!) === canvas;
       }, [x, y]);
     expect([await hit(25, 15), await hit(5, 5)]).toEqual([true, false]);
-    await screen.click({ position: { x: 50, y: 60 } });
+    await screen.click({ position: await placeOn(screen, 50, 60) });
     await expect.poll(() => pixel(page, 55, 65)).toEqual([224, 64, 32]);
 
     // a program's rail stands always, as a taskbar: no handle to open, Away's mark at its
@@ -1415,10 +1434,21 @@ test.describe('a session', () => {
     await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
     await expect.poll(() => pixel(page, 60, 20)).toEqual([80, 60, 40]);
     expect(await screen.evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height])).toEqual([200, 120]);
+    // such a desktop keeps the size its machine gives it: its picture is fitted to the
+    // window, larger than it is here, and keeps its shape, with the rest left empty
+    expect(await screen.boundingBox()).toEqual({ x: 0, y: 16, width: 1280, height: 768 });
+    await page.setViewportSize({ width: 700, height: 500 });
+    await expect.poll(() => screen.boundingBox()).toEqual({ x: 0, y: 40, width: 700, height: 420 });
+    // and smaller than it is, in a window that is narrower than the machine's screen
+    await page.setViewportSize({ width: 160, height: 500 });
+    await expect.poll(() => screen.boundingBox()).toEqual({ x: 0, y: 202, width: 160, height: 96 });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect.poll(() => screen.boundingBox()).toEqual({ x: 0, y: 16, width: 1280, height: 768 });
+    expect(await screen.evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height])).toEqual([200, 120]);
 
     // a click goes to the machine; a key goes by what it writes: a capital is the capital,
     // whatever the machine's own layout is
-    await screen.click({ position: { x: 50, y: 60 } });
+    await screen.click({ position: await placeOn(screen, 50, 60) });
     await expect.poll(() => pixel(page, 55, 65)).toEqual([224, 64, 32]);
     await page.keyboard.press('a');
     await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 158, 97]);
@@ -1429,7 +1459,7 @@ test.describe('a session', () => {
     // pixels on the person's device is a hundred rows there, and no more
     const bar = (row: number) => pixel(page, 197, row);
     await page.mouse.move(100, 60);
-    await screen.hover({ position: { x: 100, y: 60 } });
+    await screen.hover({ position: await placeOn(screen, 100, 60) });
     await page.mouse.wheel(0, 100);
     await expect.poll(() => bar(99)).toEqual([48, 208, 16]);
     expect(await bar(100)).not.toEqual([48, 208, 16]);
@@ -1456,7 +1486,7 @@ test.describe('a session', () => {
     const tux = page.getByRole('application', { name: 'the desktop of tux-02' });
     await expect(tux).toBeVisible();
     await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
-    await tux.hover({ position: { x: 100, y: 60 } });
+    await tux.hover({ position: await placeOn(tux, 100, 60) });
     await page.mouse.wheel(0, 100);
     await expect.poll(() => bar(0)).toEqual([48, 208, 16]);
     expect(await bar(1)).not.toEqual([48, 208, 16]);
@@ -1466,6 +1496,102 @@ test.describe('a session', () => {
     await page.keyboard.press('Escape');
     await sessionBar.getByRole('button', { name: 'end' }).click();
     await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/tux-02`);
+    expect(seen.complaints).toEqual([]);
+  });
+
+  test('on a phone a desktop is fitted to the screen, fingers move the pointer as on a trackpad, and two of them scroll and zoom', async ({ page }) => {
+    const seen = watch(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/mac-01/desktop`);
+    await page.getByLabel('Password').fill('a desktop');
+    await page.getByRole('button', { name: 'sign in' }).click();
+    const screen = page.getByRole('application', { name: 'the desktop of mac-01' });
+    await expect(screen).toBeVisible();
+    await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
+    // the whole of the machine's screen shows, as wide as the phone's
+    expect(await screen.boundingBox()).toEqual({ x: 0, y: 305, width: 390, height: 234 });
+
+    // the pointer that fingers move is Away's own arrow: it shows with the first finger,
+    // in the middle of the machine's screen, and no tap has clicked anywhere yet
+    const arrow = page.locator('svg.spointer');
+    await expect(arrow).toBeHidden();
+    const pointer = async () => (await arrow.getAttribute('data-at'))!.split(',').map(Number) as [number, number];
+    const first = finger(screen, 1);
+    const second = finger(screen, 2);
+
+    // a finger that moves carries the pointer along, from where it was and not from
+    // where the finger is: here to the right and down, beside the picture too
+    await first.down(40, 700);
+    await expect(arrow).toBeVisible();
+    expect(await pointer()).toEqual([100, 60]);
+    for (const [x, y] of [[52, 702], [80, 710], [110, 720]] as const) await first.move(x, y);
+    await first.up(110, 720);
+    const [x, y] = await pointer();
+    expect(x).toBeGreaterThan(125);
+    expect(x).toBeLessThan(200);
+    expect(y).toBeGreaterThan(64);
+    expect(y).toBeLessThan(120);
+    // the arrow's tip is where the pointer is, in the picture as it lies on the phone
+    const tip = await arrow.boundingBox();
+    expect(Math.abs(tip!.x - (x * 390) / 200)).toBeLessThanOrEqual(1);
+    expect(Math.abs(tip!.y - (305 + (y * 234) / 120))).toBeLessThanOrEqual(1);
+
+    // a tap clicks where the pointer is, wherever the finger is
+    expect(await pixel(page, Math.min(x + 5, 199), Math.min(y + 5, 119))).not.toEqual([224, 64, 32]);
+    await first.down(300, 200);
+    await first.up(300, 200);
+    await expect.poll(() => pixel(page, Math.min(x + 5, 199), Math.min(y + 5, 119))).toEqual([224, 64, 32]);
+    expect(await pointer()).toEqual([x, y]);
+
+    // two fingers that go up together scroll down, as a page under a finger does: a
+    // Mac scrolls by a row for a step, so the bar is about as long as the fingers went
+    const bar = (row: number) => pixel(page, 197, row);
+    await first.down(150, 600);
+    await second.down(220, 600);
+    for (let up = 10; up <= 60; up += 10) {
+      await first.move(150, 600 - up);
+      await second.move(220, 600 - up);
+    }
+    await first.up(150, 540);
+    await second.up(220, 540);
+    await expect.poll(() => bar(35)).toEqual([48, 208, 16]);
+    expect(await bar(60)).not.toEqual([48, 208, 16]);
+    // and the pointer stayed where it was
+    expect(await pointer()).toEqual([x, y]);
+
+    // two fingers that spread zoom into the picture, and the pointer comes along into the
+    // part that shows, which follows it from then on; two that close bring the whole back
+    await first.down(150, 420);
+    await second.down(200, 420);
+    for (const to of [230, 260, 290, 320, 350]) await second.move(to, 420);
+    await first.up(150, 420);
+    await second.up(350, 420);
+    const zoomed = await screen.boundingBox();
+    expect(zoomed!.width).toBeGreaterThan(800);
+    expect(zoomed!.width / zoomed!.height).toBeCloseTo(200 / 120, 2);
+    const came = await arrow.boundingBox();
+    expect(came!.x).toBeGreaterThanOrEqual(60);
+    expect(came!.x).toBeLessThanOrEqual(330);
+    await first.down(60, 500);
+    for (const to of [75, 110, 150]) await first.move(to, 500);
+    await first.up(150, 500);
+    const shown = await arrow.boundingBox();
+    expect(shown!.x).toBeGreaterThanOrEqual(0);
+    expect(shown!.x).toBeLessThanOrEqual(390);
+    await first.down(100, 420);
+    await second.down(300, 420);
+    for (const to of [270, 240, 210, 180, 150, 120]) await second.move(to, 420);
+    await first.up(100, 420);
+    await second.up(120, 420);
+    await expect.poll(() => screen.boundingBox()).toEqual({ x: 0, y: 305, width: 390, height: 234 });
+
+    // a mouse has the browser's own pointer: Away's arrow goes
+    await page.mouse.move(200, 400);
+    await expect(arrow).toBeHidden();
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await accessible(page);
+    await page.getByRole('toolbar', { name: "the session's bar" }).getByRole('button', { name: 'end' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/mac-01`);
     expect(seen.complaints).toEqual([]);
   });
 
