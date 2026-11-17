@@ -61,7 +61,7 @@ rules:
 | `collection` | for a farm of Windows machines that people see as one: the collection this entry stands for. Its address is then the farm's broker | none |
 | `served-by` | the machines that serve the collection, by their addresses. One that opens its desktop on another port than the broker names it after a colon, as `rdsh-02.corp.example:3390`. Away goes on to no other machine for the collection | none |
 | `signs-in` | how people are signed in on a Windows machine: `typed` with a password, `themselves` with a certificate, or `restricted-admin` with the native Windows client | `typed` |
-| `clipboard` | which ways text and pictures pass between the person's clipboard and the machine's, and with `both` or `from-the-machine` the files that are copied on the machine: `both`, `to-the-machine`, `from-the-machine` or `none` | `both` |
+| `clipboard` | which ways text and pictures pass between the person's clipboard and the machine's, and with them files: one's own to the machine, and the ones that are copied there from it: `both`, `to-the-machine`, `from-the-machine` or `none` | `both` |
 
 A machine offers at least one way in: a desktop, programs, or a shell.
 
@@ -148,7 +148,7 @@ publishes.
 | `feed` | the address of the farm's feed, over HTTPS | needed |
 | `groups` | the groups of machines that everything the farm publishes is in | none |
 | `served-by` | the machines that serve what the farm publishes, by their addresses. Away goes on to no other machine for it, so a farm names them unless its broker serves everything itself | none |
-| `clipboard` | which ways text and pictures pass between the person's clipboard and the machines', and with `both` or `from-the-machine` the files that are copied there, for everything the farm publishes: `both`, `to-the-machine`, `from-the-machine` or `none` | `both` |
+| `clipboard` | which ways text and pictures pass between the person's clipboard and the machines', and with them files, one's own to the machines and the ones that are copied there from them, for everything the farm publishes: `both`, `to-the-machine`, `from-the-machine` or `none` | `both` |
 
 - **A desktop the farm publishes is a machine**, by the name the farm gives
   it. It is opened through the farm's broker
@@ -332,7 +332,17 @@ machine that offers more is opened from its own page, where each way in is.
   them; the machine is told to keep the files meanwhile, so that they are
   still there after something else was copied. Each file that passed is a
   record, with its name and its size. A file of more than 1 GB doesn't pass
-  yet, and neither do files to the machine or text with its formatting.
+  yet.
+- **One's own files are pasted on a Windows machine**, where the machine's
+  entry lets the clipboard pass to the machine. They are given from the
+  clipboard panel, with its **add files** button or by pasting them there, or
+  by dropping them on the session. The machine is told their names and sizes
+  and has them in its clipboard; pasted where files go there, it asks for what
+  is in them a piece at a time, and the page reads each piece off the person's
+  device then. Nothing of a file is kept by Away, so the session has to stay
+  open until the machine has it, and a file may be as large as the device
+  holds. Each file the machine had to its end is a record. Folders of one's
+  own don't pass yet, and neither does text with its formatting.
 - **A Windows desktop follows its window.** Once the window has rested at
   another size, the machine is told and offers its desktop anew at that size,
   so nothing is scaled and text keeps its size. A machine that doesn't take a

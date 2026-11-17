@@ -45,7 +45,7 @@ For the goal [Work on a machine that is somewhere else](../goals/README.md#work-
 | A Mac or a Linux desktop in the browser | partly | [`open-desktop`](./session.md#opening-a-machine) partly built, [`fit-to-window`](./session.md#the-picture) partly built, [`pointer-without-delay`](./session.md#the-picture) first release | — |
 | A shell in the browser | first release | [`open-shell`](./session.md#opening-a-machine) first release, [`run-full-screen-programs`](./session.md#the-shell) first release, [`scroll-back`](./session.md#the-shell) first release, [`select-shell-text`](./session.md#the-shell) first release | — |
 | Copy and paste between the machine and one's own device | partly | [`copy-paste-text`](./session.md#clipboard-files-and-printing) partly built, [`copy-paste-rich`](./session.md#clipboard-files-and-printing) partly built, [`copy-paste-files`](./session.md#clipboard-files-and-printing) partly built | — |
-| Move files to and from the machine | later | [`move-files`](./session.md#clipboard-files-and-printing) later, [`drop-file`](./session.md#clipboard-files-and-printing) later | — |
+| Move files to and from the machine | partly | [`move-files`](./session.md#clipboard-files-and-printing) later, [`drop-file`](./session.md#clipboard-files-and-printing) partly built | — |
 | Hear the machine and speak to it | later | [`hear-sound`](./session.md#sound-and-devices) later, [`use-microphone`](./session.md#sound-and-devices) later | — |
 | Print from the machine | later | [`print-to-own-device`](./session.md#clipboard-files-and-printing) later | — |
 | The whole screen, and more than one | partly | [`fill-screen`](./session.md#the-picture) partly built, [`several-screens`](./session.md#the-picture) later | — |

@@ -44,9 +44,9 @@ compose-characters,input,Type in a language whose characters are composed of sev
 hold-pointer,input,Hold the pointer inside the session for a program that needs it,person,later,later,—,—,
 copy-paste-text,exchange,Copy text on one side and paste it on the other,person,v1,partial,v1,—,
 copy-paste-rich,exchange,"Copy and paste a picture, or text with its formatting",person,partial,no,—,—,"a picture passes, both ways; text keeps its formatting later; VNC carries text alone"
-copy-paste-files,exchange,Copy files on one side and paste them on the other,person,partial,no,—,—,"files copied on the machine are listed, to download; to the machine later; VNC carries text alone"
+copy-paste-files,exchange,Copy files on one side and paste them on the other,person,partial,no,—,—,"one's own files are pasted on the machine, folders later; the machine's are downloaded; VNC carries text alone"
 move-files,exchange,Move files between one's own device and the machine,person,later,no,later,—,a shell: in a panel beside it; a Windows machine: as a drive the machine sees; VNC moves no files
-drop-file,exchange,Drop a file onto a session to send it to the machine,person,later,no,later,—,VNC moves no files
+drop-file,exchange,Drop a file onto a session to send it to the machine,person,built,no,later,—,VNC moves no files
 print-to-own-device,exchange,Print from the machine to a printer or a file of one's own,person,later,no,—,—,VNC carries no printing
 hear-sound,sound,Hear the machine's sound,person,later,no,—,—,VNC carries no sound
 use-microphone,sound,Speak to the machine through one's own microphone,person,later,no,—,—,VNC carries no sound

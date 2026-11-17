@@ -739,6 +739,20 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
         [(2, 1, vec![200, 100, 50, 1, 2, 3])]
     );
 
+    // a file the person copied: the machine is told its name and its size, pastes at
+    // once, and wants what is in it, which the person's device gives in pieces
+    session.say(Json::read(r#"{"gives":[{"name":"report.txt","size":8}]}"#).expect("JSON")).await;
+    assert_eq!(session.until("wants").await.write(), r#"{"wants":{"file":0,"from":0,"length":100000}}"#);
+    session.did(&[&[0x11, 1][..], b"a re"].concat()).await;
+    session.did(&[&[0x11, 2][..], b"port"].concat()).await;
+    let pasted = async {
+        while world.machine.seen().last().is_none_or(|seen| seen.pasted_files.is_empty()) {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    };
+    tokio::time::timeout(Duration::from_secs(10), pasted).await.expect("the machine pastes the file");
+    assert_eq!(world.machine.seen().last().expect("the client").pasted_files, [("report.txt".to_string(), b"a report".to_vec())]);
+
     // the person leaves: the session says so and ends, and the machine was told
     session.say(Json::object([("leaves", true.into())])).await;
     assert_eq!(session.until("ended").await.write(), r#"{"ended":"left"}"#);
@@ -749,7 +763,7 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
     let of_sessions: Vec<_> = kept.iter().filter(|(kind, ..)| kind.starts_with("session-")).collect();
     assert_eq!(
         of_sessions.iter().map(|(kind, ..)| kind.as_str()).collect::<Vec<_>>(),
-        ["session-asked", "session-opened", "session-file", "session-file", "session-ended"]
+        ["session-asked", "session-opened", "session-file", "session-file", "session-file", "session-ended"]
     );
     for (_, person, machine, _) in &of_sessions {
         assert_eq!((person.as_deref(), machine.as_deref()), (Some("Alex Urban"), Some("desk-01")));
@@ -760,15 +774,19 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
         (Some(200), Some(120))
     );
     // each file that passed, with its name, its size and which way it went, and nothing of what is in it
-    let passed: Vec<_> = of_sessions[2..4]
+    let passed: Vec<_> = of_sessions[2..5]
         .iter()
         .map(|(.., details)| (details.text_of("name"), details.get("size").and_then(Json::count), details.text_of("direction")))
         .collect();
     assert_eq!(
         passed,
-        [(Some("notes.txt"), Some(11), Some("from-the-machine")), (Some("folder/data.bin"), Some(300_000), Some("from-the-machine"))]
+        [
+            (Some("notes.txt"), Some(11), Some("from-the-machine")),
+            (Some("folder/data.bin"), Some(300_000), Some("from-the-machine")),
+            (Some("report.txt"), Some(8), Some("to-the-machine"))
+        ]
     );
-    assert_eq!(of_sessions[4].3.text_of("why"), Some("left"));
+    assert_eq!(of_sessions[5].3.text_of("why"), Some("left"));
     // and each is a line on the server's output
     let lines = world.server_lines.kept();
     for kind in ["session-asked", "session-opened", "session-ended"] {

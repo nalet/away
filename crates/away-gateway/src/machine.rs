@@ -480,6 +480,7 @@ impl Secured {
                 copied_picture: None,
                 copied_files: None,
                 piece: None,
+                wanted: Vec::new(),
             };
             while !desktop.is_open {
                 // a machine that reads a card waits for the reader's word as time passes
@@ -563,6 +564,23 @@ pub struct Desktop {
     copied_files: Option<Vec<CopiedFile>>,
     /// The piece of a file that arrived, until it is taken: none where the machine gave none.
     piece: Option<Option<Vec<u8>>>,
+    /// What the machine wants of the files the person copied, until it is taken.
+    wanted: Vec<Wanted>,
+}
+
+/// A piece the machine wants of a file the person copied, as it pastes it: the file by
+/// its place among those they copied, the piece by where it begins and how long it is.
+/// It is given under the number.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Wanted {
+    /// The number the piece is given under.
+    pub number: u32,
+    /// The file.
+    pub file: u32,
+    /// Where the piece begins.
+    pub from: u64,
+    /// How long it is.
+    pub length: u32,
 }
 
 impl Desktop {
@@ -690,6 +708,8 @@ impl Desktop {
                     // a piece of the file that is being had, or that the machine gave none
                     Happened::PieceOfAFile(piece) => self.piece = Some(Some(piece)),
                     Happened::NoPieceOfAFile => self.piece = Some(None),
+                    // the machine pastes a file the person copied: what it wants of it
+                    Happened::WantsPieceOfTheirs { number, file, from, length } => self.wanted.push(Wanted { number, file, from, length }),
                     Happened::Windows(changes) => {
                         self.windows.take(changes);
                         self.windows_changed = true;
@@ -854,6 +874,30 @@ impl Desktop {
         self.write(&asks).await.map(|()| true)
     }
 
+    /// What the machine wants of the files the person copied, since this was last asked.
+    pub fn wanted(&mut self) -> Vec<Wanted> {
+        std::mem::take(&mut self.wanted)
+    }
+
+    /// Tells the machine that the person copied these files, so that they can be pasted
+    /// there: their names and their sizes, where the clipboard passes to the machine.
+    pub async fn offer_files(&mut self, files: Vec<CopiedFile>) -> Result<(), Failure> {
+        let told = self.open.copied_files(files);
+        if told.is_empty() {
+            return Ok(());
+        }
+        self.write(&told).await
+    }
+
+    /// Gives the machine the piece of a file it wanted, or says that there is none.
+    pub async fn give_a_piece(&mut self, number: u32, piece: Option<&[u8]>) -> Result<(), Failure> {
+        let gives = self.open.give_a_piece(number, piece);
+        if gives.is_empty() {
+            return Ok(());
+        }
+        self.write(&gives).await
+    }
+
     /// Tells the machine that the person copied this picture, so that it can be pasted
     /// there: where the clipboard passes to the machine.
     pub async fn offer_picture(&mut self, picture: CopiedPicture) -> Result<(), Failure> {
@@ -964,6 +1008,18 @@ impl Shown for Desktop {
 
     async fn ask_for_a_piece(&mut self, file: u32, from: u64) -> Result<bool, Failure> {
         Desktop::ask_for_a_piece(self, file, from).await
+    }
+
+    fn wanted(&mut self) -> Vec<Wanted> {
+        Desktop::wanted(self)
+    }
+
+    async fn offer_files(&mut self, files: Vec<CopiedFile>) -> Result<(), Failure> {
+        Desktop::offer_files(self, files).await
+    }
+
+    async fn give_a_piece(&mut self, number: u32, piece: Option<&[u8]>) -> Result<(), Failure> {
+        Desktop::give_a_piece(self, number, piece).await
     }
 
     async fn did(&mut self, did: &[Did]) -> Result<(), Failure> {

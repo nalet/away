@@ -18,6 +18,8 @@ export type Said =
   // the files that were copied on the machine, and what became of the one that was asked for
   | { files: { name: string; size?: number; folder?: boolean }[] }
   | { file: 'whole' | 'failed' }
+  // the machine pastes a file the person copied, and wants a piece of it
+  | { wants: { file: number; from: number; length: number } }
   | { started: { program: string; ok: boolean; details?: string } }
   | { tray: TrayOf[] };
 
@@ -122,17 +124,39 @@ export function copied(text: string): string {
 // gateway is short, so it goes in pieces, each of which says whether it is the first
 // and whether it is the last.
 export function copiedPicture(png: Uint8Array): Uint8Array<ArrayBuffer>[] {
+  return inPieces(0x10, png);
+}
+
+// What the machine wanted of a file the person copied, as it pastes it: in pieces too.
+export function ofTheirFile(bytes: Uint8Array): Uint8Array<ArrayBuffer>[] {
+  return inPieces(0x11, bytes);
+}
+
+// Bytes of one kind in pieces that fit a message: each says its kind, and whether it is
+// the first and whether it is the last. Nothing at all is one piece, which is both.
+function inPieces(kind: number, whole: Uint8Array): Uint8Array<ArrayBuffer>[] {
   const most = 48 * 1024;
   const pieces: Uint8Array<ArrayBuffer>[] = [];
-  for (let at = 0; at < png.byteLength || at === 0; at += most) {
-    const piece = png.subarray(at, at + most);
+  for (let at = 0; at < whole.byteLength || at === 0; at += most) {
+    const piece = whole.subarray(at, at + most);
     const bytes = new Uint8Array(2 + piece.byteLength);
-    bytes[0] = 0x10;
-    bytes[1] = (at === 0 ? 1 : 0) | (at + most >= png.byteLength ? 2 : 0);
+    bytes[0] = kind;
+    bytes[1] = (at === 0 ? 1 : 0) | (at + most >= whole.byteLength ? 2 : 0);
     bytes.set(piece, 2);
     pieces.push(bytes);
   }
   return pieces;
+}
+
+// The person copied these files on their own device, for the machine to paste: their
+// names and their sizes. None: they took them back.
+export function gives(files: { name: string; size: number }[]): string {
+  return JSON.stringify({ gives: files });
+}
+
+// The person's device has nothing to give of what the machine wanted.
+export function givesNothing(): string {
+  return JSON.stringify({ gives: 'nothing' });
 }
 
 // A piece of the file that was asked for: the pieces come in their order.

@@ -40,8 +40,8 @@ What the clipboard column says:
 
 | It says | What passes |
 |---|---|
-| both ways | text or a picture copied on either side can be pasted on the other, and files copied on the machine can be downloaded |
-| to the machine only | text or a picture from one's own device reaches the machine, and nothing comes back |
+| both ways | text or a picture copied on either side can be pasted on the other, one's own files can be pasted on the machine, and files copied on the machine can be downloaded |
+| to the machine only | text, a picture or files from one's own device reach the machine, and nothing comes back |
 | from the machine only | text, a picture or files from the machine reach one's own device, and nothing goes the other way |
 | off | nothing |
 

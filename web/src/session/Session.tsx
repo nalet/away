@@ -23,7 +23,10 @@ import {
   credentials,
   did,
   file as asksForFile,
+  gives,
+  givesNothing,
   leaves,
+  ofTheirFile,
   readCopiedPicture,
   readIcon,
   readPieceOfAFile,
@@ -68,6 +71,10 @@ function useSession(machine: string, program: string | null, method?: string) {
   const [copied, setCopied] = useState<Held | null>(null);
   // who takes the pieces of the file that is being had from the machine
   const taking = useRef<Takes | null>(null);
+  // the files the person gave for the machine to paste: what is in them stays on their
+  // device until the machine wants it, a piece at a time
+  const given = useRef<File[]>([]);
+  const [gave, setGave] = useState<{ name: string; size: number }[]>([]);
   // the icons of the windows, each as a picture the page holds
   const [icons, setIcons] = useState<Record<number, ImageBitmap>>({});
   // the icons of the tray, and their pictures, each by its window and its number
@@ -102,6 +109,8 @@ function useSession(machine: string, program: string | null, method?: string) {
     setWindows([]);
     setPasses(null);
     setCopied(null);
+    given.current = [];
+    setGave([]);
     setLost(null);
     setStarted(null);
     // the pictures of the icons are the page's until the session ends
@@ -253,7 +262,25 @@ function useSession(machine: string, program: string | null, method?: string) {
         else if ('clipboard' in said) setPasses(said.clipboard);
         else if ('copied' in said) setCopied({ text: said.copied });
         else if ('files' in said) setCopied({ files: said.files });
-        else if ('file' in said) {
+        else if ('wants' in said) {
+          // the machine pastes one of the files the person gave: the piece it wants is
+          // read off their device now, and goes on in pieces
+          const { file, from, length } = said.wants;
+          const nothing = () => {
+            if (opened.readyState === WebSocket.OPEN) opened.send(givesNothing());
+          };
+          const wanted = given.current[file];
+          if (!wanted) nothing();
+          else {
+            wanted
+              .slice(from, from + length)
+              .arrayBuffer()
+              .then((bytes) => {
+                for (const piece of ofTheirFile(new Uint8Array(bytes))) if (opened.readyState === WebSocket.OPEN) opened.send(piece);
+              })
+              .catch(nothing);
+          }
+        } else if ('file' in said) {
           // all of the file came, or the machine gave no more of it
           const took = taking.current;
           taking.current = null;
@@ -330,6 +357,17 @@ function useSession(machine: string, program: string | null, method?: string) {
       if (took) say(asksForFile('none'));
       took?.ended(false);
     },
+    // the files the person gives for the machine to paste: it is told their names and
+    // sizes. None: they are taken back
+    gave,
+    give: (files: File[]) => {
+      // as many as a message to the gateway names
+      const few = files.slice(0, 200);
+      given.current = few;
+      const named = few.map((file) => ({ name: file.name, size: file.size }));
+      setGave(named);
+      say(gives(named));
+    },
     canvas,
     say,
     lost,
@@ -358,7 +396,7 @@ export function Session({ showMachine, ...session }: SessionProps & { showMachin
 
 // The page of a session with a machine's desktop, or with one of its programs.
 function BrowserSession({ name, program, method, go, contact, machine }: SessionProps & { machine: Machine | null }) {
-  const { state, windows, inFront, icons, tray, trayPictures, layout, written, started, passes, copied, have, giveUp, canvas, say, lost, tryNow, leave, again } = useSession(
+  const { state, windows, inFront, icons, tray, trayPictures, layout, written, started, passes, copied, have, giveUp, gave, give, canvas, say, lost, tryNow, leave, again } = useSession(
     name,
     program,
     method,
@@ -392,6 +430,8 @@ function BrowserSession({ name, program, method, go, contact, machine }: Session
         copied={copied}
         have={have}
         giveUp={giveUp}
+        gave={gave}
+        give={give}
         canvas={canvas}
         say={say}
         lost={lost}
@@ -706,6 +746,8 @@ function Desktop({
   copied,
   have,
   giveUp,
+  gave,
+  give,
   canvas,
   say,
   lost,
@@ -729,6 +771,8 @@ function Desktop({
   copied: Held | null;
   have: (at: number, takes: Takes) => void;
   giveUp: () => void;
+  gave: { name: string; size: number }[];
+  give: (files: File[]) => void;
   canvas: HTMLCanvasElement;
   say: (message: string | Uint8Array<ArrayBuffer>) => void;
   lost: Lost | null;
@@ -757,14 +801,26 @@ function Desktop({
   const clipboard = useClipboard(canvas, passes, copied, say);
   // files that were copied on the machine reach no clipboard of a browser's: a line at
   // the foot says that they are there, for a while, and leads to the panel that lists them
-  const [noticed, setNoticed] = useState<number | null>(null);
+  const [noticed, setNoticed] = useState<{ from: number } | { to: number } | null>(null);
   useEffect(() => {
     const files = copied !== null && 'files' in copied && passes?.from ? copied.files.filter((file) => !file.folder).length : 0;
-    setNoticed(files > 0 ? files : null);
+    setNoticed(files > 0 ? { from: files } : null);
     if (files === 0) return undefined;
     const goes = window.setTimeout(() => setNoticed(null), 12_000);
     return () => window.clearTimeout(goes);
   }, [copied, passes]);
+  // the same for files the person gave by dropping them on the session: the machine has
+  // them in its clipboard, to paste
+  useEffect(() => {
+    setNoticed(gave.length > 0 ? { to: gave.length } : null);
+    if (gave.length === 0) return undefined;
+    const goes = window.setTimeout(() => setNoticed(null), 12_000);
+    return () => window.clearTimeout(goes);
+  }, [gave]);
+  // files that are dropped on the session are given to the machine, where the
+  // clipboard passes to it and the machine carries more than text
+  const drops = useRef<((files: File[]) => void) | null>(null);
+  drops.current = passes?.to && passes.pictures ? give : null;
   // the clock at the foot of the rail, and the first control, focused when a desktop's
   // rail opens. For a program the rail is always there, as a taskbar
   const [clock, setClock] = useState(timeNow);
@@ -1111,6 +1167,20 @@ function Desktop({
     canvas.addEventListener('pointerup', onUp);
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('contextmenu', onMenu);
+    // files that are dragged over the session are taken when they are dropped
+    const onDragOver = (event: DragEvent) => {
+      if (!drops.current || !event.dataTransfer?.types.includes('Files')) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    };
+    const onDrop = (event: DragEvent) => {
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      if (!drops.current || files.length === 0) return;
+      event.preventDefault();
+      drops.current(files);
+    };
+    holds.addEventListener('dragover', onDragOver);
+    holds.addEventListener('drop', onDrop);
     // a finger counts wherever it is in what the window has for the picture, beside it too
     holds.addEventListener('pointerdown', onFingerDown);
     holds.addEventListener('pointermove', onFingerMove);
@@ -1125,6 +1195,8 @@ function Desktop({
       pad.ends();
       windowChanges.disconnect();
       screenChanges.disconnect();
+      holds.removeEventListener('dragover', onDragOver);
+      holds.removeEventListener('drop', onDrop);
       holds.removeEventListener('pointerdown', onFingerDown);
       holds.removeEventListener('pointermove', onFingerMove);
       holds.removeEventListener('pointerup', onFingerUp);
@@ -1267,6 +1339,8 @@ function Desktop({
               screen={canvas}
               have={have}
               giveUp={giveUp}
+              gave={gave}
+              give={give}
             />
           )}
         </span>
@@ -1592,7 +1666,7 @@ function Desktop({
       )}
       {noticed !== null && !clip && (
         <div className="snotice" role="status">
-          <span>{t.clipboard.filesCopied(noticed, program ?? name)}</span>
+          <span>{'from' in noticed ? t.clipboard.filesCopied(noticed.from, program ?? name) : t.clipboard.filesGiven(noticed.to, program ?? name)}</span>
           <Button
             size="sm"
             onClick={() => {

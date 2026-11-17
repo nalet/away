@@ -264,6 +264,12 @@ export const texts = {
       tooLargeFile: "Files of more than 1 GB don't pass yet.",
       filesCopied: (count: number, machine: string) => (count === 1 ? `A file was copied on ${machine}.` : `${count} files were copied on ${machine}.`),
       showFiles: 'show',
+      // the person's own files, for the machine to paste
+      addFiles: 'add files',
+      filesGiven: (count: number, machine: string) =>
+        count === 1 ? `A file is in the clipboard of ${machine} now. Paste it there.` : `${count} files are in the clipboard of ${machine} now. Paste them there.`,
+      filesFor: (machine: string) => `files for ${machine}`,
+      takeBack: 'take them back',
       // a picture of what the session shows, taken by Away itself
       shot: 'copy a picture of the screen',
       shotTaken: 'A picture of the screen is in your clipboard now.',

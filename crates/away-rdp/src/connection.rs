@@ -94,6 +94,19 @@ pub enum Happened {
     PieceOfAFile(Vec<u8>),
     /// The machine did not give the piece of a file that was asked for.
     NoPieceOfAFile,
+    /// The machine pastes a file the person copied, and wants a piece of it: the file by
+    /// its place among those they copied, the piece by where it begins and how long it
+    /// is. It is given under the number.
+    WantsPieceOfTheirs {
+        /// The number the piece is given under.
+        number: u32,
+        /// The file.
+        file: u32,
+        /// Where the piece begins.
+        from: u64,
+        /// How long it is.
+        length: u32,
+    },
 }
 
 /// The client's smart card reader, and how far the machine and the client are with it.
@@ -354,8 +367,30 @@ impl Connection {
             clipboard::Carried::Files(files) => Happened::CopiedFiles(files),
             clipboard::Carried::Piece(piece) => Happened::PieceOfAFile(piece),
             clipboard::Carried::NoPiece => Happened::NoPieceOfAFile,
+            clipboard::Carried::Wants { number, file, from, length } => Happened::WantsPieceOfTheirs { number, file, from, length },
         });
         Ok((send, copied.into_iter().collect()))
+    }
+
+    /// The person copied these files, for the machine to paste: their names and their
+    /// sizes. What is in them is wanted when the machine pastes. Nothing where the
+    /// clipboard doesn't pass to the machine.
+    pub fn copied_files(&mut self, files: Vec<clipboard::File>) -> Vec<u8> {
+        let told = match self.clipboard.as_mut() {
+            Some((_, clipboard)) => clipboard.copied_files(files),
+            None => Vec::new(),
+        };
+        told.iter().flat_map(|message| self.on(clipboard::CHANNEL, message)).collect()
+    }
+
+    /// Gives the machine the piece of a file it wanted, under the number it asked
+    /// with, or says that there is none to give.
+    pub fn give_a_piece(&mut self, number: u32, piece: Option<&[u8]>) -> Vec<u8> {
+        let gives = match self.clipboard.as_ref() {
+            Some((_, clipboard)) => clipboard.gives_a_piece(number, piece),
+            None => Vec::new(),
+        };
+        gives.iter().flat_map(|message| self.on(clipboard::CHANNEL, message)).collect()
     }
 
     /// Asks the machine for a piece of a file that was copied there: the file by its
@@ -848,6 +883,36 @@ mod tests {
         // a folder holds nothing to give
         let asks = connection.ask_for_a_piece(1, 0, 100);
         assert!(talk(&mut connection, &mut machine, asks).expect("the machine answers").contains(&Happened::NoPieceOfAFile));
+
+        // the person copies files: the machine is told their names and sizes, pastes at
+        // once, and wants what is in each a piece at a time, which whoever holds the
+        // files gives
+        let theirs: Vec<(String, Vec<u8>)> = vec![
+            ("report.txt".to_string(), b"a report".to_vec()),
+            ("data.bin".to_string(), (0..250_000u32).map(|nth| (nth % 241) as u8).collect()),
+        ];
+        let listed = theirs.iter().map(|(name, holds)| file(name, holds.len() as u64, false)).collect();
+        let mut told = connection.copied_files(listed);
+        assert!(!told.is_empty());
+        let mut pieces = 0;
+        while !told.is_empty() {
+            let happened = talk(&mut connection, &mut machine, told).expect("the machine pastes files");
+            told = Vec::new();
+            for wanted in happened {
+                let Happened::WantsPieceOfTheirs { number, file, from, length } = wanted else { continue };
+                let holds = &theirs[file as usize].1;
+                let from = (from as usize).min(holds.len());
+                told.extend(connection.give_a_piece(number, Some(&holds[from..holds.len().min(from + length as usize)])));
+                pieces += 1;
+            }
+        }
+        assert_eq!(machine.seen().pasted_files, theirs);
+        // the small one in one piece, the large one in three
+        assert_eq!(pieces, 4);
+        // the stand-in copies what it was handed: the same files are the person's to have again
+        let pressed = connection.input(&key_f);
+        let happened = talk(&mut connection, &mut machine, pressed).expect("the machine copies files");
+        assert!(happened.contains(&Happened::CopiedFiles(vec![file("report.txt", 8, false), file("data.bin", 250_000, false)])));
 
         // what the person copied before the machine was ready is told once it is
         let client = Client { clipboard: clipboard::Passes::BOTH, ..connection.client().clone() };

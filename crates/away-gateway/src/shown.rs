@@ -5,7 +5,7 @@
 use away_rdp::rail::Program;
 use away_wire::{Did, Does, TrayDoes, TrayIcon, Window};
 
-use crate::machine::{Area, CopiedFile, CopiedPicture, Failure, Screen};
+use crate::machine::{Area, CopiedFile, CopiedPicture, Failure, Screen, Wanted};
 
 /// A desktop's picture as it is now: rows from the top down, four bytes a pixel, blue,
 /// green, red, and a fourth that is always full.
@@ -82,6 +82,23 @@ pub(crate) trait Shown {
     /// Whether it was asked.
     async fn ask_for_a_piece(&mut self, _file: u32, _from: u64) -> Result<bool, Failure> {
         Ok(false)
+    }
+
+    /// What the machine wants of the files the person copied, as it pastes them, since
+    /// this was last asked.
+    fn wanted(&mut self) -> Vec<Wanted> {
+        Vec::new()
+    }
+
+    /// Tells the machine that the person copied these files, so that they can be pasted
+    /// there. A machine whose clipboard carries no files is told nothing.
+    async fn offer_files(&mut self, _files: Vec<CopiedFile>) -> Result<(), Failure> {
+        Ok(())
+    }
+
+    /// Gives the machine the piece of a file it wanted, or says that there is none.
+    async fn give_a_piece(&mut self, _number: u32, _piece: Option<&[u8]>) -> Result<(), Failure> {
+        Ok(())
     }
 
     /// Tells the machine of keys and of the pointer.

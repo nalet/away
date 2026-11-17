@@ -325,6 +325,47 @@ function FilesFromMachine({
   );
 }
 
+// The files the person gives for the machine to paste: chosen with a button, pasted
+// into the panel, or dropped on the session. What is in them stays on the person's
+// device until the machine pastes them.
+function FilesToMachine({ machine, gave, give }: { machine: string; gave: { name: string; size: number }[]; give: (files: File[]) => void }) {
+  const t = texts.session.clipboard;
+  const chosen = useRef<HTMLInputElement | null>(null);
+  return (
+    <div className="held">
+      <input
+        ref={chosen}
+        type="file"
+        multiple
+        hidden
+        onChange={(event) => {
+          give(Array.from(event.target.files ?? []));
+          event.target.value = '';
+        }}
+      />
+      <Button size="sm" onClick={() => chosen.current?.click()}>
+        {t.addFiles}
+      </Button>
+      {gave.length > 0 && (
+        <>
+          <p role="status">{t.filesGiven(gave.length, machine)}</p>
+          <ul className="files" aria-label={t.filesFor(machine)}>
+            {gave.map((file, at) => (
+              <li key={`${at} ${file.name}`}>
+                <span className="grow">{file.name}</span>
+                <span className="size">{sizeOf(file.size)}</span>
+              </li>
+            ))}
+          </ul>
+          <Button size="sm" onClick={() => give([])}>
+            {t.takeBack}
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
 // The panel under the bar's clipboard button.
 export function ClipboardPanel({
   machine,
@@ -336,6 +377,8 @@ export function ClipboardPanel({
   screen,
   have,
   giveUp,
+  gave,
+  give,
 }: {
   machine: string;
   passes: Passes;
@@ -346,6 +389,8 @@ export function ClipboardPanel({
   screen: HTMLCanvasElement;
   have: (at: number, takes: Takes) => void;
   giveUp: () => void;
+  gave: { name: string; size: number }[];
+  give: (files: File[]) => void;
 }) {
   const t = texts.session.clipboard;
   const pictures = passes.pictures === true;
@@ -384,6 +429,9 @@ export function ClipboardPanel({
   const files = passes.from && fromMachine !== null && 'files' in fromMachine && (
     <FilesFromMachine machine={machine} files={fromMachine.files} have={have} giveUp={giveUp} />
   );
+  // and the person's own files are given whatever the browser does with it: none
+  // lets a page read a file off it either, except as it is pasted
+  const theirs = passes.to && pictures && <FilesToMachine machine={machine} gave={gave} give={give} />;
   const off = (
     <>
       {!passes.to && <p className="off">{t.noPasting(machine)}</p>}
@@ -396,6 +444,7 @@ export function ClipboardPanel({
         {(passes.to || passes.from) && (
           <p>{passes.to && passes.from ? t.passes(pictures) : passes.to ? t.passesTo(machine, pictures) : t.passesFrom(machine, pictures)}</p>
         )}
+        {theirs}
         {files}
         {takesAShot}
         {off}
@@ -404,7 +453,14 @@ export function ClipboardPanel({
   }
   // a picture that is pasted into the field goes to the machine at once
   const pasted = (event: ClipboardEvent<HTMLElement>) => {
-    const picture = pictures ? Array.from(event.clipboardData.files).find((file) => file.type.startsWith('image/')) : undefined;
+    const carried = pictures ? Array.from(event.clipboardData.files) : [];
+    // one picture goes as a picture; anything else that is files goes as files
+    const picture = carried.length === 1 ? carried.find((file) => file.type.startsWith('image/')) : undefined;
+    if (!picture && carried.length > 0) {
+      event.preventDefault();
+      give(carried);
+      return;
+    }
     if (!picture) return;
     event.preventDefault();
     setSent(null);
@@ -447,6 +503,7 @@ export function ClipboardPanel({
           </span>
         </form>
       )}
+      {theirs}
       {files}
       {passes.from && !files && (
         <div>

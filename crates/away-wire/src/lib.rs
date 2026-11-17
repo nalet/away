@@ -106,6 +106,16 @@ pub enum ToBrowser<'a> {
         /// Whether all of it came.
         whole: bool,
     },
+    /// The machine pastes a file the person copied, and wants a piece of it: the file by
+    /// its place among those they copied, the piece by where it begins and how long it is.
+    Wants {
+        /// The file.
+        file: u32,
+        /// Where the piece begins.
+        from: u64,
+        /// How long it is.
+        length: u32,
+    },
     /// The windows of the programs that are open, from the front one back, and which of
     /// them is the one the person works in.
     Windows {
@@ -219,6 +229,9 @@ const PIECE_OF_A_FILE: u8 = 5;
 /// The kind of bytes of the browser's that are a piece of a picture the person copied.
 /// What a person did with the keys and the pointer begins with a lower number.
 const THE_PERSONS_PICTURE: u8 = 0x10;
+/// The kind of bytes of the browser's that are a piece of what the machine wanted of
+/// a file the person copied.
+const OF_THE_PERSONS_FILE: u8 = 0x11;
 /// Which piece of a picture it is: the first, the last, or both.
 const FIRST: u8 = 1;
 const LAST: u8 = 2;
@@ -293,6 +306,10 @@ impl ToBrowser<'_> {
                 Carried::Bytes(bytes)
             }
             ToBrowser::File { whole } => object(Json::object([("file", if whole { "whole" } else { "failed" }.into())])),
+            ToBrowser::Wants { file, from, length } => object(Json::object([(
+                "wants",
+                Json::object([("file", u64::from(file).into()), ("from", from.into()), ("length", u64::from(length).into())]),
+            )])),
             ToBrowser::CopiedPicture { png } => {
                 let mut bytes = Vec::with_capacity(1 + png.len());
                 bytes.push(COPIED_PICTURE);
@@ -479,6 +496,21 @@ pub enum FromBrowser {
     File(u32),
     /// The person gives up on the file they asked for.
     NoFile,
+    /// The person copied these files on their own device, for the machine to paste:
+    /// their names and their sizes. None: they took them back.
+    Gives(Vec<CopiedFile>),
+    /// A piece of what the machine wanted of a file the person copied: what it wanted
+    /// comes in several, as a message of the browser's is short.
+    OfTheirFile {
+        /// Whether it is the first piece.
+        first: bool,
+        /// Whether it is the last one.
+        last: bool,
+        /// The piece.
+        piece: Vec<u8>,
+    },
+    /// The person's device has nothing to give of what the machine wanted.
+    NothingOfTheirFile,
     /// A piece of a picture the person copied on their own device, which is a PNG
     /// picture: a message of the browser's is short, so a picture comes in several.
     CopiedPicture {
@@ -559,6 +591,20 @@ impl FromBrowser {
                     };
                     return Ok(FromBrowser::Tray { window, icon, does });
                 }
+                if let Some(gives) = said.get("gives") {
+                    if said.text_of("gives") == Some("nothing") {
+                        return Ok(FromBrowser::NothingOfTheirFile);
+                    }
+                    let files = gives.list().ok_or(NotThis("the files a person copied are a list, or nothing is given of one"))?;
+                    let read = files.iter().map(|file| {
+                        let name = file.text_of("name").filter(|name| !name.is_empty())?;
+                        Some(CopiedFile { name: name.to_string(), size: file.get("size").and_then(Json::count)?, folder: false })
+                    });
+                    return read
+                        .collect::<Option<Vec<_>>>()
+                        .map(FromBrowser::Gives)
+                        .ok_or(NotThis("a file a person copied has a name and a size"));
+                }
                 if let Some(file) = said.get("file") {
                     return match (file.count().and_then(|file| u32::try_from(file).ok()), said.text_of("file")) {
                         (Some(file), _) => Ok(FromBrowser::File(file)),
@@ -599,6 +645,12 @@ impl FromBrowser {
                         Ok(FromBrowser::CopiedPicture { first: which & FIRST != 0, last: which & LAST != 0, piece: piece.to_vec() })
                     }
                     _ => Err(NotThis("a piece of a picture says which piece it is")),
+                },
+                Some((&OF_THE_PERSONS_FILE, rest)) => match rest.split_first() {
+                    Some((which, piece)) if *which & !(FIRST | LAST) == 0 => {
+                        Ok(FromBrowser::OfTheirFile { first: which & FIRST != 0, last: which & LAST != 0, piece: piece.to_vec() })
+                    }
+                    _ => Err(NotThis("a piece of a file says which piece it is")),
                 },
                 _ => read_what_was_done(bytes).map(FromBrowser::Did),
             },
@@ -740,6 +792,7 @@ mod tests {
             ToBrowser::PieceOfAFile(b"hello").write(),
             ToBrowser::File { whole: true }.write(),
             ToBrowser::File { whole: false }.write(),
+            ToBrowser::Wants { file: 1, from: 5_000_000_000, length: 100_000 }.write(),
         ];
         assert_eq!(written.len(), to_browser.len());
         for (written, example) in written.iter().zip(to_browser) {
@@ -765,7 +818,20 @@ mod tests {
                 FromBrowser::read(&carried).unwrap_or_else(|NotThis(why)| panic!("{}: {why}", example.write()))
             })
             .collect();
-        assert_eq!(read.len(), 15);
+        assert_eq!(read.len(), 18);
+        assert!(matches!(&read[15], FromBrowser::Gives(files) if files[..] == [
+            CopiedFile { name: "report.txt".to_string(), size: 8, folder: false },
+            CopiedFile { name: "data.bin".to_string(), size: 5_000_000_000, folder: false },
+        ]));
+        assert!(matches!(&read[16], FromBrowser::OfTheirFile { first: true, last: true, piece } if piece[..] == *b"hello"));
+        assert!(matches!(read[17], FromBrowser::NothingOfTheirFile));
+        assert!(
+            matches!(FromBrowser::read(&Carried::Text(r#"{"gives":[]}"#.to_string())), Ok(FromBrowser::Gives(files)) if files.is_empty())
+        );
+        assert!(FromBrowser::read(&Carried::Text(r#"{"gives":[{"name":"","size":1}]}"#.to_string())).is_err());
+        assert!(FromBrowser::read(&Carried::Text(r#"{"gives":[{"name":"a"}]}"#.to_string())).is_err());
+        assert!(FromBrowser::read(&Carried::Text(r#"{"gives":7}"#.to_string())).is_err());
+        assert!(FromBrowser::read(&Carried::Bytes(vec![0x11, 8, 1])).is_err());
         assert!(matches!(read[13], FromBrowser::File(2)));
         assert!(matches!(read[14], FromBrowser::NoFile));
         assert!(FromBrowser::read(&Carried::Text(r#"{"file":"another"}"#.to_string())).is_err());

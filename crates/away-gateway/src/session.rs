@@ -26,7 +26,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 
-use crate::machine::{self, Area, CopiedFile, CopiedPicture, Desktop, Failure, Opened, Passes, Screen, Step, Who, Why};
+use crate::machine::{self, Area, CopiedFile, CopiedPicture, Desktop, Failure, Opened, Passes, Screen, Step, Wanted, Who, Why};
 use crate::shown::{Pixels, Shown};
 use crate::themselves::Domain;
 use crate::vnc;
@@ -695,6 +695,13 @@ where
     let mut having: Option<Having> = None;
     let mut next: Option<u32> = None;
     let mut had = 0u32;
+    // the files the person copied, for the machine to paste; what the machine wants of
+    // them, in the order it asked; the piece that is being given, as it comes from the
+    // browser; and the files of which the machine had the end, which are records
+    let mut theirs: Vec<CopiedFile> = Vec::new();
+    let mut wants: VecDeque<Wanted> = VecDeque::new();
+    let mut giving: Option<(Wanted, Vec<u8>)> = None;
+    let mut handed: BTreeSet<u32> = BTreeSet::new();
     loop {
         // where the windows of the programs are goes out before what is drawn in them, and
         // with them the icons that changed
@@ -803,6 +810,12 @@ where
                     if tell(browser, ToBrowser::Copied(&text)).await.is_err() {
                         return Ended::BrowserGone;
                     }
+                }
+                // what the machine wants of the files the person copied, as it pastes
+                // them: the browser is asked for it, a piece at a time
+                wants.extend(desktop.wanted());
+                if wants_the_next(browser, &mut wants, &mut giving).await.is_err() {
+                    return Ended::BrowserGone;
                 }
                 // the files that were copied: which they are. What the person was having
                 // of the ones before is given up
@@ -961,6 +974,60 @@ where
                         file.given_up = true;
                     }
                 }
+                // the files they copied, for the machine to paste: it is told their names
+                // and sizes. What it wanted of the ones before is not given any more
+                Some(FromBrowser::Gives(files)) => {
+                    for (wanted, _) in giving.take().into_iter().chain(wants.drain(..).map(|wanted| (wanted, Vec::new()))) {
+                        if let Err(failed) = desktop.give_a_piece(wanted.number, None).await {
+                            return ended_by(failed);
+                        }
+                    }
+                    theirs = files.into_iter().map(|file| CopiedFile { name: file.name, size: file.size, folder: false }).collect();
+                    handed.clear();
+                    if let Err(failed) = desktop.offer_files(theirs.clone()).await {
+                        return ended_by(failed);
+                    }
+                }
+                // what the machine wanted of one comes in pieces: once its last one is
+                // there, the machine is given it. More than it wanted is not given
+                Some(FromBrowser::OfTheirFile { first, last, piece }) => {
+                    if let Some((wanted, came)) = giving.as_mut() {
+                        if first {
+                            came.clear();
+                        }
+                        let fits = came.len() + piece.len() <= wanted.length as usize;
+                        came.extend_from_slice(if fits { &piece } else { &[] });
+                        if last || !fits {
+                            let (wanted, came) = giving.take().expect("what is being given");
+                            if let Err(failed) = desktop.give_a_piece(wanted.number, fits.then_some(came.as_slice())).await {
+                                return ended_by(failed);
+                            }
+                            // a file of which the machine had the end passed: that is a record
+                            let file = theirs.get(wanted.file as usize).filter(|file| fits && wanted.from + came.len() as u64 >= file.size);
+                            if let (Some(file), true, Some((server, session))) = (file, handed.insert(wanted.file), records) {
+                                had += 1;
+                                let (number, size) = (had.to_string(), file.size.to_string());
+                                let _ = server
+                                    .told(session, "file", &[("number", &number), ("name", &file.name), ("size", &size), ("direction", "to-the-machine")])
+                                    .await;
+                            }
+                            if wants_the_next(browser, &mut wants, &mut giving).await.is_err() {
+                                return Ended::BrowserGone;
+                            }
+                        }
+                    }
+                }
+                // their device has nothing to give of it: the machine is told so
+                Some(FromBrowser::NothingOfTheirFile) => {
+                    if let Some((wanted, _)) = giving.take() {
+                        if let Err(failed) = desktop.give_a_piece(wanted.number, None).await {
+                            return ended_by(failed);
+                        }
+                    }
+                    if wants_the_next(browser, &mut wants, &mut giving).await.is_err() {
+                        return Ended::BrowserGone;
+                    }
+                }
                 // a picture they copied comes in pieces: once it is whole, and is one,
                 // the machine is told that it can be pasted
                 Some(FromBrowser::CopiedPicture { first, last, piece }) => {
@@ -1096,6 +1163,25 @@ async fn packed(picture: Pixels<'_>, areas: Vec<Area>) -> Vec<(Area, Vec<u8>)> {
             .collect::<Vec<_>>()
     });
     packing.await.unwrap_or_default()
+}
+
+/// Asks the browser for the next piece the machine wants of a file the person copied,
+/// where none is being given: one at a time, in the order the machine asked.
+async fn wants_the_next<Connection>(
+    browser: &mut WebSocketStream<Connection>,
+    wants: &mut VecDeque<Wanted>,
+    giving: &mut Option<(Wanted, Vec<u8>)>,
+) -> Result<(), ()>
+where
+    Connection: AsyncRead + AsyncWrite + Unpin,
+{
+    if giving.is_none() {
+        if let Some(wanted) = wants.pop_front() {
+            tell(browser, ToBrowser::Wants { file: wanted.file, from: wanted.from, length: wanted.length }).await?;
+            *giving = Some((wanted, Vec::new()));
+        }
+    }
+    Ok(())
 }
 
 /// A file the person is having from the machine: its place among those listed, its name

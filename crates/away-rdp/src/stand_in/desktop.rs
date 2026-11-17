@@ -34,9 +34,29 @@ const KEY_P: u8 = 0x19;
 /// The key F, by its place: with it the stand-in copies files.
 const KEY_F: u8 = 0x21;
 
-/// The files the stand-in copies when the key F goes down: a small one, a folder, and
-/// in the folder one that is longer than a piece. Each with its name as a machine
-/// writes it, what is in it, and whether it is a folder.
+/// How much of a file the stand-in asks for at once when it pastes one.
+const PASTES_BY: u32 = 100_000;
+/// Where the stand-in draws a mark once it has pasted the files it was handed.
+pub const PASTED_FILES_AT: (usize, usize) = (90, 40);
+
+/// The colour of that mark for this many files: blue, green, red.
+pub fn pasted_files_mark(files: usize) -> [u8; 3] {
+    [0x77, files as u8, 0x99]
+}
+
+/// The files the stand-in is pasting: the ones the client listed, the one it is at,
+/// what came of that one, and the number of what it asked last.
+struct Pasting {
+    files: Vec<clipboard::File>,
+    at: usize,
+    came: Vec<u8>,
+    asked: u32,
+}
+
+/// The files the stand-in copies when the key F goes down and it was handed none: a
+/// small one, a folder, and in the folder one that is longer than a piece. Each with
+/// its name as a machine writes it, what is in it, and whether it is a folder. Files it
+/// was handed it copies as they are.
 pub fn copied_files() -> Vec<(&'static str, Vec<u8>, bool)> {
     vec![
         ("notes.txt", b"hello files".to_vec(), false),
@@ -136,6 +156,9 @@ pub struct Seen {
     /// The pictures the client handed over when the stand-in pasted, which it does as
     /// soon as the client says that it holds one.
     pub pasted_pictures: Vec<clipboard::Picture>,
+    /// The files the client handed over when the stand-in pasted, which it does as soon
+    /// as the client says that it holds some: each with its name and what is in it.
+    pub pasted_files: Vec<(String, Vec<u8>)>,
     /// The channels it opened later that the client took, by their numbers.
     pub took_later: Vec<u32>,
     /// What the client said its screen is, each time it said so: how wide, how high,
@@ -238,6 +261,8 @@ pub struct Desktop {
     clipboard_pieces: Pieces,
     /// Whether it asked the client for its picture and waits for it.
     asked_for_a_picture: bool,
+    /// The files it is pasting, from the list on, where it is.
+    pasting: Option<Pasting>,
     /// Whether it said that it is ready for the clipboard.
     speaks_of_the_clipboard: bool,
     /// The windows of the programs that are open, the front one first.
@@ -281,6 +306,7 @@ impl Desktop {
             speaks_of_later: false,
             clipboard_pieces: Pieces::up_to(clipboard::LARGEST + 1024),
             asked_for_a_picture: false,
+            pasting: None,
             speaks_of_the_clipboard: false,
             windows: Vec::new(),
             opened: 0,
@@ -597,17 +623,69 @@ impl Desktop {
             update.extend(rectangle);
             return Ok(short_frame(0x01, &update));
         }
+        // the list of the files it pastes: it asks how large the first one is, and then
+        // for each file a piece at a time, until all of it came
+        if self.pasting.as_ref().is_some_and(|pasting| pasting.asked == 0) && message.starts_with(&[5, 0]) {
+            let files = clipboard::stand_in::gave_files(&message).unwrap_or_default();
+            let first = files.iter().position(|file| !file.folder);
+            self.pasting = first.map(|at| Pasting { files, at, came: Vec::new(), asked: 1 });
+            return Ok(first.map(|at| says(&clipboard::stand_in::asks_for_theirs(1, at as u32, None))).unwrap_or_default());
+        }
+        if let (Some(pasting), Some((number, gave))) = (self.pasting.as_mut(), clipboard::stand_in::gave_of_a_file(&message)) {
+            let Some(gave) = gave.filter(|_| number == pasting.asked) else {
+                self.pasting = None;
+                return Ok(Vec::new());
+            };
+            let size = pasting.files[pasting.at].size as usize;
+            // the first answer says how large the file is: it is what the list said
+            let sized = pasting.asked == 1 && gave == (size as u64).to_le_bytes();
+            if !sized {
+                pasting.came.extend_from_slice(&gave);
+            }
+            if !sized && (pasting.came.len() >= size || gave.is_empty()) {
+                self.seen.pasted_files.push((pasting.files[pasting.at].name.clone(), std::mem::take(&mut pasting.came)));
+                match (pasting.at + 1..pasting.files.len()).find(|at| !pasting.files[*at].folder) {
+                    Some(next) => pasting.at = next,
+                    // all of them came: a mark on its screen says how many, as a
+                    // folder that was pasted into shows them
+                    None => {
+                        let files = pasting.files.iter().filter(|file| !file.folder).count();
+                        self.pasting = None;
+                        let (left, top) = (PASTED_FILES_AT.0.min(self.picture.width - 1), PASTED_FILES_AT.1.min(self.picture.height - 1));
+                        let (wide, high) = (MARK.min(self.picture.width - left), MARK.min(self.picture.height - top));
+                        for row in top..top + high {
+                            for column in left..left + wide {
+                                self.picture.pixels[(row * self.picture.width + column) * 4..][..3]
+                                    .copy_from_slice(&pasted_files_mark(files));
+                            }
+                        }
+                        let rectangle = self.rectangle(left, top, wide, high, if self.bits == 16 { 1 } else { 2 });
+                        let mut update = vec![1, 0, 1, 0];
+                        update.extend(rectangle);
+                        return Ok(short_frame(0x01, &update));
+                    }
+                }
+            }
+            pasting.asked += 1;
+            let asks = clipboard::stand_in::asks_for_theirs(pasting.asked, pasting.at as u32, Some((pasting.came.len() as u64, PASTES_BY)));
+            return Ok(says(&asks));
+        }
         Ok(match clipboard::stand_in::read(&message) {
+            // the client holds files: it pastes them at once, and asks for their list
+            Said::HoldsFiles(list) => {
+                self.pasting = Some(Pasting { files: Vec::new(), at: 0, came: Vec::new(), asked: 0 });
+                [says(&clipboard::stand_in::took()), says(&clipboard::stand_in::asks_for_their_files(list))].concat()
+            }
             // the files it copies: their list, and of each the piece that is asked for.
             // A folder holds nothing, and a file that is not listed is not given
             Said::AsksForFiles => {
-                let files = copied_files();
+                let files = self.copies();
                 let listed: Vec<(&str, u64, bool)> =
-                    files.iter().map(|(name, holds, folder)| (*name, holds.len() as u64, *folder)).collect();
+                    files.iter().map(|(name, holds, folder)| (name.as_str(), holds.len() as u64, *folder)).collect();
                 says(&clipboard::stand_in::gives_files(&listed))
             }
             Said::AsksForAPiece { number, file, from, length, .. } => {
-                let files = copied_files();
+                let files = self.copies();
                 let piece = files.get(file as usize).filter(|(.., folder)| !folder).map(|(_, holds, _)| {
                     let from = usize::try_from(from).unwrap_or(usize::MAX).min(holds.len());
                     &holds[from..holds.len().min(from.saturating_add(length as usize))]
@@ -870,6 +948,15 @@ impl Desktop {
             send.extend(short_frame(0x01, &update));
         }
         Ok(send)
+    }
+
+    /// The files it copies when the key F goes down: the ones it was handed when it
+    /// pasted, as they are, or its own.
+    fn copies(&self) -> Vec<(String, Vec<u8>, bool)> {
+        match self.seen.pasted_files.is_empty() {
+            true => copied_files().into_iter().map(|(name, holds, folder)| (name.to_string(), holds, folder)).collect(),
+            false => self.seen.pasted_files.iter().map(|(name, holds)| (name.clone(), holds.clone(), false)).collect(),
+        }
     }
 
     /// The picture as the stand-in has it now, with what it drew for keys and the pointer.

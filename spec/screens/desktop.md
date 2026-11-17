@@ -113,7 +113,15 @@ on by itself.
   copied, and leads to the panel. Nothing of a file leaves the machine before
   its button is pressed, and each file that passed is a record. A file of more
   than 1 GB doesn't pass yet.
-- Text with its formatting, and files to the machine, come later.
+- One's own files are given to a Windows machine from the panel, with **add
+  files**, by pasting them into the panel, or by dropping them on the session.
+  The machine is told their names and their sizes, and has them in its
+  clipboard, to paste where files go there. What is in a file stays on one's own
+  device until the machine pastes it, and then goes a piece at a time, so the
+  session has to stay open until the machine has it. The panel lists what was
+  given, and **take them back** withdraws it. Each file the machine had to its
+  end is a record. Folders of one's own don't pass yet.
+- Text with its formatting comes later.
 - **Copy a picture of the screen** takes one of what the session shows, as Away
   has it, into one's own clipboard. The machine has no part in it, so it is
   there for every kind of machine, where copying from the machine is let.
@@ -224,6 +232,7 @@ A session that ends without the person asking for it always says why:
 | The clipboard panel, the clipboard passes by itself | Text or a picture you copy on one side can be pasted on the other. · on a machine that carries text alone: Text you copy on one side can be pasted on the other. |
 | The clipboard panel, the browser doesn't pass it on | This browser doesn't pass its clipboard on by itself. Paste here what fin-app-02 should have in its clipboard: text, or a picture, which goes at once. |
 | The clipboard panel, files | download · download all as one zip · stop · Getting budget.xlsx: 40 %. · budget.xlsx is in your downloads now. · fin-app-02 gave no more of budget.xlsx. · Files of more than 1 GB don't pass yet. |
+| The clipboard panel, one's own files | add files · 3 files are in the clipboard of fin-app-02 now. Paste them there. · A file is in the clipboard of fin-app-02 now. Paste it there. · take them back |
 | The line at the foot when files were copied | 3 files were copied on fin-app-02. · A file was copied on fin-app-02. · show |
 | The clipboard panel, a picture of the screen | copy a picture of the screen · A picture of the screen is in your clipboard now. |
 | The clipboard panel, a picture | a picture of 1920 by 1080 pixels · The picture is in the clipboard of fin-app-02 now. · That picture is too large to pass. |

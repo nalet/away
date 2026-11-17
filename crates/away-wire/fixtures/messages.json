@@ -24,7 +24,8 @@
     {"says": "three files were copied on the machine: a file, a folder, and a file in that folder of five thousand million bytes", "text": "{\"files\":[{\"name\":\"notes.txt\",\"size\":11},{\"name\":\"folder\",\"folder\":true},{\"name\":\"folder/data.bin\",\"size\":5000000000}]}"},
     {"says": "a piece of the file the person asked for: the five bytes of hello", "bytes": "0568656c6c6f"},
     {"says": "all of the file the person asked for came", "text": "{\"file\":\"whole\"}"},
-    {"says": "the machine gave no more of the file the person asked for", "text": "{\"file\":\"failed\"}"}
+    {"says": "the machine gave no more of the file the person asked for", "text": "{\"file\":\"failed\"}"},
+    {"says": "the machine pastes the second of the files the person copied, and wants a hundred thousand bytes of it from five thousand million on", "text": "{\"wants\":{\"file\":1,\"from\":5000000000,\"length\":100000}}"}
   ],
   "from_browser": [
     {"says": "the session begins: its ticket, a window of 1280 by 800 on a screen with twice the dots each way (200), and a keyboard with the Swiss German layout (2055)", "text": "{\"ticket\":\"7f3a\",\"width\":1280,\"height\":800,\"layout\":2055,\"scale\":200}"},
@@ -41,6 +42,9 @@
     {"says": "the command key down, by what it does, and the key that writes the euro up, by what it writes", "bytes": "070000ffeb0107010020ac00"},
     {"says": "the person copied a picture on their own device: its first and last piece, of a PNG picture that begins 89 50 4e 47", "bytes": "100389504e47"},
     {"says": "the person asks for the third of the files that were copied on the machine", "text": "{\"file\":2}"},
-    {"says": "the person gives up on the file they asked for", "text": "{\"file\":\"none\"}"}
+    {"says": "the person gives up on the file they asked for", "text": "{\"file\":\"none\"}"},
+    {"says": "the person copied two files on their own device, the second of five thousand million bytes", "text": "{\"gives\":[{\"name\":\"report.txt\",\"size\":8},{\"name\":\"data.bin\",\"size\":5000000000}]}"},
+    {"says": "what the machine wanted of a file the person copied: its first and last piece, the five bytes of hello", "bytes": "110368656c6c6f"},
+    {"says": "the person's device has nothing to give of what the machine wanted", "text": "{\"gives\":\"nothing\"}"}
   ]
 }
