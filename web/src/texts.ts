@@ -193,6 +193,27 @@ export const texts = {
     trayIcon: 'an icon of the tray',
     clockLabel: 'the time on your device',
     keys: 'keys',
+    // the keyboard of a phone, and the row of the keys it lacks
+    keyboard: 'keyboard',
+    phoneKeys: {
+      typed: (machine: string) => `what is typed here goes to ${machine}`,
+      row: 'the keys a phone lacks',
+      esc: 'esc',
+      tab: 'tab',
+      ctrl: 'ctrl',
+      alt: 'alt',
+      opt: 'opt',
+      cmd: 'cmd',
+      left: 'left',
+      up: 'up',
+      down: 'down',
+      right: 'right',
+      fn: 'fn',
+      home: 'home',
+      end: 'end',
+      pageUp: 'pg up',
+      pageDown: 'pg dn',
+    },
     // the key combinations a browser or a device keeps for itself
     kept: { ctrlAltDel: 'ctrl + alt + del', altTab: 'alt + tab', altF4: 'alt + f4', windows: 'windows key', ctrlW: 'ctrl + w' },
     // the same on a Mac, whose command key a browser keeps most combinations of

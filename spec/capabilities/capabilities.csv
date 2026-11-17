@@ -62,7 +62,7 @@ forward-port,shell,Forward a port through the shell's connection,person,—,—,
 use-on-phone,touch,"Find a machine and open it on a phone, with every page fitted to it",person,—,—,—,built,
 work-by-touch,touch,"Work by touch: tap to click, hold for the other button, two fingers to scroll",person,partial,partial,v1,—,"a desktop is worked as on a trackpad; tried with a browser's stand-in for fingers, not yet on a phone"
 zoom-by-touch,touch,Zoom into the picture with two fingers and move around it,person,partial,partial,v1,—,"the part that shows follows the pointer; tried with a browser's stand-in for fingers, not yet on a phone"
-use-extra-keys,touch,"Use the keys a phone's keyboard lacks: Ctrl, Alt, Esc, Tab, the arrows, the function keys",person,v1,v1,v1,—,
+use-extra-keys,touch,"Use the keys a phone's keyboard lacks: Ctrl, Alt, Esc, Tab, the arrows, the function keys",person,partial,partial,v1,—,"a desktop has them, with the phone's keyboard; tried in a browser on a computer, not yet on a phone"
 touch-as-trackpad,touch,"Move the pointer as on a trackpad, for small targets",person,partial,partial,—,—,"how a desktop is worked by touch; tried with a browser's stand-in for fingers, not yet on a phone"
 send-real-touch,touch,Send touches to the machine as touches,person,later,—,—,—,for a Windows machine's own touch gestures
 add-to-home-screen,touch,Add Away to a phone's home screen and open it like an app,person,—,—,—,later,

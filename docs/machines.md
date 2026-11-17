@@ -328,6 +328,15 @@ machine that offers more is opened from its own page, where each way in is.
   together scroll the way they go, and two that spread or close zoom into the
   picture and out of it; zoomed in, the part that shows follows the pointer.
   Away draws the pointer itself, as an arrow.
+- **A phone's keyboard types into the machine.** On a phone, and on any device
+  that is touched, the session's bar has a keyboard button. It brings the
+  device's own keyboard, and over it a row of the keys such a keyboard lacks:
+  Esc, Tab, Ctrl, Alt and the four arrows, and behind fn the function keys,
+  Home, End, Page up and Page down. A Mac's desktop has opt and cmd there. Ctrl,
+  Alt and the command key are held for the next key. What is typed reaches the
+  machine as the characters it is, whatever layout the machine has; with a held
+  key, a letter or a digit goes as its key. The keyboard goes when the bar is
+  opened.
 - **A key writes what it writes at home.** The session is given the layout of
   the person's keyboard: where the browser says what the keys write, by that;
   elsewhere by the language the browser is set to.

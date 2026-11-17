@@ -93,8 +93,16 @@ the finger:
 
 - Fn, the row's last key, changes the row to a further one: F1 to F12, Home,
   End, Page up and Page down. A second tap brings the first row back.
-- The row is there for a desktop too. A desktop keeps its size when the
-  keyboard comes up, and the view moves so that the pointer stays in sight.
+- The row is there for a desktop too. A desktop keeps its size at the machine
+  when the keyboard comes up, and its picture is fitted to the room above the
+  row.
+- For a Mac's desktop the row has a Mac's keys: opt where alt is, and cmd after
+  it.
+- With Ctrl, Alt or the command key held, a letter or a digit goes to the
+  machine as its key, as a keyboard's would. Without one, what is typed goes as
+  the character it is, whatever layout the machine has.
+- The keyboard goes when something else of Away takes the keys, such as the
+  session's bar, and when the phone puts it away itself.
 - Every key of the row is 48 px high.
 
 ## 10.4 More
@@ -135,7 +143,7 @@ the finger:
 |---|---|
 | The bar's buttons, as names for a screen reader | keyboard · more |
 | The session's name, for a screen reader | the open sessions |
-| The keys a phone lacks | esc · tab · ctrl · alt · the four arrows · fn |
+| The keys a phone lacks | esc · tab · ctrl · alt · the four arrows · fn; for a Mac's desktop opt in place of alt, and cmd after it |
 | The further row | f1 to f12 · home · end · pg up · pg dn |
 | More, for a desktop | keys · clipboard · fit the window · actual size · fill the screen · end |
 | More, for a shell | keys · clipboard · text · find · fill the screen · end |

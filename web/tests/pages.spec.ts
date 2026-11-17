@@ -1595,6 +1595,109 @@ test.describe('a session', () => {
     expect(seen.complaints).toEqual([]);
   });
 
+  test("on a phone the bar brings the phone's keyboard with the keys it lacks, and what is typed goes to the machine", async ({ page }) => {
+    const seen = watch(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const names = (row: Locator) => row.getByRole('button').evaluateAll((keys) => keys.map((key) => key.getAttribute('aria-label') ?? key.textContent));
+    const row = page.getByRole('group', { name: 'the keys a phone lacks' });
+    const bar = page.getByRole('toolbar', { name: "the session's bar" });
+    const keyboard = async () => {
+      await page.getByRole('button', { name: "open the session's bar" }).click();
+      await bar.getByRole('button', { name: 'keyboard' }).click();
+    };
+
+    // a Mac's desktop, which is told of keys by what they write
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/mac-01/desktop`);
+    await page.getByLabel('Password').fill('a desktop');
+    await page.getByRole('button', { name: 'sign in' }).click();
+    const screen = page.getByRole('application', { name: 'the desktop of mac-01' });
+    await expect.poll(() => pixel(page, 10, 10)).toEqual([241, 242, 243]);
+    // the row is not there before the keyboard is asked for; then the field the phone
+    // types into has the focus, and the row lies at the foot with a Mac's own keys
+    await expect(row).toHaveCount(0);
+    await keyboard();
+    const field = page.getByLabel('what is typed here goes to mac-01');
+    await expect(field).toBeFocused();
+    expect(await names(row)).toEqual(['esc', 'tab', 'ctrl', 'opt', 'cmd', 'left', 'up', 'down', 'right', 'fn']);
+    const key = await row.getByRole('button', { name: 'esc' }).boundingBox();
+    expect([key!.height, key!.y + key!.height]).toEqual([48, 844]);
+    // the picture has the room above the row
+    await expect.poll(() => screen.boundingBox()).toEqual({ x: 0, y: 280.5, width: 390, height: 234 });
+    await accessible(page);
+
+    // what is typed goes to the machine as what it writes
+    await page.keyboard.type('a');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 158, 97]);
+    await page.keyboard.type('A');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 190, 65]);
+    // ctrl is held for the next key and let go after it: with it a letter is the key
+    // itself, which this machine takes for copying and leaves no mark for
+    const ctrl = row.getByRole('button', { name: 'ctrl' });
+    await ctrl.click();
+    await expect(ctrl).toHaveAttribute('aria-pressed', 'true');
+    await expect(field).toBeFocused();
+    await page.keyboard.type('c');
+    await expect(ctrl).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.type('d');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 155, 100]);
+    // a second tap lets a held key go at once
+    await ctrl.click();
+    await ctrl.click();
+    await expect(ctrl).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.type('c');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 156, 99]);
+
+    // fn brings the further row, and brings the first one back
+    await row.getByRole('button', { name: 'fn' }).click();
+    expect(await names(row)).toEqual(['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12', 'home', 'end', 'pg up', 'pg dn', 'fn']);
+    await row.getByRole('button', { name: 'f5' }).click();
+    await row.getByRole('button', { name: 'fn' }).click();
+    expect((await names(row)).slice(0, 2)).toEqual(['esc', 'tab']);
+    await expect(field).toBeFocused();
+
+    // a tap on the picture clicks where the pointer is, and the keyboard stays
+    const one = finger(screen, 1);
+    await one.down(200, 400);
+    await one.up(200, 400);
+    await expect.poll(() => pixel(page, 105, 65)).toEqual([224, 64, 32]);
+    await expect(field).toBeFocused();
+    await expect(row).toBeVisible();
+    // the bar takes the keys from the field: the keyboard goes, and the picture has
+    // the whole screen again
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await expect(row).toHaveCount(0);
+    await expect(bar.getByRole('button', { name: 'keyboard' })).toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(() => screen.boundingBox()).toEqual({ x: 0, y: 305, width: 390, height: 234 });
+    await bar.getByRole('button', { name: 'end' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/mac-01`);
+
+    // a Windows desktop is told the character itself, whatever its own layout is, and
+    // the keys of the row by their places; with ctrl a letter is its key
+    await page.goto(`${AWAY_THAT_KEEPS}/machines/desk-01/desktop`);
+    await page.getByLabel('Name').fill('CORP\\alex.urban');
+    await page.getByLabel('Password').fill('a password that exists for these tests alone');
+    await page.getByRole('button', { name: 'sign in' }).click();
+    await expect(page.getByRole('application', { name: 'the desktop of desk-01' })).toBeVisible();
+    await keyboard();
+    await expect(page.getByLabel('what is typed here goes to desk-01')).toBeFocused();
+    expect(await names(row)).toEqual(['esc', 'tab', 'ctrl', 'alt', 'left', 'up', 'down', 'right', 'fn']);
+    await page.keyboard.type('a');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 158, 97]);
+    await page.keyboard.type('é');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 22, 233]);
+    await row.getByRole('button', { name: 'esc' }).click();
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 254, 1]);
+    await row.getByRole('button', { name: 'ctrl' }).click();
+    await page.keyboard.type('c');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 209, 46]);
+    await page.keyboard.press('Backspace');
+    await expect.poll(() => pixel(page, 5, 5)).toEqual([85, 241, 14]);
+    await page.getByRole('button', { name: "open the session's bar" }).click();
+    await bar.getByRole('button', { name: 'end' }).click();
+    await expect(page).toHaveURL(`${AWAY_THAT_KEEPS}/machines/desk-01`);
+    expect(seen.complaints).toEqual([]);
+  });
+
   test("on a phone a program's rail waits at the left edge, and is swiped in over the picture", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${AWAY_THAT_KEEPS}/machines/apps-01/programs/Books`);

@@ -4,7 +4,7 @@
 // its own but a handle. A program's windows show on Away's ground, where the machine
 // has them on its desktop.
 import { Button, Chevron, EmptyState, Field, IconButton, Input, Spinner } from '@nalet/design-system';
-import { AppWindow, Check, ChevronUp, ClipboardList, Keyboard, Maximize, Minimize, Monitor, Unplug, X } from 'lucide-react';
+import { AppWindow, Check, ChevronUp, ClipboardList, Keyboard, Maximize, Minimize, Monitor, TextCursorInput, Unplug, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent as KeyOfReact, PointerEvent as PointerOfReact, ReactNode } from 'react';
 
@@ -15,6 +15,7 @@ import { texts } from '../texts';
 import { ClipboardPanel, useClipboard } from './Clipboard';
 import type { Passes } from './Clipboard';
 import { isHeld, layoutName, layoutOf, placeOf, symOf, symOfPlace } from './keys';
+import { PhoneKeys } from './PhoneKeys';
 import { fingers } from './touch';
 import { following, placed, settled, showing, whole, zoomed } from './view';
 import { begins, credentials, did, leaves, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } from './wire';
@@ -698,6 +699,13 @@ function Desktop({
   // desktop has the bar across its top instead
   const phone = usePhone();
   const railAlways = program !== null && !phone;
+  // a device without keys of its own, or one that is touched: the bar brings its keyboard,
+  // with the keys such a keyboard lacks, and what is typed goes to the machine
+  const canType = phone || navigator.maxTouchPoints > 0;
+  const [typing, setTyping] = useState(false);
+  const typed = useRef<HTMLTextAreaElement | null>(null);
+  const typingNow = useRef(false);
+  typingNow.current = typing;
   // where a swipe began, on the left edge or on the rail
   const swipe = useRef<number | null>(null);
   // the card that says the connection is lost shows after two seconds without the
@@ -906,7 +914,8 @@ function Desktop({
       button: (button, isDown) => {
         if (isDown) {
           setBar(false);
-          canvas.focus();
+          // while the phone's keyboard is up it keeps the keys: the picture takes none from it
+          if (!typingNow.current) canvas.focus();
         }
         const place = pointed();
         moved = null;
@@ -1170,6 +1179,28 @@ function Desktop({
           </IconButton>
           {clip && <ClipboardPanel machine={program ?? name} passes={passes} byItself={clipboard.byItself} fromMachine={copied} send={clipboard.send} />}
         </span>
+      )}
+      {canType && (
+        <IconButton
+          variant="ghost"
+          label={t.keyboard}
+          title={t.keyboard}
+          aria-pressed={typing}
+          className={typing ? 'is-open' : undefined}
+          onClick={() => {
+            setKeys(false);
+            setClip(false);
+            setLaunch(false);
+            setBar(false);
+            setTyping(!typing);
+            // the phone brings its keyboard for the field that has the focus, and only
+            // when a tap gives it the focus
+            if (typing) canvas.focus();
+            else typed.current?.focus();
+          }}
+        >
+          <TextCursorInput size={16} aria-hidden="true" />
+        </IconButton>
       )}
       <IconButton variant="ghost" label={filled ? t.unfill : t.fill} title={filled ? t.unfill : t.fill} onClick={fill}>
         {filled ? <Minimize size={16} aria-hidden="true" /> : <Maximize size={16} aria-hidden="true" />}
@@ -1469,6 +1500,7 @@ function Desktop({
         />
       )}
       <div className="holds" ref={screen} />
+      {canType && <PhoneKeys shown={typing} machine={program ?? name} mac={kind === 'mac'} written={written} say={say} field={typed} onGone={() => setTyping(false)} />}
     </div>
   );
 }

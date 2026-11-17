@@ -768,6 +768,8 @@ impl Desktop {
             let (left, top, colour) = match event {
                 Input::Button { button: Button::Left, down: true, x, y } => (usize::from(x), usize::from(y), CLICKED),
                 Input::Key { code, down: true, .. } => (0, 0, typed(code)),
+                // a character that is typed leaves the same mark, by its own number
+                Input::Character { unit, down: true } => (0, 0, typed(unit as u8)),
                 _ => continue,
             };
             let (left, top) = (left.min(self.picture.width - 1), top.min(self.picture.height - 1));
