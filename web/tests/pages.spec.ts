@@ -1,7 +1,7 @@
 // Getting in and the frame, as a person meets them in a browser.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import type { Locator, Page, Request } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -1323,22 +1323,27 @@ test.describe('a session', () => {
     await expect(why).toBeVisible();
     await accessible(page);
     await expect(screen).toBeVisible();
-    // in a low window the list turns within the window's height: what didn't start and the way to
-    // the other machines stay in view, and nothing runs past the bottom
-    await launcher.getByText('details').click();
-    await expect(why).toBeHidden();
-    const size = page.viewportSize()!;
-    await page.setViewportSize({ width: size.width, height: 260 });
-    const inView = async (part: Locator) => {
-      const box = (await part.boundingBox())!;
-      return box.y >= 0 && box.y + box.height <= 260;
-    };
-    await expect.poll(() => inView(launcher)).toBe(true);
-    expect(await inView(launcher.getByRole('alert'))).toBe(true);
-    expect(await inView(launcher.getByRole('button', { name: 'other machines' }))).toBe(true);
-    expect(await launcher.getByRole('list').evaluate((list) => list.scrollHeight > list.clientHeight)).toBe(true);
-    await page.setViewportSize(size);
-    await expect.poll(() => launcher.getByRole('list').evaluate((list) => list.scrollHeight > list.clientHeight)).toBe(false);
+    // a machine with more programs than the window is high: the list turns within the window, and
+    // what didn't start and the way to the other machines stay in view. The rows are put in here
+    // and measured in the same breath, so that the page draws nothing in between
+    const many = await launcher.evaluate((panel) => {
+      const list = panel.querySelector('ul')!;
+      const added = Array.from({ length: 30 }, () => list.appendChild(list.firstElementChild!.cloneNode(true)));
+      const inView = (part: Element) => {
+        const box = part.getBoundingClientRect();
+        return box.top >= 0 && box.bottom <= window.innerHeight;
+      };
+      const said = {
+        panel: inView(panel),
+        alert: inView(panel.querySelector('[role="alert"]')!),
+        details: inView(panel.querySelector('details')!),
+        more: inView(panel.querySelector('.more')!),
+        turns: list.scrollHeight > list.clientHeight,
+      };
+      for (const row of added) list.removeChild(row);
+      return { ...said, turnsWithoutThem: list.scrollHeight > list.clientHeight };
+    });
+    expect(many).toEqual({ panel: true, alert: true, details: true, more: true, turns: true, turnsWithoutThem: false });
     await page.keyboard.press('Escape');
     await expect(launcher).toHaveCount(0);
     await expect(mark).toBeFocused();
