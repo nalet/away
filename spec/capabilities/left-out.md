@@ -31,11 +31,13 @@ To overrule one, change its cell in [capabilities.csv](./capabilities.csv) from
 
 ## Not planned for one kind of connection
 
-11 capabilities that are planned for another.
+13 capabilities that are planned for another.
 
 | Left out | For | Why | Area | Key |
 |---|---|---|---|---|
 | Play a video on the machine smoothly | VNC (RDP later) | the browser plays the machine's own video stream; VNC has none | [The picture](./session.md#the-picture) | `play-video-smoothly` |
+| Take a Windows machine's picture whole, as the machine composes it, at the pace the browser shows it | VNC (RDP later) | VNC sends what changed as rectangles alone | [The picture](./session.md#the-picture) | `machine-made-pictures` |
+| Leave out a machine's animations and background, for a faster picture | VNC (RDP later) | VNC has no way to ask a machine for it | [The picture](./session.md#the-picture) | `leave-out-effects` |
 | Spread a machine over several of one's own screens | VNC (RDP later) | VNC shows the machine's own screens as they are | [The picture](./session.md#the-picture) | `several-screens` |
 | Copy and paste a picture, or text with its formatting | VNC (RDP later) | VNC carries text alone | [Clipboard, files and printing](./session.md#clipboard-files-and-printing) | `copy-paste-rich` |
 | Copy files on one side and paste them on the other | VNC (RDP later) | VNC carries text alone | [Clipboard, files and printing](./session.md#clipboard-files-and-printing) | `copy-paste-files` |

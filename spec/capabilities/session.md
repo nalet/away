@@ -63,6 +63,9 @@ How the machine's screen reaches one's own: its size, its sharpness, how smoothl
 | Show the desktop as it looks at the machine: its background, smooth fonts, its effects | system | v1 | — | — | `desktop-as-at-machine` |
 | Draw the pointer on one's own device, so that it moves without delay | system | v1 | v1 | — | `pointer-without-delay` |
 | Play a video on the machine smoothly | system | later | no | — | `play-video-smoothly` |
+| Show each change of the picture whole, never in pieces | system | later | later | — | `show-whole-pictures` |
+| Take a Windows machine's picture whole, as the machine composes it, at the pace the browser shows it | system | later | no | — | `machine-made-pictures` |
+| Leave out a machine's animations and background, for a faster picture | person | later | no | — | `leave-out-effects` |
 | Spread a machine over several of one's own screens | person | later | no | — | `several-screens` |
 | Choose which of a machine's screens to see | person | — | later | — | `choose-machine-screen` |
 
@@ -70,6 +73,8 @@ How the machine's screen reaches one's own: its size, its sharpness, how smoothl
 - *Fill the whole screen with a session*: where the browser can; a phone's browser may not.
 - *Show a sharp picture on a high-density screen*: a desktop over VNC has the size its machine gives it.
 - *Play a video on the machine smoothly*: the browser plays the machine's own video stream; VNC has none.
+- *Take a Windows machine's picture whole, as the machine composes it, at the pace the browser shows it*: VNC sends what changed as rectangles alone.
+- *Leave out a machine's animations and background, for a faster picture*: VNC has no way to ask a machine for it.
 - *Spread a machine over several of one's own screens*: VNC shows the machine's own screens as they are.
 - *Choose which of a machine's screens to see*: for a machine with several screens of its own.
 

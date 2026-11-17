@@ -14,3 +14,4 @@ adr,components,capabilities,note
 0013,pipelines ; site-pipeline ; test-servers ; registry ; docs,verify-image ; see-image-contents ; build-from-source ; run-its-tests ; report-in-private,
 0014,server ; files ; farm-feed ; cluster-secrets,read-programs-from-host ; see-all-programs ; give-program-icons,
 0015,server ; database,keep-favourites ; see-last-used ; record-connections ; record-changes,
+0016,session-view ; gateway ; picture ; wire ; rdp,show-whole-pictures ; machine-made-pictures ; leave-out-effects ; play-video-smoothly,

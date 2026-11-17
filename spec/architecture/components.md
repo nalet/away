@@ -20,7 +20,7 @@ What a person's browser runs.
 | `session-view` | the session view: the picture, the keys and the pointer, the shell's screen | web | there | 37 |
 
 - `web`: Built from the design system's components; the frame is Away's own until the design system has it. Keeps: in the browser's own storage, which sessions this browser has open. Code: `web/`. Runs: served by the server. Governed by [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0011](./decisions/0011-the-web-app.md).
-- `session-view`: Drawn on a canvas, apart from the pages. Code: `web/src/session/`. Runs: part of the web app. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0011](./decisions/0011-the-web-app.md).
+- `session-view`: Drawn on a canvas, apart from the pages. Code: `web/src/session/`. Runs: part of the web app. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0011](./decisions/0011-the-web-app.md), [ADR‑0016](./decisions/0016-a-picture-that-moves.md).
 
 ## Away's parts
 
@@ -34,7 +34,7 @@ What the chart runs from Away's one image.
 | `relay` | a relay placed in a network Away is not in | relay | later | — |
 
 - `server`: The only part that reaches the database and the sign-in service; it reaches no machine. Keeps: nothing itself; what it holds is in the database. Code: `crates/away-server/`. Runs: run by the chart, as server. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0006](./decisions/0006-the-sign-in-is-held-by-the-server.md), [ADR‑0009](./decisions/0009-one-database-and-files.md), [ADR‑0014](./decisions/0014-a-farm-says-what-it-publishes.md), [ADR‑0015](./decisions/0015-a-widely-used-database-client.md).
-- `gateway`: The only part that reaches machines; the first release runs one. Keeps: in memory and for as long as a session lasts, its picture, a shell's last bytes and what signed it in. Code: `crates/away-gateway/`. Runs: run by the chart, as gateway. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0007](./decisions/0007-short-lived-certificates.md).
+- `gateway`: The only part that reaches machines; the first release runs one. Keeps: in memory and for as long as a session lasts, its picture, a shell's last bytes and what signed it in. Code: `crates/away-gateway/`. Runs: run by the chart, as gateway. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md), [ADR‑0007](./decisions/0007-short-lived-certificates.md), [ADR‑0016](./decisions/0016-a-picture-that-moves.md).
 - `issuer`: It checks a person's sign-in itself before it signs anything; the status page calls it signing in on machines. Keeps: nothing itself; its authority's keys and the kept accounts are the cluster's. Code: `crates/away-issuer/`. Runs: run by the chart, as issuer. Governed by [ADR‑0002](./decisions/0002-rust-one-program-one-repository.md), [ADR‑0003](./decisions/0003-three-parts-with-their-own-rights.md), [ADR‑0007](./decisions/0007-short-lived-certificates.md), [ADR‑0008](./decisions/0008-the-authority-for-windows-sign-ins.md), [ADR‑0010](./decisions/0010-secrets-live-in-the-cluster.md).
 - `relay`: For machines the gateway can't reach itself.
 
@@ -52,13 +52,13 @@ The libraries the parts and the session view are built from.
 | `picture` | the picture: a desktop as the gateway keeps it, and the rectangles it sends | library | first release | 5 |
 | `wire` | the session's messages between the browser and the gateway | contract | there | 1 |
 
-- `rdp`: For a Windows desktop and its programs, and for desktops of other systems that speak RDP. Code: `crates/away-rdp/`. Runs: in the gateway. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md).
+- `rdp`: For a Windows desktop and its programs, and for desktops of other systems that speak RDP. Code: `crates/away-rdp/`. Runs: in the gateway. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0016](./decisions/0016-a-picture-that-moves.md).
 - `windows-sign-in`: Code: `crates/away-winauth/`. Runs: in the gateway. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0007](./decisions/0007-short-lived-certificates.md).
 - `vnc`: Code: `crates/away-vnc/`. Runs: in the gateway. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md).
 - `ssh`: Code: `crates/away-ssh/`. Runs: in the gateway. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0007](./decisions/0007-short-lived-certificates.md).
 - `shell-screen`: What is elsewhere called a terminal emulator; later it runs in the gateway too, to hold a shell while the browser is closed. Code: `crates/away-term/`. Runs: in the browser, as WebAssembly. Governed by [ADR‑0001](./decisions/0001-own-protocol-code.md), [ADR‑0005](./decisions/0005-the-shells-screen-in-the-browser.md).
-- `picture`: Code: `crates/away-picture/`. Runs: in the gateway. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md).
-- `wire`: Written once for each side, and both are tried against the same examples. Code: `crates/away-wire/`. Runs: in the gateway and in the browser. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md).
+- `picture`: Code: `crates/away-picture/`. Runs: in the gateway. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0016](./decisions/0016-a-picture-that-moves.md).
+- `wire`: Written once for each side, and both are tried against the same examples. Code: `crates/away-wire/`. Runs: in the gateway and in the browser. Governed by [ADR‑0004](./decisions/0004-the-session-and-its-picture.md), [ADR‑0016](./decisions/0016-a-picture-that-moves.md).
 
 ## What Away rests on
 

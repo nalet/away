@@ -25,6 +25,7 @@ capabilities it governs and the work packages that rest on it.
 | [ADR‑0013](./0013-built-tested-signed-by-the-pipelines.md) | Built, tested, signed and listed by the project's own pipelines | Accepted | [1](../../plan/README.md#1-the-ground), [16](../../plan/README.md#16-ready-to-release) |
 | [ADR‑0014](./0014-a-farm-says-what-it-publishes.md) | A farm says itself what it publishes, and the server asks it | Accepted | — |
 | [ADR‑0015](./0015-a-widely-used-database-client.md) | The server speaks to its database with a client that is widely used | Accepted | — |
+| [ADR‑0016](./0016-a-picture-that-moves.md) | A picture that moves is measured, then shown whole, then taken as the machine composes it | Proposed | — |
 
 ## What each governs
 
@@ -47,6 +48,7 @@ The components a record is about, and the capabilities it decides most. A compon
 | [ADR‑0013](./0013-built-tested-signed-by-the-pipelines.md) | `pipelines`, `site-pipeline`, `test-servers`, `registry`, `docs` | `verify-image`, `see-image-contents`, `build-from-source`, `run-its-tests`, `report-in-private` |
 | [ADR‑0014](./0014-a-farm-says-what-it-publishes.md) | `server`, `files`, `farm-feed`, `cluster-secrets` | `read-programs-from-host`, `see-all-programs`, `give-program-icons` |
 | [ADR‑0015](./0015-a-widely-used-database-client.md) | `server`, `database` | `keep-favourites`, `see-last-used`, `record-connections`, `record-changes` |
+| [ADR‑0016](./0016-a-picture-that-moves.md) | `session-view`, `gateway`, `picture`, `wire`, `rdp` | `show-whole-pictures`, `machine-made-pictures`, `leave-out-effects`, `play-video-smoothly` |
 <!-- end: decisions -->
 
 ## How a record is written

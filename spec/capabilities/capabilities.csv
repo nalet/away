@@ -28,6 +28,9 @@ choose-sharper-or-faster,picture,Choose between a sharper and a faster picture b
 desktop-as-at-machine,picture,"Show the desktop as it looks at the machine: its background, smooth fonts, its effects",system,v1,—,—,—,
 pointer-without-delay,picture,"Draw the pointer on one's own device, so that it moves without delay",system,v1,v1,—,—,
 play-video-smoothly,picture,Play a video on the machine smoothly,system,later,no,—,—,the browser plays the machine's own video stream; VNC has none
+show-whole-pictures,picture,"Show each change of the picture whole, never in pieces",system,later,later,—,—,
+machine-made-pictures,picture,"Take a Windows machine's picture whole, as the machine composes it, at the pace the browser shows it",system,later,no,—,—,VNC sends what changed as rectangles alone
+leave-out-effects,picture,"Leave out a machine's animations and background, for a faster picture",person,later,no,—,—,VNC has no way to ask a machine for it
 several-screens,picture,Spread a machine over several of one's own screens,person,later,no,—,—,VNC shows the machine's own screens as they are
 choose-machine-screen,picture,Choose which of a machine's screens to see,person,—,later,—,—,for a machine with several screens of its own
 type-in-own-layout,input,"Type with one's own keyboard layout, whatever the machine's is",person,partial,built,v1,—,

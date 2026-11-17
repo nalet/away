@@ -115,20 +115,20 @@ has the steps.
 <!-- generated: overview -->
 | Part | Areas | Capabilities | built | partly built | first release | later | not planned |
 |---|---|---|---|---|---|---|---|
-| [in a session](./session.md) | 7 | 64 | 4 | 12 | 22 | 21 | 5 |
+| [in a session](./session.md) | 7 | 67 | 4 | 12 | 22 | 24 | 5 |
 | [around the sessions](./app.md) | 5 | 49 | 16 | 3 | 9 | 17 | 4 |
 | [administration](./admin.md) | 4 | 56 | 12 | 2 | 13 | 26 | 3 |
 | [the platform](./platform.md) | 3 | 33 | 15 | 1 | 8 | 7 | 2 |
-| all | 19 | 202 | 47 | 18 | 52 | 71 | 14 |
+| all | 19 | 205 | 47 | 18 | 52 | 74 | 14 |
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
-| a session over RDP | 6 | 3 | 27 | 23 | 5 | 138 |
-| a session over VNC | 8 | 4 | 14 | 11 | 13 | 152 |
-| a session over SSH | 0 | 0 | 27 | 12 | 2 | 161 |
-| Away itself | 44 | 4 | 26 | 45 | 9 | 74 |
+| a session over RDP | 6 | 3 | 27 | 26 | 5 | 138 |
+| a session over VNC | 8 | 4 | 14 | 12 | 15 | 152 |
+| a session over SSH | 0 | 0 | 27 | 12 | 2 | 164 |
+| Away itself | 44 | 4 | 26 | 45 | 9 | 77 |
 
-An expectation names 164 of the 202 capabilities; no expectation names the other 38.
+An expectation names 166 of the 205 capabilities; no expectation names the other 39.
 <!-- end: overview -->
 
 ## What is expected of it

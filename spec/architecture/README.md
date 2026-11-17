@@ -181,7 +181,7 @@ decided, why, what follows from it, and what it rules out.
 
 | Decision records | Proposed | Accepted | Superseded | Rejected |
 |---|---|---|---|---|
-| 15 |  | 15 |  |  |
+| 16 | 1 | 15 |  |  |
 
 The first release holds 117 capabilities, and a component of Away's own carries each: 28 are carried by one component, the others by up to 6.
 <!-- end: state -->
