@@ -61,7 +61,7 @@ rules:
 | `collection` | for a farm of Windows machines that people see as one: the collection this entry stands for. Its address is then the farm's broker | none |
 | `served-by` | the machines that serve the collection, by their addresses. One that opens its desktop on another port than the broker names it after a colon, as `rdsh-02.corp.example:3390`. Away goes on to no other machine for the collection | none |
 | `signs-in` | how people are signed in on a Windows machine: `typed` with a password, `themselves` with a certificate, or `restricted-admin` with the native Windows client | `typed` |
-| `clipboard` | which ways text passes between the person's clipboard and the machine's, on a Windows machine: `both`, `to-the-machine`, `from-the-machine` or `none` | `both` |
+| `clipboard` | which ways text passes between the person's clipboard and the machine's: `both`, `to-the-machine`, `from-the-machine` or `none` | `both` |
 
 A machine offers at least one way in: a desktop, programs, or a shell.
 
@@ -343,6 +343,40 @@ machine that offers more is opened from its own page, where each way in is.
 It needs a database ([installing Away](./install.md#the-database)), and the
 gateway has to reach the machines
 ([what opening a machine needs](./install.md#opening-machines)).
+
+### A desktop over VNC
+
+A Mac's own screen sharing and most desktops on Linux speak VNC. Such a
+desktop opens like any other, with what the protocol makes different:
+
+- **The machine asks for the password of its desktop, or for nothing.** It
+  knows no names: the person types the password alone, Away passes it on and
+  keeps it nowhere, and a wrong one is asked for again. On a Mac, that is the
+  password set for VNC viewers in the screen sharing's settings, of which the
+  machine reads the first eight characters. The Mac's own way of signing in,
+  with an account's name and password, is not built yet.
+- **Nothing is checked.** VNC has nothing a machine shows of itself, so there is
+  no step of checking who it is. What travels between the gateway and the
+  machine, the picture and the keys, is not secured by the protocol either: a
+  machine is reached over VNC on a network that is trusted with that.
+- **Keys arrive as what they write.** The machine is told the character a key
+  writes on the person's own keyboard, so it types that character whatever its
+  own layout is. The command key of a Mac and the Windows key are one key to
+  it. The keys menu of a Mac's desktop holds the command key's combinations
+  that a browser keeps for itself.
+- **The wheel scrolls as far as it turns.** VNC has steps of a wheel, and
+  machines make different things of one. Most scroll by a few lines for a
+  step, so a notch of a wheel is one step, and a trackpad's small turns add up
+  to one. A Mac's own screen sharing scrolls by a single pixel for a step,
+  which makes a wheel crawl with other programs; Away tells such a machine as
+  many steps as the pixels the person turned, so a page scrolls as far and as
+  smoothly as on their own device. Nothing has to be installed on the Mac for
+  it.
+- **Text that is copied passes both ways**, where the files let it, in the
+  characters of the western alphabet, which is what the protocol carries.
+- **The desktop has the size the machine gives it**, and is fitted to the
+  window. Others who look at the same desktop, and whoever sits at the
+  machine, stay where they are.
 
 ## Opening a program
 

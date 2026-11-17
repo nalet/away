@@ -13,6 +13,7 @@
 
 mod certificate;
 mod kerberos;
+mod vnc;
 
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
@@ -183,7 +184,7 @@ fn main() -> ExitCode {
     let words: Vec<String> = std::env::args().skip(1).collect();
     if let [word] = words.as_slice() {
         if matches!(word.as_str(), "help" | "--help" | "-h") {
-            print!("{USAGE}\n{}\n{}", kerberos::USAGE, certificate::USAGE);
+            print!("{USAGE}\n{}\n{}\n{}", vnc::USAGE, kerberos::USAGE, certificate::USAGE);
             return ExitCode::SUCCESS;
         }
     }
@@ -197,6 +198,20 @@ fn main() -> ExitCode {
             }
             None => {
                 eprint!("{}", certificate::USAGE);
+                ExitCode::from(2)
+            }
+        };
+    }
+    // a machine is tried over VNC
+    if words.first().is_some_and(|kind| kind == "vnc") {
+        return match vnc::run(&words[1..]) {
+            Some(Ok(())) => ExitCode::SUCCESS,
+            Some(Err(why)) => {
+                println!("   {why}");
+                ExitCode::FAILURE
+            }
+            None => {
+                eprint!("{}", vnc::USAGE);
                 ExitCode::from(2)
             }
         };
@@ -216,7 +231,7 @@ fn main() -> ExitCode {
         };
     }
     let Some(asked) = asked(&words) else {
-        eprint!("{USAGE}\n{}\n{}", kerberos::USAGE, certificate::USAGE);
+        eprint!("{USAGE}\n{}\n{}\n{}", vnc::USAGE, kerberos::USAGE, certificate::USAGE);
         return ExitCode::from(2);
     };
     let tried = tried(&asked);
@@ -760,7 +775,7 @@ fn rdp(asked: &Asked, account: Option<Account>, on_the_card: Option<OnTheCard>) 
 
 /// A picture as a BMP file: 24 bits a pixel, and rows from the bottom up, as that format
 /// has them.
-fn bmp(picture: &Picture) -> Vec<u8> {
+pub(crate) fn bmp(picture: &Picture) -> Vec<u8> {
     let row = (picture.width * 3).next_multiple_of(4);
     let size = 54 + row * picture.height;
     let mut file = Vec::with_capacity(size);

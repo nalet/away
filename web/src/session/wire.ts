@@ -7,8 +7,8 @@ export type Step = 'reaching' | 'checking' | 'signing-in' | 'first-picture';
 // What the gateway says as text.
 export type Said =
   | { step: Step }
-  | { asks: { again: boolean; instead?: boolean } }
-  | { desktop: { width: number; height: number } }
+  | { asks: { again: boolean; instead?: boolean; only?: 'password' } }
+  | { desktop: { width: number; height: number; keys?: 'written' } }
   | { drawn: number }
   | { failed: { step: Step; why: string; details: string } }
   | { ended: string }
@@ -140,7 +140,9 @@ export type Did =
   | { wheel: { by: number; sideways: boolean; x: number; y: number } }
   | { key: { code: number; extended: boolean; down: boolean } }
   | { character: { unit: number; down: boolean } }
-  | { locks: { scroll: boolean; num: boolean; caps: boolean } };
+  | { locks: { scroll: boolean; num: boolean; caps: boolean } }
+  // a key by what it writes or does, as X11 numbers such keys: for a machine that is told so
+  | { written: { sym: number; down: boolean } };
 
 export function did(events: Did[]): Uint8Array<ArrayBuffer> {
   const bytes: number[] = [];
@@ -166,6 +168,9 @@ export function did(events: Did[]): Uint8Array<ArrayBuffer> {
       bytes.push(5);
       pair(event.character.unit);
       bytes.push(event.character.down ? 1 : 0);
+    } else if ('written' in event) {
+      const sym = event.written.sym;
+      bytes.push(7, (sym >>> 24) & 0xff, (sym >>> 16) & 0xff, (sym >>> 8) & 0xff, sym & 0xff, event.written.down ? 1 : 0);
     } else {
       bytes.push(6, (event.locks.scroll ? 1 : 0) | (event.locks.num ? 2 : 0) | (event.locks.caps ? 4 : 0));
     }

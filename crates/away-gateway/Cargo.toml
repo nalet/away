@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 away-part.workspace = true
 away-rdp.workspace = true
+away-vnc.workspace = true
 away-winauth.workspace = true
 away-secret.workspace = true
 hyper.workspace = true
@@ -29,7 +30,7 @@ away-gateway = { workspace = true, features = ["stand-in"] }
 
 [features]
 # a machine that stands in for a real one, for tests
-stand-in = ["away-rdp/stand-in", "away-winauth/stand-in"]
+stand-in = ["away-rdp/stand-in", "away-vnc/stand-in", "away-winauth/stand-in"]
 
 [lints]
 workspace = true

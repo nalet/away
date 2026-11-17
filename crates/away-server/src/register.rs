@@ -78,7 +78,8 @@ pub enum Over {
 }
 
 impl Over {
-    fn written(self) -> &'static str {
+    /// The word the files and the parts of Away have for it.
+    pub fn written(self) -> &'static str {
         match self {
             Over::Rdp => "rdp",
             Over::Vnc => "vnc",

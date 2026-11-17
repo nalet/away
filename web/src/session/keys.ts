@@ -32,6 +32,59 @@ export function placeOf(code: string): { code: number; extended: boolean } | nul
   return added !== undefined ? { code: added, extended: true } : null;
 }
 
+// The keys that do something and write nothing, as X11 numbers them: by the name a
+// browser gives what a key does. A machine that speaks VNC is told of keys by what they
+// write, since it has no layout of the person's to read places with.
+const DOES: Record<string, number> = {
+  Backspace: 0xff08, Tab: 0xff09, Enter: 0xff0d, Pause: 0xff13, ScrollLock: 0xff14, Escape: 0xff1b, Home: 0xff50, ArrowLeft: 0xff51,
+  ArrowUp: 0xff52, ArrowRight: 0xff53, ArrowDown: 0xff54, PageUp: 0xff55, PageDown: 0xff56, End: 0xff57, PrintScreen: 0xff61,
+  Insert: 0xff63, ContextMenu: 0xff67, NumLock: 0xff7f, CapsLock: 0xffe5, Delete: 0xffff, AltGraph: 0xfe03,
+  F1: 0xffbe, F2: 0xffbf, F3: 0xffc0, F4: 0xffc1, F5: 0xffc2, F6: 0xffc3, F7: 0xffc4, F8: 0xffc5, F9: 0xffc6, F10: 0xffc7,
+  F11: 0xffc8, F12: 0xffc9,
+};
+// The keys held with others: the left one of each, and the right one after it. The
+// command key of a Mac and the Windows key are one key to such a machine.
+const HELD: Record<string, [number, number]> = { Shift: [0xffe1, 0xffe2], Control: [0xffe3, 0xffe4], Alt: [0xffe9, 0xffea], Meta: [0xffeb, 0xffec], OS: [0xffeb, 0xffec] };
+
+// The number of a character as X11 has what is written: the western alphabet's by its
+// own number, and every other one above a mark.
+function symOfCharacter(point: number): number | null {
+  if (point < 0x20 || (point >= 0x7f && point < 0xa0)) return null;
+  return point < 0x100 ? point : 0x01000000 + point;
+}
+
+// A key by what it writes or does, from what a browser says of it: what the key
+// writes, and its place, which tells the left key from the right. Nothing for a key
+// that neither writes one character nor is known.
+export function symOf(key: string, code: string): number | null {
+  const held = HELD[key];
+  if (held) return held[code.endsWith('Right') ? 1 : 0];
+  const does = DOES[key];
+  if (does !== undefined) return does;
+  const point = key.codePointAt(0);
+  // one character, also one beyond the first sixty thousand
+  if (point === undefined || key.length !== (point > 0xffff ? 2 : 1)) return null;
+  return symOfCharacter(point);
+}
+
+// A key by its place, as it writes with no other key held on a keyboard of the United
+// States: for the key combinations Away sends by itself.
+export function symOfPlace(code: string): number | null {
+  const letter = /^Key([A-Z])$/.exec(code)?.[1];
+  if (letter) return letter.toLowerCase().charCodeAt(0);
+  const digit = /^Digit([0-9])$/.exec(code)?.[1];
+  if (digit) return digit.charCodeAt(0);
+  if (code === 'Space') return 0x20;
+  const held = /^(Shift|Control|Alt|Meta)(Left|Right)$/.exec(code);
+  if (held) return HELD[held[1] ?? '']?.[held[2] === 'Right' ? 1 : 0] ?? null;
+  return DOES[code] ?? null;
+}
+
+// Whether a key, by its number, is one that is held with others.
+export function isHeld(sym: number): boolean {
+  return (sym >= 0xffe1 && sym <= 0xffee) || sym === 0xfe03;
+}
+
 // The layouts Away tells apart, as Windows numbers them.
 const US = 0x0409;
 const BY_LANGUAGE: [string, number][] = [

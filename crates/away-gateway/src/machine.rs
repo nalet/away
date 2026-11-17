@@ -21,12 +21,13 @@ use away_rdp::redirection::Redirection;
 use away_rdp::sign_in::{self, New, Next, SignIn};
 use away_rdp::tpkt::Frames;
 use away_rdp::{der, licence};
-use away_wire::Does;
+use away_wire::{Did, Does};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;
 use tokio_rustls::TlsConnector;
 
+use crate::shown::{Pixels, Shown};
 use crate::themselves::OnAMachine;
 use crate::windows::Windows;
 
@@ -91,7 +92,7 @@ pub struct Failure {
     pub details: String,
 }
 
-fn failure(step: Step, why: Why, details: impl ToString) -> Failure {
+pub(crate) fn failure(step: Step, why: Why, details: impl ToString) -> Failure {
     Failure { step, why, details: details.to_string() }
 }
 
@@ -170,27 +171,33 @@ pub async fn reach_restricted_admin(host: &str, port: u16) -> Result<Reached, Fa
     reach_mode(host, port, None, true).await
 }
 
+/// Finds a machine at its address and connects to it.
+pub(crate) async fn connect(host: &str, port: u16) -> Result<TcpStream, Failure> {
+    // a number of the newer kind is written in brackets, which are not part of it
+    let written = host.strip_prefix('[').and_then(|rest| rest.strip_suffix(']')).unwrap_or(host);
+    let found = tokio::net::lookup_host((written, port))
+        .await
+        .map_err(|error| failure(Step::Reaching, Why::NoAddress, format!("{host} leads to no address: {error}")))?;
+    // a name may lead to several addresses, and the machine may answer on one of them alone
+    let mut connection = Err(failure(Step::Reaching, Why::NoAddress, format!("{host} leads to no address")));
+    for to in found {
+        connection = TcpStream::connect(to).await.map_err(|error| match error.kind() {
+            std::io::ErrorKind::ConnectionRefused => failure(Step::Reaching, Why::Refused, format!("{to} refused the connection")),
+            std::io::ErrorKind::TimedOut => failure(Step::Reaching, Why::NoAnswer, format!("{to} gave no answer")),
+            _ => failure(Step::Reaching, Why::Broken, format!("{to} could not be reached: {error}")),
+        });
+        if connection.is_ok() {
+            break;
+        }
+    }
+    let connection = connection?;
+    let _ = connection.set_nodelay(true);
+    Ok(connection)
+}
+
 async fn reach_mode(host: &str, port: u16, says_first: Option<&[u8]>, restricted: bool) -> Result<Reached, Failure> {
     let reaching = async {
-        // a number of the newer kind is written in brackets, which are not part of it
-        let written = host.strip_prefix('[').and_then(|rest| rest.strip_suffix(']')).unwrap_or(host);
-        let found = tokio::net::lookup_host((written, port))
-            .await
-            .map_err(|error| failure(Step::Reaching, Why::NoAddress, format!("{host} leads to no address: {error}")))?;
-        // a name may lead to several addresses, and the machine may answer on one of them alone
-        let mut connection = Err(failure(Step::Reaching, Why::NoAddress, format!("{host} leads to no address")));
-        for to in found {
-            connection = TcpStream::connect(to).await.map_err(|error| match error.kind() {
-                std::io::ErrorKind::ConnectionRefused => failure(Step::Reaching, Why::Refused, format!("{to} refused the connection")),
-                std::io::ErrorKind::TimedOut => failure(Step::Reaching, Why::NoAnswer, format!("{to} gave no answer")),
-                _ => failure(Step::Reaching, Why::Broken, format!("{to} could not be reached: {error}")),
-            });
-            if connection.is_ok() {
-                break;
-            }
-        }
-        let mut connection = connection?;
-        let _ = connection.set_nodelay(true);
+        let mut connection = connect(host, port).await?;
         let broken = |error: std::io::Error| failure(Step::Reaching, Why::Broken, format!("the first request: {error}"));
         let request = if restricted {
             negotiation::request_restricted_admin()
@@ -806,6 +813,120 @@ impl Desktop {
         // leaving is a courtesy: the machine notices a closed connection as well
         let _ = self.writer.write_all(&self.open.leave()).await;
         let _ = self.writer.shutdown().await;
+    }
+}
+
+/// What a person did, as a Windows machine is told of it: a place beyond the desktop is
+/// its edge. Nothing for a key that is told by what it writes, which is another
+/// machine's way.
+fn input(did: &Did, wide: usize, high: usize) -> Option<Input> {
+    use away_rdp::input::Button;
+    let within = |x: u16, y: u16| (x.min(wide.saturating_sub(1) as u16), y.min(high.saturating_sub(1) as u16));
+    Some(match *did {
+        Did::Moved { x, y } => {
+            let (x, y) = within(x, y);
+            Input::Moved { x, y }
+        }
+        Did::Button { button, down, x, y } => {
+            let (x, y) = within(x, y);
+            let button = match button {
+                away_wire::Button::Main => Button::Left,
+                away_wire::Button::Middle => Button::Middle,
+                away_wire::Button::Second => Button::Right,
+                away_wire::Button::Back => Button::Back,
+                away_wire::Button::Forward => Button::Forward,
+            };
+            Input::Button { button, down, x, y }
+        }
+        Did::Wheel { by, sideways, x, y } => {
+            let (x, y) = within(x, y);
+            Input::Wheel { by, sideways, x, y }
+        }
+        Did::Key { code, extended, down } => Input::Key { code, extended, down },
+        Did::Character { unit, down } => Input::Character { unit, down },
+        Did::Locks { scroll, num, caps } => Input::Locks { scroll, num, caps },
+        Did::Written { .. } => return None,
+    })
+}
+
+impl Shown for Desktop {
+    fn picture(&self) -> Pixels<'_> {
+        let picture = Desktop::picture(self);
+        Pixels { width: picture.width, height: picture.height, pixels: &picture.pixels }
+    }
+
+    async fn arrives(&mut self) -> Result<(), Failure> {
+        Desktop::arrives(self).await
+    }
+
+    async fn take(&mut self) -> Result<Vec<Area>, Failure> {
+        Desktop::take(self).await
+    }
+
+    async fn tick(&mut self) -> Result<(), Failure> {
+        Desktop::tick(self).await
+    }
+
+    fn resized(&mut self) -> bool {
+        Desktop::resized(self)
+    }
+
+    fn copied(&mut self) -> Option<String> {
+        Desktop::copied(self)
+    }
+
+    async fn did(&mut self, did: &[Did]) -> Result<(), Failure> {
+        let (wide, high) = (Desktop::picture(self).width, Desktop::picture(self).height);
+        let events: Vec<Input> = did.iter().filter_map(|did| input(did, wide, high)).collect();
+        self.tell(&events).await
+    }
+
+    async fn offer(&mut self, text: &str) -> Result<(), Failure> {
+        Desktop::offer(self, text).await
+    }
+
+    async fn resize(&mut self, screen: Screen) -> Result<bool, Failure> {
+        Desktop::resize(self, screen).await
+    }
+
+    fn windows(&mut self) -> Option<(Vec<away_wire::Window>, Option<u32>)> {
+        Desktop::windows(self)
+    }
+
+    fn windows_listed(&self) -> usize {
+        Desktop::windows_listed(self)
+    }
+
+    fn icons(&mut self) -> Vec<(u32, Vec<u8>)> {
+        Desktop::icons(self)
+    }
+
+    fn tray(&mut self) -> Option<Vec<away_wire::TrayIcon>> {
+        Desktop::tray(self)
+    }
+
+    fn tray_pictures(&mut self) -> Vec<(u32, u32, Vec<u8>)> {
+        Desktop::tray_pictures(self)
+    }
+
+    fn started_later(&mut self) -> Vec<bool> {
+        Desktop::started_later(self)
+    }
+
+    async fn window(&mut self, id: u32, does: Does) -> Result<(), Failure> {
+        Desktop::window(self, id, does).await
+    }
+
+    async fn use_tray(&mut self, window: u32, icon: u32, does: away_wire::TrayDoes) -> Result<(), Failure> {
+        Desktop::use_tray(self, window, icon, does).await
+    }
+
+    async fn start(&mut self, program: &Program) -> Result<(), Failure> {
+        Desktop::start(self, program).await
+    }
+
+    async fn leave(self) {
+        Desktop::leave(self).await;
     }
 }
 

@@ -38,6 +38,9 @@ pub enum ToBrowser<'a> {
         /// Whether they are asked for in place of signing the person in as themselves,
         /// which Away does for this person on no machine.
         instead: bool,
+        /// Whether the machine has a password of its desktop's own and knows no names:
+        /// the password alone is asked for.
+        password_alone: bool,
     },
     /// The desktop is open, at this size in pixels.
     Desktop {
@@ -45,6 +48,9 @@ pub enum ToBrowser<'a> {
         width: u16,
         /// How high.
         height: u16,
+        /// Whether the machine is told of keys by what they write, and not by their
+        /// places on the keyboard: it has no layout of the person's to read places with.
+        written: bool,
     },
     /// A rectangle of the picture: where it goes, and its pixels as a PNG picture.
     Rectangle {
@@ -184,14 +190,24 @@ impl ToBrowser<'_> {
         let object = |held: Json| Carried::Text(held.write());
         match *self {
             ToBrowser::Step(step) => object(Json::object([("step", step.into())])),
-            ToBrowser::Asks { again, instead: false } => object(Json::object([("asks", Json::object([("again", again.into())]))])),
-            ToBrowser::Asks { again, instead: true } => {
-                object(Json::object([("asks", Json::object([("again", again.into()), ("instead", true.into())]))]))
+            ToBrowser::Asks { again, instead, password_alone } => {
+                let mut asks = vec![("again".to_string(), Json::from(again))];
+                if instead {
+                    asks.push(("instead".to_string(), true.into()));
+                }
+                if password_alone {
+                    asks.push(("only".to_string(), "password".into()));
+                }
+                object(Json::object([("asks", Json::Object(asks))]))
             }
-            ToBrowser::Desktop { width, height } => object(Json::object([(
-                "desktop",
-                Json::object([("width", u64::from(width).into()), ("height", u64::from(height).into())]),
-            )])),
+            ToBrowser::Desktop { width, height, written } => {
+                let mut desktop =
+                    vec![("width".to_string(), Json::from(u64::from(width))), ("height".to_string(), Json::from(u64::from(height)))];
+                if written {
+                    desktop.push(("keys".to_string(), "written".into()));
+                }
+                object(Json::object([("desktop", Json::Object(desktop))]))
+            }
             ToBrowser::Rectangle { left, top, width, height, png } => {
                 let mut bytes = Vec::with_capacity(10 + png.len());
                 bytes.push(RECTANGLE);
@@ -335,6 +351,14 @@ pub enum Did {
         num: bool,
         /// The lock of the capitals.
         caps: bool,
+    },
+    /// A key went down or came up: the key by what it writes or does, as X11 numbers
+    /// such keys. For a machine that is told of keys so.
+    Written {
+        /// The key's number.
+        sym: u32,
+        /// Down, or up again.
+        down: bool,
     },
 }
 
@@ -533,6 +557,10 @@ fn read_what_was_done(mut left: &[u8]) -> Result<Vec<Did>, NotThis> {
                 }
                 Did::Locks { scroll: locks & 1 != 0, num: locks & 2 != 0, caps: locks & 4 != 0 }
             }
+            7 => {
+                let told = take(5)?;
+                Did::Written { sym: u32::from_be_bytes([told[0], told[1], told[2], told[3]]), down: flag(told[4])? }
+            }
             _ => return Err(NotThis("keys and pointer of the browser are of no kind a session knows")),
         });
     }
@@ -562,9 +590,9 @@ mod tests {
         let written: Vec<Carried> = vec![
             ToBrowser::Step("reaching").write(),
             ToBrowser::Step("first-picture").write(),
-            ToBrowser::Asks { again: false, instead: false }.write(),
-            ToBrowser::Asks { again: true, instead: false }.write(),
-            ToBrowser::Desktop { width: 1280, height: 800 }.write(),
+            ToBrowser::Asks { again: false, instead: false, password_alone: false }.write(),
+            ToBrowser::Asks { again: true, instead: false, password_alone: false }.write(),
+            ToBrowser::Desktop { width: 1280, height: 800, written: false }.write(),
             ToBrowser::Rectangle { left: 64, top: 128, width: 200, height: 120, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
             ToBrowser::Drawn(7).write(),
             ToBrowser::Failed { step: "reaching", why: "no-answer", details: "no answer within 10 seconds" }.write(),
@@ -580,13 +608,15 @@ mod tests {
                 in_front: Some(65537),
             }
             .write(),
-            ToBrowser::Asks { again: false, instead: true }.write(),
+            ToBrowser::Asks { again: false, instead: true, password_alone: false }.write(),
             ToBrowser::Passes { to_the_machine: true, from_the_machine: false }.write(),
             ToBrowser::Copied("two\nlines").write(),
             ToBrowser::Icon { window: 65537, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
             ToBrowser::Started { program: "Wages", started: false }.write(),
             ToBrowser::Tray(&[TrayIcon { window: 65537, icon: 1, tip: "Ledger – 2 reminders".to_string() }]).write(),
             ToBrowser::TrayPicture { window: 65537, icon: 1, png: &[0x89, 0x50, 0x4e, 0x47] }.write(),
+            ToBrowser::Asks { again: true, instead: false, password_alone: true }.write(),
+            ToBrowser::Desktop { width: 3024, height: 1964, written: true }.write(),
         ];
         assert_eq!(written.len(), to_browser.len());
         for (written, example) in written.iter().zip(to_browser) {
@@ -612,7 +642,10 @@ mod tests {
                 FromBrowser::read(&carried).unwrap_or_else(|NotThis(why)| panic!("{}: {why}", example.write()))
             })
             .collect();
-        assert_eq!(read.len(), 11);
+        assert_eq!(read.len(), 12);
+        assert!(
+            matches!(&read[11], FromBrowser::Did(did) if did[..] == [Did::Written { sym: 0xffeb, down: true }, Did::Written { sym: 0x0100_20ac, down: false }])
+        );
         assert!(matches!(read[10], FromBrowser::Tray { window: 65537, icon: 1, does: TrayDoes::Menu }));
         assert!(matches!(&read[9], FromBrowser::Start(program) if program == "Wages"));
         assert!(matches!(&read[8], FromBrowser::Copied(text) if text == "a text\nof two lines"));
@@ -667,7 +700,21 @@ mod tests {
         ] {
             assert!(FromBrowser::read(&Carried::Text(text.to_string())).is_err(), "{text}");
         }
-        for cut in ["01", "01028001", "02000102800190ff", "0205010280019000", "030078", "04", "041e02", "0607", "0608", "07", "ff"] {
+        for cut in [
+            "01",
+            "01028001",
+            "02000102800190ff",
+            "0205010280019000",
+            "030078",
+            "04",
+            "041e02",
+            "0607",
+            "0608",
+            "07",
+            "070000ffeb",
+            "070000ffeb02",
+            "ff",
+        ] {
             let carried = Carried::Bytes(bytes(cut));
             // "0607" is the three locks, all on: the one of these that is a message
             assert_eq!(FromBrowser::read(&carried).is_err(), cut != "0607", "{cut}");

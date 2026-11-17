@@ -176,8 +176,9 @@ The gateway opens the machines. Three things have to be there:
 - **A database.** No machine is opened without a record, and the records are
   in the database ([the database](#the-database)).
 - **A way from the gateway to the machines.** With the network rules on, the
-  gateway reaches the ports the desktops are opened on, 3389 unless
-  `networkRules.machinePorts` says otherwise, and the cluster's name service.
+  gateway reaches the ports the desktops are opened on, 3389 over RDP and 5900
+  over VNC unless `networkRules.machinePorts` says otherwise, and the cluster's
+  name service.
   `networkRules.machinesAt` narrows that to the addresses it names. A machine
   whose file names another port needs that port in `networkRules.machinePorts`.
   For a farm, the gateway reaches the broker and every machine that serves a
@@ -385,7 +386,7 @@ Everything an installation is told is one of these. The chart's
 | `networkRules.wayInFrom` | who may reach Away's address, as the peers of a NetworkPolicy | the cluster's router with a route; every namespace otherwise |
 | `networkRules.measuresFrom` | who may read the measures | nobody |
 | `networkRules.signInServiceAt`, `networkRules.signInServicePort` | where the sign-in service is, as the peers of a NetworkPolicy, and its port | any address, port 443 |
-| `networkRules.machinesAt`, `networkRules.machinePorts` | where the machines are, as the peers of a NetworkPolicy, and the ports their desktops are opened on ([opening machines](#opening-machines)) | any address, port 3389 |
+| `networkRules.machinesAt`, `networkRules.machinePorts` | where the machines are, as the peers of a NetworkPolicy, and the ports their desktops are opened on ([opening machines](#opening-machines)) | any address, ports 3389 and 5900 |
 | `networkRules.databaseAt` | where the database is, as the peers of a NetworkPolicy; used once `database.host` is set | any address, at `database.port` |
 | `networkRules.farmsAt`, `networkRules.farmsPort` | where the farms' web access is, as the peers of a NetworkPolicy, and its port; used once `farms.account` is set | any address, port 443 |
 | `networkRules.domainControllersAt` | where the domain controllers are, as the peers of a NetworkPolicy; used once `domain.name` is set | any address, on port 88 |

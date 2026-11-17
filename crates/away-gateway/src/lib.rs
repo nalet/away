@@ -14,9 +14,11 @@
 pub mod machine;
 pub mod restricted_admin;
 pub mod session;
+mod shown;
 #[cfg(feature = "stand-in")]
 pub mod stand_in;
 pub mod themselves;
+pub mod vnc;
 pub mod windows;
 
 use std::sync::Arc;

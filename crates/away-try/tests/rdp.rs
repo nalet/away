@@ -985,7 +985,12 @@ fn it_says_what_it_takes() {
         &["rdp", "fin-app-02", "--as", KNOWN],
         &["rdp", "fin-app-02", "--as", KNOWN, "--as", KNOWN],
         &["rdp", "fin-app-02", "--anything", "else"],
-        &["vnc", "fin-app-02"],
+        &["ssh", "fin-app-02"],
+        // over VNC: an address, and a wheel that is turned at a place
+        &["vnc"],
+        &["vnc", "fin-app-02", "--anything", "else"],
+        &["vnc", "fin-app-02", "--wheel", "120"],
+        &["vnc", "fin-app-02", "--wheel", "far", "--at", "10,10"],
     ] {
         let refused = Command::new(env!("CARGO_BIN_EXE_away-try")).args(words).output().expect("the test program runs");
         assert_eq!(refused.status.code(), Some(2), "{words:?}");

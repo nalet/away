@@ -12,14 +12,14 @@ Getting a machine's desktop, one of its programs or its shell on the screen, and
 
 | Capability | Who | RDP | VNC | SSH | Away | Key |
 |---|---|---|---|---|---|---|
-| Open a machine's desktop | person | partial | v1 | — | — | `open-desktop` |
+| Open a machine's desktop | person | partial | built | — | — | `open-desktop` |
 | Open one program of a Windows machine, without its desktop | person | built | — | — | — | `open-program` |
 | Switch between the programs open on a machine, each in a window of its own | person | v1 | — | — | — | `switch-programs` |
 | See a machine's open windows in a list beside them, and bring one to the front, also one made small | person | partial | — | — | — | `list-open-windows` |
 | Open a shell on a machine | person | — | — | v1 | — | `open-shell` |
 | Keep several machines open at once and move between them | person | v1 | v1 | v1 | — | `open-several` |
 | Open a session in a browser tab or window of its own | person | v1 | v1 | v1 | — | `open-in-own-tab` |
-| See how far a connection has come, and which step failed and why | person | built | v1 | v1 | — | `see-connecting-steps` |
+| See how far a connection has come, and which step failed and why | person | built | built | v1 | — | `see-connecting-steps` |
 | Come back to a session by itself after the connection dropped | system | v1 | v1 | v1 | — | `reconnect-by-itself` |
 | Leave a session running while the browser is closed, and pick it up again | person | v1 | v1 | later | — | `keep-while-away` |
 | Choose between leaving a desktop running and signing out of the machine | person | no | — | — | — | `leave-or-sign-out` |
@@ -54,10 +54,10 @@ How the machine's screen reaches one's own: its size, its sharpness, how smoothl
 
 | Capability | Who | RDP | VNC | SSH | Key |
 |---|---|---|---|---|---|
-| Fit the machine's screen to the window, and follow when its size changes | person | v1 | v1 | v1 | `fit-to-window` |
-| Fill the whole screen with a session | person | v1 | v1 | v1 | `fill-screen` |
+| Fit the machine's screen to the window, and follow when its size changes | person | v1 | partial | v1 | `fit-to-window` |
+| Fill the whole screen with a session | person | v1 | built | v1 | `fill-screen` |
 | Show a sharp picture on a high-density screen | system | v1 | later | v1 | `sharp-on-dense-screen` |
-| Show a screen at rest exactly, pixel for pixel | system | v1 | v1 | — | `exact-at-rest` |
+| Show a screen at rest exactly, pixel for pixel | system | v1 | built | — | `exact-at-rest` |
 | Give up detail while the picture moves or the line is slow, and restore it after | system | v1 | v1 | — | `adapt-to-line` |
 | Choose between a sharper and a faster picture by hand | person | later | later | — | `choose-sharper-or-faster` |
 | Show the desktop as it looks at the machine: its background, smooth fonts, its effects | system | v1 | — | — | `desktop-as-at-machine` |
@@ -79,12 +79,12 @@ Typing, shortcuts, the mouse and the trackpad, as they arrive on the machine. Fo
 
 | Capability | Who | RDP | VNC | SSH | Key |
 |---|---|---|---|---|---|
-| Type with one's own keyboard layout, whatever the machine's is | person | partial | v1 | v1 | `type-in-own-layout` |
-| Send the key combinations a browser or a device keeps for itself, from a menu | person | v1 | v1 | v1 | `send-kept-keys` |
-| Give every key to the machine while a session fills the screen | person | v1 | v1 | v1 | `give-all-keys` |
+| Type with one's own keyboard layout, whatever the machine's is | person | partial | built | v1 | `type-in-own-layout` |
+| Send the key combinations a browser or a device keeps for itself, from a menu | person | v1 | built | v1 | `send-kept-keys` |
+| Give every key to the machine while a session fills the screen | person | v1 | built | v1 | `give-all-keys` |
 | Use a Mac keyboard on a Windows machine and the reverse, with the keys where the hands expect them | person | v1 | v1 | — | `map-modifier-keys` |
-| Use every mouse button and the wheel, in both directions | person | v1 | v1 | v1 | `use-mouse-fully` |
-| Scroll with a trackpad as smoothly, as fast and in the direction one is used to | person | v1 | v1 | v1 | `scroll-as-used-to` |
+| Use every mouse button and the wheel, in both directions | person | v1 | partial | v1 | `use-mouse-fully` |
+| Scroll with a trackpad as smoothly, as fast and in the direction one is used to | person | v1 | partial | v1 | `scroll-as-used-to` |
 | Type the clipboard's text into the machine key by key | person | later | v1 | — | `type-clipboard` |
 | Type in a language whose characters are composed of several keys | person | later | later | v1 | `compose-characters` |
 | Hold the pointer inside the session for a program that needs it | person | later | later | — | `hold-pointer` |
@@ -101,7 +101,7 @@ What passes between one's own device and the machine. For the goal [Work on a ma
 
 | Capability | Who | RDP | VNC | SSH | Key |
 |---|---|---|---|---|---|
-| Copy text on one side and paste it on the other | person | v1 | v1 | v1 | `copy-paste-text` |
+| Copy text on one side and paste it on the other | person | v1 | partial | v1 | `copy-paste-text` |
 | Copy and paste a picture, or text with its formatting | person | later | no | — | `copy-paste-rich` |
 | Copy files on one side and paste them on the other | person | later | no | — | `copy-paste-files` |
 | Move files between one's own device and the machine | person | later | no | later | `move-files` |

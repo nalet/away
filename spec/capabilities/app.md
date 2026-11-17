@@ -18,7 +18,7 @@ Signing in to Away once, and from there on each machine. For the goal [Get in wi
 | Sign out, and end the sessions Away opened | person | — | — | — | built | `sign-out` |
 | Be signed in on the machine as oneself, with nothing asked | system | v1 | no | v1 | — | `be-oneself-on-machine` |
 | Be signed in with a name and password or a key that Away keeps for the machine | system | v1 | v1 | v1 | — | `use-kept-secret` |
-| Type a name and a password when the machine asks for them | person | built | v1 | v1 | — | `type-credentials` |
+| Type a name and a password when the machine asks for them | person | built | built | v1 | — | `type-credentials` |
 | Have Away remember what one typed for a machine | person | later | later | later | — | `remember-typed-credentials` |
 | Choose which of one's accounts to be on the machine as | person | later | — | later | — | `choose-account` |
 | Reach file shares and printers from the machine as oneself | system | v1 | — | — | — | `reach-network-as-oneself` |

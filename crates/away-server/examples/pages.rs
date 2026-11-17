@@ -146,6 +146,12 @@ async fn main() -> std::io::Result<()> {
         };
         let lost = away_gateway::stand_in::Machine::start_broker(account, password, astray).await;
         let (_, lost_at) = lost.address();
+        // two machines that speak VNC: a Mac, whose screen sharing asks for the password of
+        // its desktop, and a desktop on Linux that asks for nothing
+        let shows = away_gateway::stand_in::vnc::desktop;
+        let mac = away_gateway::stand_in::vnc::Machine::start_a_mac_at("127.0.0.1:0", "a desktop", shows()).await;
+        let tux = away_gateway::stand_in::vnc::Machine::start_open(shows()).await;
+        let ((_, mac_at), (_, tux_at)) = (mac.address(), tux.address());
         let nothing = std::net::TcpListener::bind("127.0.0.1:0")?.local_addr()?.port();
         std::fs::write(
             std::path::Path::new(&files).join("desks.yaml"),
@@ -157,11 +163,13 @@ async fn main() -> std::io::Result<()> {
                  - name: Farm Desk\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {broker_at} }}\n    \
                  collection: Desks\n    served-by: [localhost:{at}]\n  \
                  - name: Lost Desk\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {lost_at} }}\n    \
-                 collection: Lost\n    served-by: [127.0.0.9]\n\
+                 collection: Lost\n    served-by: [127.0.0.9]\n  \
+                 - name: mac-01\n    kind: mac\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {mac_at} }}\n  \
+                 - name: tux-02\n    kind: linux\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {tux_at} }}\n\
                  rules:\n  - name: staff-desks\n    who: [staff]\n    reaches: [desks]\n"
             ),
         )?;
-        machine = Some((stand_in, broker, lost));
+        machine = Some((stand_in, broker, lost, mac, tux));
     }
 
     let told = Told {

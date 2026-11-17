@@ -340,3 +340,126 @@ async fn serve(
         }
     }
 }
+
+/// A machine that stands in for one that speaks VNC, for tests: a Mac's own screen
+/// sharing, with the password of its desktop, or a desktop that asks for nothing.
+pub mod vnc {
+    use std::net::SocketAddr;
+    use std::sync::{Arc, Mutex};
+
+    use away_vnc::picture::Picture;
+    pub use away_vnc::stand_in::{typed, Seen, BAR, CLICKED, MARK, SCROLLED};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    /// The desktop a stand-in shows: the one of the stand-in that speaks RDP, pixel for pixel.
+    pub fn desktop() -> Picture {
+        let shows = super::desktop();
+        Picture { width: shows.width, height: shows.height, pixels: shows.pixels }
+    }
+
+    /// What a stand-in keeps of its connections, for a test to look at.
+    #[derive(Default)]
+    struct Kept {
+        /// What it saw of each client, the last one last.
+        seen: Vec<Seen>,
+        /// The desktop's picture as the last connection has it now.
+        picture: Option<Picture>,
+    }
+
+    /// A stand-in for a machine that speaks VNC, listening.
+    pub struct Machine {
+        address: SocketAddr,
+        kept: Arc<Mutex<Kept>>,
+        listening: tokio::task::JoinHandle<()>,
+    }
+
+    impl Machine {
+        /// Starts a stand-in at an address of this machine: a Mac's own screen sharing,
+        /// which asks for this password and shows this desktop to whoever knows it.
+        pub async fn start_a_mac_at(at: &str, password: &str, shows: Picture) -> Machine {
+            Machine::listen(at, Some(password.to_string()), true, shows).await
+        }
+
+        /// Starts a stand-in at a port of this machine that is free: a desktop that asks
+        /// for no password.
+        pub async fn start_open(shows: Picture) -> Machine {
+            Machine::listen("127.0.0.1:0", None, false, shows).await
+        }
+
+        async fn listen(at: &str, password: Option<String>, a_mac: bool, shows: Picture) -> Machine {
+            let listener = TcpListener::bind(at).await.expect("an address for the stand-in machine");
+            let address = listener.local_addr().expect("its address");
+            let kept = Arc::new(Mutex::new(Kept::default()));
+            let keeps = kept.clone();
+            let listening = tokio::spawn(async move {
+                while let Ok((mut connection, _)) = listener.accept().await {
+                    let (keeps, shows, password) = (keeps.clone(), shows.clone(), password.clone());
+                    tokio::spawn(async move {
+                        let mut machine = away_vnc::stand_in::Machine::new(shows);
+                        if let Some(password) = &password {
+                            machine = machine.with_the_password(password);
+                        }
+                        if a_mac {
+                            machine = machine.as_a_mac();
+                        }
+                        // each client that comes has a place of its own among those that were seen
+                        let nth = {
+                            let mut kept = keeps.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                            kept.seen.push(Seen::default());
+                            kept.seen.len() - 1
+                        };
+                        if connection.write_all(&machine.greets()).await.is_err() {
+                            return;
+                        }
+                        let mut bytes = vec![0u8; 16 * 1024];
+                        loop {
+                            let count = match connection.read(&mut bytes).await {
+                                Ok(0) | Err(_) => return,
+                                Ok(count) => count,
+                            };
+                            let Ok(answer) = machine.answer(&bytes[..count]) else { return };
+                            {
+                                let mut kept = keeps.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                                kept.seen[nth] = machine.seen().clone();
+                                if machine.is_open() {
+                                    kept.picture = Some(machine.picture().clone());
+                                }
+                            }
+                            if connection.write_all(&answer).await.is_err() {
+                                return;
+                            }
+                        }
+                    });
+                }
+            });
+            Machine { address, kept, listening }
+        }
+
+        /// Where it listens: a name of this machine, and its port.
+        pub fn address(&self) -> (String, u16) {
+            ("localhost".to_string(), self.address.port())
+        }
+
+        /// What it saw of each client, the last one last.
+        pub fn seen(&self) -> Vec<Seen> {
+            self.kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).seen.clone()
+        }
+
+        /// The desktop's picture as the last connection has it now, with the marks it drew.
+        pub fn picture(&self) -> Option<Picture> {
+            self.kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).picture.clone()
+        }
+
+        /// Stops listening.
+        pub fn stop(&self) {
+            self.listening.abort();
+        }
+    }
+
+    impl Drop for Machine {
+        fn drop(&mut self) {
+            self.listening.abort();
+        }
+    }
+}

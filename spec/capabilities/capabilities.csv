@@ -1,12 +1,12 @@
 key,area,capability,who,rdp,vnc,ssh,away,note
-open-desktop,open,Open a machine's desktop,person,partial,v1,—,—,
+open-desktop,open,Open a machine's desktop,person,partial,built,—,—,
 open-program,open,"Open one program of a Windows machine, without its desktop",person,built,—,—,—,a program the machine publishes for remote use
 switch-programs,open,"Switch between the programs open on a machine, each in a window of its own",person,v1,—,—,—,one sign-in on the machine holds them all
 list-open-windows,open,"See a machine's open windows in a list beside them, and bring one to the front, also one made small",person,partial,—,—,—,"programs bring no task bar of the machine's, so the list is how a window that was made small is reached"
 open-shell,open,Open a shell on a machine,person,—,—,v1,—,
 open-several,open,Keep several machines open at once and move between them,person,v1,v1,v1,—,
 open-in-own-tab,open,Open a session in a browser tab or window of its own,person,v1,v1,v1,—,
-see-connecting-steps,open,"See how far a connection has come, and which step failed and why",person,built,v1,v1,—,"reaching the machine, checking who it is, signing in, the first picture"
+see-connecting-steps,open,"See how far a connection has come, and which step failed and why",person,built,built,v1,—,"reaching the machine, checking who it is, signing in, the first picture"
 reconnect-by-itself,open,Come back to a session by itself after the connection dropped,system,v1,v1,v1,—,"a desktop goes on at its machine meanwhile; a shell is held by Away for a few minutes, while its page stays open"
 keep-while-away,open,"Leave a session running while the browser is closed, and pick it up again",person,v1,v1,later,—,a desktop goes on running on its machine; a shell has to be held by Away
 leave-or-sign-out,open,Choose between leaving a desktop running and signing out of the machine,person,no,—,—,—,"Away only ends the connection, so that a desktop is taken along to another device; signing out is done at the machine"
@@ -19,10 +19,10 @@ follow-broker,open,Reach a farm of Windows machines through its broker and land 
 take-licence,open,Take the licence that a machine for many people hands every client,system,built,—,—,—,"a Windows machine that serves desktops or programs to many people asks every client to take one before it shows anything"
 jump-through,open,Reach a shell that is only reachable through another machine,system,—,—,later,—,
 open-other-kinds,open,"Open other kinds of target: Telnet, a serial console, a database, a web page",person,—,—,—,no,Away is for desktops and shells
-fit-to-window,picture,"Fit the machine's screen to the window, and follow when its size changes",person,v1,v1,v1,—,a Windows machine and a shell take the window's size; other desktops are scaled to it
-fill-screen,picture,Fill the whole screen with a session,person,v1,v1,v1,—,where the browser can; a phone's browser may not
+fit-to-window,picture,"Fit the machine's screen to the window, and follow when its size changes",person,v1,partial,v1,—,a Windows machine and a shell take the window's size; other desktops are scaled to it
+fill-screen,picture,Fill the whole screen with a session,person,v1,built,v1,—,where the browser can; a phone's browser may not
 sharp-on-dense-screen,picture,Show a sharp picture on a high-density screen,system,v1,later,v1,—,a desktop over VNC has the size its machine gives it
-exact-at-rest,picture,"Show a screen at rest exactly, pixel for pixel",system,v1,v1,—,—,
+exact-at-rest,picture,"Show a screen at rest exactly, pixel for pixel",system,v1,built,—,—,
 adapt-to-line,picture,"Give up detail while the picture moves or the line is slow, and restore it after",system,v1,v1,—,—,
 choose-sharper-or-faster,picture,Choose between a sharper and a faster picture by hand,person,later,later,—,—,
 desktop-as-at-machine,picture,"Show the desktop as it looks at the machine: its background, smooth fonts, its effects",system,v1,—,—,—,
@@ -30,16 +30,16 @@ pointer-without-delay,picture,"Draw the pointer on one's own device, so that it 
 play-video-smoothly,picture,Play a video on the machine smoothly,system,later,no,—,—,the browser plays the machine's own video stream; VNC has none
 several-screens,picture,Spread a machine over several of one's own screens,person,later,no,—,—,VNC shows the machine's own screens as they are
 choose-machine-screen,picture,Choose which of a machine's screens to see,person,—,later,—,—,for a machine with several screens of its own
-type-in-own-layout,input,"Type with one's own keyboard layout, whatever the machine's is",person,partial,v1,v1,—,
-send-kept-keys,input,"Send the key combinations a browser or a device keeps for itself, from a menu",person,v1,v1,v1,—,"Ctrl+Alt+Del, Alt+Tab, the Windows key, Ctrl+W"
-give-all-keys,input,Give every key to the machine while a session fills the screen,person,v1,v1,v1,—,where the browser allows it
+type-in-own-layout,input,"Type with one's own keyboard layout, whatever the machine's is",person,partial,built,v1,—,
+send-kept-keys,input,"Send the key combinations a browser or a device keeps for itself, from a menu",person,v1,built,v1,—,"Ctrl+Alt+Del, Alt+Tab, the Windows key, Ctrl+W"
+give-all-keys,input,Give every key to the machine while a session fills the screen,person,v1,built,v1,—,where the browser allows it
 map-modifier-keys,input,"Use a Mac keyboard on a Windows machine and the reverse, with the keys where the hands expect them",person,v1,v1,—,—,
-use-mouse-fully,input,"Use every mouse button and the wheel, in both directions",person,v1,v1,v1,—,"in a shell, for the programs that take the mouse"
-scroll-as-used-to,input,"Scroll with a trackpad as smoothly, as fast and in the direction one is used to",person,v1,v1,v1,—,whatever the machine's own system makes of a wheel
+use-mouse-fully,input,"Use every mouse button and the wheel, in both directions",person,v1,partial,v1,—,"in a shell, for the programs that take the mouse"
+scroll-as-used-to,input,"Scroll with a trackpad as smoothly, as fast and in the direction one is used to",person,v1,partial,v1,—,whatever the machine's own system makes of a wheel
 type-clipboard,input,Type the clipboard's text into the machine key by key,person,later,v1,—,—,for a sign-in screen or a console that takes no clipboard
 compose-characters,input,Type in a language whose characters are composed of several keys,person,later,later,v1,—,
 hold-pointer,input,Hold the pointer inside the session for a program that needs it,person,later,later,—,—,
-copy-paste-text,exchange,Copy text on one side and paste it on the other,person,v1,v1,v1,—,
+copy-paste-text,exchange,Copy text on one side and paste it on the other,person,v1,partial,v1,—,
 copy-paste-rich,exchange,"Copy and paste a picture, or text with its formatting",person,later,no,—,—,VNC carries text alone
 copy-paste-files,exchange,Copy files on one side and paste them on the other,person,later,no,—,—,VNC carries text alone
 move-files,exchange,Move files between one's own device and the machine,person,later,no,later,—,a shell: in a panel beside it; a Windows machine: as a drive the machine sees; VNC moves no files
@@ -70,7 +70,7 @@ sign-in-again,signin,"Sign in again when the sign-in has run out, with the open 
 sign-out,signin,"Sign out, and end the sessions Away opened",person,—,—,—,built,
 be-oneself-on-machine,signin,"Be signed in on the machine as oneself, with nothing asked",system,v1,no,v1,—,"a Windows machine in a domain, and a shell that trusts Away; an ordinary account is enough; VNC knows no identity"
 use-kept-secret,signin,Be signed in with a name and password or a key that Away keeps for the machine,system,v1,v1,v1,—,for a machine that knows no directory; the secret never reaches the browser
-type-credentials,signin,Type a name and a password when the machine asks for them,person,built,v1,v1,—,
+type-credentials,signin,Type a name and a password when the machine asks for them,person,built,built,v1,—,
 remember-typed-credentials,signin,Have Away remember what one typed for a machine,person,later,later,later,—,
 choose-account,signin,Choose which of one's accounts to be on the machine as,person,later,—,later,—,
 reach-network-as-oneself,signin,Reach file shares and printers from the machine as oneself,system,v1,—,—,—,

@@ -133,12 +133,17 @@ export function useFavourites(): Stars {
   return { asking: answer === 'asking', kept, favourites, has: (machine, program) => favourites.some((one) => same(one, machine, program)), star };
 }
 
-// Whether this version of Away opens a machine's desktop: the desktop of a Windows
-// machine, or of another that speaks RDP. A farm's desktop is one of them: its broker
-// says which machine serves it.
+// What a machine's desktop is reached over: what its files say, and otherwise RDP on a
+// Windows machine and VNC on every other.
+export function desktopOver(machine: Machine): 'rdp' | 'vnc' {
+  return machine.desktop?.over ?? (machine.kind === 'windows' ? 'rdp' : 'vnc');
+}
+
+// Whether this version of Away opens a machine's desktop: it opens every desktop, over
+// RDP and over VNC. A farm's desktop is one of them: its broker says which machine
+// serves it.
 export function opensDesktop(machine: Machine): boolean {
-  const over = machine.desktop?.over ?? (machine.kind === 'windows' ? 'rdp' : 'vnc');
-  return machine.desktop !== null && over === 'rdp';
+  return machine.desktop !== null;
 }
 
 // Whether this version of Away opens a machine's programs: those of a Windows machine,

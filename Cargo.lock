@@ -58,6 +58,7 @@ dependencies = [
  "away-rdp",
  "away-secret",
  "away-server",
+ "away-vnc",
  "away-winauth",
  "away-wire",
  "futures-util",
@@ -76,6 +77,7 @@ dependencies = [
  "away-part",
  "away-rdp",
  "away-secret",
+ "away-vnc",
  "away-winauth",
  "away-wire",
  "futures-util",
@@ -163,11 +165,21 @@ dependencies = [
  "away-part",
  "away-rdp",
  "away-secret",
+ "away-vnc",
  "away-winauth",
  "getrandom 0.4.3",
  "rustls",
  "sha2",
  "tokio",
+]
+
+[[package]]
+name = "away-vnc"
+version = "0.1.0"
+dependencies = [
+ "away-secret",
+ "des",
+ "flate2",
 ]
 
 [[package]]
@@ -410,6 +422,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "des"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "916a94e407b54f9034d71dd748234cd1e516ced6284009906ae246f177eafe5a"
+dependencies = [
+ "cipher",
 ]
 
 [[package]]

@@ -1,0 +1,21 @@
+[package]
+name = "away-vnc"
+description = "Away's own VNC code: it takes bytes and gives bytes and what happened, and opens no connection itself."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+away-secret.workspace = true
+des.workspace = true
+flate2.workspace = true
+
+[features]
+# the machine's side of a connection, for tests and for whatever stands in for a machine
+stand-in = []
+
+[lints]
+workspace = true

@@ -68,7 +68,7 @@ export const texts = {
     notHere: 'no machine of that name for you',
     notHereWhy: "It doesn't exist, or no rule gives it to you.",
     home: 'go home',
-    notYet: "This version of Away opens Windows desktops and the programs of Windows machines. It doesn't open shells or other desktops yet.",
+    notYet: "This version of Away opens desktops, and the programs of Windows machines. It doesn't open shells yet.",
     desktop: 'desktop',
     programs: 'programs',
     shell: 'shell',
@@ -124,6 +124,9 @@ export const texts = {
     asksInstead: (machine: string) =>
       `Away signs you in on no machine as yourself, so ${machine} asks for a name and a password. Away passes them on and doesn't keep them.`,
     asksAgain: (machine: string) => `${machine} didn't accept that name and password.`,
+    // a machine that has a password of its desktop's own, and knows no names
+    asksPassword: (machine: string) => `${machine} asks for the password of its desktop. Away passes it on and doesn't keep it.`,
+    asksPasswordAgain: (machine: string) => `${machine} didn't accept that password.`,
     name: 'Name',
     password: 'Password',
     signIn: 'sign in',
@@ -134,7 +137,8 @@ export const texts = {
     bringHere: 'bring it here',
     details: 'details',
     // a step that failed: what it says, and whether trying again can help
-    failed: (step: string, why: string, machine: string, address: string): { says: string; again: boolean } => {
+    failed: (step: string, why: string, machine: string, address: string, passwordAlone = false): { says: string; again: boolean } => {
+      if (passwordAlone && `${step} ${why}` === 'signing-in sign-in-refused') return { says: `${machine} didn't accept that password.`, again: true };
       const known: Record<string, { says: string; again: boolean }> = {
         'reaching no-answer': { says: "It didn't answer within 10 seconds. It may be switched off, or its address may have changed.", again: true },
         'reaching no-address': { says: `Its name, ${address}, leads to no address.`, again: true },
@@ -151,7 +155,7 @@ export const texts = {
     // the server didn't begin the session: what the page says, and whether trying again can help
     refused: (status: number, machine: string): { title: string; why: string; again: boolean } => {
       if (status === 404) return { title: 'no machine of that name for you', why: "It doesn't exist, or no rule gives it to you.", again: false };
-      if (status === 501) return { title: `${machine} can't be opened yet`, why: 'This version of Away opens Windows desktops and programs, and nothing else yet.', again: false };
+      if (status === 501) return { title: `${machine} can't be opened yet`, why: 'This version of Away opens desktops and the programs of Windows machines, and nothing else yet.', again: false };
       if (status === 503) return { title: "away can't open machines right now", why: "No machine is opened without a record, and Away can't write its records right now.", again: true };
       return { title: `couldn't open ${machine}`, why: 'Away did not begin the session.', again: true };
     },
@@ -191,6 +195,8 @@ export const texts = {
     keys: 'keys',
     // the key combinations a browser or a device keeps for itself
     kept: { ctrlAltDel: 'ctrl + alt + del', altTab: 'alt + tab', altF4: 'alt + f4', windows: 'windows key', ctrlW: 'ctrl + w' },
+    // the same on a Mac, whose command key a browser keeps most combinations of
+    keptOnAMac: { cmdTab: 'cmd + tab', cmdSpace: 'cmd + space', cmdW: 'cmd + w', cmdQ: 'cmd + q', cmdOptEsc: 'cmd + opt + esc' },
     // a desktop whose connection dropped: the card over it while Away tries again
     lost: {
       title: 'connection lost',

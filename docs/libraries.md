@@ -25,7 +25,8 @@ library has no line that says what it is for.
 | [num-bigint](https://crates.io/crates/num-bigint) | does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is | 0.5.1 | — |
 | [aes](https://crates.io/crates/aes) | the cipher Kerberos seals its messages with: part of signing in on a Windows machine with a certificate | 0.9.4 | — |
 | [rsa](https://crates.io/crates/rsa) | makes the key of the smart card that exists in memory alone, which a Windows machine signs a person in with, and signs with it | 0.10.0 | `encoding`, `getrandom`, `pkcs1v15` |
-| [flate2](https://crates.io/crates/flate2) | packs the certificate on that card the way a card holds one | 1.1.11 | `rust_backend` |
+| [flate2](https://crates.io/crates/flate2) | packs the certificate on that card the way a card holds one, and unpacks what a machine draws over VNC | 1.1.11 | `rust_backend` |
+| [des](https://crates.io/crates/des) | the cipher VNC answers a machine's question for its password with, as the protocol defines it | 0.9.0 | — |
 | [getrandom](https://crates.io/crates/getrandom) | takes random bytes from the system, for keys and for numbers used once | 0.2.17, 0.4.3 | — |
 | [saphyr-parser](https://crates.io/crates/saphyr-parser) | reads the files of machines and rules, which are YAML, and knows the line each thing is written in | 0.3.4 | — |
 | [tokio-tungstenite](https://crates.io/crates/tokio-tungstenite) | carries a session between a browser and the gateway: the WebSocket | 0.30.0 | `handshake` |
@@ -34,7 +35,7 @@ library has no line that says what it is for.
 | [tokio-postgres](https://crates.io/crates/tokio-postgres) | speaks to the database: the client that most programs in this language use | 0.7.18 | `runtime` |
 | [tokio-postgres-rustls](https://crates.io/crates/tokio-postgres-rustls) | lets rustls secure the connection to the database | 0.14.0 | `ring` |
 
-Away names 25 libraries. With what they bring with them, a build holds 170 in all, each in the version Cargo.lock names.
+Away names 26 libraries. With what they bring with them, a build holds 171 in all, each in the version Cargo.lock names.
 <!-- end: libraries -->
 
 ## The pages

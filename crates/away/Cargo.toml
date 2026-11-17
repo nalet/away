@@ -19,6 +19,7 @@ tokio.workspace = true
 away-server = { workspace = true, features = ["stand-in"] }
 away-gateway = { workspace = true, features = ["stand-in"] }
 away-rdp = { workspace = true, features = ["stand-in"] }
+away-vnc = { workspace = true, features = ["stand-in"] }
 away-issuer = { workspace = true, features = ["stand-in"] }
 away-winauth = { workspace = true, features = ["stand-in"] }
 away-secret.workspace = true

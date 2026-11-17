@@ -29,6 +29,8 @@ pub struct Asked {
     pub address: String,
     /// On which port.
     pub port: u16,
+    /// What the machine is reached over: RDP, or VNC for a desktop that speaks that.
+    pub over: crate::register::Over,
     /// The collection of a farm that the machine stands for, where it stands for one.
     pub collection: Option<String>,
     /// The machines that serve the collection, by their addresses.
@@ -151,6 +153,7 @@ mod tests {
             machine: "fin-app-02".to_string(),
             address: "fin-app-02.corp.example".to_string(),
             port: 3389,
+            over: crate::register::Over::Rdp,
             collection: None,
             served_by: Vec::new(),
             themselves: false,

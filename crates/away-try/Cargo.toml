@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 away-rdp.workspace = true
+away-vnc.workspace = true
 away-winauth.workspace = true
 away-issuer.workspace = true
 away-part.workspace = true

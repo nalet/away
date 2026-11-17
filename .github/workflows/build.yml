@@ -228,6 +228,9 @@ jobs:
       - name: A desktop over RDP on Linux
         run: tests/machines/linux/rdp.sh
 
+      - name: A desktop over VNC on Linux
+        run: tests/machines/vnc/vnc.sh
+
       - name: A sign-in service, which a browser signs in at by typing a name and a password
         run: |
           npx --prefix web playwright install --with-deps chromium

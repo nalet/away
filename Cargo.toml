@@ -9,6 +9,7 @@ members = [
     "crates/away-issuer",
     "crates/away-secret",
     "crates/away-rdp",
+    "crates/away-vnc",
     "crates/away-winauth",
     "crates/away-wire",
     "crates/away-try",
@@ -42,7 +43,8 @@ sha1 = { version = "0.11", default-features = false } # the second hash that the
 num-bigint = { version = "0.5", default-features = false } # does the arithmetic of the old RSA step in taking a licence, which the protocol defines as it is
 aes = { version = "0.9", default-features = false } # the cipher Kerberos seals its messages with: part of signing in on a Windows machine with a certificate
 rsa = { version = "0.10", default-features = false, features = ["encoding", "getrandom", "pkcs1v15"] } # makes the key of the smart card that exists in memory alone, which a Windows machine signs a person in with, and signs with it
-flate2 = { version = "1", default-features = false, features = ["rust_backend"] } # packs the certificate on that card the way a card holds one
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] } # packs the certificate on that card the way a card holds one, and unpacks what a machine draws over VNC
+des = { version = "0.9", default-features = false } # the cipher VNC answers a machine's question for its password with, as the protocol defines it
 getrandom = { version = "0.4", default-features = false } # takes random bytes from the system, for keys and for numbers used once
 saphyr-parser = { version = "0.3", default-features = false } # reads the files of machines and rules, which are YAML, and knows the line each thing is written in
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] } # carries a session between a browser and the gateway: the WebSocket
@@ -57,6 +59,7 @@ away-server = { path = "crates/away-server" }
 away-gateway = { path = "crates/away-gateway" }
 away-issuer = { path = "crates/away-issuer" }
 away-rdp = { path = "crates/away-rdp" }
+away-vnc = { path = "crates/away-vnc" }
 away-winauth = { path = "crates/away-winauth" }
 away-wire = { path = "crates/away-wire" }
 

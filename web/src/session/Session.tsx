@@ -8,13 +8,13 @@ import { AppWindow, Check, ChevronUp, ClipboardList, Keyboard, Maximize, Minimiz
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent as KeyOfReact, PointerEvent as PointerOfReact, ReactNode } from 'react';
 
-import { pageOf, useMachines } from '../machines';
+import { desktopOver, pageOf, useMachines } from '../machines';
 import type { Machine, Program } from '../machines';
 import { addressOf } from '../place';
 import { texts } from '../texts';
 import { ClipboardPanel, useClipboard } from './Clipboard';
 import type { Passes } from './Clipboard';
-import { layoutName, layoutOf, placeOf } from './keys';
+import { isHeld, layoutName, layoutOf, placeOf, symOf, symOfPlace } from './keys';
 import { begins, credentials, did, leaves, readIcon, readRectangle, readSaid, readTrayPicture, seen, sized, start, trayDoes, windowDoes } from './wire';
 import type { Did, Step, TrayOf, WindowOf } from './wire';
 
@@ -29,7 +29,7 @@ interface Lost {
 
 // How far a session has come.
 type State =
-  | { is: 'opening'; step: Step | null; asks: { again: boolean; instead?: boolean } | null }
+  | { is: 'opening'; step: Step | null; asks: { again: boolean; instead?: boolean; only?: 'password' } | null }
   | { is: 'refused'; status: number }
   | { is: 'failed'; step: Step; why: string; details: string }
   | { is: 'open' }
@@ -54,6 +54,8 @@ function useSession(machine: string, program: string | null, method?: string) {
   // the keyboard's layout the machine was told of, and what became of a program the
   // person asked for in the session, the last of them
   const [layout, setLayout] = useState<number | null>(null);
+  // whether the machine is told of keys by what they write, and not by their places
+  const [written, setWritten] = useState(false);
   const [started, setStarted] = useState<{ program: string; ok: boolean } | null>(null);
   // the picture is drawn on a canvas of the session's own, which a page shows once it is open
   const [canvas] = useState(() => document.createElement('canvas'));
@@ -178,11 +180,12 @@ function useSession(machine: string, program: string | null, method?: string) {
           setLost(null);
           setState({ is: 'opening', step: 'signing-in', asks: said.asks });
         } else if ('desktop' in said) {
-          const { width, height } = said.desktop;
+          const { width, height, keys } = said.desktop;
           drawing = drawing.then(() => {
             canvas.width = width;
             canvas.height = height;
             if (over) return;
+            setWritten(keys === 'written');
             wasOpen = true;
             tries = 0;
             setLost(null);
@@ -269,6 +272,7 @@ function useSession(machine: string, program: string | null, method?: string) {
     tray,
     trayPictures,
     layout,
+    written,
     started,
     passes,
     copied,
@@ -300,7 +304,7 @@ export function Session({ showMachine, ...session }: SessionProps & { showMachin
 
 // The page of a session with a machine's desktop, or with one of its programs.
 function BrowserSession({ name, program, method, go, contact, machine }: SessionProps & { machine: Machine | null }) {
-  const { state, windows, inFront, icons, tray, trayPictures, layout, started, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program, method);
+  const { state, windows, inFront, icons, tray, trayPictures, layout, written, started, passes, copied, canvas, say, lost, tryNow, leave, again } = useSession(name, program, method);
   const toMachines = () => go(machine ? pageOf(name) : addressOf.machines);
 
   useEffect(() => {
@@ -323,6 +327,8 @@ function BrowserSession({ name, program, method, go, contact, machine }: Session
         trayPictures={trayPictures}
         programs={machine?.programs ?? []}
         layout={layout}
+        written={written}
+        kind={machine?.kind ?? null}
         started={started}
         passes={passes}
         copied={copied}
@@ -394,16 +400,22 @@ function Opening({
   const asks = state.is === 'opening' ? state.asks : null;
   // a new question takes a new answer
   useEffect(() => setSent(false), [asks]);
-  const at = state.step === null ? -1 : STEPS.indexOf(state.step);
+  // a desktop over VNC shows nothing of itself that could be checked, and has a password
+  // of its own in place of names
+  const overVnc = program === null && machine !== null && desktopOver(machine) === 'vnc';
+  const steps = overVnc ? STEPS.filter((step) => step !== 'checking') : STEPS;
+  const passwordAlone = asks?.only === 'password';
+  const at = state.step === null ? -1 : steps.indexOf(state.step);
   const failed = state.is === 'failed';
+  const filled = typed.password !== '' && (passwordAlone || typed.name !== '');
   const signIn = (event: FormEvent) => {
     event.preventDefault();
-    if (!typed.name || !typed.password) return;
+    if (!filled) return;
     setSent(true);
-    say(credentials(typed.name, typed.password));
+    say(credentials(passwordAlone ? '' : typed.name, typed.password));
     setTyped((before) => ({ ...before, password: '' }));
   };
-  const why = failed ? t.failed(state.step, state.why, name, machine?.address ?? name) : null;
+  const why = failed ? t.failed(state.step, state.why, name, machine?.address ?? name, overVnc) : null;
   return (
     <form className="stage" onSubmit={signIn}>
       <div className="box">
@@ -417,7 +429,7 @@ function Opening({
           </div>
         </div>
         <ol className="steps" aria-label={t.stepsOf(name)}>
-          {STEPS.map((step, nth) => {
+          {steps.map((step, nth) => {
             const is = nth < at ? 'done' : nth > at ? 'todo' : failed ? 'failed' : 'now';
             const asked = is === 'now' && step === 'signing-in' && asks !== null && !sent;
             return (
@@ -437,23 +449,33 @@ function Opening({
                   {asked && (
                     <>
                       <span className="why" role={asks.again ? 'alert' : undefined}>
-                        {asks.again ? t.asksAgain(name) : asks.instead ? t.asksInstead(name) : t.asks(name)}
+                        {passwordAlone
+                          ? asks.again
+                            ? t.asksPasswordAgain(name)
+                            : t.asksPassword(name)
+                          : asks.again
+                            ? t.asksAgain(name)
+                            : asks.instead
+                              ? t.asksInstead(name)
+                              : t.asks(name)}
                       </span>
                       <div className="form">
-                        <Field label={t.name}>
-                          <Input
-                            autoFocus={!asks.again}
-                            autoComplete="username"
-                            autoCapitalize="none"
-                            spellCheck={false}
-                            value={typed.name}
-                            onChange={(event) => setTyped((before) => ({ ...before, name: event.target.value }))}
-                          />
-                        </Field>
+                        {!passwordAlone && (
+                          <Field label={t.name}>
+                            <Input
+                              autoFocus={!asks.again}
+                              autoComplete="username"
+                              autoCapitalize="none"
+                              spellCheck={false}
+                              value={typed.name}
+                              onChange={(event) => setTyped((before) => ({ ...before, name: event.target.value }))}
+                            />
+                          </Field>
+                        )}
                         <Field label={t.password}>
                           <Input
                             type="password"
-                            autoFocus={asks.again}
+                            autoFocus={asks.again || passwordAlone}
                             autoComplete="off"
                             value={typed.password}
                             onChange={(event) => setTyped((before) => ({ ...before, password: event.target.value }))}
@@ -492,7 +514,7 @@ function Opening({
                 {t.cancel}
               </Button>
               {asks !== null && !sent && (
-                <Button type="submit" variant="primary" disabled={!typed.name || !typed.password}>
+                <Button type="submit" variant="primary" disabled={!filled}>
                   {t.signIn}
                 </Button>
               )}
@@ -567,6 +589,19 @@ const KEPT: { name: string; keys: string[] }[] = [
   { name: texts.session.kept.ctrlW, keys: ['ControlLeft', 'KeyW'] },
 ];
 
+// The same for a Mac's desktop: the combinations of its command key, most of which a
+// browser keeps for itself.
+const KEPT_ON_A_MAC: { name: string; keys: string[] }[] = [
+  { name: texts.session.keptOnAMac.cmdTab, keys: ['MetaLeft', 'Tab'] },
+  { name: texts.session.keptOnAMac.cmdSpace, keys: ['MetaLeft', 'Space'] },
+  { name: texts.session.keptOnAMac.cmdW, keys: ['MetaLeft', 'KeyW'] },
+  { name: texts.session.keptOnAMac.cmdQ, keys: ['MetaLeft', 'KeyQ'] },
+  { name: texts.session.keptOnAMac.cmdOptEsc, keys: ['MetaLeft', 'AltLeft', 'Escape'] },
+];
+
+// Whether the person's own device is a Mac, whose browser tells of some keys in its own way.
+const ON_A_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+
 // What a browser that gives a page every key is asked through, where it has it.
 type KeysOfBrowser = { lock?: () => Promise<void>; unlock?: () => void };
 
@@ -582,6 +617,8 @@ function Desktop({
   trayPictures,
   programs,
   layout,
+  written,
+  kind,
   started,
   passes,
   copied,
@@ -601,6 +638,8 @@ function Desktop({
   trayPictures: Record<string, ImageBitmap>;
   programs: Program[];
   layout: number | null;
+  written: boolean;
+  kind: Machine['kind'] | null;
   started: { program: string; ok: boolean } | null;
   passes: Passes | null;
   copied: string | null;
@@ -761,13 +800,30 @@ function Desktop({
     };
     const onDown = onButton(true);
     const onUp = onButton(false);
+    // what the wheel turned and was less than the machine is told at once: up and down, and sideways
+    const rest = [0, 0];
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
-      // a browser counts in pixels, lines or pages: a notch of a wheel is 120 to a machine
+      // a browser counts in pixels, lines or pages: a notch of a wheel is 120 to a machine,
+      // and stands for a hundred pixels. A trackpad turns by little at a time, and what
+      // is less than one part adds up, so that a slow turn is as far as a fast one
       const scale = event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 800 : 1.2;
       const place = at(event);
-      const turned = (by: number, sideways: boolean): Did[] =>
-        by === 0 ? [] : [{ wheel: { by: Math.max(-255, Math.min(255, Math.round(by))), sideways, ...place } }];
+      const turned = (turn: number, sideways: boolean): Did[] => {
+        const nth = sideways ? 1 : 0;
+        // counted in tenths, which are whole numbers: nothing of a turn is lost to rounding
+        const tenths = (rest[nth] ?? 0) + Math.round(turn * 10);
+        const whole = Math.trunc(tenths / 10);
+        rest[nth] = tenths - whole * 10;
+        const told: Did[] = [];
+        // more than one message holds goes out as several
+        for (let left = whole; left !== 0; ) {
+          const by = Math.max(-255, Math.min(255, left));
+          told.push({ wheel: { by, sideways, ...place } });
+          left -= by;
+        }
+        return told;
+      };
       const events = [...turned(-event.deltaY * scale, false), ...turned(event.deltaX * scale, true)];
       if (events.length > 0) tell(events);
     };
@@ -778,7 +834,46 @@ function Desktop({
     let locksSaid = false;
     // Ctrl + Alt + Shift, pressed and let go with no other key, opens the session's bar
     let chord: Set<string> | null = new Set();
+    // the same for a machine that is told of keys by what they write: each key that is
+    // down, by its place, with what it wrote as it went down
+    const writing = new Map<string, number>();
+    const onWritten = (isDown: boolean, event: KeyboardEvent) => {
+      const modifier = /^(Control|Alt|Shift)(Left|Right)$/.exec(event.code)?.[1];
+      if (!isDown) {
+        const sym = writing.get(event.code);
+        if (sym === undefined) return;
+        event.preventDefault();
+        writing.delete(event.code);
+        if (writing.size === 0 && chord?.size === 3) setBar((before) => !before);
+        tell([{ written: { sym, down: false } }]);
+        return;
+      }
+      const sym = symOf(event.key, event.code);
+      if (sym === null) return;
+      event.preventDefault();
+      if (writing.size === 0) chord = new Set();
+      if (modifier) chord?.add(modifier);
+      else chord = null;
+      const events: Did[] = [];
+      // on a Mac the option key makes another character of a key: the machine is told the
+      // character, and the option key comes up before it, or it would make yet another of it
+      if (ON_A_MAC && !isHeld(sym) && sym < 0xff00 && !event.ctrlKey && !event.metaKey) {
+        for (const [code, held] of writing) {
+          if (held === 0xffe9 || held === 0xffea) {
+            events.push({ written: { sym: held, down: false } });
+            writing.delete(code);
+          }
+        }
+      }
+      events.push({ written: { sym, down: true } });
+      // a Mac's browser doesn't say when a key comes up while the command key is held: such
+      // a key comes up at once
+      if (ON_A_MAC && event.metaKey && !isHeld(sym)) events.push({ written: { sym, down: false } });
+      else writing.set(event.code, sym);
+      tell(events);
+    };
     const onKey = (isDown: boolean) => (event: KeyboardEvent) => {
+      if (written) return onWritten(isDown, event);
       const place = placeOf(event.code);
       if (!place) return;
       event.preventDefault();
@@ -804,6 +899,8 @@ function Desktop({
     const onKeyUp = onKey(false);
     const onBlur = () => {
       if (down.size > 0) tell([...down.values()].map((place) => ({ key: { ...place, down: false } })));
+      if (writing.size > 0) tell([...writing.values()].map((sym) => ({ written: { sym, down: false } })));
+      writing.clear();
       down.clear();
       locksSaid = false;
       chord = null;
@@ -829,7 +926,7 @@ function Desktop({
       canvas.removeEventListener('keyup', onKeyUp);
       canvas.removeEventListener('blur', onBlur);
     };
-  }, [canvas, name, program, say, t]);
+  }, [canvas, name, program, say, t, written]);
 
   const fill = () => {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
@@ -859,12 +956,19 @@ function Desktop({
   // the keys go down in their order and come up in the other, as under a hand; then
   // the machine has the window again
   const send = (codes: string[]) => {
-    const places = codes.map(placeOf).filter((place) => place !== null);
-    const goDown: Did[] = places.map((place) => ({ key: { ...place, down: true } }));
-    const comeUp: Did[] = [...places].reverse().map((place) => ({ key: { ...place, down: false } }));
-    say(did([...goDown, ...comeUp]));
+    const keys: ((down: boolean) => Did)[] = written
+      ? codes
+          .map(symOfPlace)
+          .filter((sym) => sym !== null)
+          .map((sym) => (down: boolean) => ({ written: { sym, down } }))
+      : codes
+          .map(placeOf)
+          .filter((place) => place !== null)
+          .map((place) => (down: boolean) => ({ key: { ...place, down } }));
+    say(did([...keys.map((key) => key(true)), ...[...keys].reverse().map((key) => key(false))]));
     close();
   };
+  const kept = kind === 'mac' ? KEPT_ON_A_MAC : KEPT;
   const inKeysMenu = (event: KeyOfReact<HTMLDivElement>) => {
     const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]'));
     const at = items.indexOf(document.activeElement as HTMLElement);
@@ -914,9 +1018,9 @@ function Desktop({
         </IconButton>
         {keys && (
           <div className="sessmenu" role="menu" aria-label={t.keys} onKeyDown={inKeysMenu}>
-            {KEPT.map((kept) => (
-              <button key={kept.name} type="button" role="menuitem" tabIndex={-1} className="nc-actionmenu__item" onClick={() => send(kept.keys)}>
-                <span className="nc-actionmenu__label">{kept.name}</span>
+            {kept.map((one) => (
+              <button key={one.name} type="button" role="menuitem" tabIndex={-1} className="nc-actionmenu__item" onClick={() => send(one.keys)}>
+                <span className="nc-actionmenu__label">{one.name}</span>
               </button>
             ))}
           </div>

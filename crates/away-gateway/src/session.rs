@@ -17,19 +17,19 @@ use away_part::client::Client;
 use away_part::json::Json;
 use away_part::lines::Lines;
 use away_part::Stop;
-use away_rdp::input::{Button, Input};
 use away_rdp::ntlm::Account;
-use away_rdp::picture::Picture;
 use away_rdp::rail::Program;
 use away_secret::Secret;
-use away_wire::{Carried, Did, FromBrowser, ToBrowser};
+use away_wire::{Carried, FromBrowser, ToBrowser};
 use futures_util::{SinkExt, StreamExt};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 
 use crate::machine::{self, Area, Desktop, Failure, Opened, Passes, Screen, Step, Who, Why};
+use crate::shown::{Pixels, Shown};
 use crate::themselves::Domain;
+use crate::vnc;
 
 /// How long a browser gets to say which session it is, once its connection is open.
 const BEGINS_WITHIN: Duration = Duration::from_secs(10);
@@ -77,6 +77,8 @@ pub struct Taken {
     pub subject: String,
     /// Which ways the clipboard passes on the machine.
     pub clipboard: Passes,
+    /// Whether the desktop is reached over VNC, and not over RDP.
+    pub over_vnc: bool,
 }
 
 impl Server {
@@ -125,7 +127,9 @@ impl Server {
                 };
                 let restricted_admin = machine.and_then(|machine| machine.text_of("signs_in")) == Some("restricted-admin-sso");
                 let subject = text(said.get("person"), "subject").unwrap_or_default();
+                let over_vnc = machine.and_then(|machine| machine.text_of("over")) == Some("vnc");
                 Ok(Some(Taken {
+                    over_vnc,
                     restricted_admin,
                     subject,
                     session,
@@ -241,11 +245,53 @@ where
         .lines
         .info("a session was taken over", &[("session", taken.session.as_str().into()), ("machine", taken.machine.as_str().into())]);
 
-    let opened = open(&mut browser, server, &around, &taken, screen, layout).await;
-    let (why, details) = match opened {
+    // a desktop over VNC and one over RDP open in their own ways, and are shown in the same
+    let shown = match taken.over_vnc {
+        true => {
+            let opened = open_over_vnc(&mut browser, &taken).await.map(|opened| opened.map(|desktop| Open { desktop, served_by: None }));
+            shown(&mut browser, server, &around, &taken, screen, opened).await
+        }
+        false => {
+            let opened = open(&mut browser, server, &around, &taken, screen, layout).await;
+            shown(&mut browser, server, &around, &taken, screen, opened).await
+        }
+    };
+    let Some((why, details)) = shown else { return };
+    around
+        .lines
+        .info("a session ended", &[("session", taken.session.as_str().into()), ("why", why.into()), ("details", details.as_str().into())]);
+    if let Err(unsaid) = server.told(&taken.session, "ended", &[("why", why)]).await {
+        around.lines.warn(
+            "the server could not be told that a session ended",
+            &[("session", taken.session.as_str().into()), ("why", unsaid.as_str().into())],
+        );
+    }
+    end(&mut browser, why).await;
+}
+
+/// A desktop that is open.
+struct Open<Of> {
+    desktop: Of,
+    /// The machine that serves it, where a farm's broker sent the connection on to one.
+    served_by: Option<String>,
+}
+
+/// Shows a desktop that opened until the session ends, and says why it ended. Nothing
+/// where it did not open: that was said, and the browser's connection is closed.
+async fn shown<Connection, Of: Shown>(
+    browser: &mut WebSocketStream<Connection>,
+    server: &Server,
+    around: &Around,
+    taken: &Taken,
+    screen: Screen,
+    opened: Result<Option<Open<Of>>, Failure>,
+) -> Option<(&'static str, String)>
+where
+    Connection: AsyncRead + AsyncWrite + Unpin,
+{
+    match opened {
         Ok(Some(Open { mut desktop, served_by })) => {
-            let picture = desktop.picture();
-            let (wide, high) = (picture.width.to_string(), picture.height.to_string());
+            let (wide, high) = (desktop.picture().width.to_string(), desktop.picture().height.to_string());
             around.lines.info(
                 "a desktop is open",
                 &[
@@ -262,22 +308,22 @@ where
             // in a session for a program, the person may ask for others of the machine
             let starts = taken.program.is_some().then_some(Starts { server, session: &taken.session, lines: &around.lines });
             let ended = match recorded {
-                Ok(200) => show(&mut browser, &mut desktop, screen, taken.clipboard, starts, around.stop.clone()).await,
+                Ok(200) => show(browser, &mut desktop, screen, taken.clipboard, starts, around.stop.clone()).await,
                 Ok(status) => Ended::Machine(format!("the server did not take the record that the desktop is open: status {status}")),
                 Err(why) => Ended::Machine(why),
             };
             desktop.leave().await;
-            match ended {
+            Some(match ended {
                 Ended::Updating => ("updating", String::new()),
                 Ended::Elsewhere => ("elsewhere", String::new()),
                 Ended::Left => ("left", String::new()),
                 Ended::BrowserGone => ("browser-gone", String::new()),
                 Ended::Machine(details) => ("machine", details),
                 Ended::Closed => ("closed", String::new()),
-            }
+            })
         }
         // the person gave up before the desktop was open
-        Ok(None) => ("left", String::new()),
+        Ok(None) => Some(("left", String::new())),
         Err(failed) => {
             let (step, why) = (step_word(failed.step), why_word(failed.why));
             around.lines.warn(
@@ -290,28 +336,76 @@ where
                 ],
             );
             let _ = server.told(&taken.session, "failed", &[("step", step), ("why", why), ("details", &failed.details)]).await;
-            let _ = tell(&mut browser, ToBrowser::Failed { step, why, details: &failed.details }).await;
+            let _ = tell(browser, ToBrowser::Failed { step, why, details: &failed.details }).await;
             let _ = browser.close(None).await;
-            return;
+            None
         }
-    };
-    around
-        .lines
-        .info("a session ended", &[("session", taken.session.as_str().into()), ("why", why.into()), ("details", details.as_str().into())]);
-    if let Err(unsaid) = server.told(&taken.session, "ended", &[("why", why)]).await {
-        around.lines.warn(
-            "the server could not be told that a session ended",
-            &[("session", taken.session.as_str().into()), ("why", unsaid.as_str().into())],
-        );
     }
-    end(&mut browser, why).await;
 }
 
-/// A desktop that is open.
-struct Open {
-    desktop: Desktop,
-    /// The machine that serves it, where a farm's broker sent the connection on to one.
-    served_by: Option<String>,
+/// The way to a desktop over VNC, step by step, each said to the browser as it begins.
+/// Nothing where the person left on the way. Such a machine shows nothing of itself
+/// that could be checked, and asks for the desktop's own password or for nothing.
+async fn open_over_vnc<Connection>(browser: &mut WebSocketStream<Connection>, taken: &Taken) -> Result<Option<vnc::Desktop>, Failure>
+where
+    Connection: AsyncRead + AsyncWrite + Unpin,
+{
+    let gone = |step: Step| Failure { step, why: Why::Broken, details: "the browser's connection ended".to_string() };
+    tell(browser, ToBrowser::Step("reaching")).await.map_err(|()| gone(Step::Reaching))?;
+    let reached = vnc::reach(&taken.address, taken.port, taken.clipboard).await?;
+    tell(browser, ToBrowser::Step("signing-in")).await.map_err(|()| gone(Step::SigningIn))?;
+    let mut desktop = 'asked: {
+        if !reached.asks() {
+            break 'asked reached.sign_in(None).await?;
+        }
+        // the machine asks for its password. The connection that said so is let go: the
+        // person may take their time to type, and a machine doesn't wait that long
+        drop(reached);
+        let mut again = false;
+        for _ in 0..ASKS_AT_MOST {
+            tell(browser, ToBrowser::Asks { again, instead: false, password_alone: true }).await.map_err(|()| gone(Step::SigningIn))?;
+            let typed = tokio::time::timeout(TYPED_WITHIN, async {
+                loop {
+                    match said(browser).await {
+                        Some(FromBrowser::Credentials { password, .. }) => break Some(password),
+                        Some(FromBrowser::Leaves) | None => break None,
+                        Some(_) => {}
+                    }
+                }
+            })
+            .await;
+            let Ok(Some(password)) = typed else { return Ok(None) };
+            match vnc::reach(&taken.address, taken.port, taken.clipboard).await?.sign_in(Some(&password)).await {
+                Ok(desktop) => break 'asked desktop,
+                Err(Failure { why: Why::SignInRefused, .. }) => again = true,
+                Err(failed) => return Err(failed),
+            }
+        }
+        let details = "the machine took none of the passwords".to_string();
+        return Err(Failure { step: Step::SigningIn, why: Why::SignInRefused, details });
+    };
+
+    // then its first picture
+    tell(browser, ToBrowser::Step("first-picture")).await.map_err(|()| gone(Step::FirstPicture))?;
+    let within = machine::FIRST_PICTURE_WITHIN;
+    let first = tokio::time::timeout(within, async {
+        loop {
+            if !desktop.take().await?.is_empty() {
+                // what was drawn is for whoever shows the desktop: said again there
+                break Ok::<(), Failure>(());
+            }
+            desktop.arrives().await?;
+        }
+    })
+    .await;
+    match first {
+        Ok(Ok(())) => Ok(Some(desktop)),
+        Ok(Err(failed)) => Err(Failure { step: Step::FirstPicture, ..failed }),
+        Err(_) => {
+            let details = format!("it showed nothing within {} seconds", within.as_secs());
+            Err(Failure { step: Step::FirstPicture, why: Why::NoPicture, details })
+        }
+    }
 }
 
 fn not_owned(details: String) -> Failure {
@@ -327,7 +421,7 @@ async fn open<Connection>(
     taken: &Taken,
     screen: Screen,
     layout: u32,
-) -> Result<Option<Open>, Failure>
+) -> Result<Option<Open<Desktop>>, Failure>
 where
     Connection: AsyncRead + AsyncWrite + Unpin,
 {
@@ -412,7 +506,7 @@ where
         // doesn't wait that long
         drop(secured);
         for _ in 0..ASKS_AT_MOST {
-            tell(browser, ToBrowser::Asks { again, instead }).await.map_err(|()| gone(Step::SigningIn))?;
+            tell(browser, ToBrowser::Asks { again, instead, password_alone: false }).await.map_err(|()| gone(Step::SigningIn))?;
             let typed = tokio::time::timeout(TYPED_WITHIN, async {
                 loop {
                     match said(browser).await {
@@ -554,9 +648,9 @@ struct Starts<'a> {
 
 /// Shows an open desktop to the browser, and passes keys and the pointer on, until one
 /// of the two sides ends it.
-async fn show<Connection>(
+async fn show<Connection, Of: Shown>(
     browser: &mut WebSocketStream<Connection>,
-    desktop: &mut Desktop,
+    desktop: &mut Of,
     mut screen: Screen,
     clipboard: Passes,
     starts: Option<Starts<'_>>,
@@ -566,7 +660,8 @@ where
     Connection: AsyncRead + AsyncWrite + Unpin,
 {
     let (mut wide, mut high) = (desktop.picture().width, desktop.picture().height);
-    if tell(browser, ToBrowser::Desktop { width: wide as u16, height: high as u16 }).await.is_err() {
+    let written = desktop.takes_keys_as_written();
+    if tell(browser, ToBrowser::Desktop { width: wide as u16, height: high as u16, written }).await.is_err() {
         return Ended::BrowserGone;
     }
     // which ways the clipboard passes, for the page to say and to act on
@@ -670,7 +765,7 @@ where
                 // told the size, and everything of the new picture is new to it
                 if desktop.resized() {
                     (wide, high) = (desktop.picture().width, desktop.picture().height);
-                    if tell(browser, ToBrowser::Desktop { width: wide as u16, height: high as u16 }).await.is_err() {
+                    if tell(browser, ToBrowser::Desktop { width: wide as u16, height: high as u16, written }).await.is_err() {
                         return Ended::BrowserGone;
                     }
                     changed = Changed::default();
@@ -686,8 +781,7 @@ where
             }
             told = said(browser) => match told {
                 Some(FromBrowser::Did(did)) => {
-                    let events: Vec<Input> = did.iter().map(|did| input(did, wide, high)).collect();
-                    if let Err(failed) = desktop.tell(&events).await {
+                    if let Err(failed) = desktop.did(&did).await {
                         return ended_by(failed);
                     }
                 }
@@ -823,7 +917,7 @@ impl Changed {
 /// Packs areas of the picture as PNG pictures, which every browser reads by itself and
 /// which lose nothing. The packing is work, and is done beside what waits for the
 /// machine and the browser.
-async fn packed(picture: &Picture, areas: Vec<Area>) -> Vec<(Area, Vec<u8>)> {
+async fn packed(picture: Pixels<'_>, areas: Vec<Area>) -> Vec<(Area, Vec<u8>)> {
     // the pixels of each area, as red, green and blue
     let cut: Vec<(Area, Vec<u8>)> = areas
         .into_iter()
@@ -854,35 +948,6 @@ async fn packed(picture: &Picture, areas: Vec<Area>) -> Vec<(Area, Vec<u8>)> {
             .collect::<Vec<_>>()
     });
     packing.await.unwrap_or_default()
-}
-
-/// What a person did, as the machine is told of it: a place beyond the desktop is its edge.
-fn input(did: &Did, wide: usize, high: usize) -> Input {
-    let within = |x: u16, y: u16| (x.min(wide.saturating_sub(1) as u16), y.min(high.saturating_sub(1) as u16));
-    match *did {
-        Did::Moved { x, y } => {
-            let (x, y) = within(x, y);
-            Input::Moved { x, y }
-        }
-        Did::Button { button, down, x, y } => {
-            let (x, y) = within(x, y);
-            let button = match button {
-                away_wire::Button::Main => Button::Left,
-                away_wire::Button::Middle => Button::Middle,
-                away_wire::Button::Second => Button::Right,
-                away_wire::Button::Back => Button::Back,
-                away_wire::Button::Forward => Button::Forward,
-            };
-            Input::Button { button, down, x, y }
-        }
-        Did::Wheel { by, sideways, x, y } => {
-            let (x, y) = within(x, y);
-            Input::Wheel { by, sideways, x, y }
-        }
-        Did::Key { code, extended, down } => Input::Key { code, extended, down },
-        Did::Character { unit, down } => Input::Character { unit, down },
-        Did::Locks { scroll, num, caps } => Input::Locks { scroll, num, caps },
-    }
 }
 
 fn step_word(step: Step) -> &'static str {

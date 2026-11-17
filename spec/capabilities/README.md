@@ -115,16 +115,16 @@ has the steps.
 <!-- generated: overview -->
 | Part | Areas | Capabilities | built | partly built | first release | later | not planned |
 |---|---|---|---|---|---|---|---|
-| [in a session](./session.md) | 7 | 64 | 4 | 4 | 30 | 21 | 5 |
+| [in a session](./session.md) | 7 | 64 | 4 | 12 | 22 | 21 | 5 |
 | [around the sessions](./app.md) | 5 | 49 | 16 | 3 | 9 | 17 | 4 |
 | [administration](./admin.md) | 4 | 56 | 12 | 2 | 13 | 26 | 3 |
 | [the platform](./platform.md) | 3 | 33 | 15 | 1 | 8 | 7 | 2 |
-| all | 19 | 202 | 47 | 10 | 60 | 71 | 14 |
+| all | 19 | 202 | 47 | 18 | 52 | 71 | 14 |
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
 | a session over RDP | 6 | 3 | 27 | 23 | 5 | 138 |
-| a session over VNC | 0 | 0 | 26 | 11 | 13 | 152 |
+| a session over VNC | 8 | 4 | 14 | 11 | 13 | 152 |
 | a session over SSH | 0 | 0 | 27 | 12 | 2 | 161 |
 | Away itself | 44 | 4 | 26 | 45 | 9 | 74 |
 
@@ -140,7 +140,7 @@ the capabilities that meet it, and says how the states are worked out.
 <!-- generated: expected -->
 | Expected, for the goal | Expectations | there | partly | first release | first release in part | later | not planned |
 |---|---|---|---|---|---|---|---|
-| [Work on a machine that is somewhere else](./expectations.md#work-on-a-machine-that-is-somewhere-else) | 24 | 3 | 6 | 5 | 3 | 5 | 2 |
+| [Work on a machine that is somewhere else](./expectations.md#work-on-a-machine-that-is-somewhere-else) | 24 | 3 | 10 | 4 | 0 | 5 | 2 |
 | [Get in without another password](./expectations.md#get-in-without-another-password) | 16 | 3 | 4 | 5 | 1 | 2 | 1 |
 | [Look at a machine together](./expectations.md#look-at-a-machine-together) | 4 | 0 | 0 | 0 | 0 | 3 | 1 |
 | [Know the machines](./expectations.md#know-the-machines) | 13 | 3 | 2 | 1 | 0 | 6 | 1 |
@@ -148,7 +148,7 @@ the capabilities that meet it, and says how the states are worked out.
 | [Know what happened](./expectations.md#know-what-happened) | 9 | 1 | 1 | 1 | 1 | 5 | 0 |
 | [Run it oneself](./expectations.md#run-it-oneself) | 16 | 4 | 5 | 1 | 1 | 2 | 3 |
 | [Trust it](./expectations.md#trust-it) | 4 | 3 | 1 | 0 | 0 | 0 | 0 |
-| all | 99 | 20 | 19 | 17 | 8 | 27 | 8 |
+| all | 99 | 20 | 23 | 16 | 5 | 27 | 8 |
 <!-- end: expected -->
 
 ## Pages

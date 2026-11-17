@@ -33,6 +33,8 @@ use tokio_tungstenite::WebSocketStream;
 const KNOWN: &str = "CORP\\alex.urban";
 const PASSWORD: &str = "a password that exists for these tests alone";
 const DATABASE_PASSWORD: &str = "a password for this machine alone";
+/// The password of the desktop of the Mac that stands in.
+const VNC_PASSWORD: &str = "a desktop";
 
 /// The tests' database, with a database of its own in it for one test.
 async fn a_database_of_its_own() -> Option<Database> {
@@ -93,6 +95,10 @@ struct World {
     alone: Machine,
     /// A broker that sends whoever signs in on to a machine that is nowhere in the files.
     _lost: Machine,
+    /// A Mac, whose own screen sharing asks for the password of its desktop, and a
+    /// desktop on Linux that asks for nothing: both speak VNC.
+    mac: stand_in::vnc::Machine,
+    open_desk: stand_in::vnc::Machine,
     database: Database,
     server_lines: Lines,
     /// What signing in as oneself takes, where the world has a domain.
@@ -184,6 +190,10 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
     )
     .await;
     let (_, alone_port) = alone.address();
+    // two machines that speak VNC: a Mac with the password of its desktop, and a desktop that asks for nothing
+    let mac = stand_in::vnc::Machine::start_a_mac_at("127.0.0.1:0", VNC_PASSWORD, stand_in::vnc::desktop()).await;
+    let open_desk = stand_in::vnc::Machine::start_open(stand_in::vnc::desktop()).await;
+    let ((_, mac_port), (_, open_port)) = (mac.address(), open_desk.address());
     // a port of this machine that nothing listens on, for a machine that is not there
     let nothing = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
     let folder = Folder(std::env::temp_dir().join(format!("away-session-{}-{name}", std::process::id())));
@@ -202,8 +212,11 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
          - name: Unnamed\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {lost_port} }}\n    collection: Unnamed\n  \
          - name: Alone\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {alone_port} }}\n    collection: Alone\n  \
          - name: Anywhere\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {port} }}\n    collection: Anywhere\n  \
-         - name: hidden-09\n    kind: windows\n    address: hidden-09.corp.example\n    desktop: true\n\
-         rules:\n  - name: staff-desks\n    who: [staff]\n    reaches: [desk-01, apps-01, gone-02, build-01, Desktops, Elsewhere, Unnamed, Alone, Anywhere]\n"
+         - name: hidden-09\n    kind: windows\n    address: hidden-09.corp.example\n    desktop: true\n  \
+         - name: mac-01\n    kind: mac\n    address: {host}\n    desktop: {{ port: {mac_port} }}\n    clipboard: both\n  \
+         - name: tux-02\n    kind: linux\n    address: {host}\n    desktop: {{ port: {open_port} }}\n    clipboard: none\n\
+         rules:\n  - name: staff-desks\n    who: [staff]\n    \
+         reaches: [desk-01, apps-01, gone-02, build-01, Desktops, Elsewhere, Unnamed, Alone, Anywhere, mac-01, tux-02]\n"
     );
     // the machine of the domain, where the world has one, in a file of its own: people
     // are signed in on it as themselves
@@ -353,6 +366,8 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
         broker,
         alone,
         _lost: lost,
+        mac,
+        open_desk,
         database,
         server_lines,
         domain,
@@ -801,7 +816,7 @@ async fn only_what_a_rule_gives_is_opened_and_a_ticket_is_good_once_for_the_brow
     // what Away doesn't open yet says so: a shell
     assert_eq!(
         browser.open(&world, "build-01"),
-        (501, "Away opens Windows desktops and programs so far, and this machine offers neither.\n".to_string())
+        (501, "Away opens desktops and programs so far, and this machine offers neither.\n".to_string())
     );
     assert_eq!(browser.ask("GET", &format!("{}/api/sessions?machine=desk-01", world.away), true).0, 405);
 
@@ -1110,6 +1125,94 @@ async fn a_program_opens_in_a_window_of_its_own_and_closing_it_ends_the_session(
     let (_, desktop) = session.steps().await;
     assert!(desktop.get("desktop").is_some());
     assert!(!world.machine.seen().last().expect("a client came").for_a_program);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_desktop_over_vnc_opens_with_its_password_and_a_mac_scrolls_as_far_as_the_person_turns() {
+    let Some(world) = world("vnc").await else { return };
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+
+    // a Mac: reached, and then asked for the password of its desktop alone. There is
+    // nothing such a machine shows of itself, so nothing is checked
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "mac-01")).await;
+    let (steps, asks) = session.steps().await;
+    assert_eq!(steps, ["reaching", "signing-in"], "{}", asks.write());
+    assert_eq!(asks.write(), r#"{"asks":{"again":false,"only":"password"}}"#);
+    // a wrong password is asked for again, and the right one opens the desktop
+    session.say(credentials("", "another")).await;
+    assert_eq!(session.until("asks").await.write(), r#"{"asks":{"again":true,"only":"password"}}"#);
+    session.say(credentials("", VNC_PASSWORD)).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!(steps, ["first-picture"]);
+    // the machine is told of keys by what they write
+    assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120,"keys":"written"}}"#);
+    assert_eq!(session.next().await.map(|says| says.write()).as_deref(), Some(r#"{"clipboard":{"to":true,"from":true}}"#));
+    // its picture arrives pixel for pixel
+    let shows = stand_in::vnc::desktop();
+    let is_the_desktop = |session: &Session, shows: &away_vnc::picture::Picture| {
+        let picture = session.picture.as_ref().expect("a picture");
+        picture.pixels.as_chunks::<4>().0.iter().zip(shows.pixels.as_chunks::<4>().0).all(|(has, shows)| has[..3] == shows[..3])
+    };
+    while !is_the_desktop(&session, &shows) {
+        let drawn = session.until("drawn").await.get("drawn").and_then(Json::count).expect("a number");
+        session.say(Json::object([("seen", drawn.into())])).await;
+    }
+
+    // a click, a key by what it writes, the command key, and a notch of the wheel towards the person
+    let written = |sym: u32, down: bool| [&[7u8][..], &sym.to_be_bytes(), &[u8::from(down)]].concat();
+    session.did(&[2, 0, 1, 0, 50, 0, 60, 2, 0, 0, 0, 50, 0, 60]).await;
+    session.did(&[written(0xffeb, true), written(0x61, true), written(0x61, false), written(0xffeb, false)].concat()).await;
+    session.did(&[3, 0xff, 0x88, 0, 0, 30, 0, 40]).await;
+    // the machine's marks arrive: for the click where it was, for the key in the corner
+    let clicked = stand_in::vnc::CLICKED;
+    let typed = stand_in::vnc::typed(0x61);
+    while session.pixel(55, 65) != [clicked[0], clicked[1], clicked[2]] || session.pixel(5, 5) != [typed[0], typed[1], typed[2]] {
+        let drawn = session.until("drawn").await.get("drawn").and_then(Json::count).expect("a number");
+        session.say(Json::object([("seen", drawn.into())])).await;
+    }
+    let seen = world.mac.seen().last().cloned().expect("a client came");
+    assert_eq!((seen.answered.as_deref(), seen.chose, seen.shared), (Some("RFB 003.008\n"), Some(2), Some(true)));
+    assert_eq!(seen.keys, [(0xffeb, true), (0x61, true), (0x61, false), (0xffeb, false)]);
+    // the button at its place, down and up; then the wheel: a Mac scrolls by a pixel for a
+    // step, so a notch, which stands for a hundred pixels, is a hundred steps down
+    assert_eq!(seen.pointer[..2], [(1, 50, 60), (0, 50, 60)]);
+    let steps = &seen.pointer[2..];
+    assert_eq!(steps.len(), 200);
+    assert!(steps.chunks(2).all(|step| step == [(0x10, 30, 40), (0, 30, 40)]));
+
+    // text passes both ways: what the person copied, and what is copied on the machine
+    session.say(Json::object([("copied", "from the person".into())])).await;
+    session.did(&[written(0xffe3, true), written(0x63, true)].concat()).await;
+    assert_eq!(session.until("copied").await.write(), r#"{"copied":"FROM THE PERSON"}"#);
+
+    // the person leaves, and the records say what was opened, over what
+    session.say(Json::object([("leaves", true.into())])).await;
+    assert_eq!(session.until("ended").await.write(), r#"{"ended":"left"}"#);
+    let kept = records(&world.database).await;
+    let of_sessions: Vec<_> = kept.iter().filter(|(kind, ..)| kind.starts_with("session-")).collect();
+    assert_eq!(
+        of_sessions.iter().map(|(kind, ..)| kind.as_str()).collect::<Vec<_>>(),
+        ["session-asked", "session-opened", "session-ended"]
+    );
+    assert_eq!((of_sessions[0].3.text_of("way"), of_sessions[0].3.text_of("over")), (Some("desktop"), Some("vnc")));
+
+    // a desktop that asks for nothing opens with nothing asked, and its wheel is a step a notch
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "tux-02")).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!(steps, ["reaching", "signing-in", "first-picture"]);
+    assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120,"keys":"written"}}"#);
+    // the clipboard passes neither way where the files switch it off
+    assert_eq!(session.next().await.map(|says| says.write()).as_deref(), Some(r#"{"clipboard":{"to":false,"from":false}}"#));
+    session.did(&[3, 0xff, 0x88, 0, 0, 30, 0, 40]).await;
+    session.did(&[2, 0, 1, 0, 9, 0, 9]).await;
+    while session.pixel(12, 12) != [clicked[0], clicked[1], clicked[2]] {
+        let drawn = session.until("drawn").await.get("drawn").and_then(Json::count).expect("a number");
+        session.say(Json::object([("seen", drawn.into())])).await;
+    }
+    let seen = world.open_desk.seen().last().cloned().expect("a client came");
+    assert_eq!((seen.chose, &seen.pointer[..]), (Some(1), &[(0x10, 30, 40), (0, 30, 40), (1, 9, 9)][..]));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

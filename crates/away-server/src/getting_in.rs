@@ -516,18 +516,18 @@ impl GettingIn {
         };
         let themselves = method == SignsIn::Themselves;
         let restricted_admin = method == SignsIn::RestrictedAdminSso;
-        // what Away opens so far: a Windows desktop and the programs of a Windows machine, of
-        // one machine or of a farm's collection
+        // what Away opens so far: a desktop, over RDP or over VNC, of one machine or of a
+        // farm's collection, and the programs of a Windows machine
         let asked_for = named.iter().find(|(its, value)| its == "program" && !value.is_empty()).map(|(_, value)| value.as_str());
-        let (port, program) = match asked_for {
+        let (over, port, program) = match asked_for {
             None => {
-                let Some((Over::Rdp, port)) = machine.desktop else {
+                let Some((over, port)) = machine.desktop else {
                     return plain(
                         StatusCode::NOT_IMPLEMENTED,
-                        "Away opens Windows desktops and programs so far, and this machine offers neither.\n",
+                        "Away opens desktops and programs so far, and this machine offers neither.\n",
                     );
                 };
-                (port, None)
+                (over, port, None)
             }
             Some(asked_for) => {
                 let Some(program) = machine.programs.iter().find(|program| program.name == asked_for) else {
@@ -538,7 +538,7 @@ impl GettingIn {
                     Some((Over::Rdp, port)) => port,
                     _ => 3389,
                 };
-                (port, Some((program.name.clone(), program.run.clone())))
+                (Over::Rdp, port, Some((program.name.clone(), program.run.clone())))
             }
         };
         if !self.records.are_kept() {
@@ -561,6 +561,7 @@ impl GettingIn {
                 ("program", program.as_ref().map_or(Json::Null, |(name, _)| name.as_str().into())),
                 ("address", machine.address.as_str().into()),
                 ("port", u64::from(port).into()),
+                ("over", over.written().into()),
                 (
                     "signs_in",
                     if restricted_admin {
@@ -591,6 +592,7 @@ impl GettingIn {
             machine: machine.name.clone(),
             address: machine.address.clone(),
             port,
+            over,
             collection: machine.collection.clone(),
             served_by: machine.served_by.clone(),
             themselves,
@@ -645,7 +647,7 @@ impl GettingIn {
                         && machine.collection == asked.collection
                         && machine.served_by == asked.served_by
                         && (match &asked.program {
-                            None => machine.desktop == Some((Over::Rdp, asked.port)),
+                            None => machine.desktop == Some((asked.over, asked.port)),
                             Some((name, run)) => {
                                 machine.programs.iter().any(|p| &p.name == name && &p.run == run)
                                     && machine.desktop.map_or(3389, |(_, port)| port) == asked.port
@@ -684,6 +686,7 @@ impl GettingIn {
                                 .into(),
                             ),
                             ("clipboard", asked.clipboard.word().into()),
+                            ("over", asked.over.written().into()),
                             (
                                 "program",
                                 asked.program.as_ref().map_or(Json::Null, |(name, run)| {
