@@ -1130,14 +1130,19 @@ test.describe('a session', () => {
 
     // text keeps its formatting: the key H copies some on the machine, and the person's
     // clipboard holds the text and, with it, the text with its formatting
+    // a clipboard that changes while it is read holds nothing to read yet: it is read again
     const formatted = () =>
       page.evaluate(async () => {
-        const item = (await navigator.clipboard.read()).find((one) => one.types.includes('text/html'));
-        return item ? [await (await item.getType('text/plain')).text(), await (await item.getType('text/html')).text()] : null;
+        try {
+          const item = (await navigator.clipboard.read()).find((one) => one.types.includes('text/html'));
+          return item ? [await (await item.getType('text/plain')).text(), await (await item.getType('text/html')).text()] : null;
+        } catch {
+          return null;
+        }
       });
     await page.keyboard.press('h');
     await expect.poll(async () => (await formatted())?.[0]).toBe('COPIED BY THE PERSON');
-    expect((await formatted())?.[1]).toContain('<b>copied</b> on the machine');
+    await expect.poll(async () => (await formatted())?.[1] ?? '').toContain('<b>copied</b> on the machine');
     // and what the person copies with formatting is the machine's to paste with it: the
     // stand-in copies the formatting it was handed back as it was
     await page.getByRole('button', { name: "open the session's bar" }).click();
@@ -1157,18 +1162,22 @@ test.describe('a session', () => {
         return (await formatted())?.[0] ?? '';
       })
       .toBe('SLANTED BY THE PERSON');
-    expect((await formatted())?.[1]).toContain('<i>slanted</i> by the person');
+    await expect.poll(async () => (await formatted())?.[1] ?? '').toContain('<i>slanted</i> by the person');
 
     // a picture passes the same way: the key P copies one on the machine, of three by
     // two pixels, and it is in the person's clipboard
     const held = () =>
       page.evaluate(async () => {
-        const item = (await navigator.clipboard.read()).find((one) => one.types.includes('image/png'));
-        if (!item) return null;
-        const picture = await createImageBitmap(await item.getType('image/png'));
-        const drawn = new OffscreenCanvas(picture.width, picture.height).getContext('2d')!;
-        drawn.drawImage(picture, 0, 0);
-        return [picture.width, picture.height, ...drawn.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+        try {
+          const item = (await navigator.clipboard.read()).find((one) => one.types.includes('image/png'));
+          if (!item) return null;
+          const picture = await createImageBitmap(await item.getType('image/png'));
+          const drawn = new OffscreenCanvas(picture.width, picture.height).getContext('2d')!;
+          drawn.drawImage(picture, 0, 0);
+          return [picture.width, picture.height, ...drawn.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+        } catch {
+          return null;
+        }
       });
     await page.keyboard.press('p');
     await expect.poll(held).toEqual([3, 2, 10, 20, 30]);
