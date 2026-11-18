@@ -779,7 +779,7 @@ async fn a_person_opens_a_desktop_types_the_password_sees_the_machines_picture_a
     // a file the person copied: the machine is told its name and its size, pastes at
     // once, and wants what is in it, which the person's device gives in pieces
     session.say(Json::read(r#"{"gives":[{"name":"report.txt","size":8}]}"#).expect("JSON")).await;
-    assert_eq!(session.until("wants").await.write(), r#"{"wants":{"file":0,"from":0,"length":100000}}"#);
+    assert_eq!(session.until("wants").await.write(), r#"{"wants":{"file":0,"from":0,"length":8}}"#);
     session.did(&[&[0x11, 1][..], b"a re"].concat()).await;
     session.did(&[&[0x11, 2][..], b"port"].concat()).await;
     let pasted = async {

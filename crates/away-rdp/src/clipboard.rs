@@ -78,6 +78,10 @@ const A_FOLDER: u32 = 0x0000_0010;
 pub const MOST_FILES: usize = 4096;
 /// The longest piece of a file that is asked for at once.
 pub const LONGEST_PIECE: u32 = 256 * 1024;
+/// The most of a file the person copied that a machine is given at once. A program on
+/// the machine that asks for more than that in one go is given nothing: a part of what
+/// it asked for would be the end of the file to it.
+pub const MOST_AT_ONCE: u32 = 16 * 1024 * 1024;
 
 /// Which ways the clipboard passes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -601,13 +605,16 @@ impl Clipboard {
                         says.extend(file.size.to_le_bytes());
                         Ok((vec![message(GIVES_A_FILE, WORKED, &says)], None))
                     }
-                    (Some(_), (Some(at), Some(2), Some(low), Some(high), Some(length))) => {
-                        let wants = Carried::Wants {
-                            number: four(holds, 0).ok_or(WRONG)?,
-                            file: at,
-                            from: u64::from(low) | (u64::from(high) << 32),
-                            length: length.min(LONGEST_PIECE * 4),
-                        };
+                    (Some(file), (Some(at), Some(2), Some(low), Some(high), Some(length))) => {
+                        let from = u64::from(low) | (u64::from(high) << 32);
+                        // no more is wanted than is left of the file, and what is wanted
+                        // is given whole or not at all: a program that asks for much in
+                        // one go takes a part of it for all there is
+                        let length = length.min(u32::try_from(file.size.saturating_sub(from)).unwrap_or(u32::MAX));
+                        if length > MOST_AT_ONCE {
+                            return Ok((vec![message(GIVES_A_FILE, FAILED, number)], None));
+                        }
+                        let wants = Carried::Wants { number: four(holds, 0).ok_or(WRONG)?, file: at, from, length };
                         Ok((Vec::new(), Some(wants)))
                     }
                     _ => Ok((vec![message(GIVES_A_FILE, FAILED, number)], None)),
@@ -1261,6 +1268,15 @@ mod tests {
         assert_eq!((answers.len(), wants), (0, Some(Carried::Wants { number: 8, file: 1, from: 4_294_967_296, length: 65_536 })));
         assert_eq!(stand_in::gave_of_a_file(&clipboard.gives_a_piece(8, Some(b"a piece"))[0]), Some((8, Some(b"a piece".to_vec()))));
         assert_eq!(stand_in::gave_of_a_file(&clipboard.gives_a_piece(9, None)[0]), Some((9, None)));
+        // no more is wanted than is left of the file
+        let (answers, wants) = clipboard.receive(&stand_in::asks_for_theirs(12, 0, Some((4, 100)))).unwrap();
+        assert_eq!((answers.len(), wants), (0, Some(Carried::Wants { number: 12, file: 0, from: 4, length: 7 })));
+        // a program that reads much of a file in one go is given all it asked for: a part
+        // of it would be the end of the file to it. More than is given at once is not given
+        let (answers, wants) = clipboard.receive(&stand_in::asks_for_theirs(13, 1, Some((0, MOST_AT_ONCE)))).unwrap();
+        assert_eq!((answers.len(), wants), (0, Some(Carried::Wants { number: 13, file: 1, from: 0, length: MOST_AT_ONCE })));
+        let (answers, wants) = clipboard.receive(&stand_in::asks_for_theirs(14, 1, Some((0, MOST_AT_ONCE + 1)))).unwrap();
+        assert_eq!((stand_in::gave_of_a_file(&answers[0]), wants), (Some((14, None)), None));
         // a file that is not among them is not given
         let (answers, wants) = clipboard.receive(&stand_in::asks_for_theirs(10, 2, Some((0, 100)))).unwrap();
         assert_eq!((stand_in::gave_of_a_file(&answers[0]), wants), (Some((10, None)), None));

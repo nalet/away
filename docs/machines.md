@@ -345,8 +345,11 @@ machine that offers more is opened from its own page, where each way in is.
   is in them a piece at a time, and the page reads each piece off the person's
   device then. Nothing of a file is kept by Away, so the session has to stay
   open until the machine has it, and a file may be as large as the device
-  holds. Each file the machine had to its end is a record. Folders of one's
-  own don't pass yet.
+  holds. A program on the machine that reads a file in one go, and not a
+  piece at a time as the file manager does, is given all it asks for up to
+  16 MB at once; more than that in one go it is told it can't have, and not
+  given a part of. Each file the machine had to its end is a record. Folders
+  of one's own don't pass yet.
 - **A Windows desktop follows its window.** Once the window has rested at
   another size, the machine is told and offers its desktop anew at that size,
   so nothing is scaled and text keeps its size. A machine that doesn't take a
