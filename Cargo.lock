@@ -102,6 +102,8 @@ dependencies = [
  "away-winauth",
  "getrandom 0.4.3",
  "hyper",
+ "ring",
+ "rsa",
  "tokio",
 ]
 
