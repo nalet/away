@@ -33,7 +33,7 @@ Which machines there are, how each is reached and how people are signed in on it
 
 - *Keep machines, groups and rules as files, applied as they change*: so they can live in a repository and be reviewed like code.
 - *Say for a machine how people are signed in: as themselves, with a kept secret, or by typing*: as themselves or by typing on a Windows machine; with a kept secret on a desktop over VNC alone so far.
-- *Keep a name and password or a key for a machine, never shown again*: the machine's file names a secret the cluster holds; a desktop's password over VNC is kept, a name and password or a key for RDP and SSH not yet.
+- *Keep a name and password or a key for a machine, never shown again*: a password is typed once on the administration's page and sealed to the issuer (ADR-0017); a name and password or a key for RDP and SSH not yet.
 - *Change a kept password on the machine by itself from time to time*: Away keeps the secrets it needs and manages no others.
 - *Give a program an icon of its own, which people know it by*: a picture among the files; Away serves it itself.
 - *Read the desktops and programs a farm of Windows machines publishes from the farm itself, as it changes*: the files name the farm's feed; Away asks it as an account of its own.

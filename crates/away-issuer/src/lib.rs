@@ -16,6 +16,7 @@
 
 pub mod administrators;
 pub mod authority;
+pub mod keeping;
 pub mod server;
 pub mod sign_in;
 pub mod told;
@@ -31,6 +32,7 @@ use away_part::http::{answer, carried, plain, Answer, Answers, Listener};
 use away_part::json::Json;
 use away_part::part::Bound;
 use away_part::{time, Lines, Part, Settings};
+use away_secret::Secret;
 use hyper::body::Incoming;
 use hyper::{Method, Request, StatusCode};
 
@@ -61,6 +63,8 @@ struct Inside {
     domain: Option<Domain>,
     /// The folder of the secrets kept for machines.
     kept: Option<PathBuf>,
+    /// The keys of the secrets Away keeps in its own store.
+    keeping: Option<keeping::Keeping>,
     lines: Lines,
 }
 
@@ -134,6 +138,18 @@ impl Issuer {
             }
             (None, _) => None,
         };
+        let keeping = match (told.keeping, &checks) {
+            (Some(keys), Some(_)) => {
+                let keeping = keeping::Keeping::read(&keys).map_err(|why| could_not(format!("The keeping keys can't be used: {why}.")))?;
+                let (name, _) = keeping.current();
+                part.lines.info("secrets Away keeps are sealed to its key", &[("key", away_part::sealed::written(&name).as_str().into())]);
+                Some(keeping)
+            }
+            (Some(_), None) => {
+                return Err(could_not("Secrets Away keeps are opened only with the sign-in service and the server told.".to_string()))
+            }
+            (None, _) => None,
+        };
         let health = part.listen("health", &settings.health_address).await?;
         let internal = match told.internal {
             None => None,
@@ -150,7 +166,7 @@ impl Issuer {
                 })
             }
         };
-        let inside = Arc::new(Inside { checks, domain, kept, lines: part.lines.clone() });
+        let inside = Arc::new(Inside { checks, domain, kept, keeping, lines: part.lines.clone() });
         Ok(Issuer { part, health, internal, inside })
     }
 
@@ -245,9 +261,11 @@ impl Inside {
     }
 
     /// The secret kept for the machine of a session: checked as a sign-in is, recorded,
-    /// and then handed to the gateway, for that session alone.
+    /// and then handed to the gateway, for that session alone. Away's own store keeps it
+    /// sealed, and the server hands it over with the session; where it holds none, the
+    /// installation's folder of secrets is looked in.
     async fn kept(&self, session: &str) -> Answer {
-        let (Some(folder), Some(checks)) = (&self.kept, &self.checks) else {
+        let Some(checks) = self.checks.as_ref().filter(|_| self.kept.is_some() || self.keeping.is_some()) else {
             return says(StatusCode::NOT_FOUND, "no-kept", "This installation keeps no secrets for machines.");
         };
         let refuse = |refused: Refused| {
@@ -268,16 +286,33 @@ impl Inside {
         let Some(name) = vouched.kept.as_deref().filter(|name| is_a_kept_name(name)) else {
             return refuse(because("policy", "The server names no kept secret for this session's machine.".to_string()));
         };
-        // read anew each time, a small file: a secret the installation changes is the one
-        // handed out next
-        let held = match std::fs::read(folder.join(name)) {
-            Ok(held) => held,
-            Err(error) => return refuse(because("not-kept", format!("Away keeps no secret named {name}: {error}."))),
-        };
-        let Some(secret) =
-            String::from_utf8(held).ok().map(|held| held.trim_end_matches(['\r', '\n']).to_string()).filter(|held| !held.is_empty())
-        else {
-            return refuse(because("not-kept", format!("The secret named {name} is empty, or is no text.")));
+        let secret = match (&vouched.kept_sealed, &self.keeping, &self.kept) {
+            // sealed in Away's own store: it opens with the issuer's key, under its name alone
+            (Some(sealed), Some(keeping), _) => match keeping.open(sealed, name) {
+                Ok(secret) => secret,
+                Err(keeping::NotOpened::OtherKey) => {
+                    return refuse(because("not-kept", format!("The secret named {name} is sealed to a key this issuer doesn't hold.")));
+                }
+                Err(_) => return refuse(because("not-kept", format!("The secret named {name} doesn't open: it is not as it was sealed."))),
+            },
+            (Some(_), None, _) => return refuse(because("not-kept", "This issuer holds no key that opens Away's own store.".to_string())),
+            // the installation's folder: read anew each time, a small file, so that a
+            // secret the installation changes is the one handed out next
+            (None, _, Some(folder)) => {
+                let held = match std::fs::read(folder.join(name)) {
+                    Ok(held) => held,
+                    Err(error) => return refuse(because("not-kept", format!("Away keeps no secret named {name}: {error}."))),
+                };
+                let Some(secret) = String::from_utf8(held)
+                    .ok()
+                    .map(|held| held.trim_end_matches(['\r', '\n']).to_string())
+                    .filter(|held| !held.is_empty())
+                else {
+                    return refuse(because("not-kept", format!("The secret named {name} is empty, or is no text.")));
+                };
+                Secret::new(secret)
+            }
+            (None, _, None) => return refuse(because("not-kept", format!("Away keeps no secret named {name}."))),
         };
         // the record comes before the secret is handed out, and without it none is
         if let Err(why) = checks.server.handed(session, name).await {
@@ -292,7 +327,7 @@ impl Inside {
                 ("kept", name.into()),
             ],
         );
-        answer(StatusCode::OK, "application/json", Json::object([("password", secret.as_str().into())]).write())
+        answer(StatusCode::OK, "application/json", Json::object([("password", secret.expose().into())]).write())
     }
 
     /// What signs the person of a session in on its machine: checked, made, recorded,

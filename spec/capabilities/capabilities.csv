@@ -121,7 +121,7 @@ see-refused-change,register,"See that a changed file was refused, and why, while
 add-machine-in-browser,register,"Add a machine in the browser: its address, its kind, how one gets in",admin,—,—,—,later,
 group-machines,register,Put machines in groups,admin,—,—,—,built,
 set-sign-in-way,register,"Say for a machine how people are signed in: as themselves, with a kept secret, or by typing",admin,—,—,—,partial,as themselves or by typing on a Windows machine; with a kept secret on a desktop over VNC alone so far
-keep-secret,register,"Keep a name and password or a key for a machine, never shown again",admin,—,—,—,partial,"the machine's file names a secret the cluster holds; a desktop's password over VNC is kept, a name and password or a key for RDP and SSH not yet"
+keep-secret,register,"Keep a name and password or a key for a machine, never shown again",admin,—,—,—,partial,"a password is typed once on the administration's page and sealed to the issuer (ADR-0017); a name and password or a key for RDP and SSH not yet"
 change-kept-secret,register,Change a kept password on the machine by itself from time to time,system,—,—,—,no,Away keeps the secrets it needs and manages no others
 offer-programs,register,Say which programs of a Windows machine people may open,admin,—,—,—,built,
 give-program-icons,register,"Give a program an icon of its own, which people know it by",admin,—,—,—,built,"a picture among the files; Away serves it itself"

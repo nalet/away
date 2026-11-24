@@ -27,6 +27,7 @@
 //! | `AWAY_DATABASE_AUTHORITIES_FILE` | certificates of authorities to trust for the database besides the public ones, as PEM |
 //! | `AWAY_INTERNAL_ADDRESS` | where the gateway asks the server, such as `0.0.0.0:8082`; without it no session is opened |
 //! | `AWAY_INTERNAL_CERTIFICATE_FILE`, `AWAY_INTERNAL_KEY_FILE` | the certificate that secures that address and its key, as PEM |
+//! | `AWAY_KEEPING_CERTIFICATE_FILE` | the certificate of the issuer's key that the secrets Away keeps for machines are sealed to, as PEM; without it none are kept |
 
 use std::time::Duration;
 
@@ -71,6 +72,8 @@ pub struct Told {
     /// Where the gateway asks the server: to take a session over, and to say what
     /// became of it. Without it no session is opened.
     pub internal: Option<Internal>,
+    /// The certificate of the issuer's key that the secrets Away keeps are sealed to, as PEM.
+    pub keeping: Option<Vec<u8>>,
 }
 
 /// Where Away's other parts ask the server, and what secures that.
@@ -134,6 +137,10 @@ impl Told {
     pub fn read(variable: impl Fn(&str) -> Option<String>, file: impl Fn(&str) -> std::io::Result<Vec<u8>>) -> Result<Told, String> {
         let contact = variable("AWAY_CONTACT");
         let files = variable("AWAY_FILES").filter(|folder| !folder.is_empty()).map(std::path::PathBuf::from);
+        let keeping = variable("AWAY_KEEPING_CERTIFICATE_FILE")
+            .filter(|path| !path.is_empty())
+            .map(|path| file(&path).map_err(|error| format!("AWAY_KEEPING_CERTIFICATE_FILE names {path}, which can't be read: {error}.")))
+            .transpose()?;
         let farms = match (variable("AWAY_FARMS_ACCOUNT"), variable("AWAY_FARMS_PASSWORD_FILE")) {
             (None, None) => None,
             (Some(account), Some(path)) => {
@@ -226,7 +233,7 @@ impl Told {
         let needed = ["AWAY_PUBLIC_ADDRESS", "AWAY_SIGN_IN_SERVICE", "AWAY_SIGN_IN_CLIENT", "AWAY_SIGN_IN_SECRET_FILE"];
         let said: Vec<Option<String>> = needed.iter().map(|name| variable(name)).collect();
         if said.iter().all(Option::is_none) {
-            return Ok(Told { sign_in: None, contact, files, farms, database, internal });
+            return Ok(Told { sign_in: None, contact, files, farms, database, internal, keeping });
         }
         if let Some(missing) = needed.iter().zip(&said).find(|(_, said)| said.is_none()).map(|(name, _)| name) {
             return Err(format!("{missing} is not set, and signing in needs it."));
@@ -270,6 +277,7 @@ impl Told {
             farms,
             database,
             internal,
+            keeping,
         })
     }
 }

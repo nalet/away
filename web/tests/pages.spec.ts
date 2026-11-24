@@ -802,6 +802,56 @@ test('a sign-in service that does not answer is said not to answer, with the rea
 test.describe('with a database', () => {
   test.skip(!DATABASE, 'no database to test against: AWAY_TEST_DATABASE is not set');
 
+  test('a password Away keeps for machines is typed once, sealed in the browser, and never shown again', async ({ page }) => {
+    // what the page sends to keep a password
+    const sent: Uint8Array[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/api/kept') && request.method() === 'PUT') sent.push(new Uint8Array(request.postDataBuffer() ?? []));
+    });
+    const holds = (bytes: Uint8Array | undefined, text: string) => {
+      const sought = new TextEncoder().encode(text);
+      return bytes !== undefined && bytes.some((_, at) => sought.every((byte, nth) => bytes[at + nth] === byte));
+    };
+    await page.goto(`${AWAY_THAT_KEEPS}/administration/passwords`);
+    await expect(page.getByRole('tab', { name: 'passwords' })).toHaveAttribute('aria-selected', 'true');
+    const passwords = page.getByRole('table', { name: 'passwords' });
+    const mac = passwords.getByRole('row', { name: /^mac-02/ });
+    await expect(mac).toContainText('mac-02');
+    await expect(mac).toContainText('not yet: people type it');
+    await accessible(page);
+
+    // kept: typed once, in a dialog of its own
+    await mac.getByRole('button', { name: 'keep a password' }).click();
+    const keeping = page.getByRole('dialog', { name: 'keep the password mac-02' });
+    await expect(keeping).toContainText('For mac-02.');
+    await keeping.getByLabel('Password').fill('a desktop');
+    await accessible(page);
+    await keeping.getByRole('button', { name: 'keep it' }).click();
+    await expect(keeping).toBeHidden();
+    await expect(mac).toContainText(/since .+, by /);
+    // what left the browser is sealed: it begins as a sealed secret does, and holds
+    // nothing of the password
+    expect(sent).toHaveLength(1);
+    expect(new TextDecoder().decode(sent[0]?.subarray(0, 4))).toBe('AKS1');
+    expect(holds(sent[0], 'a desktop')).toBe(false);
+    // and nothing of it comes back: the page is told who kept it and since when, alone
+    const told = await page.evaluate(async () => (await fetch('/api/kept')).text());
+    expect(told).not.toContain('AKS1');
+    expect(told).toContain('"kept":true');
+
+    // replaced, and removed: then the machine asks for it again
+    await mac.getByRole('button', { name: 'replace' }).click();
+    await page.getByRole('dialog', { name: 'keep the password mac-02' }).getByLabel('Password').fill('another desktop');
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog', { name: 'keep the password mac-02' })).toBeHidden();
+    expect(sent).toHaveLength(2);
+    await mac.getByRole('button', { name: 'remove' }).click();
+    const removing = page.getByRole('dialog', { name: 'remove the password mac-02' });
+    await expect(removing).toContainText('mac-02 will ask for the password again.');
+    await removing.getByRole('button', { name: 'remove' }).click();
+    await expect(mac).toContainText('not yet: people type it');
+  });
+
   test('what a person stars is on home, in the order they starred it, on every browser they sign in with', async ({ page, browser }) => {
     const seen = watch(page);
     // nothing is starred yet: home says where the programs and the machines are

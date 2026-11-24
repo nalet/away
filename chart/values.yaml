@@ -86,6 +86,18 @@ database:
 # Signing people in on the machines of a Windows domain as themselves, with nothing
 # typed, where a machine's file says "signs-in: themselves". Without a domain named
 # here nobody is, and Away reaches no domain controller and no authority.
+# Away's own store of the passwords of machines that know no directory, such as a
+# desktop over VNC: an administrator types one once on the administration's passwords
+# page, the browser seals it to the issuer's key, the database keeps it sealed, and only
+# the issuer opens it, for one session. It needs a database and the sign-in service.
+keeping:
+  enabled: true
+  # A Secret of one's own with the key ("key.pem": the key new passwords are sealed to
+  # first, then older ones that still open what was sealed to them) and its certificate
+  # ("certificate.pem"). Without it the chart makes one at the first install and keeps it,
+  # also when Away is removed: back it up with the database.
+  secretName: ""
+
 # The secrets Away keeps for machines that know no directory, such as the password of a
 # desktop over VNC, so that nobody types it. A Secret of the cluster, made by whoever
 # installs Away, which only the issuer reads: each of its keys is one secret, by the name

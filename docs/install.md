@@ -224,26 +224,49 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
 ## Kept passwords
 
 A desktop over VNC can open with a password that Away keeps for it, where its
-entry names one ([a kept password](./machines.md#a-kept-password)). The
-passwords are a secret of the cluster, one key each, by the name the files
-give it:
+entry names one ([a kept password](./machines.md#a-kept-password)). An
+administrator types it once, on the administration's page **passwords**.
+
+- **Sealed in the browser, opened by the issuer alone.** The page seals the
+  password to the issuer's key (RSA-OAEP and AES-256-GCM) before it is sent;
+  the server checks that it is sealed to that key and keeps it in the database
+  as it is. Neither the server nor the database ever holds a password. For a
+  session of such a machine the issuer, once the server and the sign-in
+  service have said whose the session is, opens it and hands it to the gateway
+  for that sign-in alone ([ADR-0017](../spec/architecture/decisions/0017-away-keeps-the-secrets-of-machines-sealed.md)).
+- **It needs a database and the sign-in service.** The chart keeps passwords
+  as soon as both are there; `keeping.enabled=false` turns it off.
+- **The key is made once and kept.** At the first install the chart makes an
+  RSA key of 4096 bits and a certificate of it, as the secret `away-keeping`:
+  the issuer reads the key, the server the certificate and never the key. The
+  secret stays when Away is removed, because without it no kept password
+  opens again. **Back it up with the database**: one without the other is
+  worth nothing.
+- **Several of each part keep one store.** All servers share the database and
+  all issuers read the one key, so any server takes a password and any issuer
+  opens it.
+- **A key of one's own.** `keeping.secretName` names a secret with `key.pem`
+  and `certificate.pem` in place of the chart's. To replace the key, put the
+  new key first in `key.pem` and the old ones after it, and its certificate in
+  `certificate.pem`: new passwords are sealed to the new key, and the old ones
+  still open. A password is moved to the new key by keeping it anew. Without
+  the chart, as one container, make the two with
+  `openssl req -x509 -newkey rsa:4096 -nodes -days 36500 -subj "/CN=away keeping" -keyout key.pem -out certificate.pem`
+  and name them in `AWAY_KEEPING_KEYS_FILE` (the issuer) and
+  `AWAY_KEEPING_CERTIFICATE_FILE` (the server).
+- With the network rules on, the gateway reaches the issuer, and the issuer
+  the server and the sign-in service, as for signing in as oneself.
+
+An installation that keeps such passwords as secrets of the cluster instead,
+one key each by the name the files give it, names that secret; a name Away's
+own store doesn't hold is looked for there, and the issuer reads it anew for
+each session:
 
 ```sh
 kubectl --namespace away create secret generic away-kept-secrets --from-file=mac-01=./mac-01-password
 helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
   --namespace away --reuse-values --set keptSecrets.secretName=away-kept-secrets
 ```
-
-- **Only the issuer reads it.** It hands a password out to the gateway for a
-  session whose machine names it, once the server and the sign-in service have
-  said whose the session is. Kept passwords need the sign-in service, like
-  signing in as oneself.
-- **A changed password counts at once.** The issuer reads the password anew
-  for each session, and the cluster brings a changed secret to it by itself
-  within a minute or so: nothing has to start anew. A key of the secret ends
-  in a line break or not; the line break is no part of the password.
-- With the network rules on, the gateway reaches the issuer, and the issuer
-  the server and the sign-in service, as for signing in as oneself.
 
 ## Signing in as oneself on a Windows domain
 
@@ -389,7 +412,9 @@ Everything an installation is told is one of these. The chart's
 | `farms.account` | the account Away reads the farms' feeds with, such as `CORP\svc-away` ([the farms' feeds](#the-farms-feeds)) | none: a farm in the files shows nothing |
 | `farms.secretName` | the secret that holds the account's password, under the key `password` | none |
 | `farms.authoritiesConfigMap` | a ConfigMap with certificates of authorities to trust for the farms' web access besides the public ones, under the key `authorities.pem` | none |
-| `keptSecrets.secretName` | the secret that holds the passwords Away keeps for desktops over VNC, each under the name a machine's entry gives it ([kept passwords](#kept-passwords)) | none: nothing is kept, and people type such passwords |
+| `keeping.enabled` | whether Away keeps the passwords of machines in its own store, sealed to the issuer's key ([kept passwords](#kept-passwords)); it needs a database and the sign-in service | yes |
+| `keeping.secretName` | a secret of one's own with the key (`key.pem`) and its certificate (`certificate.pem`) | none: the chart makes `away-keeping` once and keeps it |
+| `keptSecrets.secretName` | a secret of the cluster that holds passwords for desktops over VNC, each under the name a machine's entry gives it, beside Away's own store | none |
 | `domain.name`, `domain.shortName` | the Windows domain whose machines people are signed in on as themselves, as it is named in full and in short ([signing in as oneself](#signing-in-as-oneself-on-a-windows-domain)) | none: nobody is signed in as themselves |
 | `domain.controllers` | the domain controllers that give tickets, by their names | none |
 | `domain.authoritiesConfigMap` | a ConfigMap with the certificates of the authorities the domain controllers' certificates lead to, under the key `authorities.pem` | none |

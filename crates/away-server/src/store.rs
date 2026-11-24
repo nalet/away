@@ -11,6 +11,7 @@
 
 pub mod favourites;
 pub mod identities;
+pub mod kept;
 pub mod records;
 
 use std::time::Duration;
@@ -62,6 +63,17 @@ pub const SHAPE: &[(&str, &str)] = &[
             machine text primary key,
             fingerprint text not null,
             since timestamptz not null default now()
+        )",
+    ),
+    (
+        "the secrets Away keeps for machines, each sealed to the issuer's key",
+        "create table kept_secret (
+            name text primary key,
+            sealed bytea not null,
+            key text not null,
+            since timestamptz not null default now(),
+            by_person text not null,
+            by_name text not null
         )",
     ),
 ];

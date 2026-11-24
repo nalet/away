@@ -458,10 +458,16 @@ have Away keep it, so that it opens with nothing typed:
     signs-in: { kept: mac-01 }
 ```
 
-- **The file names the password, and holds nothing of it.** The password is a
-  secret of the cluster that the installation makes, under the name the file
-  gives it ([kept passwords](./install.md#kept-passwords)). A name is made of
-  letters, digits and `- _ .`, 63 of them at most.
+- **The file names the password, and holds nothing of it.** An administrator
+  types the password once, on the administration's page **passwords**, which
+  lists every name the files give, with the machines that give it. The page
+  seals the password before it leaves the browser, so that only Away's issuer
+  opens it, and it is never shown again: it is replaced or removed. A name is
+  made of letters, digits and `- _ .`, 63 of them at most.
+- **Where it is kept.** Away keeps it in its database, sealed
+  ([kept passwords](./install.md#kept-passwords)). An installation that keeps
+  such passwords as secrets of the cluster instead names a folder of them, and
+  a name Away's own store doesn't hold is looked for there.
 - **Everyone a rule gives the machine is signed in with it.** Who reaches the
   machine is the rules' to say, as for any machine: whoever they give it opens
   the desktop without knowing its password.
@@ -474,8 +480,9 @@ have Away keep it, so that it opens with nothing typed:
   has none under that name, or the machine refuses the one it has, the person
   is asked for the password as where nothing is kept, and the line of the
   gateway says why.
-- **Each time it is handed out is a record**, with the person, the machine and
-  the name of the password.
+- **Each time it is kept, replaced, removed or handed out is a record**, with
+  the person, the name of the password and, where it opened a desktop, the
+  machine; never with anything of the password.
 
 ## Opening a program
 

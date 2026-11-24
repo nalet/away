@@ -6,12 +6,14 @@ import { Search } from 'lucide-react';
 import { useState } from 'react';
 
 import { whatItIs } from './Home';
+import { Passwords } from './Passwords';
 import { matches, useInForce } from './machines';
 import type { FarmState, Rule, Written } from './machines';
 import { texts } from './texts';
 
 export const RULES = '/administration/rules';
 export const FARMS = '/administration/farms';
+export const PASSWORDS = '/administration/passwords';
 
 // A moment, as people write one: the day and the time, in the reader's own way.
 function moment(seconds: number): string {
@@ -21,7 +23,7 @@ function moment(seconds: number): string {
 export function Administration({ path, go }: { path: string; go: (to: string) => void }) {
   const [inForce, again] = useInForce();
   const [sought, setSought] = useState('');
-  const tab = path === RULES ? 'rules' : path === FARMS ? 'farms' : 'machines';
+  const tab = path === RULES ? 'rules' : path === FARMS ? 'farms' : path === PASSWORDS ? 'passwords' : 'machines';
   const t = texts.administration;
 
   if (inForce === 'asking') return <div className="fill" aria-busy="true" />;
@@ -54,9 +56,10 @@ export function Administration({ path, go }: { path: string; go: (to: string) =>
           { value: 'machines', label: t.tabs.machines },
           { value: 'rules', label: t.tabs.rules },
           { value: 'farms', label: t.tabs.farms },
+          { value: 'passwords', label: t.tabs.passwords },
         ]}
         value={tab}
-        onChange={(to) => go(to === 'rules' ? RULES : to === 'farms' ? FARMS : '/administration')}
+        onChange={(to) => go(to === 'rules' ? RULES : to === 'farms' ? FARMS : to === 'passwords' ? PASSWORDS : '/administration')}
       />
       {refused && (
         <Banner state="error" live="polite">
@@ -142,6 +145,7 @@ export function Administration({ path, go }: { path: string; go: (to: string) =>
           empty={t.noFarms}
         />
       )}
+      {tab === 'passwords' && <Passwords />}
       {tab === 'rules' && (
         <Table<Rule>
           dense

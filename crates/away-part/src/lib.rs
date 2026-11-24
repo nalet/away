@@ -13,6 +13,7 @@ pub mod json;
 pub mod lines;
 pub mod measures;
 pub mod part;
+pub mod sealed;
 #[cfg(any(test, feature = "stand-in"))]
 pub mod stand_in;
 pub mod stop;

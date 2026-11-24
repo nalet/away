@@ -29,7 +29,7 @@ first release unless its note begins with *There* or *Later*.
 | `server` | signs in | `sign-in-service` | OpenID Connect | A code for tokens, their renewal, the sign-out. |
 | `server` | writes | `database` | the database away | — |
 | `server` | reads | `files` | the mounted files | At its start and on every change. |
-| `server` | reads | `cluster-secrets` | its own: the client's secret, the key for what the database holds encrypted, its signing key, the password of the account that reads the farms' feeds | Mounted. |
+| `server` | reads | `cluster-secrets` | its own: the client's secret, the key for what the database holds encrypted, its signing key, the password of the account that reads the farms' feeds, the certificate of the key kept passwords are sealed to | Mounted. |
 | `server` | fetches | `farm-feed` | HTTPS | Only where the files name a farm: what the farm publishes, each thing's icon and how it is reached, every five minutes, as an account that opens nothing. |
 | `server` | calls | `gateway` | internal | End a session, test a machine, announce an update. |
 | `gateway` | calls | `server` | internal | Take over a session with its ticket; report its steps, its use and its end. |
@@ -45,7 +45,7 @@ first release unless its note begins with *There* or *Later*.
 | `gateway` | uses | `picture` | — | — |
 | `gateway` | uses | `wire` | — | — |
 | `issuer` | fetches | `sign-in-service` | the provider's public keys | To check a person's sign-in itself. |
-| `issuer` | reads | `cluster-secrets` | its authority's keys and the kept accounts | The one part that may read the kept accounts. |
+| `issuer` | reads | `cluster-secrets` | its authority's keys, the kept accounts and the key that opens the passwords Away keeps | The one part that may read the kept accounts or open a kept password. |
 | `issuer` | asks | `authority` | the pages the authority publishes for asking it, over TLS | Only where the configuration says that the organisation's own authority issues. The issuer is signed in there with a ticket of the domain's, bound to the connection. |
 | `issuer` | calls | `domain` | Kerberos | Only where the organisation's own authority issues: it gets the ticket it is signed in at the authority's pages with. |
 | `issuer` | calls | `server` | internal | Whose a session is, before it signs anybody in, and the record of that sign-in. What is public of it: its state, the kept accounts' names, its authority's certificate and the list it withdrew. |

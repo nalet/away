@@ -31,6 +31,8 @@ pub struct Vouched {
     pub signed: Secret,
     /// The secret kept for the machine, by its name, where the machine's entry names one.
     pub kept: Option<String>,
+    /// That secret as Away's own store keeps it, sealed to the issuer, where it keeps it.
+    pub kept_sealed: Option<Vec<u8>>,
 }
 
 /// Why the server answered for nothing.
@@ -77,6 +79,9 @@ impl Server {
                         machine: machine.to_string(),
                         signed: Secret::new(signed),
                         kept: said.text_of("kept").map(str::to_string),
+                        kept_sealed: said.text_of("kept_sealed").and_then(|letters| {
+                            away_part::base64::read_for_addresses(&letters.replace('+', "-").replace('/', "_").replace('=', ""))
+                        }),
                     }),
                     _ => Err(NotVouched::NotAsked("The server answered for the session with nothing a sign-in can rest on.".to_string())),
                 }

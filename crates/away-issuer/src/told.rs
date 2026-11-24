@@ -99,6 +99,9 @@ pub struct Told {
     /// file of its own, named as a machine's entry names it. It needs the sign-in
     /// service and the server.
     pub kept: Option<String>,
+    /// The keys the secrets Away keeps in its own store are sealed to, as PEM: the first
+    /// seals, all of them open. It needs the sign-in service and the server.
+    pub keeping: Option<Vec<u8>>,
 }
 
 fn list(said: Option<String>, otherwise: &[&str]) -> Vec<String> {
@@ -131,6 +134,10 @@ impl Told {
             }
         };
         let kept = said("AWAY_KEPT_SECRETS");
+        let keeping = read("AWAY_KEEPING_KEYS_FILE")?;
+        if keeping.as_ref().is_some_and(|keys| keys.iter().all(u8::is_ascii_whitespace)) {
+            return Err("AWAY_KEEPING_KEYS_FILE names a file that is empty.".to_string());
+        }
         // the issuer checks a person's sign-in itself, and asks the server whose a session
         // is: for whatever it hands out, a sign-in on a domain's machine or a kept secret
         let checks = |what: &str| -> Result<(SignInService, Server), String> {
@@ -158,15 +165,11 @@ impl Told {
                     ));
                 }
             }
-            let Some(kept) = kept else { return Ok(Told { internal, ..Told::default() }) };
+            if kept.is_none() && keeping.is_none() {
+                return Ok(Told { internal, ..Told::default() });
+            }
             let (sign_in, server) = checks("handing out the secrets Away keeps for machines")?;
-            return Ok(Told {
-                internal: internal.clone(),
-                sign_in: Some(sign_in),
-                server: Some(server),
-                kept: Some(kept),
-                ..Told::default()
-            });
+            return Ok(Told { internal: internal.clone(), sign_in: Some(sign_in), server: Some(server), kept, keeping, ..Told::default() });
         };
 
         let needed = |name: &str| {
@@ -249,7 +252,7 @@ impl Told {
         };
 
         let (sign_in, server) = checks(&format!("signing people in on the machines of {domain}"))?;
-        Ok(Told { administrators, internal, windows: Some(windows), sign_in: Some(sign_in), server: Some(server), kept })
+        Ok(Told { administrators, internal, windows: Some(windows), sign_in: Some(sign_in), server: Some(server), kept, keeping })
     }
 }
 
@@ -264,6 +267,7 @@ mod tests {
             "/secrets/password" => Ok(b"a password\n".to_vec()),
             "/secrets/empty" => Ok(Vec::new()),
             "/secrets/authorities" => Ok(b"-----BEGIN CERTIFICATE-----".to_vec()),
+            "/secrets/keeping" => Ok(b"-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n".to_vec()),
             _ => Err(std::io::Error::from(std::io::ErrorKind::NotFound)),
         };
         Told::read(variable, file)
@@ -375,6 +379,14 @@ mod tests {
             let why = told(&without).unwrap_err();
             assert!(why.starts_with(&format!("{name} is not set, and handing out the secrets Away keeps for machines needs it")), "{why}");
         }
+        // the keys of Away's own store rest on the same, and are read as they are
+        let keeping: Vec<(&str, &str)> = std::iter::once(("AWAY_KEEPING_KEYS_FILE", "/secrets/keeping")).chain(rests_on).collect();
+        let keeps = told(&keeping).expect("a store of its own");
+        assert!(keeps.keeping.is_some_and(|keys| keys.starts_with(b"-----BEGIN PRIVATE KEY-----")) && keeps.kept.is_none());
+        let why = told(&[("AWAY_KEEPING_KEYS_FILE", "/secrets/keeping")]).unwrap_err();
+        assert!(why.starts_with("AWAY_SIGN_IN_SERVICE is not set, and handing out the secrets Away keeps for machines needs it"), "{why}");
+        let why = told(&[("AWAY_KEEPING_KEYS_FILE", "/secrets/empty")]).unwrap_err();
+        assert_eq!(why, "AWAY_KEEPING_KEYS_FILE names a file that is empty.");
         // and beside a domain, as well
         let with_a_domain = read_with(&WHOLE, &[("AWAY_KEPT_SECRETS", "/run/away/kept")]).expect("a domain and kept secrets");
         assert!(with_a_domain.windows.is_some() && with_a_domain.kept.is_some());

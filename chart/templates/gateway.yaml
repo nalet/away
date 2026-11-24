@@ -12,7 +12,7 @@
 {{- $mounts = append $mounts (dict "at" "/run/away/domain-authorities" "volume" (dict "name" "domain-authorities" "configMap" (dict "name" (required "domain.authoritiesConfigMap is not set" .authoritiesConfigMap)))) -}}
 {{- end }}
 {{- end }}
-{{- if or .Values.domain.name .Values.keptSecrets.secretName }}
+{{- if include "away.issuerAnswers" . }}
 {{- /* the issuer, which signs people in on a domain's machines and hands out the secrets kept for machines, at an address of its own */ -}}
 {{- $told = append $told (dict "name" "AWAY_ISSUER" "value" (printf "https://%s-issuer:8083" (include "away.name" .))) -}}
 {{- $told = append $told (dict "name" "AWAY_ISSUER_AUTHORITIES_FILE" "value" "/run/away/to-the-issuer/authority.pem") -}}

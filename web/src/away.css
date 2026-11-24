@@ -115,6 +115,7 @@ a.m:focus-visible { border-color: var(--cloud-blue); }
 /* ── the administration: what is in force, as tables ── */
 .adm .nc-tabs { margin: 0 0 16px; }
 .adm .inforce { margin: 0 0 12px; color: var(--fg-muted); font-size: 13px; }
+.adm .acts { display: flex; justify-content: flex-end; gap: 8px; }
 .adm .listhead .find { margin-left: 0; width: 280px; }
 .plain { margin: 0; padding: 0; list-style: none; }
 

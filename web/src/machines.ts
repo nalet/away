@@ -76,7 +76,7 @@ async function ask<Answer>(address: string): Promise<Answer> {
 export type Asked<Answer> = 'asking' | 'unanswered' | Answer;
 
 // Asks when the page opens, and again when its window is looked at again.
-function useAsked<Answer>(address: string): [Asked<Answer>, () => void] {
+export function useAsked<Answer>(address: string): [Asked<Answer>, () => void] {
   const [answer, setAnswer] = useState<Asked<Answer>>('asking');
   const again = useCallback(() => {
     ask<Answer>(address).then(setAnswer, () => setAnswer((before) => (typeof before === 'string' ? 'unanswered' : before)));

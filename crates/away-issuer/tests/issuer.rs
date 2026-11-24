@@ -236,6 +236,7 @@ async fn world_with(kerberos: &str, good_for: u64) -> World {
         sign_in: Some(SignInService { service: service.at.clone(), client: "away".to_string(), authorities: None }),
         server: Some(told::Server { at: Address::read(&server.at).expect("the server's address"), authorities: None }),
         kept: None,
+        keeping: None,
     };
     let (stopper, stop) = stop::pair();
     let lines = Lines::kept_for("issuer");

@@ -7,6 +7,7 @@
 
 pub mod farm;
 pub mod getting_in;
+pub mod keeping;
 pub mod pages;
 pub mod records;
 pub mod register;
@@ -261,6 +262,10 @@ fn public(getting_in: Arc<GettingIn>) -> Answers {
     Arc::new(move |request| {
         let getting_in = getting_in.clone();
         Box::pin(async move {
+            // what an administrator's browser sealed comes as the request's body
+            if request.uri().path() == "/api/kept" && request.method() == Method::PUT {
+                return for_a_browser(getting_in.keep(request).await);
+            }
             if let Some(answer) = getting_in.answer(&request).await {
                 return for_a_browser(answer);
             }

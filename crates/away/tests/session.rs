@@ -35,6 +35,10 @@ const PASSWORD: &str = "a password that exists for these tests alone";
 const DATABASE_PASSWORD: &str = "a password for this machine alone";
 /// The password of the desktop of the Mac that stands in.
 const VNC_PASSWORD: &str = "a desktop";
+/// The certificate of the key the tests seal what Away keeps to, which the server
+/// reads, and the key, which the issuer reads.
+const KEEPING_CERTIFICATE: &[u8] = include_bytes!("../../away-server/tests/fixtures/keeping.pem");
+const KEEPING_KEY: &[u8] = include_bytes!("../../away-server/tests/fixtures/keeping.key.pem");
 
 /// The tests' database, with a database of its own in it for one test.
 async fn a_database_of_its_own() -> Option<Database> {
@@ -226,9 +230,11 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
          - name: mac-01\n    kind: mac\n    address: {host}\n    desktop: {{ port: {mac_port} }}\n    clipboard: both\n  \
          - name: tux-02\n    kind: linux\n    address: {host}\n    desktop: {{ port: {open_port} }}\n    clipboard: none\n  \
          - name: mac-03\n    kind: mac\n    address: {host}\n    desktop: {{ port: {mac_port} }}\n    signs-in: {{ kept: mac-03.vnc }}\n  \
-         - name: mac-04\n    kind: mac\n    address: {host}\n    desktop: {{ port: {mac_port} }}\n    signs-in: {{ kept: mac-04.vnc }}\n\
+         - name: mac-04\n    kind: mac\n    address: {host}\n    desktop: {{ port: {mac_port} }}\n    signs-in: {{ kept: mac-04.vnc }}\n  \
+         - name: mac-05\n    kind: mac\n    address: {host}\n    desktop: {{ port: {mac_port} }}\n    signs-in: {{ kept: mac-05 }}\n  \
+         - name: mac-06\n    kind: mac\n    address: {host}\n    desktop: {{ port: {mac_port} }}\n    signs-in: {{ kept: mac-06 }}\n\
          rules:\n  - name: staff-desks\n    who: [staff]\n    \
-         reaches: [desk-01, apps-01, gone-02, build-01, Desktops, Elsewhere, Unnamed, Alone, Anywhere, mac-01, tux-02, mac-03, mac-04]\n"
+         reaches: [desk-01, apps-01, gone-02, build-01, Desktops, Elsewhere, Unnamed, Alone, Anywhere, mac-01, tux-02, mac-03, mac-04, mac-05, mac-06]\n"
     );
     // the machine of the domain, where the world has one, in a file of its own: people
     // are signed in on it as themselves
@@ -275,6 +281,7 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
         farms: None,
         database: Some(database.clone()),
         internal: Some(Internal { address: "127.0.0.1:0".to_string(), certificate: None }),
+        keeping: Some(KEEPING_CERTIFICATE.to_vec()),
     };
     let (server_stopper, stop) = stop::pair();
     let server_lines = Lines::kept_for("server");
@@ -337,6 +344,7 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
                     authorities: None,
                 }),
                 kept: Some(kept.0.to_string_lossy().to_string()),
+                keeping: Some(KEEPING_KEY.to_vec()),
             };
             let (stopper, stop) = stop::pair();
             let issuer_lines = Lines::kept_for("issuer");
@@ -371,6 +379,7 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
                     authorities: None,
                 }),
                 kept: Some(kept.0.to_string_lossy().to_string()),
+                keeping: Some(KEEPING_KEY.to_vec()),
                 ..away_issuer::Told::default()
             };
             let (stopper, stop) = stop::pair();
@@ -1376,6 +1385,52 @@ async fn a_desktop_over_vnc_whose_password_away_keeps_opens_with_nothing_typed_a
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_password_away_keeps_in_its_own_store_is_sealed_there_and_only_the_issuer_opens_it_for_a_session() {
+    let Some(world) = world("store").await else { return };
+    // what an administrator's browser sealed to the issuer's key, as the store keeps it:
+    // the desktop's password under mac-05, and under mac-06 one sealed under another name
+    let public = away_server::keeping::read(KEEPING_CERTIFICATE).expect("the key's certificate").public;
+    let kept = beside(&world.database).await;
+    for (name, sealed) in [
+        ("mac-05", away_issuer::keeping::seal(&public, "mac-05", VNC_PASSWORD)),
+        ("mac-06", away_issuer::keeping::seal(&public, "another name", VNC_PASSWORD)),
+    ] {
+        let key = away_part::sealed::written(&away_part::sealed::key_name(&public));
+        kept.execute(
+            "insert into kept_secret (name, sealed, key, by_person, by_name) values ($1, $2, $3, 'a1', 'Ari Admin')",
+            &[&name, &sealed, &key],
+        )
+        .await
+        .expect("kept");
+    }
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+
+    // the Mac whose password the store keeps opens with nothing asked
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "mac-05")).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!(steps, ["reaching", "signing-in", "first-picture"], "{}", desktop.write());
+    session.say(Json::object([("leaves", true.into())])).await;
+    assert_eq!(session.until("ended").await.write(), r#"{"ended":"left"}"#);
+    let handed = world.issuer_lines.kept().into_iter().find(|line| line.contains("handed out a kept secret")).expect("a line");
+    assert!(handed.contains("\"kept\":\"mac-05\""), "{handed}");
+    // the password is in no line, and the sealed secret is what the database holds
+    assert!(world.issuer_lines.kept().iter().chain(world.server_lines.kept().iter()).all(|line| !line.contains(VNC_PASSWORD)));
+    let row = kept.query_one("select sealed from kept_secret where name = 'mac-05'", &[]).await.expect("the row");
+    let sealed: Vec<u8> = row.get(0);
+    assert!(sealed.starts_with(away_part::sealed::MARK) && !sealed.windows(VNC_PASSWORD.len()).any(|part| part == VNC_PASSWORD.as_bytes()));
+
+    // a secret sealed under another name than the one it is kept under doesn't open: the
+    // person is asked, as where nothing is kept
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "mac-06")).await;
+    let (steps, asks) = session.steps().await;
+    assert_eq!(steps, ["reaching", "signing-in"], "{}", asks.write());
+    assert_eq!(asks.write(), r#"{"asks":{"again":false,"only":"password"}}"#);
+    assert!(world.issuer_lines.kept().iter().any(|line| line.contains("handed out no kept secret") && line.contains("doesn't open")));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_desktop_over_vnc_opens_with_its_password_and_a_mac_scrolls_as_far_as_the_person_turns() {
     let Some(world) = world("vnc").await else { return };
     let mut browser = Browser::default();
@@ -1497,6 +1552,7 @@ async fn without_a_database_no_machine_is_opened() {
         farms: None,
         database: None,
         internal: None,
+        keeping: None,
     };
     let (_stopper, stop) = stop::pair();
     let settings = Settings { address: away.trim_start_matches("http://").to_string(), health_address: "127.0.0.1:0".to_string() };

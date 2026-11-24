@@ -1,6 +1,6 @@
 # ADR-0010: Secrets and keys live in the cluster, and only the issuer reads a kept account
 
-**Status:** Accepted · 2026-11-14. Nothing of it is built.
+**Status:** Accepted · 2026-11-14. Its first point, that Away has no store of secrets of its own, is replaced by [ADR-0017](./0017-away-keeps-the-secrets-of-machines-sealed.md) (2026-11-24): Away keeps the passwords of machines in its database, sealed so that only the issuer opens them. A folder of kept secrets of the cluster, which a machine's file names, is built beside it for the password of a desktop over VNC.
 
 ## Context
 

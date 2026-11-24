@@ -71,6 +71,7 @@ fn world_with(change: impl FnOnce(&mut Told)) -> World {
         farms: None,
         database: None,
         internal: None,
+        keeping: None,
     };
     change(&mut told);
     let (away, lines, stopper) = serve(&runtime, port, told);

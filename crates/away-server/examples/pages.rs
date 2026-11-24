@@ -165,6 +165,8 @@ async fn main() -> std::io::Result<()> {
                  - name: Lost Desk\n    kind: windows\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {lost_at} }}\n    \
                  collection: Lost\n    served-by: [127.0.0.9]\n  \
                  - name: mac-01\n    kind: mac\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {mac_at} }}\n  \
+                 - name: mac-02\n    kind: mac\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {mac_at} }}\n    \
+                 signs-in: {{ kept: mac-02 }}\n  \
                  - name: tux-02\n    kind: linux\n    address: localhost\n    groups: [desks]\n    desktop: {{ port: {tux_at} }}\n\
                  rules:\n  - name: staff-desks\n    who: [staff]\n    reaches: [desks]\n"
             ),
@@ -193,6 +195,8 @@ async fn main() -> std::io::Result<()> {
         farms,
         database,
         internal: machine.as_ref().map(|_| Internal { address: "127.0.0.1:0".to_string(), certificate: None }),
+        // the key of the tests that the secrets Away keeps are sealed to
+        keeping: Some(include_bytes!("../tests/fixtures/keeping.pem").to_vec()),
     };
 
     let lines = Lines::to_output("server");

@@ -11,7 +11,7 @@ way-in,gateway,passes on,/session,v1,The chart sets the way in's time limits for
 server,sign-in-service,signs in,OpenID Connect,v1,"A code for tokens, their renewal, the sign-out"
 server,database,writes,the database away,v1,
 server,files,reads,the mounted files,v1,At its start and on every change
-server,cluster-secrets,reads,"its own: the client's secret, the key for what the database holds encrypted, its signing key, the password of the account that reads the farms' feeds",v1,Mounted
+server,cluster-secrets,reads,"its own: the client's secret, the key for what the database holds encrypted, its signing key, the password of the account that reads the farms' feeds, the certificate of the key kept passwords are sealed to",v1,Mounted
 server,farm-feed,fetches,HTTPS,v1,"Only where the files name a farm: what the farm publishes, each thing's icon and how it is reached, every five minutes, as an account that opens nothing"
 server,gateway,calls,internal,v1,"End a session, test a machine, announce an update"
 gateway,server,calls,internal,v1,"Take over a session with its ticket; report its steps, its use and its end"
@@ -28,7 +28,7 @@ gateway,picture,uses,,v1,
 gateway,wire,uses,,v1,
 rdp,windows-sign-in,uses,,v1,
 issuer,sign-in-service,fetches,the provider's public keys,v1,To check a person's sign-in itself
-issuer,cluster-secrets,reads,its authority's keys and the kept accounts,v1,The one part that may read the kept accounts
+issuer,cluster-secrets,reads,"its authority's keys, the kept accounts and the key that opens the passwords Away keeps",v1,The one part that may read the kept accounts or open a kept password
 issuer,authority,asks,"the pages the authority publishes for asking it, over TLS",v1,"Only where the configuration says that the organisation's own authority issues. The issuer is signed in there with a ticket of the domain's, bound to the connection"
 issuer,domain,calls,Kerberos,v1,Only where the organisation's own authority issues: it gets the ticket it is signed in at the authority's pages with
 issuer,server,calls,internal,v1,"Whose a session is, before it signs anybody in, and the record of that sign-in. What is public of it: its state, the kept accounts' names, its authority's certificate and the list it withdrew"

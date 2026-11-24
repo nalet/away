@@ -110,6 +110,12 @@ binaryData:
 {{- $told = append $told (dict "name" "AWAY_INTERNAL_KEY_FILE" "value" "/run/away/between-parts/server-key.pem") -}}
 {{- $own := dict "secretName" (printf "%s-between-parts" (include "away.name" .)) "items" (list (dict "key" "server.pem" "path" "server.pem") (dict "key" "server-key.pem" "path" "server-key.pem")) -}}
 {{- $mounts = append $mounts (dict "at" "/run/away/between-parts" "volume" (dict "name" "between-parts" "secret" $own)) -}}
+{{- if include "away.keeps" . }}
+{{- /* the certificate of the issuer's key, which administrators' browsers seal a password to: never the key itself */ -}}
+{{- $told = append $told (dict "name" "AWAY_KEEPING_CERTIFICATE_FILE" "value" "/run/away/keeping/certificate.pem") -}}
+{{- $keeping := dict "secretName" (include "away.keepingSecret" .) "items" (list (dict "key" "certificate.pem" "path" "certificate.pem")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/keeping" "volume" (dict "name" "keeping" "secret" $keeping)) -}}
+{{- end }}
 {{ include "away.part" (dict "root" . "part" "server" "port" 8080 "named" "http" "more" (list (dict "name" "internal" "port" 8082)) "told" $told "mounts" $mounts) }}
 ---
 apiVersion: v1

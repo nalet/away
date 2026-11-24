@@ -9,6 +9,8 @@
 //! | `POST /sign-out` | ends the sign-in |
 //! | `GET /api/favourites` | what the person starred, of what they reach |
 //! | `PUT /api/favourites?machine=…&program=…` | stars a machine, or a program of it; `DELETE` takes the star away |
+//! | `GET /api/kept` | the secrets Away keeps for machines, by their names, and the key a browser seals one to: for those who administer Away |
+//! | `PUT /api/kept?name=…` | keeps a secret for machines, as an administrator's browser sealed it; `DELETE` keeps it no more |
 //! | `POST /api/sessions?machine=…` | asks to open a machine's desktop: writes the record, and gives the ticket the page's connection to the gateway begins with |
 //!
 //! The gateway asks the server on an address of its own, which no browser reaches:
@@ -85,6 +87,8 @@ pub struct GettingIn {
     records: Records,
     /// The sessions that were asked for, and those that run.
     sessions: Sessions,
+    /// The key the secrets Away keeps are sealed to, where it keeps any.
+    keeping: Option<crate::keeping::Keeping>,
     part: Part,
 }
 
@@ -131,6 +135,15 @@ impl GettingIn {
             }
         };
         let records = Records::new(store.clone(), part.lines.clone());
+        let keeping = match &told.keeping {
+            None => None,
+            Some(certificate) => {
+                let keeping =
+                    crate::keeping::read(certificate).map_err(|why| format!("AWAY_KEEPING_CERTIFICATE_FILE can't be used: {why}."))?;
+                part.lines.info("secrets Away keeps for machines are sealed to the issuer's key", &[("key", keeping.name.as_str().into())]);
+                Some(keeping)
+            }
+        };
         Ok(GettingIn {
             contact: told.contact,
             signing,
@@ -139,6 +152,7 @@ impl GettingIn {
             said_of_the_store: std::sync::Mutex::new(None),
             records,
             sessions: Sessions::default(),
+            keeping,
             part,
         })
     }
@@ -165,6 +179,9 @@ impl GettingIn {
             ("/api/favourites", true) => self.favourites(request).await,
             ("/api/favourites", _) if matches!(*request.method(), Method::PUT | Method::DELETE) => self.star(request).await,
             ("/api/favourites", _) => plain(StatusCode::METHOD_NOT_ALLOWED, "This address answers GET, PUT and DELETE.\n"),
+            ("/api/kept", true) => self.kept_secrets(request).await,
+            ("/api/kept", _) if request.method() == Method::DELETE => self.forget(request).await,
+            ("/api/kept", _) => plain(StatusCode::METHOD_NOT_ALLOWED, "This address answers GET, PUT and DELETE.\n"),
             ("/api/sessions", _) if request.method() == Method::POST => self.open(request).await,
             ("/api/sessions", _) => plain(StatusCode::METHOD_NOT_ALLOWED, "This address only answers POST.\n"),
             ("/licence.txt", true) => answer(StatusCode::OK, "text/plain; charset=utf-8", LICENCE_TEXT),
@@ -762,7 +779,163 @@ impl GettingIn {
             ("kept", running.kept.as_deref().map_or(Json::Null, Json::from)),
             ("token", token.expose().into()),
         ]);
+        // the secret Away keeps for the machine, sealed as it is kept, for the issuer to open
+        let sealed = match (&running.kept, &self.store) {
+            (Some(name), Some(store)) => match store.sealed_secret(name).await {
+                Ok(sealed) => sealed,
+                Err(unusable) => return self.kept_nothing(&unusable),
+            },
+            _ => None,
+        };
+        let says = match (says, sealed) {
+            (Json::Object(mut fields), Some(sealed)) => {
+                fields.push(("kept_sealed".to_string(), away_part::base64::ordinary(&sealed).into()));
+                Json::Object(fields)
+            }
+            (says, _) => says,
+        };
         answer(StatusCode::OK, "application/json", says.write())
+    }
+
+    /// Whether a person administers Away.
+    fn administers(signing: &Signing, person: &Person) -> bool {
+        person.groups.iter().any(|group| signing.told.administrators.contains(group))
+    }
+
+    /// The secrets Away keeps for machines, for those who administer it: each name that a
+    /// machine names or that is kept, with the machines that name it, and since when and
+    /// by whom one is kept; and the key a browser seals a new one to. Nothing of a secret
+    /// itself, sealed or not, ever leaves the server.
+    async fn kept_secrets(&self, request: &Request<Incoming>) -> Answer {
+        let Some((signing, person)) = self.signed_in(request) else {
+            return plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n");
+        };
+        if !Self::administers(signing, &person) {
+            return plain(StatusCode::FORBIDDEN, "This is for those who administer Away.\n");
+        }
+        let kept = match &self.store {
+            Some(store) => match store.kept_secrets().await {
+                Ok(kept) => kept,
+                Err(unusable) => return self.kept_nothing(&unusable),
+            },
+            None => Vec::new(),
+        };
+        let (in_force, _) = self.register.in_force();
+        let mut named: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+        for machine in &in_force.machines {
+            if let Some(name) = &machine.kept {
+                named.entry(name.clone()).or_default().push(machine.name.clone());
+            }
+        }
+        for one in &kept {
+            named.entry(one.name.clone()).or_default();
+        }
+        let secrets = named.into_iter().map(|(name, machines)| {
+            let held = kept.iter().find(|one| one.name == name);
+            Json::object([
+                ("name", name.as_str().into()),
+                ("machines", Json::List(machines.iter().map(|machine| machine.as_str().into()).collect())),
+                ("kept", held.is_some().into()),
+                ("since", held.map_or(Json::Null, |held| u64::try_from(held.since).unwrap_or(0).into())),
+                ("by", held.map_or(Json::Null, |held| held.by.as_str().into())),
+                ("sealed_to", held.map_or(Json::Null, |held| held.key.as_str().into())),
+            ])
+        });
+        let key = self.keeping.as_ref().map_or(Json::Null, |keeping| {
+            Json::object([("name", keeping.name.as_str().into()), ("public", away_part::base64::ordinary(&keeping.public).into())])
+        });
+        let says = Json::object([
+            ("keeps", (self.store.is_some() && self.keeping.is_some()).into()),
+            ("key", key),
+            ("secrets", Json::List(secrets.collect())),
+        ]);
+        answer(StatusCode::OK, "application/json", says.write())
+    }
+
+    /// Who may change what Away keeps for machines, and the secret's name: an administrator,
+    /// on one of Away's own pages, with a name a machine's entry may give.
+    fn may_keep<'a>(
+        &'a self,
+        request: &Request<Incoming>,
+    ) -> Result<(Person, String, &'a Store, &'a crate::keeping::Keeping), Box<Answer>> {
+        let Some((signing, person)) = self.signed_in(request) else {
+            return Err(Box::new(plain(StatusCode::UNAUTHORIZED, "This is for people who are signed in.\n")));
+        };
+        if !from_aways_page(request, signing) {
+            return Err(Box::new(plain(StatusCode::FORBIDDEN, "Only Away's own pages change what Away keeps.\n")));
+        }
+        if !Self::administers(signing, &person) {
+            return Err(Box::new(plain(StatusCode::FORBIDDEN, "This is for those who administer Away.\n")));
+        }
+        let named = read_form(request.uri().query().unwrap_or_default()).unwrap_or_default();
+        let Some(name) =
+            named.iter().find(|(its, _)| its == "name").map(|(_, name)| name.clone()).filter(|name| crate::register::is_a_kept_name(name))
+        else {
+            return Err(Box::new(plain(
+                StatusCode::BAD_REQUEST,
+                "A kept secret is named as name=: letters, digits and - _ ., 63 of them at most.\n",
+            )));
+        };
+        let (Some(store), Some(keeping)) = (self.store.as_deref(), self.keeping.as_ref()) else {
+            return Err(Box::new(plain(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Away keeps no secrets for machines here: it is given no database or no key to seal them to.\n",
+            )));
+        };
+        Ok((person, name, store, keeping))
+    }
+
+    /// Keeps a secret for machines, as an administrator's browser sealed it to the
+    /// issuer's key, in place of one kept under that name before. The record says who
+    /// and which, and nothing of the secret.
+    pub async fn keep(&self, request: Request<Incoming>) -> Answer {
+        let (person, name, store, keeping) = match self.may_keep(&request) {
+            Ok(may) => may,
+            Err(refused) => return *refused,
+        };
+        let Some(sealed) =
+            carried(request, away_part::sealed::LONGEST + 1).await.filter(|sealed| sealed.len() <= away_part::sealed::LONGEST)
+        else {
+            return plain(StatusCode::BAD_REQUEST, "What is kept is a secret sealed to the issuer's key, as Away's pages seal it.\n");
+        };
+        let Some(parts) = away_part::sealed::read(&sealed) else {
+            return plain(StatusCode::BAD_REQUEST, "What is kept is a secret sealed to the issuer's key, as Away's pages seal it.\n");
+        };
+        if away_part::sealed::written(&parts.key) != keeping.name {
+            return plain(StatusCode::CONFLICT, "The secret is sealed to another key than the issuer's: seal it anew.\n");
+        }
+        if let Err(unusable) = store.keep_secret(&name, &sealed, &keeping.name, (&person.subject, &person.name)).await {
+            return self.kept_nothing(&unusable);
+        }
+        self.kept_record(&person, "kept-secret-set", Json::object([("name", name.as_str().into()), ("key", keeping.name.as_str().into())]))
+            .await;
+        answer(StatusCode::OK, "application/json", "{}")
+    }
+
+    /// Keeps a secret for machines no more.
+    async fn forget(&self, request: &Request<Incoming>) -> Answer {
+        let (person, name, store, _) = match self.may_keep(request) {
+            Ok(may) => may,
+            Err(refused) => return *refused,
+        };
+        match store.forget_secret(&name).await {
+            Ok(true) => {
+                self.kept_record(&person, "kept-secret-removed", Json::object([("name", name.as_str().into())])).await;
+                answer(StatusCode::OK, "application/json", "{}")
+            }
+            Ok(false) => plain(StatusCode::NOT_FOUND, "No secret of that name is kept.\n"),
+            Err(unusable) => self.kept_nothing(&unusable),
+        }
+    }
+
+    /// The record of a change to what Away keeps for machines.
+    async fn kept_record(&self, person: &Person, kind: &str, details: Json) {
+        let Ok(key) = Records::key() else { return };
+        let record =
+            Record { key, kind: kind.to_string(), person: Some((person.subject.clone(), person.name.clone())), machine: None, details };
+        if let Err(unusable) = self.records.add(&record).await {
+            let _ = self.kept_nothing(&unusable);
+        }
     }
 
     /// Answers the gateway that asks for another program of the machine in a session that

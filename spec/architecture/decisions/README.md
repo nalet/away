@@ -26,6 +26,7 @@ capabilities it governs and the work packages that rest on it.
 | [ADR‑0014](./0014-a-farm-says-what-it-publishes.md) | A farm says itself what it publishes, and the server asks it | Accepted | — |
 | [ADR‑0015](./0015-a-widely-used-database-client.md) | The server speaks to its database with a client that is widely used | Accepted | — |
 | [ADR‑0016](./0016-a-picture-that-moves.md) | A picture that moves is measured, then shown whole, then taken as the machine composes it | Proposed | — |
+| [ADR‑0017](./0017-away-keeps-the-secrets-of-machines-sealed.md) | Away keeps the passwords of machines itself, sealed so that only the issuer opens them | Accepted | — |
 
 ## What each governs
 
@@ -49,6 +50,7 @@ The components a record is about, and the capabilities it decides most. A compon
 | [ADR‑0014](./0014-a-farm-says-what-it-publishes.md) | `server`, `files`, `farm-feed`, `cluster-secrets` | `read-programs-from-host`, `see-all-programs`, `give-program-icons` |
 | [ADR‑0015](./0015-a-widely-used-database-client.md) | `server`, `database` | `keep-favourites`, `see-last-used`, `record-connections`, `record-changes` |
 | [ADR‑0016](./0016-a-picture-that-moves.md) | `session-view`, `gateway`, `picture`, `wire`, `rdp` | `show-whole-pictures`, `machine-made-pictures`, `leave-out-effects`, `play-video-smoothly` |
+| [ADR‑0017](./0017-away-keeps-the-secrets-of-machines-sealed.md) | `web`, `server`, `issuer`, `gateway`, `database`, `cluster-secrets`, `chart` | `keep-secret`, `use-kept-secret`, `protect-secrets`, `set-sign-in-way` |
 <!-- end: decisions -->
 
 ## How a record is written

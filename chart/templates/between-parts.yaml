@@ -28,7 +28,7 @@ data:
   authority.pem: {{ index $held "authority.pem" }}
   server.pem: {{ index $held "server.pem" }}
   server-key.pem: {{ index $held "server-key.pem" }}
-{{- if or .Values.domain.name .Values.keptSecrets.secretName }}
+{{- if include "away.issuerAnswers" . }}
 {{- /*
 And what secures what the gateway asks the issuer, where the installation names a
 domain or keeps secrets for machines: an authority of its own, and a certificate of it
@@ -59,4 +59,35 @@ data:
   authority.pem: {{ index $held "authority.pem" }}
   issuer.pem: {{ index $held "issuer.pem" }}
   issuer-key.pem: {{ index $held "issuer-key.pem" }}
+{{- end }}
+{{- if and (include "away.keeps" .) (not .Values.keeping.secretName) }}
+{{- /*
+And the key the passwords Away keeps for machines are sealed to, with a certificate of it.
+Made once, at the first install, and kept: every issuer of the installation reads the
+key, every server the certificate. It stays when Away is removed, since without it no
+kept password opens again: back it up with the database.
+*/ -}}
+{{- $name := include "away.keepingSecret" . -}}
+{{- $held := dict -}}
+{{- with lookup "v1" "Secret" .Release.Namespace $name }}
+{{- $held = .data | default dict -}}
+{{- end }}
+{{- if not (and (index $held "key.pem") (index $held "certificate.pem")) }}
+{{- $key := genPrivateKey "rsa" -}}
+{{- $certificate := genSelfSignedCertWithKey "away, the key the passwords it keeps are sealed to" nil nil 36500 $key -}}
+{{- $held = dict "key.pem" ($key | b64enc) "certificate.pem" ($certificate.Cert | b64enc) -}}
+{{- end }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "away.labels" (dict "root" .) | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+type: Opaque
+data:
+  key.pem: {{ index $held "key.pem" }}
+  certificate.pem: {{ index $held "certificate.pem" }}
 {{- end }}

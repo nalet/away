@@ -7,6 +7,24 @@
 {{- end -}}
 {{- end -}}
 
+{{/* Whether Away keeps the passwords of machines in its own store: where it is not told
+otherwise and people sign in, since the issuer checks a person's sign-in before it opens one. */}}
+{{- define "away.keeps" -}}
+{{- if and .Values.keeping.enabled .Values.signIn.service -}}true{{- end -}}
+{{- end -}}
+
+{{/* The Secret that holds the key what Away keeps is sealed to: the issuer reads its key,
+the server its certificate. */}}
+{{- define "away.keepingSecret" -}}
+{{- .Values.keeping.secretName | default (printf "%s-keeping" (include "away.name" .)) -}}
+{{- end -}}
+
+{{/* Whether the issuer answers the gateway: for a domain, for kept secrets of a folder, or
+for Away's own store. */}}
+{{- define "away.issuerAnswers" -}}
+{{- if or .Values.domain.name .Values.keptSecrets.secretName (include "away.keeps" .) -}}true{{- end -}}
+{{- end -}}
+
 {{/* The labels that pick this installation's pods, and one part of them. */}}
 {{- define "away.picks" -}}
 app.kubernetes.io/name: away
