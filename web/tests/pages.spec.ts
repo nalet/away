@@ -1099,6 +1099,16 @@ test.describe('a session', () => {
 
   test('a browser that lets the page read its clipboard passes it on by itself, both ways', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    // what the page tells the machine the person copied: a key that makes the machine copy
+    // is pressed once the machine has it, or the machine copies what it had before, and
+    // that is then in the person's clipboard in place of what they copied
+    const told: string[] = [];
+    page.on('websocket', (socket) =>
+      socket.on('framesent', ({ payload }) => {
+        if (typeof payload === 'string' && payload.startsWith('{"copied"')) told.push(payload);
+      }),
+    );
+    const machineHas = (text: string) => expect.poll(() => told.some((said) => said.includes(text))).toBe(true);
     await page.goto(`${AWAY_THAT_KEEPS}/machines/desk-01/desktop`);
     await page.getByLabel('Name').fill('CORP\\alex.urban');
     await page.getByLabel('Password').fill('a password that exists for these tests alone');
@@ -1121,6 +1131,7 @@ test.describe('a session', () => {
     await page.evaluate(() => navigator.clipboard.writeText('copied by the person'));
     await page.keyboard.press('Escape');
     await expect(screen).toBeFocused();
+    await machineHas('copied by the person');
     await expect
       .poll(async () => {
         await page.keyboard.press('c');
@@ -1156,6 +1167,7 @@ test.describe('a session', () => {
     );
     await page.keyboard.press('Escape');
     await expect(screen).toBeFocused();
+    await machineHas('slanted by the person');
     await expect
       .poll(async () => {
         await page.keyboard.press('h');
