@@ -3,7 +3,8 @@
 //! ([ADR-0008](../../../spec/architecture/decisions/0008-the-authority-for-windows-sign-ins.md)).
 //!
 //! An installation that names no domain tells the issuer nothing of this, and the
-//! issuer then signs nobody in.
+//! issuer then signs nobody in. An installation that keeps secrets for machines names
+//! the folder they are in, with or without a domain.
 
 use away_part::address::Address;
 use away_secret::Secret;
@@ -94,6 +95,10 @@ pub struct Told {
     pub sign_in: Option<SignInService>,
     /// The server. A domain needs it.
     pub server: Option<Server>,
+    /// The folder of the secrets Away keeps for machines, where it keeps any: each a
+    /// file of its own, named as a machine's entry names it. It needs the sign-in
+    /// service and the server.
+    pub kept: Option<String>,
 }
 
 fn list(said: Option<String>, otherwise: &[&str]) -> Vec<String> {
@@ -125,6 +130,22 @@ impl Told {
                 Some(Internal { address, certificate })
             }
         };
+        let kept = said("AWAY_KEPT_SECRETS");
+        // the issuer checks a person's sign-in itself, and asks the server whose a session
+        // is: for whatever it hands out, a sign-in on a domain's machine or a kept secret
+        let checks = |what: &str| -> Result<(SignInService, Server), String> {
+            let needed = |name: &str| said(name).ok_or_else(|| format!("{name} is not set, and {what} needs it."));
+            let service = needed("AWAY_SIGN_IN_SERVICE")?;
+            Address::read(&service).map_err(|why| format!("AWAY_SIGN_IN_SERVICE is no address: {why}."))?;
+            let sign_in =
+                SignInService { service, client: needed("AWAY_SIGN_IN_CLIENT")?, authorities: read("AWAY_SIGN_IN_AUTHORITIES_FILE")? };
+            let at = Address::read(&needed("AWAY_SERVER")?).map_err(|why| format!("AWAY_SERVER is no address: {why}."))?;
+            let server = Server { at, authorities: read("AWAY_SERVER_AUTHORITIES_FILE")? };
+            if internal.is_none() {
+                return Err(format!("AWAY_INTERNAL_ADDRESS is not set, and {what} needs it: the gateway asks there."));
+            }
+            Ok((sign_in, server))
+        };
         let Some(domain) = said("AWAY_DOMAIN") else {
             if said("AWAY_ADMIN_CERTIFICATE_ENABLED").as_deref().is_some_and(|value| value != "false") {
                 return Err("Administrative certificate SSO requires AWAY_DOMAIN.".into());
@@ -137,7 +158,15 @@ impl Told {
                     ));
                 }
             }
-            return Ok(Told { internal, ..Told::default() });
+            let Some(kept) = kept else { return Ok(Told { internal, ..Told::default() }) };
+            let (sign_in, server) = checks("handing out the secrets Away keeps for machines")?;
+            return Ok(Told {
+                internal: internal.clone(),
+                sign_in: Some(sign_in),
+                server: Some(server),
+                kept: Some(kept),
+                ..Told::default()
+            });
         };
 
         let needed = |name: &str| {
@@ -219,19 +248,8 @@ impl Told {
             Some(_) => return Err("AWAY_ADMIN_CERTIFICATE_ENABLED must be true or false.".into()),
         };
 
-        // the issuer checks a person's sign-in itself, and asks the server whose a session is
-        let service = needed("AWAY_SIGN_IN_SERVICE")?;
-        Address::read(&service).map_err(|why| format!("AWAY_SIGN_IN_SERVICE is no address: {why}."))?;
-        let sign_in =
-            SignInService { service, client: needed("AWAY_SIGN_IN_CLIENT")?, authorities: read("AWAY_SIGN_IN_AUTHORITIES_FILE")? };
-        let at = Address::read(&needed("AWAY_SERVER")?).map_err(|why| format!("AWAY_SERVER is no address: {why}."))?;
-        let server = Server { at, authorities: read("AWAY_SERVER_AUTHORITIES_FILE")? };
-        if internal.is_none() {
-            return Err(format!(
-                "AWAY_INTERNAL_ADDRESS is not set, and signing people in on the machines of {domain} needs it: the gateway asks there."
-            ));
-        }
-        Ok(Told { administrators, internal, windows: Some(windows), sign_in: Some(sign_in), server: Some(server) })
+        let (sign_in, server) = checks(&format!("signing people in on the machines of {domain}"))?;
+        Ok(Told { administrators, internal, windows: Some(windows), sign_in: Some(sign_in), server: Some(server), kept })
     }
 }
 
@@ -336,6 +354,31 @@ mod tests {
             changed.iter_mut().find(|(name, _)| name == &key).unwrap().1 = ordinary;
             assert!(read_with(&WHOLE, &changed).is_err());
         }
+    }
+
+    #[test]
+    fn secrets_kept_for_machines_are_handed_out_with_or_without_a_domain() {
+        let rests_on = [
+            ("AWAY_SIGN_IN_SERVICE", "https://sign-in.example.com/realms/staff"),
+            ("AWAY_SIGN_IN_CLIENT", "away"),
+            ("AWAY_SERVER", "https://away-server:8082"),
+            ("AWAY_INTERNAL_ADDRESS", "0.0.0.0:8083"),
+        ];
+        let kept: Vec<(&str, &str)> = std::iter::once(("AWAY_KEPT_SECRETS", "/run/away/kept")).chain(rests_on).collect();
+        let without_a_domain = told(&kept).expect("kept secrets");
+        assert_eq!(without_a_domain.kept.as_deref(), Some("/run/away/kept"));
+        assert!(without_a_domain.windows.is_none() && without_a_domain.sign_in.is_some() && without_a_domain.server.is_some());
+        // the issuer hands a kept secret out only for a session the server says runs, of
+        // a person the sign-in service signed: what it asks them at is needed
+        for (name, _) in rests_on {
+            let without: Vec<(&str, &str)> = kept.iter().filter(|(its, _)| *its != name).copied().collect();
+            let why = told(&without).unwrap_err();
+            assert!(why.starts_with(&format!("{name} is not set, and handing out the secrets Away keeps for machines needs it")), "{why}");
+        }
+        // and beside a domain, as well
+        let with_a_domain = read_with(&WHOLE, &[("AWAY_KEPT_SECRETS", "/run/away/kept")]).expect("a domain and kept secrets");
+        assert!(with_a_domain.windows.is_some() && with_a_domain.kept.is_some());
+        assert!(told(&WHOLE).expect("a domain").kept.is_none());
     }
 
     #[test]

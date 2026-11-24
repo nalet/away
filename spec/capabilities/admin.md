@@ -16,8 +16,8 @@ Which machines there are, how each is reached and how people are signed in on it
 | See that a changed file was refused, and why, while what was in force stays | operator | built | `see-refused-change` |
 | Add a machine in the browser: its address, its kind, how one gets in | admin | later | `add-machine-in-browser` |
 | Put machines in groups | admin | built | `group-machines` |
-| Say for a machine how people are signed in: as themselves, with a kept secret, or by typing | admin | v1 | `set-sign-in-way` |
-| Keep a name and password or a key for a machine, never shown again | admin | v1 | `keep-secret` |
+| Say for a machine how people are signed in: as themselves, with a kept secret, or by typing | admin | partial | `set-sign-in-way` |
+| Keep a name and password or a key for a machine, never shown again | admin | partial | `keep-secret` |
 | Change a kept password on the machine by itself from time to time | system | no | `change-kept-secret` |
 | Say which programs of a Windows machine people may open | admin | built | `offer-programs` |
 | Give a program an icon of its own, which people know it by | admin | built | `give-program-icons` |
@@ -32,7 +32,8 @@ Which machines there are, how each is reached and how people are signed in on it
 | Reach a machine through a helper installed on it | system | no | `install-helper-on-machine` |
 
 - *Keep machines, groups and rules as files, applied as they change*: so they can live in a repository and be reviewed like code.
-- *Keep a name and password or a key for a machine, never shown again*: in the first release the machine's file names a secret that the cluster holds; typing one in the browser comes with adding machines there.
+- *Say for a machine how people are signed in: as themselves, with a kept secret, or by typing*: as themselves or by typing on a Windows machine; with a kept secret on a desktop over VNC alone so far.
+- *Keep a name and password or a key for a machine, never shown again*: the machine's file names a secret the cluster holds; a desktop's password over VNC is kept, a name and password or a key for RDP and SSH not yet.
 - *Change a kept password on the machine by itself from time to time*: Away keeps the secrets it needs and manages no others.
 - *Give a program an icon of its own, which people know it by*: a picture among the files; Away serves it itself.
 - *Read the desktops and programs a farm of Windows machines publishes from the farm itself, as it changes*: the files name the farm's feed; Away asks it as an account of its own.

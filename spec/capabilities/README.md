@@ -116,17 +116,17 @@ has the steps.
 | Part | Areas | Capabilities | built | partly built | first release | later | not planned |
 |---|---|---|---|---|---|---|---|
 | [in a session](./session.md) | 7 | 67 | 4 | 19 | 19 | 20 | 5 |
-| [around the sessions](./app.md) | 5 | 49 | 16 | 3 | 9 | 17 | 4 |
-| [administration](./admin.md) | 4 | 56 | 12 | 3 | 13 | 25 | 3 |
+| [around the sessions](./app.md) | 5 | 49 | 16 | 4 | 8 | 17 | 4 |
+| [administration](./admin.md) | 4 | 56 | 12 | 5 | 11 | 25 | 3 |
 | [the platform](./platform.md) | 3 | 33 | 15 | 1 | 8 | 7 | 2 |
-| all | 19 | 205 | 47 | 26 | 49 | 69 | 14 |
+| all | 19 | 205 | 47 | 29 | 46 | 69 | 14 |
 
 | For | built | partly built | first release | later | not planned | does not apply |
 |---|---|---|---|---|---|---|
 | a session over RDP | 8 | 8 | 24 | 22 | 5 | 138 |
-| a session over VNC | 9 | 7 | 11 | 11 | 15 | 152 |
+| a session over VNC | 10 | 7 | 10 | 11 | 15 | 152 |
 | a session over SSH | 0 | 0 | 27 | 12 | 2 | 164 |
-| Away itself | 44 | 5 | 26 | 44 | 9 | 77 |
+| Away itself | 44 | 7 | 24 | 44 | 9 | 77 |
 
 An expectation names 166 of the 205 capabilities; no expectation names the other 39.
 <!-- end: overview -->
@@ -141,14 +141,14 @@ the capabilities that meet it, and says how the states are worked out.
 | Expected, for the goal | Expectations | there | partly | first release | first release in part | later | not planned |
 |---|---|---|---|---|---|---|---|
 | [Work on a machine that is somewhere else](./expectations.md#work-on-a-machine-that-is-somewhere-else) | 24 | 3 | 11 | 4 | 0 | 4 | 2 |
-| [Get in without another password](./expectations.md#get-in-without-another-password) | 16 | 3 | 4 | 5 | 1 | 2 | 1 |
+| [Get in without another password](./expectations.md#get-in-without-another-password) | 16 | 3 | 5 | 4 | 1 | 2 | 1 |
 | [Look at a machine together](./expectations.md#look-at-a-machine-together) | 4 | 0 | 0 | 0 | 0 | 3 | 1 |
 | [Know the machines](./expectations.md#know-the-machines) | 13 | 3 | 2 | 1 | 0 | 6 | 1 |
 | [Decide who reaches what](./expectations.md#decide-who-reaches-what) | 13 | 3 | 0 | 4 | 2 | 4 | 0 |
 | [Know what happened](./expectations.md#know-what-happened) | 9 | 1 | 2 | 1 | 1 | 4 | 0 |
 | [Run it oneself](./expectations.md#run-it-oneself) | 16 | 4 | 5 | 1 | 1 | 2 | 3 |
 | [Trust it](./expectations.md#trust-it) | 4 | 3 | 1 | 0 | 0 | 0 | 0 |
-| all | 99 | 20 | 25 | 16 | 5 | 25 | 8 |
+| all | 99 | 20 | 26 | 15 | 5 | 25 | 8 |
 <!-- end: expected -->
 
 ## Pages

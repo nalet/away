@@ -64,6 +64,19 @@ impl Issuer {
         Issuer { client, at }
     }
 
+    /// Asks for the secret Away keeps for the machine of a session: the password of its
+    /// desktop. Why there is none, in the issuer's own words, where it gives none.
+    pub async fn kept(&self, session: &str) -> Result<away_secret::Secret, String> {
+        let at = Address { path: "/internal/kept".to_string(), ..self.at.clone() };
+        let got = self.client.send_form(&at, &[("session", session)], None).await.map_err(|failed| format!("the issuer: {failed}"))?;
+        let said = std::str::from_utf8(&got.body).ok().and_then(|text| Json::read(text).ok()).unwrap_or(Json::Null);
+        match (got.status, said.text_of("password"), said.text_of("why"), said.text_of("says")) {
+            (200, Some(password), _, _) if !password.is_empty() => Ok(away_secret::Secret::new(password)),
+            (_, _, Some(why), Some(says)) => Err(format!("{says} ({why})")),
+            (status, _, _, _) => Err(format!("the issuer answered with the status {status}, and with no kept secret")),
+        }
+    }
+
     /// Asks for what signs the person of a session in: a certificate for the key of
     /// this request. Nothing where the issuer says that Away signs this person in as
     /// themselves on no machine; any other refusal is given in the issuer's own words.

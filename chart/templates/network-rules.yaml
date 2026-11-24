@@ -243,9 +243,10 @@ spec:
           protocol: TCP
         {{- end }}
 {{- end }}
-{{- if .Values.domain.name }}
+{{- if or .Values.domain.name .Values.keptSecrets.secretName }}
 ---
-# the gateway asks the issuer for what signs the person of a session in as themselves
+# the gateway asks the issuer for what signs the person of a session in as themselves,
+# and for the secret kept for a session's machine
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -266,6 +267,7 @@ spec:
         - port: internal
 ---
 # the issuer asks the server whose a session is, and has it keep the record of a sign-in
+# and of a kept secret it handed out
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -307,6 +309,7 @@ spec:
       ports:
         - port: 8083
           protocol: TCP
+    {{- if .Values.domain.name }}
     - to:
         {{- with .Values.networkRules.domainControllersAt }}
         {{- toYaml . | nindent 8 }}
@@ -319,6 +322,7 @@ spec:
       ports:
         - port: 88
           protocol: TCP
+    {{- end }}
 ---
 # the issuer reaches the server's own address for it; the sign-in service, whose keys it
 # reads to check a person's sign-in itself; the organisation's authority, which it asks
@@ -355,6 +359,7 @@ spec:
       ports:
         - port: {{ .Values.networkRules.signInServicePort }}
           protocol: TCP
+    {{- if .Values.domain.name }}
     - to:
         {{- with .Values.networkRules.authorityAt }}
         {{- toYaml . | nindent 8 }}
@@ -379,6 +384,7 @@ spec:
       ports:
         - port: 88
           protocol: TCP
+    {{- end }}
     - to:
         - namespaceSelector: {}
       ports:

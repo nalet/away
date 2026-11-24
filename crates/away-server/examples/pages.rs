@@ -211,6 +211,7 @@ async fn main() -> std::io::Result<()> {
             authorities: None,
             restricted_admin: None,
             domain: None,
+            issuer: None,
         };
         let settings = Settings { address: "127.0.0.1:0".to_string(), health_address: "127.0.0.1:0".to_string() };
         let gateway = away_gateway::Gateway::bind(&settings, told, Part::new("gateway", Lines::to_output("gateway"), stop)).await?;

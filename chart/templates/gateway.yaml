@@ -10,11 +10,14 @@
 {{- $told = append $told (dict "name" "AWAY_DOMAIN_CONTROLLERS" "value" (join "," (required "domain.controllers is not set" .controllers))) -}}
 {{- $told = append $told (dict "name" "AWAY_DOMAIN_AUTHORITIES_FILE" "value" "/run/away/domain-authorities/authorities.pem") -}}
 {{- $mounts = append $mounts (dict "at" "/run/away/domain-authorities" "volume" (dict "name" "domain-authorities" "configMap" (dict "name" (required "domain.authoritiesConfigMap is not set" .authoritiesConfigMap)))) -}}
-{{- $told = append $told (dict "name" "AWAY_ISSUER" "value" (printf "https://%s-issuer:8083" (include "away.name" $))) -}}
-{{- $told = append $told (dict "name" "AWAY_ISSUER_AUTHORITIES_FILE" "value" "/run/away/to-the-issuer/authority.pem") -}}
-{{- $issuer := dict "secretName" (printf "%s-to-the-issuer" (include "away.name" $)) "items" (list (dict "key" "authority.pem" "path" "authority.pem")) -}}
-{{- $mounts = append $mounts (dict "at" "/run/away/to-the-issuer" "volume" (dict "name" "to-the-issuer" "secret" $issuer)) -}}
 {{- end }}
+{{- end }}
+{{- if or .Values.domain.name .Values.keptSecrets.secretName }}
+{{- /* the issuer, which signs people in on a domain's machines and hands out the secrets kept for machines, at an address of its own */ -}}
+{{- $told = append $told (dict "name" "AWAY_ISSUER" "value" (printf "https://%s-issuer:8083" (include "away.name" .))) -}}
+{{- $told = append $told (dict "name" "AWAY_ISSUER_AUTHORITIES_FILE" "value" "/run/away/to-the-issuer/authority.pem") -}}
+{{- $issuer := dict "secretName" (printf "%s-to-the-issuer" (include "away.name" .)) "items" (list (dict "key" "authority.pem" "path" "authority.pem")) -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/to-the-issuer" "volume" (dict "name" "to-the-issuer" "secret" $issuer)) -}}
 {{- end }}
 {{- with .Values.restrictedAdmin }}
 {{- if .enabled }}

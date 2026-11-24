@@ -58,6 +58,9 @@ pub struct Told {
     /// The domain whose machines people are signed in on as themselves, where the
     /// installation names one.
     pub domain: Option<InADomain>,
+    /// The issuer, where the installation keeps secrets for machines, which it hands out:
+    /// where it is asked, and the authority that secures that address, as PEM.
+    pub issuer: Option<(Address, Option<Vec<u8>>)>,
     /// Explicitly enabled, scoped browser Restricted Admin policy.
     pub restricted_admin: Option<restricted_admin::RestrictedAdmin>,
 }
@@ -111,7 +114,14 @@ impl Told {
             }
         };
         let restricted_admin = restricted_admin::RestrictedAdmin::read(&variable, &file)?;
-        Ok(Told { server, authorities, domain, restricted_admin })
+        let issuer = match said("AWAY_ISSUER") {
+            None => None,
+            Some(at) => Some((
+                Address::read(&at).map_err(|why| format!("AWAY_ISSUER is no address: {why}."))?,
+                read("AWAY_ISSUER_AUTHORITIES_FILE")?,
+            )),
+        };
+        Ok(Told { server, authorities, domain, issuer, restricted_admin })
     }
 }
 
@@ -155,11 +165,23 @@ impl Gateway {
                 Some(domain)
             }
         };
+        let issuer = match told.issuer {
+            None => None,
+            Some((at, authorities)) => match Client::new(authorities.as_deref()) {
+                Ok(client) => Some(themselves::Issuer::new(client, at)),
+                Err(why) => {
+                    let why = format!("The authority that secures the issuer's address can't be used: {why}.");
+                    part.lines.error("could not start", &[("why", (&why).into())]);
+                    return Err(std::io::Error::other(why));
+                }
+            },
+        };
         let sessions = part.listen("sessions", &settings.address).await?;
         let health = part.listen("health", &settings.health_address).await?;
         let around = Arc::new(Around {
             server,
             domain,
+            issuer,
             restricted_admin: told.restricted_admin,
             lines: part.lines.clone(),
             stop: part.stop.clone(),

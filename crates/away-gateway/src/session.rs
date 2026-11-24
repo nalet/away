@@ -79,6 +79,8 @@ pub struct Taken {
     pub clipboard: Passes,
     /// Whether the desktop is reached over VNC, and not over RDP.
     pub over_vnc: bool,
+    /// Whether a secret Away keeps for the machine signs the person in.
+    pub kept: bool,
 }
 
 impl Server {
@@ -128,8 +130,10 @@ impl Server {
                 let restricted_admin = machine.and_then(|machine| machine.text_of("signs_in")) == Some("restricted-admin-sso");
                 let subject = text(said.get("person"), "subject").unwrap_or_default();
                 let over_vnc = machine.and_then(|machine| machine.text_of("over")) == Some("vnc");
+                let kept = machine.and_then(|machine| machine.text_of("signs_in")) == Some("kept");
                 Ok(Some(Taken {
                     over_vnc,
+                    kept,
                     restricted_admin,
                     subject,
                     session,
@@ -175,6 +179,9 @@ pub struct Around {
     /// The domain whose machines people are signed in on as themselves, where the
     /// installation names one.
     pub domain: Option<Domain>,
+    /// The issuer, which hands out the secrets Away keeps for machines, where the
+    /// gateway is told of it.
+    pub issuer: Option<crate::themselves::Issuer>,
     /// The explicitly enabled browser Restricted Admin policy.
     pub restricted_admin: Option<crate::restricted_admin::RestrictedAdmin>,
     /// Where the gateway writes what happens.
@@ -248,7 +255,8 @@ where
     // a desktop over VNC and one over RDP open in their own ways, and are shown in the same
     let shown = match taken.over_vnc {
         true => {
-            let opened = open_over_vnc(&mut browser, &taken).await.map(|opened| opened.map(|desktop| Open { desktop, served_by: None }));
+            let opened =
+                open_over_vnc(&mut browser, &around, &taken).await.map(|opened| opened.map(|desktop| Open { desktop, served_by: None }));
             shown(&mut browser, server, &around, &taken, screen, opened).await
         }
         false => {
@@ -348,7 +356,13 @@ where
 /// The way to a desktop over VNC, step by step, each said to the browser as it begins.
 /// Nothing where the person left on the way. Such a machine shows nothing of itself
 /// that could be checked, and asks for the desktop's own password or for nothing.
-async fn open_over_vnc<Connection>(browser: &mut WebSocketStream<Connection>, taken: &Taken) -> Result<Option<vnc::Desktop>, Failure>
+/// Where Away keeps the password for the machine, the issuer hands it over and nobody
+/// types it; where it gives none, or the machine refuses it, the person is asked.
+async fn open_over_vnc<Connection>(
+    browser: &mut WebSocketStream<Connection>,
+    around: &Around,
+    taken: &Taken,
+) -> Result<Option<vnc::Desktop>, Failure>
 where
     Connection: AsyncRead + AsyncWrite + Unpin,
 {
@@ -356,14 +370,46 @@ where
     tell(browser, ToBrowser::Step("reaching")).await.map_err(|()| gone(Step::Reaching))?;
     let reached = vnc::reach(&taken.address, taken.port, taken.clipboard).await?;
     tell(browser, ToBrowser::Step("signing-in")).await.map_err(|()| gone(Step::SigningIn))?;
+    let mut again = false;
     let mut desktop = 'asked: {
         if !reached.asks() {
             break 'asked reached.sign_in(None).await?;
         }
+        // the password Away keeps for the machine, held for this sign-in alone
+        let kept = match (&around.issuer, taken.kept) {
+            (Some(issuer), true) => match issuer.kept(&taken.session).await {
+                Ok(password) => Some(password),
+                Err(why) => {
+                    let what = [("session", taken.session.as_str().into()), ("why", why.as_str().into())];
+                    around.lines.warn("the issuer handed out no kept secret, so the person is asked", &what);
+                    None
+                }
+            },
+            (None, true) => {
+                around.lines.warn(
+                    "no issuer is told of, so the person is asked for what Away keeps",
+                    &[("session", taken.session.as_str().into())],
+                );
+                None
+            }
+            (_, false) => None,
+        };
+        let reached = match kept {
+            Some(password) => match reached.sign_in(Some(&password)).await {
+                Ok(desktop) => break 'asked desktop,
+                Err(Failure { why: Why::SignInRefused, .. }) => {
+                    let what = [("session", taken.session.as_str().into()), ("machine", taken.machine.as_str().into())];
+                    around.lines.warn("the machine refused the password Away keeps for it, so the person is asked", &what);
+                    again = true;
+                    None
+                }
+                Err(failed) => return Err(failed),
+            },
+            None => Some(reached),
+        };
         // the machine asks for its password. The connection that said so is let go: the
         // person may take their time to type, and a machine doesn't wait that long
         drop(reached);
-        let mut again = false;
         for _ in 0..ASKS_AT_MOST {
             tell(browser, ToBrowser::Asks { again, instead: false, password_alone: true }).await.map_err(|()| gone(Step::SigningIn))?;
             let typed = tokio::time::timeout(TYPED_WITHIN, async {

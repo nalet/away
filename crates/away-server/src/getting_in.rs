@@ -38,7 +38,7 @@ use crate::records::Records;
 use crate::register::files::Register;
 use crate::register::{Over, SignsIn};
 use crate::service::{Failed, Service};
-use crate::sessions::{Asked, Sessions};
+use crate::sessions::{way_of_signing_in, Asked, Sessions};
 use crate::sign_ins::{Failure, Person, SignIns, KEPT_FOR};
 use crate::store::favourites::Favourite;
 use crate::store::records::Record;
@@ -516,6 +516,7 @@ impl GettingIn {
         };
         let themselves = method == SignsIn::Themselves;
         let restricted_admin = method == SignsIn::RestrictedAdminSso;
+        let kept = if method == SignsIn::Kept { machine.kept.clone() } else { None };
         // what Away opens so far: a desktop, over RDP or over VNC, of one machine or of a
         // farm's collection, and the programs of a Windows machine
         let asked_for = named.iter().find(|(its, value)| its == "program" && !value.is_empty()).map(|(_, value)| value.as_str());
@@ -562,17 +563,7 @@ impl GettingIn {
                 ("address", machine.address.as_str().into()),
                 ("port", u64::from(port).into()),
                 ("over", over.written().into()),
-                (
-                    "signs_in",
-                    if restricted_admin {
-                        "restricted-admin-sso"
-                    } else if themselves {
-                        "themselves"
-                    } else {
-                        "typed"
-                    }
-                    .into(),
-                ),
+                ("signs_in", way_of_signing_in(restricted_admin, themselves, kept.as_deref()).into()),
                 ("clipboard", machine.clipboard.word().into()),
             ]),
         };
@@ -597,6 +588,7 @@ impl GettingIn {
             served_by: machine.served_by.clone(),
             themselves,
             restricted_admin,
+            kept,
             clipboard: machine.clipboard,
             program,
             at: time::now().as_secs(),
@@ -634,15 +626,10 @@ impl GettingIn {
                 // A pending ticket cannot outlive a management policy or target change.
                 let (in_force, _) = self.register.in_force();
                 let current = in_force.machines.iter().find(|machine| machine.name == asked.machine);
-                let method = if asked.restricted_admin {
-                    "restricted-admin-sso"
-                } else if asked.themselves {
-                    "themselves"
-                } else {
-                    "typed"
-                };
+                let method = way_of_signing_in(asked.restricted_admin, asked.themselves, asked.kept.as_deref());
                 let allowed = current.is_some_and(|machine| {
                     machine.signs_in.select(Some(method)).is_some()
+                        && machine.kept == asked.kept
                         && machine.address == asked.address
                         && machine.collection == asked.collection
                         && machine.served_by == asked.served_by
@@ -674,17 +661,7 @@ impl GettingIn {
                             ("port", u64::from(asked.port).into()),
                             ("collection", asked.collection.as_deref().map_or(Json::Null, Json::from)),
                             ("served_by", Json::List(asked.served_by.iter().map(|served| served.as_str().into()).collect())),
-                            (
-                                "signs_in",
-                                if asked.restricted_admin {
-                                    "restricted-admin-sso"
-                                } else if asked.themselves {
-                                    "themselves"
-                                } else {
-                                    "typed"
-                                }
-                                .into(),
-                            ),
+                            ("signs_in", method.into()),
                             ("clipboard", asked.clipboard.word().into()),
                             ("over", asked.over.written().into()),
                             (
@@ -742,24 +719,22 @@ impl GettingIn {
         let (true, Some(token)) = (still_them, &signed.token) else {
             return plain(StatusCode::FORBIDDEN, "The sign-in service did not sign anew who this person is.\n");
         };
-        let method = if running.restricted_admin {
-            "restricted-admin-sso"
-        } else if running.themselves {
-            "themselves"
-        } else {
-            "typed"
-        };
+        let method = way_of_signing_in(running.restricted_admin, running.themselves, running.kept.as_deref());
         let (in_force, _) = self.register.in_force();
         let allowed = signing.sign_ins.who(&running.sign_in, now).is_some_and(|(person, expired)| {
             !expired
                 && in_force.reached_by(&person.groups).iter().any(|(machine, _)| {
                     machine.name == running.machine
                         && machine.signs_in.select(Some(method)).is_some()
+                        && machine.kept == running.kept
                         && machine.address == running.address
                         && machine.collection == running.collection
                         && machine.served_by == running.served_by
                         && (match &running.program {
-                            None => machine.desktop == Some((Over::Rdp, running.port)),
+                            // a desktop over VNC is answered for where a kept secret signs in on it
+                            None => machine.desktop.is_some_and(|(over, port)| {
+                                port == running.port && (over == Over::Rdp || (over == Over::Vnc && running.kept.is_some()))
+                            }),
                             Some((name, run)) => {
                                 machine.programs.iter().any(|p| &p.name == name && &p.run == run)
                                     && machine.desktop.map_or(3389, |(_, port)| port) == running.port
@@ -784,6 +759,7 @@ impl GettingIn {
                         .collect(),
                 ),
             ),
+            ("kept", running.kept.as_deref().map_or(Json::Null, Json::from)),
             ("token", token.expose().into()),
         ]);
         answer(StatusCode::OK, "application/json", says.write())
@@ -901,6 +877,17 @@ impl GettingIn {
                 ]);
                 let record = Record { key: format!("{session}-signed-in-{number}"), ..record("signed-in", details) };
                 match self.records.add(&record).await {
+                    Ok(()) => answer(StatusCode::OK, "application/json", "{}"),
+                    Err(unusable) => self.kept_nothing(&unusable),
+                }
+            }
+            // the issuer handed out the secret kept for the machine: which one, by its name
+            Some("kept-secret") => {
+                let Some(kept) = said("kept").filter(|kept| crate::register::is_a_kept_name(kept)) else {
+                    return plain(StatusCode::BAD_REQUEST, "A kept secret that was handed out is said by its name, as kept=.\n");
+                };
+                let details = Json::object([("session", session.into()), ("kept", kept.into())]);
+                match self.records.add(&record("kept-secret", details)).await {
                     Ok(()) => answer(StatusCode::OK, "application/json", "{}"),
                     Err(unusable) => self.kept_nothing(&unusable),
                 }

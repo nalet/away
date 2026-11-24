@@ -29,6 +29,8 @@ pub struct Vouched {
     pub machine: String,
     /// What the sign-in service signed about the person a moment ago, as it signed it.
     pub signed: Secret,
+    /// The secret kept for the machine, by its name, where the machine's entry names one.
+    pub kept: Option<String>,
 }
 
 /// Why the server answered for nothing.
@@ -74,6 +76,7 @@ impl Server {
                         subject: subject.to_string(),
                         machine: machine.to_string(),
                         signed: Secret::new(signed),
+                        kept: said.text_of("kept").map(str::to_string),
                     }),
                     _ => Err(NotVouched::NotAsked("The server answered for the session with nothing a sign-in can rest on.".to_string())),
                 }
@@ -81,6 +84,15 @@ impl Server {
             404 => Err(NotVouched::NoSession),
             403 => Err(NotVouched::SignedOut(said)),
             status => Err(NotVouched::NotAsked(format!("The server answered with the status {status}: {said}"))),
+        }
+    }
+
+    /// Has the server keep the record of a kept secret that was handed out for a session:
+    /// which one, by its name, and nothing of the secret itself.
+    pub async fn handed(&self, session: &str, kept: &str) -> Result<(), String> {
+        match self.ask("/internal/told", &[("session", session), ("what", "kept-secret"), ("kept", kept)]).await? {
+            (200, _) => Ok(()),
+            (status, said) => Err(format!("The server kept no record of the kept secret: it answered with the status {status}: {said}")),
         }
     }
 

@@ -35,9 +35,19 @@
 {{- $mounts = append $mounts (dict "at" "/run/away/admin-authority" "volume" (dict "name" "admin-authority" "secret" $adminSecret)) -}}
 {{- end }}
 {{- end }}
+{{- end }}
+{{- end }}
+{{- with .Values.keptSecrets }}
+{{- if .secretName }}
+{{- /* the secrets kept for machines: each key of the Secret is one, by the name a machine's entry gives it */ -}}
+{{- $told = append $told (dict "name" "AWAY_KEPT_SECRETS" "value" "/run/away/kept") -}}
+{{- $mounts = append $mounts (dict "at" "/run/away/kept" "volume" (dict "name" "kept" "secret" (dict "secretName" .secretName))) -}}
+{{- end }}
+{{- end }}
+{{- if or .Values.domain.name .Values.keptSecrets.secretName }}
 {{- /* the issuer checks a person's sign-in itself: with the sign-in service the server signs people in at */ -}}
-{{- $told = append $told (dict "name" "AWAY_SIGN_IN_SERVICE" "value" (required "a domain needs the sign-in service: signIn.service is not set" $.Values.signIn.service)) -}}
-{{- $told = append $told (dict "name" "AWAY_SIGN_IN_CLIENT" "value" (required "a domain needs the sign-in service: signIn.client is not set" $.Values.signIn.client)) -}}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_SERVICE" "value" (required "the issuer needs the sign-in service: signIn.service is not set" $.Values.signIn.service)) -}}
+{{- $told = append $told (dict "name" "AWAY_SIGN_IN_CLIENT" "value" (required "the issuer needs the sign-in service: signIn.client is not set" $.Values.signIn.client)) -}}
 {{- $told = append $told (dict "name" "AWAY_SIGN_IN_GROUPS" "value" $.Values.signIn.groupsEntry) -}}
 {{- if $.Values.signIn.authoritiesConfigMap }}
 {{- $told = append $told (dict "name" "AWAY_SIGN_IN_AUTHORITIES_FILE" "value" "/run/away/authorities/authorities.pem") -}}
@@ -54,7 +64,6 @@
 {{- $own := dict "secretName" (printf "%s-to-the-issuer" (include "away.name" $)) "items" (list (dict "key" "issuer.pem" "path" "issuer.pem") (dict "key" "issuer-key.pem" "path" "issuer-key.pem")) -}}
 {{- $mounts = append $mounts (dict "at" "/run/away/to-the-issuer" "volume" (dict "name" "to-the-issuer" "secret" $own)) -}}
 {{- $more = list (dict "name" "internal" "port" 8083) -}}
-{{- end }}
 {{- end }}
 {{ include "away.part" (dict "root" . "part" "issuer" "more" $more "told" $told "mounts" $mounts) }}
 {{- if .Values.domain.name }}

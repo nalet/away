@@ -51,6 +51,9 @@ type Said = Vec<(String, String)>;
 enum Vouches {
     /// The session runs: whose it is, on which machine, and what the service signed.
     Runs(String, String, String),
+    /// The session runs on a machine a kept secret signs in on: whose it is, on which
+    /// machine, what the service signed, and the name of the secret.
+    Keeps(String, String, String, String),
     /// The person's sign-in has run out.
     SignedOut,
 }
@@ -90,6 +93,18 @@ impl Server {
                             ("machine", machine.as_str().into()),
                             ("signs_in", "themselves".into()),
                             ("targets", Json::List(vec!["host.corp.example:3389".into()])),
+                            ("token", signed.as_str().into()),
+                        ]);
+                        answer(StatusCode::OK, "application/json", says.write())
+                    }
+                    ("/internal/vouch", Some(Vouches::Keeps(subject, machine, signed, kept))) => {
+                        let says = Json::object([
+                            ("session", named.as_str().into()),
+                            ("subject", subject.as_str().into()),
+                            ("machine", machine.as_str().into()),
+                            ("signs_in", "kept".into()),
+                            ("kept", kept.as_str().into()),
+                            ("targets", Json::List(vec!["mac-01.corp.example:5900".into()])),
                             ("token", signed.as_str().into()),
                         ]);
                         answer(StatusCode::OK, "application/json", says.write())
@@ -220,6 +235,7 @@ async fn world_with(kerberos: &str, good_for: u64) -> World {
         }),
         sign_in: Some(SignInService { service: service.at.clone(), client: "away".to_string(), authorities: None }),
         server: Some(told::Server { at: Address::read(&server.at).expect("the server's address"), authorities: None }),
+        kept: None,
     };
     let (stopper, stop) = stop::pair();
     let lines = Lines::kept_for("issuer");
@@ -457,4 +473,131 @@ async fn an_issuer_of_an_installation_without_a_domain_signs_nobody_in() {
     assert_eq!(client.send_form(&elsewhere, &[("session", "5e55")], None).await.unwrap().status, 404);
     assert_eq!(client.get(&at).await.unwrap().status, 405);
     assert!(lines.kept().iter().any(|line| line.contains("no domain is named, so nobody is signed in on a machine as themselves")));
+}
+
+/// A folder of kept secrets of its own, for one test, gone when the test is.
+struct Folder(std::path::PathBuf);
+
+impl Folder {
+    fn with(secrets: &[(&str, &[u8])]) -> Folder {
+        let random: [u8; 8] = std::array::from_fn(|_| rand_byte());
+        let path = std::env::temp_dir().join(format!("away-kept-{}", random.iter().map(|byte| format!("{byte:02x}")).collect::<String>()));
+        std::fs::create_dir_all(&path).expect("a folder");
+        for (name, secret) in secrets {
+            std::fs::write(path.join(name), secret).expect("a kept secret");
+        }
+        Folder(path)
+    }
+}
+
+impl Drop for Folder {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn rand_byte() -> u8 {
+    let mut byte = [0u8; 1];
+    getrandom::fill(&mut byte).expect("random bytes");
+    byte[0]
+}
+
+/// An issuer that keeps secrets for machines, in an installation that names no domain,
+/// and what it rests on: where it is asked for a kept secret.
+async fn keeping(folder: &Folder) -> (Server, Service, Address, Lines, Stopper) {
+    let server = Server::start().await;
+    let service = Service::start().await;
+    let told = Told {
+        internal: Some(Internal { address: "127.0.0.1:0".to_string(), certificate: None }),
+        sign_in: Some(SignInService { service: service.at.clone(), client: "away".to_string(), authorities: None }),
+        server: Some(told::Server { at: Address::read(&server.at).expect("the server's address"), authorities: None }),
+        kept: Some(folder.0.to_string_lossy().to_string()),
+        ..Told::default()
+    };
+    let (stopper, stop) = stop::pair();
+    let lines = Lines::kept_for("issuer");
+    let settings = Settings { address: String::new(), health_address: "127.0.0.1:0".to_string() };
+    let issuer = Issuer::bind(&settings, told, Part::new("issuer", lines.clone(), stop)).await.expect("the issuer binds");
+    let at = Address::read(&format!("http://127.0.0.1:{}/internal/kept", issuer.bound().address.expect("where the gateway asks").port()))
+        .unwrap();
+    tokio::spawn(issuer.run());
+    (server, service, at, lines, stopper)
+}
+
+/// Asks the issuer for the secret kept for a session's machine, as the gateway does:
+/// the status, the secret, and the reason as one word where it refuses.
+async fn kept(at: &Address, session: &str) -> (u16, Option<String>, String) {
+    let got = Client::new(None).unwrap().send_form(at, &[("session", session)], None).await.expect("an answer");
+    let said = Json::read(&String::from_utf8_lossy(&got.body)).unwrap_or(Json::Null);
+    (got.status, said.text_of("password").map(str::to_string), said.text_of("why").unwrap_or_default().to_string())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_secret_kept_for_a_machine_is_handed_out_for_its_sessions_alone_and_the_record_comes_first() {
+    let folder = Folder::with(&[("mac-01", b"the desktop's own password\n"), ("empty", b"")]);
+    let (server, service, at, lines, _stopper) = keeping(&folder).await;
+    let signed = service.signs("7c1f", "alex.urban", &["staff"]);
+    server.runs("5e55", Vouches::Keeps("7c1f".to_string(), "mac-01".to_string(), signed.clone(), "mac-01".to_string()));
+
+    // the secret, as the file holds it without the end of its line
+    assert_eq!(kept(&at, "5e55").await, (200, Some("the desktop's own password".to_string()), String::new()));
+    // the server was told which secret was handed out for the session, and nothing of it
+    let told = server.told.lock().unwrap().clone();
+    assert_eq!(told.len(), 1);
+    let said = |name: &str| told[0].iter().find(|(its, _)| its == name).map(|(_, value)| value.as_str());
+    assert_eq!((said("session"), said("what"), said("kept")), (Some("5e55"), Some("kept-secret"), Some("mac-01")));
+    assert!(told[0].iter().all(|(_, value)| !value.contains("password")));
+    // and it is a line of the issuer's own: who, on which machine, which secret
+    let line = lines.kept().into_iter().find(|line| line.contains("handed out a kept secret")).expect("a line");
+    for fact in ["\"who\":\"7c1f\"", "\"machine\":\"mac-01\"", "\"kept\":\"mac-01\"", "\"session\":\"5e55\""] {
+        assert!(line.contains(fact), "{fact} in {line}");
+    }
+    assert!(lines.kept().iter().all(|line| !line.contains("own password")));
+
+    // a session that is signed in on its machine otherwise gets none, nor does one that
+    // runs on no machine of a kept secret, or whose secret leads out of the folder
+    server.runs("6f66", Vouches::Runs("7c1f".to_string(), "desk-01".to_string(), signed.clone()));
+    assert_eq!(kept(&at, "6f66").await, (403, None, "policy".to_string()));
+    for name in ["../mac-01", ".hidden", ""] {
+        server.runs("7a77", Vouches::Keeps("7c1f".to_string(), "mac-01".to_string(), signed.clone(), name.to_string()));
+        assert_eq!(kept(&at, "7a77").await, (403, None, "policy".to_string()), "{name}");
+    }
+    // a secret that isn't kept, or is empty, is none
+    for name in ["mac-02", "empty"] {
+        server.runs("8b88", Vouches::Keeps("7c1f".to_string(), "mac-01".to_string(), signed.clone(), name.to_string()));
+        assert_eq!(kept(&at, "8b88").await, (404, None, "not-kept".to_string()), "{name}");
+    }
+    // no session, a person whose sign-in ran out, a sign-in the service didn't make
+    assert_eq!(kept(&at, "9c99").await, (404, None, "no-session".to_string()));
+    server.runs("9c99", Vouches::SignedOut);
+    assert_eq!(kept(&at, "9c99").await, (403, None, "signed-out".to_string()));
+    server.runs("ad00", Vouches::Keeps("7c1f".to_string(), "mac-01".to_string(), "a.b.c".to_string(), "mac-01".to_string()));
+    assert_eq!(kept(&at, "ad00").await, (403, None, "sign-in".to_string()));
+    // a server that keeps no record gets no secret
+    server.keeps.store(false, Ordering::SeqCst);
+    assert_eq!(kept(&at, "5e55").await, (503, None, "not-recorded".to_string()));
+    assert_eq!(server.told.lock().unwrap().len(), 1);
+    // and asked without a session, it says how it is asked
+    let got = Client::new(None).unwrap().send_form(&at, &[("other", "x")], None).await.unwrap();
+    assert_eq!(got.status, 400);
+}
+
+#[tokio::test]
+async fn an_issuer_that_keeps_no_secrets_hands_none_out() {
+    let told = Told { internal: Some(Internal { address: "127.0.0.1:0".to_string(), certificate: None }), ..Told::default() };
+    let (_stopper, stop) = stop::pair();
+    let settings = Settings { address: String::new(), health_address: "127.0.0.1:0".to_string() };
+    let issuer = Issuer::bind(&settings, told, Part::new("issuer", Lines::kept_for("issuer"), stop)).await.expect("the issuer binds");
+    let at = Address::read(&format!("http://127.0.0.1:{}/internal/kept", issuer.bound().address.unwrap().port())).unwrap();
+    tokio::spawn(issuer.run());
+    assert_eq!(kept(&at, "5e55").await, (404, None, "no-kept".to_string()));
+    // a folder of kept secrets with nothing to check a session with is no issuer
+    let folder = Folder::with(&[]);
+    let told = Told {
+        internal: Some(Internal { address: "127.0.0.1:0".to_string(), certificate: None }),
+        kept: Some(folder.0.to_string_lossy().to_string()),
+        ..Told::default()
+    };
+    let (_stopper, stop) = stop::pair();
+    assert!(Issuer::bind(&settings, told, Part::new("issuer", Lines::kept_for("issuer"), stop)).await.is_err());
 }

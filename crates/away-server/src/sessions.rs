@@ -39,6 +39,8 @@ pub struct Asked {
     pub themselves: bool,
     /// Whether the direct desktop requires browser Restricted Admin.
     pub restricted_admin: bool,
+    /// The secret kept for the machine that signs the person in, by its name, where one does.
+    pub kept: Option<String>,
     /// Which ways the clipboard passes on the machine.
     pub clipboard: crate::register::Clipboard,
     /// The program the session is for, where it is for one and not for the desktop: its
@@ -46,6 +48,19 @@ pub struct Asked {
     pub program: Option<(String, String)>,
     /// When it was asked for, in seconds since 1970.
     pub at: u64,
+}
+
+/// How the person of a session is signed in on its machine, as the parts of Away say it.
+pub fn way_of_signing_in(restricted_admin: bool, themselves: bool, kept: Option<&str>) -> &'static str {
+    if restricted_admin {
+        "restricted-admin-sso"
+    } else if themselves {
+        "themselves"
+    } else if kept.is_some() {
+        "kept"
+    } else {
+        "typed"
+    }
 }
 
 /// A session the gateway took over.
@@ -65,6 +80,8 @@ pub struct Running {
     pub themselves: bool,
     /// Whether fresh authorization is required for browser Restricted Admin.
     pub restricted_admin: bool,
+    /// The secret kept for the machine that signs the person in, by its name, where one does.
+    pub kept: Option<String>,
     /// Whose it is.
     pub person: Person,
     /// The sign-in of the browser that asked for it.
@@ -116,6 +133,7 @@ impl Sessions {
             program: asked.program.clone(),
             themselves: asked.themselves,
             restricted_admin: asked.restricted_admin,
+            kept: asked.kept.clone(),
             person: asked.person.clone(),
             sign_in: asked.sign_in.clone(),
             machine: asked.machine.clone(),
@@ -158,6 +176,7 @@ mod tests {
             served_by: Vec::new(),
             themselves: false,
             restricted_admin: false,
+            kept: None,
             clipboard: crate::register::Clipboard::BOTH,
             program: None,
             at,

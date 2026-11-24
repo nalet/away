@@ -28,10 +28,11 @@ data:
   authority.pem: {{ index $held "authority.pem" }}
   server.pem: {{ index $held "server.pem" }}
   server-key.pem: {{ index $held "server-key.pem" }}
-{{- if .Values.domain.name }}
+{{- if or .Values.domain.name .Values.keptSecrets.secretName }}
 {{- /*
 And what secures what the gateway asks the issuer, where the installation names a
-domain: an authority of its own, and a certificate of it for the issuer's address. They
+domain or keeps secrets for machines: an authority of its own, and a certificate of it
+for the issuer's address. They
 are made and kept as the ones above are.
 */ -}}
 {{- $name := printf "%s-to-the-issuer" (include "away.name" .) -}}

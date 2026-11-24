@@ -60,7 +60,7 @@ rules:
 | `shell` | its shell: `true`, or its port | none |
 | `collection` | for a farm of Windows machines that people see as one: the collection this entry stands for. Its address is then the farm's broker | none |
 | `served-by` | the machines that serve the collection, by their addresses. One that opens its desktop on another port than the broker names it after a colon, as `rdsh-02.corp.example:3390`. Away goes on to no other machine for the collection | none |
-| `signs-in` | how people are signed in on a Windows machine: `typed` with a password, `themselves` with a certificate, or `restricted-admin` with the native Windows client | `typed` |
+| `signs-in` | how people are signed in: on a Windows machine `typed` with a password, `themselves` with a certificate, or `restricted-admin` with the native Windows client; on a desktop over VNC `typed`, or `{ kept: <name> }` with the password Away keeps for it under that name ([a kept password](#a-kept-password)) | `typed` |
 | `clipboard` | which ways text and pictures pass between the person's clipboard and the machine's, and with them files: one's own to the machine, and the ones that are copied there from it: `both`, `to-the-machine`, `from-the-machine` or `none` | `both` |
 
 A machine offers at least one way in: a desktop, programs, or a shell.
@@ -414,8 +414,10 @@ desktop opens like any other, with what the protocol makes different:
   knows no names: the person types the password alone, Away passes it on and
   keeps it nowhere, and a wrong one is asked for again. On a Mac, that is the
   password set for VNC viewers in the screen sharing's settings, of which the
-  machine reads the first eight characters. The Mac's own way of signing in,
-  with an account's name and password, is not built yet.
+  machine reads the first eight characters. Where Away keeps the password for
+  the machine, nobody types it ([a kept password](#a-kept-password)). The
+  Mac's own way of signing in, with an account's name and password, is not
+  built yet.
 - **Nothing is checked.** VNC has nothing a machine shows of itself, so there is
   no step of checking who it is. What travels between the gateway and the
   machine, the picture and the keys, is not secured by the protocol either: a
@@ -440,6 +442,38 @@ desktop opens like any other, with what the protocol makes different:
   has left over empty. VNC has no way to ask a machine such as a Mac for
   another size. Others who look at the same desktop, and whoever sits at the
   machine, stay where they are.
+
+### A kept password
+
+A desktop over VNC whose password everyone who reaches it would type anyway can
+have Away keep it, so that it opens with nothing typed:
+
+```yaml
+  - name: mac-01
+    kind: mac
+    address: mac-01.corp.example
+    desktop: true
+    signs-in: { kept: mac-01 }
+```
+
+- **The file names the password, and holds nothing of it.** The password is a
+  secret of the cluster that the installation makes, under the name the file
+  gives it ([kept passwords](./install.md#kept-passwords)). A name is made of
+  letters, digits and `- _ .`, 63 of them at most.
+- **Everyone a rule gives the machine is signed in with it.** Who reaches the
+  machine is the rules' to say, as for any machine: whoever they give it opens
+  the desktop without knowing its password.
+- **Only the issuer reads it.** For a session of such a machine the gateway
+  asks the issuer, which checks with the server that the session runs and with
+  the sign-in service who it is of, has the server write a record, and hands
+  the password to the gateway for that sign-in alone. It never reaches the
+  browser, and no line of Away holds it.
+- **A password that doesn't open the desktop is asked for.** Where the issuer
+  has none under that name, or the machine refuses the one it has, the person
+  is asked for the password as where nothing is kept, and the line of the
+  gateway says why.
+- **Each time it is handed out is a record**, with the person, the machine and
+  the name of the password.
 
 ## Opening a program
 

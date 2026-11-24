@@ -86,6 +86,14 @@ database:
 # Signing people in on the machines of a Windows domain as themselves, with nothing
 # typed, where a machine's file says "signs-in: themselves". Without a domain named
 # here nobody is, and Away reaches no domain controller and no authority.
+# The secrets Away keeps for machines that know no directory, such as the password of a
+# desktop over VNC, so that nobody types it. A Secret of the cluster, made by whoever
+# installs Away, which only the issuer reads: each of its keys is one secret, by the name
+# a machine's entry gives it ("signs-in: { kept: mac-01 }"), and its value the secret.
+# Without it no secret is kept, and people type the passwords of such desktops.
+keptSecrets:
+  secretName: ""
+
 domain:
   # The domain, as it is named in full, such as corp.example
   name: ""

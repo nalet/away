@@ -17,7 +17,7 @@ Signing in to Away once, and from there on each machine. For the goal [Get in wi
 | Sign in again when the sign-in has run out, with the open sessions kept | person | — | — | — | built | `sign-in-again` |
 | Sign out, and end the sessions Away opened | person | — | — | — | built | `sign-out` |
 | Be signed in on the machine as oneself, with nothing asked | system | v1 | no | v1 | — | `be-oneself-on-machine` |
-| Be signed in with a name and password or a key that Away keeps for the machine | system | v1 | v1 | v1 | — | `use-kept-secret` |
+| Be signed in with a name and password or a key that Away keeps for the machine | system | v1 | built | v1 | — | `use-kept-secret` |
 | Type a name and a password when the machine asks for them | person | built | built | v1 | — | `type-credentials` |
 | Have Away remember what one typed for a machine | person | later | later | later | — | `remember-typed-credentials` |
 | Choose which of one's accounts to be on the machine as | person | later | — | later | — | `choose-account` |
@@ -30,7 +30,7 @@ Signing in to Away once, and from there on each machine. For the goal [Get in wi
 - *Sign in through the organisation's identity provider*: over OpenID Connect.
 - *Sign in through an identity provider that speaks SAML only*: OpenID Connect is the one way in.
 - *Be signed in on the machine as oneself, with nothing asked*: a Windows machine in a domain, and a shell that trusts Away; an ordinary account is enough; VNC knows no identity.
-- *Be signed in with a name and password or a key that Away keeps for the machine*: for a machine that knows no directory; the secret never reaches the browser.
+- *Be signed in with a name and password or a key that Away keeps for the machine*: for a machine that knows no directory; the secret never reaches the browser; over VNC the desktop's password, handed to the gateway for one session.
 - *Go on from the machine to a further one with nothing asked*: the further machine is opened from Away: every connection starts there.
 
 ## The frame

@@ -221,6 +221,30 @@ helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
   `networkRules.farmsPort` says otherwise, and the cluster's name service.
   `networkRules.farmsAt` narrows that to the addresses it names.
 
+## Kept passwords
+
+A desktop over VNC can open with a password that Away keeps for it, where its
+entry names one ([a kept password](./machines.md#a-kept-password)). The
+passwords are a secret of the cluster, one key each, by the name the files
+give it:
+
+```sh
+kubectl --namespace away create secret generic away-kept-secrets --from-file=mac-01=./mac-01-password
+helm upgrade away oci://ghcr.io/nalet/charts/away --version <version> \
+  --namespace away --reuse-values --set keptSecrets.secretName=away-kept-secrets
+```
+
+- **Only the issuer reads it.** It hands a password out to the gateway for a
+  session whose machine names it, once the server and the sign-in service have
+  said whose the session is. Kept passwords need the sign-in service, like
+  signing in as oneself.
+- **A changed password counts at once.** The issuer reads the password anew
+  for each session, and the cluster brings a changed secret to it by itself
+  within a minute or so: nothing has to start anew. A key of the secret ends
+  in a line break or not; the line break is no part of the password.
+- With the network rules on, the gateway reaches the issuer, and the issuer
+  the server and the sign-in service, as for signing in as oneself.
+
 ## Signing in as oneself on a Windows domain
 
 On a machine whose file says `signs-in: themselves`
@@ -365,6 +389,7 @@ Everything an installation is told is one of these. The chart's
 | `farms.account` | the account Away reads the farms' feeds with, such as `CORP\svc-away` ([the farms' feeds](#the-farms-feeds)) | none: a farm in the files shows nothing |
 | `farms.secretName` | the secret that holds the account's password, under the key `password` | none |
 | `farms.authoritiesConfigMap` | a ConfigMap with certificates of authorities to trust for the farms' web access besides the public ones, under the key `authorities.pem` | none |
+| `keptSecrets.secretName` | the secret that holds the passwords Away keeps for desktops over VNC, each under the name a machine's entry gives it ([kept passwords](#kept-passwords)) | none: nothing is kept, and people type such passwords |
 | `domain.name`, `domain.shortName` | the Windows domain whose machines people are signed in on as themselves, as it is named in full and in short ([signing in as oneself](#signing-in-as-oneself-on-a-windows-domain)) | none: nobody is signed in as themselves |
 | `domain.controllers` | the domain controllers that give tickets, by their names | none |
 | `domain.authoritiesConfigMap` | a ConfigMap with the certificates of the authorities the domain controllers' certificates lead to, under the key `authorities.pem` | none |

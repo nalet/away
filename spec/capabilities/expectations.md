@@ -76,7 +76,7 @@ For the goal [Get in without another password](../goals/README.md#get-in-without
 | No second password and no key of one's own on a shell | first release | [`be-oneself-on-machine`](./app.md#signing-in) first release, [`make-shells-trust`](./platform.md#installing-and-configuring) first release | — |
 | From any device, also one the organisation does not manage | partly | [`sign-in`](./app.md#signing-in) built, [`be-oneself-on-machine`](./app.md#signing-in) first release | — |
 | For every person, not for administrators only | first release | [`be-oneself-on-machine`](./app.md#signing-in) first release | An ordinary account is enough |
-| A machine that knows no directory opens too, with a secret nobody sees | first release | [`use-kept-secret`](./app.md#signing-in) first release, [`keep-secret`](./admin.md#the-register-of-machines) first release | — |
+| A machine that knows no directory opens too, with a secret nobody sees | partly | [`use-kept-secret`](./app.md#signing-in) partly built, [`keep-secret`](./admin.md#the-register-of-machines) partly built | — |
 | Typing a name and a password works where nothing else does | partly | [`type-credentials`](./app.md#signing-in) partly built, [`remember-typed-credentials`](./app.md#signing-in) later | — |
 | Signed in onwards too: on a file share, on a further machine | first release in part | [`reach-network-as-oneself`](./app.md#signing-in) first release, [`go-on-without-password`](./app.md#signing-in) not planned | — |
 | A locked desktop opens again without the password | first release | [`unlock-without-password`](./app.md#signing-in) first release | — |
@@ -160,7 +160,7 @@ For the goal [Run it oneself](../goals/README.md#run-it-oneself).
 
 | Expected | State | Met by | Note |
 |---|---|---|---|
-| It runs where there is no Windows domain | partly | [`use-own-provider`](./platform.md#installing-and-configuring) built, [`make-shells-trust`](./platform.md#installing-and-configuring) first release, [`use-kept-secret`](./app.md#signing-in) first release, [`type-credentials`](./app.md#signing-in) partly built | people come from the sign-in service; a Windows domain is a part one turns on |
+| It runs where there is no Windows domain | partly | [`use-own-provider`](./platform.md#installing-and-configuring) built, [`make-shells-trust`](./platform.md#installing-and-configuring) first release, [`use-kept-secret`](./app.md#signing-in) partly built, [`type-credentials`](./app.md#signing-in) partly built | people come from the sign-in service; a Windows domain is a part one turns on |
 | Install it in one step | partly | [`install-with-chart`](./platform.md#installing-and-configuring) built, [`install-as-one-container`](./platform.md#installing-and-configuring) later | — |
 | Runs on Kubernetes and OpenShift, without special rights | there | [`install-with-chart`](./platform.md#installing-and-configuring) built, [`run-without-special-rights`](./platform.md#installing-and-configuring) built | — |
 | Works with the identity provider that is there | partly | [`use-own-provider`](./platform.md#installing-and-configuring) built, [`name-account-claim`](./platform.md#installing-and-configuring) first release | — |

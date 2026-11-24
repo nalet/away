@@ -143,6 +143,9 @@ pub enum SignsIn {
     RestrictedAdminSso,
     /// One management desktop offers Restricted Admin by default and certificate SSO explicitly.
     ManagementSso,
+    /// Away signs the person in with a secret it keeps for the machine, which the
+    /// machine's entry names: the password of a desktop over VNC. Nobody types it.
+    Kept,
 }
 
 impl SignsIn {
@@ -154,6 +157,7 @@ impl SignsIn {
             Some("themselves") => Self::Themselves,
             Some("restricted-admin-sso") => Self::RestrictedAdminSso,
             Some("typed") => Self::Typed,
+            Some("kept") => Self::Kept,
             _ => return None,
         };
         (selected == default || (self == Self::ManagementSso && selected == Self::Themselves)).then_some(selected)
@@ -183,6 +187,9 @@ pub struct Machine {
     pub served_by: Vec<String>,
     /// How people sign in on the machine.
     pub signs_in: SignsIn,
+    /// The secret Away keeps for the machine, by its name, where people are signed in
+    /// with one.
+    pub kept: Option<String>,
     /// Which ways the clipboard passes.
     pub clipboard: Clipboard,
     /// The farm that publishes it, where it is not written in a file itself but read
@@ -673,8 +680,17 @@ fn machine(
     if let Some((other, line)) = served_by.iter().find(|(address, _)| !serves(address)) {
         return Err(refused(file, *line, format!("“{other}” is no address of a machine")));
     }
-    let (signs_in, line) = signs_in(&parts, file, of)?.unwrap_or((SignsIn::Typed, node.line));
+    let (signs_in, line, kept) = signs_in(&parts, file, of)?.unwrap_or((SignsIn::Typed, node.line, None));
     match signs_in {
+        SignsIn::Kept => {
+            if kind == Kind::Windows || !matches!(desktop, Some((Over::Vnc, _))) || !programs.is_empty() || collection.is_some() {
+                return Err(refused(
+                    file,
+                    line,
+                    format!("{name} signs people in with a kept secret, which is for a desktop over VNC so far"),
+                ));
+            }
+        }
         SignsIn::Themselves => {
             let over_rdp = matches!(desktop, Some((Over::Rdp, _))) || !programs.is_empty();
             if kind != Kind::Windows || !over_rdp {
@@ -728,22 +744,47 @@ fn machine(
         collection: collection.map(|(collection, _)| collection),
         served_by: served_by.into_iter().map(|(address, _)| address).collect(),
         signs_in,
+        kept,
         clipboard,
         farm: None,
         written_in: (file.to_string(), node.line),
     })
 }
 
-/// How people are signed in, and the line it is said in, where an entry says so.
-fn signs_in(parts: &Parts, file: &str, of: &str) -> Result<Option<(SignsIn, usize)>, Refused> {
+/// Whether a name is one a kept secret may have: as the cluster names what a secret
+/// holds, and nothing that leads out of the folder the secrets are in.
+pub fn is_a_kept_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 63
+        && !name.starts_with('.')
+        && name.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
+}
+
+/// How people are signed in, the line it is said in, and the kept secret it names,
+/// where an entry says so. A kept secret is named as `signs-in: { kept: mac-01 }`.
+fn signs_in(parts: &Parts, file: &str, of: &str) -> Result<Option<(SignsIn, usize, Option<String>)>, Refused> {
+    if let Some(node @ Node { value: Value::Thing(_), .. }) = parts.get("signs-in") {
+        let way = Parts::of(file, node, &["kept"], "a way of signing in", "")?;
+        let Some((name, line)) = way.text("kept", &format!("the way {of} signs people in"))? else {
+            return Err(refused(file, node.line, format!("{of} signs people in with a kept secret, and names none: kept: and its name")));
+        };
+        if !is_a_kept_name(&name) {
+            return Err(refused(
+                file,
+                line,
+                format!("“{name}” is no name of a kept secret: letters, digits and - _ ., 63 of them at most, as the cluster names what a secret holds"),
+            ));
+        }
+        return Ok(Some((SignsIn::Kept, node.line, Some(name))));
+    }
     match parts.text("signs-in", of)? {
         None => Ok(None),
         Some((way, line)) => match way.as_str() {
-            "themselves" => Ok(Some((SignsIn::Themselves, line))),
-            "typed" => Ok(Some((SignsIn::Typed, line))),
-            "restricted-admin" => Ok(Some((SignsIn::RestrictedAdmin, line))),
-            "restricted-admin-sso" => Ok(Some((SignsIn::RestrictedAdminSso, line))),
-            "management-sso" => Ok(Some((SignsIn::ManagementSso, line))),
+            "themselves" => Ok(Some((SignsIn::Themselves, line, None))),
+            "typed" => Ok(Some((SignsIn::Typed, line, None))),
+            "restricted-admin" => Ok(Some((SignsIn::RestrictedAdmin, line, None))),
+            "restricted-admin-sso" => Ok(Some((SignsIn::RestrictedAdminSso, line, None))),
+            "management-sso" => Ok(Some((SignsIn::ManagementSso, line, None))),
             _ => Err(refused(
                 file,
                 line,
@@ -805,7 +846,7 @@ fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
         return Err(refused(file, *line, format!("“{other}” is no address of a machine")));
     }
     let themselves = match signs_in(&parts, file, &name)? {
-        Some((SignsIn::Themselves, line)) => {
+        Some((SignsIn::Themselves, line, _)) => {
             if let Some((number, _)) = served_by.iter().find(|(address, _)| is_a_number(address)) {
                 return Err(refused(
                     file,
@@ -815,8 +856,15 @@ fn farm(file: &str, node: &Node) -> Result<Farm, Refused> {
             }
             true
         }
-        Some((SignsIn::RestrictedAdmin | SignsIn::RestrictedAdminSso | SignsIn::ManagementSso, line)) => {
+        Some((SignsIn::RestrictedAdmin | SignsIn::RestrictedAdminSso | SignsIn::ManagementSso, line, _)) => {
             return Err(refused(file, line, format!("the farm {name} cannot use restricted-admin: it is for a direct Windows desktop")));
+        }
+        Some((SignsIn::Kept, line, _)) => {
+            return Err(refused(
+                file,
+                line,
+                format!("the farm {name} signs people in with a kept secret, which is for a desktop over VNC so far"),
+            ));
         }
         _ => false,
     };
@@ -921,6 +969,42 @@ impl Machine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_desktop_over_vnc_signs_people_in_with_a_secret_away_keeps_which_its_entry_names() {
+        let entry = |kind: &str, more: &str| {
+            format!("machines:\n  - name: mac-01\n    kind: {kind}\n    address: mac-01.corp.example\n    desktop: true\n{more}")
+        };
+        for written in [entry("mac", "    signs-in: { kept: mac-01.vnc }\n"), entry("linux", "    signs-in:\n      kept: mac-01.vnc\n")] {
+            let in_force = InForce::read(&files(&[("machines.yaml", &written)])).expect("a desktop with a kept secret");
+            let machine = &in_force.machines[0];
+            assert_eq!((machine.signs_in, machine.kept.as_deref()), (SignsIn::Kept, Some("mac-01.vnc")));
+            // it is the one way in: nobody chooses to type instead
+            assert_eq!(machine.signs_in.select(None), Some(SignsIn::Kept));
+            assert_eq!(machine.signs_in.select(Some("typed")), None);
+            // and nothing of it is told to the people who reach the machine
+            assert!(!machine.for_a_person().write().contains("mac-01.vnc"));
+        }
+        // an entry without one signs people in as before, by typing
+        let typed = InForce::read(&files(&[("machines.yaml", &entry("mac", ""))])).unwrap();
+        assert_eq!((typed.machines[0].signs_in, typed.machines[0].kept.as_deref()), (SignsIn::Typed, None));
+        for (more, why) in [
+            ("    signs-in: { kept: ../mac-01 }\n", "machines.yaml, line 6: “../mac-01” is no name of a kept secret"),
+            ("    signs-in: { kept: .hidden }\n", "machines.yaml, line 6: “.hidden” is no name of a kept secret"),
+            ("    signs-in: { other: mac-01 }\n", "machines.yaml, line 6: “other” is not something a way of signing in has"),
+        ] {
+            let refused = InForce::read(&files(&[("machines.yaml", &entry("mac", more))])).unwrap_err().to_string();
+            assert!(refused.starts_with(why), "{refused}");
+        }
+        // a kept secret signs in on a desktop over VNC alone, so far
+        let windows = "machines:\n  - name: desk-01\n    kind: windows\n    address: desk-01.corp.example\n    desktop: true\n    signs-in: { kept: desk-01 }\n";
+        let refused = InForce::read(&files(&[("machines.yaml", windows)])).unwrap_err().to_string();
+        assert_eq!(refused, "machines.yaml, line 6: desk-01 signs people in with a kept secret, which is for a desktop over VNC so far");
+        let shell = "machines:\n  - name: build-01\n    kind: linux\n    address: build-01.corp.example\n    shell: true\n    signs-in: { kept: build-01 }\n";
+        assert!(InForce::read(&files(&[("machines.yaml", shell)])).is_err());
+        let farm = "farms:\n  - name: Work Resources\n    feed: https://broker.corp.example/RDWeb/Feed/webfeed.aspx\n    signs-in: { kept: farm }\n";
+        assert!(InForce::read(&files(&[("farms.yaml", farm)])).unwrap_err().to_string().contains("with a kept secret"));
+    }
 
     #[test]
     fn management_sso_offers_two_passwordless_methods_on_one_direct_desktop() {

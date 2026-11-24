@@ -108,8 +108,13 @@ struct World {
     server_lines: Lines,
     /// What signing in as oneself takes, where the world has a domain.
     domain: Option<OfADomain>,
+    /// What the issuer writes: it keeps the passwords of two desktops over VNC, one of
+    /// them wrong, in a world with a domain or without one.
+    issuer_lines: Lines,
+    _issuer: Option<Stopper>,
     _stoppers: (Stopper, Stopper),
     _folder: Folder,
+    _kept: Folder,
 }
 
 /// A domain's part of a world: a machine of the domain, which takes tickets and reads
@@ -219,9 +224,11 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
          - name: Anywhere\n    kind: windows\n    address: {broker_host}\n    desktop: {{ port: {port} }}\n    collection: Anywhere\n  \
          - name: hidden-09\n    kind: windows\n    address: hidden-09.corp.example\n    desktop: true\n  \
          - name: mac-01\n    kind: mac\n    address: {host}\n    desktop: {{ port: {mac_port} }}\n    clipboard: both\n  \
-         - name: tux-02\n    kind: linux\n    address: {host}\n    desktop: {{ port: {open_port} }}\n    clipboard: none\n\
+         - name: tux-02\n    kind: linux\n    address: {host}\n    desktop: {{ port: {open_port} }}\n    clipboard: none\n  \
+         - name: mac-03\n    kind: mac\n    address: {host}\n    desktop: {{ port: {mac_port} }}\n    signs-in: {{ kept: mac-03.vnc }}\n  \
+         - name: mac-04\n    kind: mac\n    address: {host}\n    desktop: {{ port: {mac_port} }}\n    signs-in: {{ kept: mac-04.vnc }}\n\
          rules:\n  - name: staff-desks\n    who: [staff]\n    \
-         reaches: [desk-01, apps-01, gone-02, build-01, Desktops, Elsewhere, Unnamed, Alone, Anywhere, mac-01, tux-02]\n"
+         reaches: [desk-01, apps-01, gone-02, build-01, Desktops, Elsewhere, Unnamed, Alone, Anywhere, mac-01, tux-02, mac-03, mac-04]\n"
     );
     // the machine of the domain, where the world has one, in a file of its own: people
     // are signed in on it as themselves
@@ -234,6 +241,14 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
         std::fs::write(folder.0.join("own.yaml"), of_the_domain).expect("the domain's file");
     }
     std::fs::write(folder.0.join("machines.yaml"), files).expect("the files");
+    // the passwords Away keeps for machines, in a folder of their own beside the files:
+    // the right one of the Mac's desktop, and a wrong one
+    let kept = std::env::temp_dir().join(format!("away-kept-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&kept);
+    std::fs::create_dir_all(&kept).expect("a folder of kept secrets");
+    std::fs::write(kept.join("mac-03.vnc"), format!("{VNC_PASSWORD}\n")).expect("a kept secret");
+    std::fs::write(kept.join("mac-04.vnc"), "not the desktop's password").expect("a kept secret");
+    let kept = Folder(kept);
 
     let free = || std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
     let away = format!("http://127.0.0.1:{}", free());
@@ -275,7 +290,7 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
         let lines: Vec<&str> = letters.as_bytes().chunks(64).map(|line| std::str::from_utf8(line).unwrap()).collect();
         format!("-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----\n", lines.join("\n"))
     };
-    let (domain, in_a_domain) = match (kerberos, own) {
+    let (domain, in_a_domain, issuer) = match (kerberos, own) {
         (Some(kerberos), Some(own)) => {
             use away_issuer::authority::stand_in::{Pages, With};
             let fixture =
@@ -321,6 +336,7 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
                     at: Address::read(&format!("http://127.0.0.1:{}", internal.port())).unwrap(),
                     authorities: None,
                 }),
+                kept: Some(kept.0.to_string_lossy().to_string()),
             };
             let (stopper, stop) = stop::pair();
             let issuer_lines = Lines::kept_for("issuer");
@@ -338,10 +354,38 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
                 issuer: at,
                 issuer_authorities: None,
             };
-            (Some(OfADomain { machine: own, pages, issuer_lines, _stopper: stopper }), Some(told))
+            let issuer = (told.issuer.clone(), issuer_lines.clone(), None);
+            (Some(OfADomain { machine: own, pages, issuer_lines, _stopper: stopper }), Some(told), issuer)
         }
-        _ => (None, None),
+        // without a domain the issuer keeps the secrets alone
+        _ => {
+            let told = away_issuer::Told {
+                internal: Some(away_issuer::told::Internal { address: "127.0.0.1:0".to_string(), certificate: None }),
+                sign_in: Some(away_issuer::told::SignInService {
+                    service: service.address(),
+                    client: "away".to_string(),
+                    authorities: None,
+                }),
+                server: Some(away_issuer::told::Server {
+                    at: Address::read(&format!("http://127.0.0.1:{}", internal.port())).unwrap(),
+                    authorities: None,
+                }),
+                kept: Some(kept.0.to_string_lossy().to_string()),
+                ..away_issuer::Told::default()
+            };
+            let (stopper, stop) = stop::pair();
+            let issuer_lines = Lines::kept_for("issuer");
+            let settings = Settings { address: String::new(), health_address: "127.0.0.1:0".to_string() };
+            let issuer = away_issuer::Issuer::bind(&settings, told, Part::new("issuer", issuer_lines.clone(), stop))
+                .await
+                .expect("the issuer binds");
+            let at =
+                Address::read(&format!("http://127.0.0.1:{}", issuer.bound().address.expect("where the gateway asks").port())).unwrap();
+            tokio::spawn(issuer.run());
+            (None, None, (at, issuer_lines, Some(stopper)))
+        }
     };
+    let (issuer_at, issuer_lines, issuer_stopper) = issuer;
 
     let (gateway_stopper, stop) = stop::pair();
     let told = away_gateway::Told {
@@ -349,6 +393,7 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
         authorities: None,
         restricted_admin: None,
         domain: in_a_domain,
+        issuer: Some((issuer_at, None)),
     };
     let settings = Settings { address: "127.0.0.1:0".to_string(), health_address: "127.0.0.1:0".to_string() };
     let gateway = Gateway::bind(&settings, told, Part::new("gateway", Lines::kept_for("gateway"), stop)).await.expect("the gateway binds");
@@ -376,8 +421,11 @@ async fn world_with(name: &str, kerberos: Option<&str>) -> Option<World> {
         database,
         server_lines,
         domain,
+        issuer_lines,
+        _issuer: issuer_stopper,
         _stoppers: (server_stopper, gateway_stopper),
         _folder: folder,
+        _kept: kept,
     })
 }
 
@@ -1282,6 +1330,49 @@ async fn a_program_opens_in_a_window_of_its_own_and_closing_it_ends_the_session(
     let (_, desktop) = session.steps().await;
     assert!(desktop.get("desktop").is_some());
     assert!(!world.machine.seen().last().expect("a client came").for_a_program);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_desktop_over_vnc_whose_password_away_keeps_opens_with_nothing_typed_and_a_wrong_one_kept_is_asked_for() {
+    let Some(world) = world("kept").await else { return };
+    let mut browser = Browser::default();
+    browser.sign_in(&world);
+    let sign_in = browser.signed_in_as(&world);
+
+    // the Mac whose password Away keeps: reached, signed in on, and its picture, with
+    // nothing asked of the person
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "mac-03")).await;
+    let (steps, desktop) = session.steps().await;
+    assert_eq!(steps, ["reaching", "signing-in", "first-picture"], "{}", desktop.write());
+    assert_eq!(desktop.write(), r#"{"desktop":{"width":200,"height":120,"keys":"written"}}"#);
+    session.say(Json::object([("leaves", true.into())])).await;
+    assert_eq!(session.until("ended").await.write(), r#"{"ended":"left"}"#);
+
+    // the issuer handed the password out for the session, and wrote who and which, and
+    // nothing of the password itself; nor did anybody else
+    let handed = world.issuer_lines.kept().into_iter().find(|line| line.contains("handed out a kept secret")).expect("a line");
+    for fact in ["\"machine\":\"mac-03\"", "\"kept\":\"mac-03.vnc\""] {
+        assert!(handed.contains(fact), "{fact} in {handed}");
+    }
+    assert!(world.issuer_lines.kept().iter().chain(world.server_lines.kept().iter()).all(|line| !line.contains(VNC_PASSWORD)));
+    // the records say how the person was signed in, and which secret was handed out
+    let kept = records(&world.database).await;
+    let asked = kept.iter().find(|(kind, _, machine, _)| kind == "session-asked" && machine.as_deref() == Some("mac-03")).expect("asked");
+    assert_eq!(asked.3.text_of("signs_in"), Some("kept"));
+    let handed = kept.iter().find(|(kind, ..)| kind == "session-kept-secret").expect("the kept secret's record");
+    assert_eq!((handed.2.as_deref(), handed.3.text_of("kept")), (Some("mac-03"), Some("mac-03.vnc")));
+
+    // where the password Away keeps is not the desktop's, the machine refuses it, and the
+    // person is asked as where nothing is kept: as after a wrong password
+    let mut session = Session::begin(&world, &sign_in, &browser.ticket(&world, "mac-04")).await;
+    let (steps, asks) = session.steps().await;
+    assert_eq!(steps, ["reaching", "signing-in"], "{}", asks.write());
+    assert_eq!(asks.write(), r#"{"asks":{"again":true,"only":"password"}}"#);
+    session.say(credentials("", VNC_PASSWORD)).await;
+    let (steps, _) = session.steps().await;
+    assert_eq!(steps, ["first-picture"]);
+    let handed_out = world.issuer_lines.kept().into_iter().filter(|line| line.contains("handed out a kept secret")).count();
+    assert_eq!(handed_out, 2);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
