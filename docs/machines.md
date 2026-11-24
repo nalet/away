@@ -376,7 +376,11 @@ machine that offers more is opened from its own page, where each way in is.
   opened.
 - **A key writes what it writes at home.** The session is given the layout of
   the person's keyboard: where the browser says what the keys write, by that;
-  elsewhere by the language the browser is set to.
+  elsewhere by the language the browser is set to. A Windows machine takes the
+  layout when it begins a session; a session it had open before, begun from
+  another device, keeps its own. A program's windows are given the person's
+  layout each time they are opened, also in such a session. On a desktop, the
+  machine's own language switch in its taskbar changes it.
 - **Ending a session leaves the desktop running** on the machine, for the
   account to come back to, on the same device or on another. Away signs
   nobody out of a machine: whoever wants the desktop gone signs out there.

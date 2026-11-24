@@ -514,14 +514,17 @@ impl Connection {
     fn on_the_programs_channel(&mut self, piece: &[u8]) -> Result<(Vec<u8>, Vec<Happened>), Error> {
         let Some(message) = self.pieces.take(piece)? else { return Ok((Vec::new(), Vec::new())) };
         Ok(match rail::read(&message)? {
-            // the machine is ready: the client is too, says what it is and how much room
-            // the windows have, and asks for the program
+            // the machine is ready: the client is too, says what it is, how much room the
+            // windows have and which keyboard is typed on, and asks for the program. The
+            // keyboard is said each time: a session that was open before keeps the layout
+            // it was begun with, which may be another device's
             rail::Said::Ready => {
                 let (width, height) = match self.size {
                     (0, _) | (_, 0) => (self.client.width, self.client.height),
                     size => size,
                 };
                 let mut says = vec![rail::ready(), rail::client(), rail::work_area(width, height)];
+                says.extend(rail::keyboard(self.client.layout));
                 // the program is asked for once: a machine that says again that it is ready
                 // has it running already
                 if let (Some(program), false) = (&self.client.program, self.programs_ready) {
@@ -1090,7 +1093,8 @@ mod tests {
         );
 
         // the machine was told that the connection is for a program, and then, in this
-        // order: that the client is ready, what it is, how much room there is, the program
+        // order: that the client is ready, what it is, how much room there is, the
+        // keyboard's layout, the program
         let seen = machine.seen();
         assert!(seen.for_a_program);
         assert_eq!(
@@ -1099,6 +1103,7 @@ mod tests {
                 Asked::Ready,
                 Asked::Client(0x200),
                 Asked::WorkArea(200, 120),
+                Asked::Keyboard(0x0409_0409),
                 Asked::Start(Program { run: "||ledger".to_string(), arguments: String::new() }),
             ]
         );
@@ -1112,7 +1117,7 @@ mod tests {
         let changes: Vec<Change> =
             after.into_iter().flat_map(|happened| if let Happened::Windows(changes) = happened { changes } else { Vec::new() }).collect();
         assert_eq!(changes, [Change::InFront(WINDOW), Change::Order(vec![WINDOW]), Change::Gone(WINDOW)]);
-        assert_eq!(machine.seen().about_programs[4..], [Asked::Activate(WINDOW, true), Asked::Command(WINDOW, Command::Close)]);
+        assert_eq!(machine.seen().about_programs[5..], [Asked::Activate(WINDOW, true), Asked::Command(WINDOW, Command::Close)]);
     }
 
     #[test]
@@ -1122,7 +1127,7 @@ mod tests {
         let happened = happened.expect("the connection opens");
         // the language bar that opened with the first program was hidden, and only it; of
         // its window nothing is told
-        assert_eq!(machine.seen().about_programs[4..], [Asked::Cloak(LANGUAGE_BAR)]);
+        assert_eq!(machine.seen().about_programs[5..], [Asked::Cloak(LANGUAGE_BAR)]);
         let told: Vec<&Change> = happened
             .iter()
             .filter_map(|happened| if let Happened::Windows(changes) = happened { Some(changes) } else { None })
@@ -1167,7 +1172,7 @@ mod tests {
         let happened = happened.unwrap();
         assert_eq!(happened.last(), Some(&Happened::NotStarted { result: 3, raw: 2 }));
         assert!(!happened.iter().any(|happened| matches!(happened, Happened::Windows(_) | Happened::Drawn(_))));
-        assert_eq!(machine.seen().about_programs.len(), 4);
+        assert_eq!(machine.seen().about_programs.len(), 5);
 
         // a connection for the desktop asks for no channel, says nothing of programs, and is shown the desktop
         let (happened, connection, machine) = run(None, Desktop::new(picture()).that_publishes(&["||ledger"]));

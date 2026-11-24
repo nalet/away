@@ -516,7 +516,7 @@ fn a_program_is_asked_for_and_its_window_is_said_and_drawn() {
     assert!(lines[lines.len() - 2].starts_with("   200 by 120 pixels. Their SHA-256: "), "{said}");
     let seen = ended.seen.expect("the client came as far as the desktop");
     assert!(seen.for_a_program);
-    assert_eq!(seen.about_programs.len(), 4);
+    assert_eq!(seen.about_programs.len(), 5);
 }
 
 #[test]

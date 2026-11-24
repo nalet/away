@@ -16,6 +16,7 @@ const COMMAND: u16 = 0x0004;
 const NOTIFY: u16 = 0x0006;
 const READY: u16 = 0x0005;
 const CLIENT: u16 = 0x000b;
+const KEYBOARD: u16 = 0x0011;
 const READY_WITH_MORE: u16 = 0x0013;
 const CLOAK: u16 = 0x0015;
 const RESULT: u16 = 0x0080;
@@ -25,6 +26,8 @@ const WORK_AREA: u32 = 0x0000_002f;
 /// The client hides windows from the machine's picture, and is told of those the
 /// machine hides.
 const CLOAKS: u32 = 0x0000_0200;
+/// Of what a person types with: a keyboard layout, and not a text service.
+const A_LAYOUT: u32 = 0x0000_0002;
 
 const WRONG: Error = Error::NotRdp("a message about programs is not built as one");
 
@@ -74,6 +77,21 @@ pub fn ready() -> Vec<u8> {
 /// show beside their titles.
 pub fn client() -> Vec<u8> {
     message(CLIENT, &CLOAKS.to_le_bytes())
+}
+
+/// The keyboard the person types on, by its layout as Windows numbers them: the
+/// machine gives the program's windows that layout. A session the machine had open
+/// before keeps the layout it was begun with until it is told so. Nothing for a layout
+/// that is not the one of a language as such.
+pub fn keyboard(layout: u32) -> Option<Vec<u8>> {
+    let language = u16::try_from(layout).ok()?;
+    let mut holds = A_LAYOUT.to_le_bytes().to_vec();
+    holds.extend(language.to_le_bytes());
+    // a layout is no text service: the two names of one are none
+    holds.extend([0; 32]);
+    // the layout as the machine has it loaded: the layout over its language
+    holds.extend((u32::from(language) << 16 | u32::from(language)).to_le_bytes());
+    Some(message(KEYBOARD, &holds))
 }
 
 /// How much room the windows have: the whole desktop, which has no bar of the client's.
@@ -225,6 +243,8 @@ pub mod stand_in {
         Client(u32),
         /// How much room the windows have.
         WorkArea(u16, u16),
+        /// The keyboard layout to type with, as the machine has it loaded.
+        Keyboard(u32),
         /// To start a program.
         Start(Program),
         /// A window is the one the person works in, or no longer is.
@@ -257,6 +277,7 @@ pub mod stand_in {
             READY => Asked::Ready,
             CLIENT => Asked::Client(number32(4)?),
             SETTING if number32(4)? == WORK_AREA => Asked::WorkArea(number16(12)?, number16(14)?),
+            KEYBOARD if number32(4)? == A_LAYOUT => Asked::Keyboard(number32(42)?),
             START => {
                 let (run, directory, arguments) = (usize::from(number16(6)?), usize::from(number16(8)?), usize::from(number16(10)?));
                 Asked::Start(Program { run: text(12, run)?, arguments: text(12 + run + directory, arguments)? })
@@ -307,6 +328,11 @@ mod tests {
     fn the_client_says_it_is_ready_what_it_is_and_which_program_it_wants() {
         assert_eq!(ready(), [0x05, 0x00, 0x08, 0x00, 1, 0, 0, 0]);
         assert_eq!(client(), [0x0b, 0x00, 0x08, 0x00, 0x00, 0x02, 0, 0]);
+        let swiss = keyboard(0x0807).expect("a language's own layout");
+        assert_eq!((&swiss[..10], &swiss[42..]), (&[0x11, 0x00, 46, 0x00, 2, 0, 0, 0, 0x07, 0x08][..], &[0x07, 0x08, 0x07, 0x08][..]));
+        assert!(swiss[10..42].iter().all(|byte| *byte == 0));
+        assert_eq!(stand_in::read(&swiss), Ok(stand_in::Asked::Keyboard(0x0807_0807)));
+        assert_eq!(keyboard(0x0001_0409), None);
         assert_eq!(work_area(1280, 800), [0x03, 0x00, 0x10, 0x00, 0x2f, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x05, 0x20, 0x03]);
         let program = Program { run: "||ledger".to_string(), arguments: "a b".to_string() };
         let asks = start(&program).unwrap();

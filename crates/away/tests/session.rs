@@ -484,9 +484,15 @@ impl Session {
         request.headers_mut().insert("origin", format!("http://{}", world.gateway).parse().unwrap());
         let stream = TcpStream::connect(&world.gateway).await.expect("the gateway takes connections");
         let (mut connection, _) = tokio_tungstenite::client_async(request, stream).await.expect("the connection becomes a session's");
-        // a window of 1280 by 800, on a screen with twice the dots each way
-        let begins =
-            Json::object([("ticket", ticket.into()), ("width", 1280u64.into()), ("height", 800u64.into()), ("scale", 200u64.into())]);
+        // a window of 1280 by 800, on a screen with twice the dots each way, and a Swiss
+        // German keyboard
+        let begins = Json::object([
+            ("ticket", ticket.into()),
+            ("width", 1280u64.into()),
+            ("height", 800u64.into()),
+            ("scale", 200u64.into()),
+            ("layout", 0x0807u64.into()),
+        ]);
         connection.send(Message::text(begins.write())).await.expect("the first message goes out");
         Session {
             connection,
@@ -1177,10 +1183,12 @@ async fn a_program_opens_in_a_window_of_its_own_and_closing_it_ends_the_session(
         let drawn = session.until("drawn").await.get("drawn").and_then(Json::count).expect("a number");
         session.say(Json::object([("seen", drawn.into())])).await;
     }
-    // the machine was told that the connection is for a program, and which
+    // the machine was told that the connection is for a program, the layout of the
+    // person's keyboard, as it has it loaded, and which program
     let seen = world.machine.seen();
     let last = seen.last().expect("a client came");
     assert!(last.for_a_program);
+    assert!(last.about_programs.contains(&away_rdp::rail::stand_in::Asked::Keyboard(0x0807_0807)));
     assert_eq!(
         last.about_programs.last(),
         Some(&away_rdp::rail::stand_in::Asked::Start(away_rdp::rail::Program { run: "||ledger".to_string(), arguments: String::new() }))
