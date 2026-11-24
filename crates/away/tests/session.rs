@@ -1232,11 +1232,11 @@ async fn a_program_opens_in_a_window_of_its_own_and_closing_it_ends_the_session(
         session.say(Json::object([("seen", drawn.into())])).await;
     }
     // the machine was told that the connection is for a program, the layout of the
-    // person's keyboard, as it has it loaded, and which program
+    // person's keyboard, and which program
     let seen = world.machine.seen();
     let last = seen.last().expect("a client came");
     assert!(last.for_a_program);
-    assert!(last.about_programs.contains(&away_rdp::rail::stand_in::Asked::Keyboard(0x0807_0807)));
+    assert!(last.about_programs.contains(&away_rdp::rail::stand_in::Asked::Keyboard(0x0807)));
     assert_eq!(
         last.about_programs.last(),
         Some(&away_rdp::rail::stand_in::Asked::Start(away_rdp::rail::Program { run: "||ledger".to_string(), arguments: String::new() }))

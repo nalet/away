@@ -80,18 +80,19 @@ pub fn client() -> Vec<u8> {
 }
 
 /// The keyboard the person types on, by its layout as Windows numbers them: the
-/// machine gives the program's windows that layout. A session the machine had open
-/// before keeps the layout it was begun with until it is told so. Nothing for a layout
-/// that is not the one of a language as such.
-pub fn keyboard(layout: u32) -> Option<Vec<u8>> {
-    let language = u16::try_from(layout).ok()?;
+/// machine gives the windows that open from now on that layout. A session the machine
+/// had open before keeps the layout it was begun with until it is told so, and its
+/// windows that are open keep theirs.
+pub fn keyboard(layout: u32) -> Vec<u8> {
     let mut holds = A_LAYOUT.to_le_bytes().to_vec();
-    holds.extend(language.to_le_bytes());
+    // the language it writes: the low half of the layout's number
+    holds.extend(((layout & 0xffff) as u16).to_le_bytes());
     // a layout is no text service: the two names of one are none
     holds.extend([0; 32]);
-    // the layout as the machine has it loaded: the layout over its language
-    holds.extend((u32::from(language) << 16 | u32::from(language)).to_le_bytes());
-    Some(message(KEYBOARD, &holds))
+    // and the layout by its number, as the client said it when it connected: a handle
+    // of the client's own system would name nothing on the machine
+    holds.extend(layout.to_le_bytes());
+    message(KEYBOARD, &holds)
 }
 
 /// How much room the windows have: the whole desktop, which has no bar of the client's.
@@ -243,7 +244,7 @@ pub mod stand_in {
         Client(u32),
         /// How much room the windows have.
         WorkArea(u16, u16),
-        /// The keyboard layout to type with, as the machine has it loaded.
+        /// The keyboard layout to type with, by its number.
         Keyboard(u32),
         /// To start a program.
         Start(Program),
@@ -328,11 +329,13 @@ mod tests {
     fn the_client_says_it_is_ready_what_it_is_and_which_program_it_wants() {
         assert_eq!(ready(), [0x05, 0x00, 0x08, 0x00, 1, 0, 0, 0]);
         assert_eq!(client(), [0x0b, 0x00, 0x08, 0x00, 0x00, 0x02, 0, 0]);
-        let swiss = keyboard(0x0807).expect("a language's own layout");
-        assert_eq!((&swiss[..10], &swiss[42..]), (&[0x11, 0x00, 46, 0x00, 2, 0, 0, 0, 0x07, 0x08][..], &[0x07, 0x08, 0x07, 0x08][..]));
+        let swiss = keyboard(0x0807);
+        assert_eq!((&swiss[..10], &swiss[42..]), (&[0x11, 0x00, 46, 0x00, 2, 0, 0, 0, 0x07, 0x08][..], &[0x07, 0x08, 0x00, 0x00][..]));
         assert!(swiss[10..42].iter().all(|byte| *byte == 0));
-        assert_eq!(stand_in::read(&swiss), Ok(stand_in::Asked::Keyboard(0x0807_0807)));
-        assert_eq!(keyboard(0x0001_0409), None);
+        assert_eq!(stand_in::read(&swiss), Ok(stand_in::Asked::Keyboard(0x0807)));
+        // a layout that is a variant of its language's: the language, and the layout's number
+        let dvorak = keyboard(0x0001_0409);
+        assert_eq!((&dvorak[8..10], &dvorak[42..]), (&[0x09, 0x04][..], &[0x09, 0x04, 0x01, 0x00][..]));
         assert_eq!(work_area(1280, 800), [0x03, 0x00, 0x10, 0x00, 0x2f, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x05, 0x20, 0x03]);
         let program = Program { run: "||ledger".to_string(), arguments: "a b".to_string() };
         let asks = start(&program).unwrap();

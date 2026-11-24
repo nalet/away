@@ -517,14 +517,15 @@ impl Connection {
             // the machine is ready: the client is too, says what it is, how much room the
             // windows have and which keyboard is typed on, and asks for the program. The
             // keyboard is said each time: a session that was open before keeps the layout
-            // it was begun with, which may be another device's
+            // it was begun with, which may be another device's, and the windows that open
+            // from now on are given this one
             rail::Said::Ready => {
                 let (width, height) = match self.size {
                     (0, _) | (_, 0) => (self.client.width, self.client.height),
                     size => size,
                 };
                 let mut says = vec![rail::ready(), rail::client(), rail::work_area(width, height)];
-                says.extend(rail::keyboard(self.client.layout));
+                says.push(rail::keyboard(self.client.layout));
                 // the program is asked for once: a machine that says again that it is ready
                 // has it running already
                 if let (Some(program), false) = (&self.client.program, self.programs_ready) {
@@ -1103,7 +1104,7 @@ mod tests {
                 Asked::Ready,
                 Asked::Client(0x200),
                 Asked::WorkArea(200, 120),
-                Asked::Keyboard(0x0409_0409),
+                Asked::Keyboard(0x0409),
                 Asked::Start(Program { run: "||ledger".to_string(), arguments: String::new() }),
             ]
         );
